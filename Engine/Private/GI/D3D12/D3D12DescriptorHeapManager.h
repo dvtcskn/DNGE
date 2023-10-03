@@ -1,7 +1,7 @@
 /* ---------------------------------------------------------------------------------------
 * MIT License
 *
-* Copyright (c) 2022 Davut Coþkun.
+* Copyright (c) 2022 Davut CoÃ¾kun.
 * All rights reserved.
 *
 * Permission is hereby granted, free of charge, to any person obtaining
@@ -103,7 +103,7 @@ private:
         inline bool AllocateDescriptor(D3D12DescriptorHandle* DescriptorHandle)
         {
             if (TotalAllocatedDescriptorCount >= TotalDescriptorSize)
-                /*GrowHeap();*/ return false;
+                return false;
 
             if (FreedDescriptorIndices.size() > 0)
             {
@@ -137,20 +137,6 @@ private:
         }
 
         inline ID3D12DescriptorHeap* GetHeap() const { return Heap; }
-
-    private:
-        inline bool GrowHeap()
-        {
-            /*
-            * to do ?
-            * Save all DescriptorHandles.
-            * Create new bigger heap
-            * Then reset all DescriptorHandless again. 
-            * ???
-            */
-
-            return false;
-        }
 
     private:
         uint32_t IncrementSize;
