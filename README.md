@@ -1,5 +1,5 @@
 # DNGE
-DNGE is a free and open source Gmae Engine.
+DNGE is a free and open source Game Engine.
 
 ## Features
 * D3D11, D3D12, Vulkan(WIP)
