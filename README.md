@@ -22,5 +22,6 @@ For third-party licenses see [ThirdPartyLicenses.txt](ThirdParty/ThirdPartyLicen
 ## How to build
 1. Install latest Visual Studio
 2. Get latest CBGUI (https://github.com/dvtcskn/CBGUI), DirectX-Headers, box2d
-3. Place the libraries in the file named "ThirdParty".
+3. Place the libraries in the folder named "ThirdParty".
 4. Open the solution(DNGE.sln) then build it.
+5. For Sample1, get Free Sprites from itch.io, then put it in the Content folder. (https://pixelfrog-assets.itch.io/pixel-adventure-1)
