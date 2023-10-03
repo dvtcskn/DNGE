@@ -103,7 +103,7 @@ private:
         inline bool AllocateDescriptor(D3D12DescriptorHandle* DescriptorHandle)
         {
             if (TotalAllocatedDescriptorCount >= TotalDescriptorSize)
-                return false;
+                /*GrowHeap();*/ return false;
 
             if (FreedDescriptorIndices.size() > 0)
             {
@@ -137,6 +137,20 @@ private:
         }
 
         inline ID3D12DescriptorHeap* GetHeap() const { return Heap; }
+
+    private:
+        inline bool GrowHeap()
+        {
+            /*
+            * to do ?
+            * Save all DescriptorHandles.
+            * Create new bigger heap
+            * Then reset all DescriptorHandless again. 
+            * ???
+            */
+
+            return false;
+        }
 
     private:
         uint32_t IncrementSize;
@@ -181,6 +195,9 @@ public:
 
 private:
     D3D12Device* Owner;
+    /*
+    * Make vectors and make another heap for each pass ?
+    */
     std::unique_ptr<D3D12DescriptorHeap> RTV_Heap;
     std::unique_ptr<D3D12DescriptorHeap> DSV_Heap;
     std::unique_ptr<D3D12DescriptorHeap> CBV_SRV_UAV_Heap;
