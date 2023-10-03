@@ -11,7 +11,7 @@ DNGE is a free and open source Game Engine.
 * Canvas based GUI
 
 ## Example
-See Samples1
+See Sample1
 ![SS1366768](https://github.com/dvtcskn/DNGE/assets/117200113/0693d9a6-4609-451a-9749-f1bd29ee8d66)
 
 
