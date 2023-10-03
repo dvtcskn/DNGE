@@ -1,26 +1,26 @@
 # DNGE
-DNGE is a free and open source canvas-based graphical user interface framework for writing C++ GUI applications. CBGUI can be automatically scaled and aligned for all resolutions, but the font size of the text must be adjusted manually.
+DNGE is a free and open source Gmae Engine.
 
 ## Features
-* Canvas-based
-* Easy to align to different Resolutions
-* Renderer agnostic
-* Freetype2 Based Font Builder
-* Font texture atlas
-* Unicode aware
-* Text Format and Multiple font supported
+* D3D11, D3D12, Vulkan(WIP)
+* Audio
+* Gameplay Framework
+* Box2D physics
+* Local Split-Screen Coop
+* Canvas based GUI
+* Component Based
 
 ## Example
-See Samples/Sample1
-![Main_menu](https://user-images.githubusercontent.com/117200113/199342945-a33c2f13-f945-423c-b329-4abc9f21b4ec.jpg)
+See Samples1
+![SS1366768](https://github.com/dvtcskn/DNGE/assets/117200113/0693d9a6-4609-451a-9749-f1bd29ee8d66)
+
 
 ## License
-CBGUI is licensed under MIT license. See [LICENSE](LICENSE)
+DNGE is licensed under MIT license. See [LICENSE](LICENSE)
 For third-party licenses see [ThirdPartyLicenses.txt](ThirdParty/ThirdPartyLicenses.txt)
 
 ## How to build
 1. Install latest Visual Studio
-2. Get latest Freetype2 (http://freetype.org/download.html)
-3. Place the Freetype2 library in the file named "ThirdParty".
-4. Change the freetype2 library filename to "freetype2".	("CBGUI\ThirdParty\freetype2\include")
-5. Open the solution(CBGUI.sln) then build it.
+2. Get latest CBGUI (https://github.com/dvtcskn/CBGUI), DirectX-Headers, box2d
+3. Place the libraries in the file named "ThirdParty".
+4. Open the solution(DNGE.sln) then build it.
