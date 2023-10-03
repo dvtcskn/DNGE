@@ -195,9 +195,6 @@ public:
 
 private:
     D3D12Device* Owner;
-    /*
-    * Make vectors and make another heap for each pass ?
-    */
     std::unique_ptr<D3D12DescriptorHeap> RTV_Heap;
     std::unique_ptr<D3D12DescriptorHeap> DSV_Heap;
     std::unique_ptr<D3D12DescriptorHeap> CBV_SRV_UAV_Heap;
