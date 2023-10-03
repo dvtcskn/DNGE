@@ -17,7 +17,6 @@ See Samples1
 
 ## License
 DNGE is licensed under MIT license. See [LICENSE](LICENSE)
-For third-party licenses see [ThirdPartyLicenses.txt](ThirdParty/ThirdPartyLicenses.txt)
 
 ## How to build
 1. Install latest Visual Studio
