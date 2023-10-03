@@ -52,16 +52,14 @@ public:
     //inline uint32_t GetSize() const { return DescriptorSize; }
     inline D3D12_DESCRIPTOR_HEAP_TYPE GetHeapType() const { return Type; }
 
-    inline D3D12_CPU_DESCRIPTOR_HANDLE GetCPU(/*const uint32_t i = 0*/) const
+    inline D3D12_CPU_DESCRIPTOR_HANDLE GetCPU() const
     {
         return CPUDescriptor;
-        //return CD3DX12_CPU_DESCRIPTOR_HANDLE(CPUDescriptor, i * IncrementSize);
     }
 
-    inline D3D12_GPU_DESCRIPTOR_HANDLE GetGPU(/*const uint32_t i = 0*/) const
+    inline D3D12_GPU_DESCRIPTOR_HANDLE GetGPU() const
     {
         return GPUDescriptor;
-        //return CD3DX12_GPU_DESCRIPTOR_HANDLE(GPUDescriptor, i * IncrementSize);
     }
 
     inline bool IsCPUOnly() const { return GPUDescriptor == D3D12_GPU_DESCRIPTOR_HANDLE(~0u); }
