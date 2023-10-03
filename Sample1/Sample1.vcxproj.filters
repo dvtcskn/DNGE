@@ -1,0 +1,195 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="WindowsApplication.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="AssetManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Canvas.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="CanvasBase.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="cbScaleBox.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="cbTextBox.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="DefaultLevel.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GCanvas.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GAIController.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GGameInstance.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GPlayer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GPlayerCharacter.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GPlayerController.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GPlayerState.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Materials.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MetaWorld.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="pch.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Sprite.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="SpriteAnimationManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="SpriteComponent.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="SpriteEffectComponent.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="SpriteSheetComponent.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="WindowsPlatform.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="World.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="TrapActor.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Items.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="AnimationStates.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="AssetManager.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Canvas.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CanvasBase.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cbScaleBox.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cbString.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cbTextBox.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="DefaultLevel.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="GCanvas.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="framework.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="GAIController.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="GGameInstance.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="GPlayer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="GPlayerCharacter.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="GPlayerController.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="GPlayerState.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Materials.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MetaWorld.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="pch.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Resource.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Sprite.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="SpriteAnimationManager.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="SpriteComponent.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="SpriteEffectComponent.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="SpriteSheetComponent.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="targetver.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="WindowsApplication.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="WindowsPlatform.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="World.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="TrapActor.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="HelperFunctions.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Items.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

@@ -1,0 +1,82 @@
+#pragma once
+
+#include <shlobj.h>
+#include <ctime>
+#include <iomanip>
+#include <commdlg.h>
+#include <sstream>
+#include <vector>
+#include <cuchar>
+#include <iostream>
+#include <Windows.h>
+
+#pragma comment(lib, "Shell32.lib")
+
+namespace FileManager
+{
+	std::wstring GetContentDirectory();
+	std::wstring GetAssetDirectory();
+	std::wstring GetMeshAssetDirectory();
+	std::wstring GetMaterialAssetDirectory();
+	std::wstring GetMapAssetDirectory();
+	std::wstring GetLogsFolder();
+
+	bool FileExists(const std::wstring& file);
+	bool FileIsNewer(const std::wstring& file1, const std::wstring& file2); // ?
+
+	std::string Normalize(const std::string& filePath);
+	void NormalizeInline(std::string& filePath);
+	bool ResolveRelativePaths(std::string& path);
+
+	bool fsCreateFile(const std::string& InPath, const std::string InName);
+	bool CreateDirectory_(const std::string& path);
+	bool DeleteDirectory(const std::string& directory);
+	bool DirectoryExists(const std::string& directory);
+	bool IsDirectory(const std::string& directory);
+	void OpenDirectoryWindow(const std::string& directory);
+	bool OpenFile(OPENFILENAMEW& FILE);
+
+	bool FileExists(const std::string& filePath);
+	bool DeleteFile_(const std::string& filePath);
+	bool CopyFileFromTo(const std::string& source, const std::string& destination);
+
+	std::string GetFileNameFromFilePath(const std::string& path);
+	std::string GetFileNameNoExtensionFromFilePath(const std::string& filepath);
+	std::string GetDirectoryFromFilePath(const std::string& filePath);
+	std::string GetFilePathWithoutExtension(const std::string& filePath);
+	std::string GetExtensionFromFilePath(const std::string& filePath);
+	std::string GetRelativeFilePath(const std::string& absoluteFilePath);
+	std::string GetWorkingDirectory();
+	std::string GetParentDirectory(const std::string& directory);
+	std::vector<std::string> GetDirectoriesInDirectory(const std::string& directory);
+	std::vector<std::string> GetFilesInDirectory(const std::string& directory);
+
+	std::vector<std::string> GetSupportedFilesInDirectory(const std::string& directory);
+	std::vector<std::string> GetSupportedImageFilesFromPaths(const std::vector<std::string>& paths);
+	std::vector<std::string> GetSupportedAudioFilesFromPaths(const std::vector<std::string>& paths);
+	std::vector<std::string> GetSupportedModelFilesFromPaths(const std::vector<std::string>& paths);
+	std::vector<std::string> GetSupportedModelFilesInDirectory(const std::string& directory);
+	std::vector<std::string> GetSupportedMapFilesInDirectory(const std::string& directory);
+
+	bool IsMaterialFile(const std::string& filePath);
+	bool IsMeshFile(const std::string& filePath);
+	bool IsAudioFile(const std::string& filePath);
+	bool IsMapFile(const std::string& filePath);
+	bool IsTextureFile(const std::string& filePath);
+	bool IsShaderFile(const std::string& filePath);
+
+	std::string GetStringAfterExpression(const std::string& str, const std::string& expression);
+	std::string GetStringBetweenExpressions(const std::string& str, const std::string& firstExpression, const std::string& secondExpression);
+	std::string ConvertToUppercase(const std::string& lower);
+	std::string ReplaceExpression(const std::string& str, const std::string& from, const std::string& to);
+	std::string ResolveIncludeDirectives(const std::string& source, const std::string& directory);
+
+	HRESULT ReadDataFromFile(LPCWSTR filename, byte* data, UINT* size);
+	HRESULT ReadDataFromDDSFile(LPCWSTR filename, byte* data, UINT* offset, UINT* size);
+	void GetAssetsPath(_Out_writes_(pathSize) WCHAR* path, UINT pathSize);
+
+	std::wstring StringToWstring(const std::string& str);
+	std::string WideStringToString(const std::wstring& s);
+	std::u16string StringtoU16(const std::string& str);
+	std::string U16toString(const std::u16string& wstr);
+};

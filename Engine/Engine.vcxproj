@@ -1,0 +1,353 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>16.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{d4e9419e-8ff6-4b3c-96e8-3ac321afc917}</ProjectGuid>
+    <RootNamespace>Engine</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <IncludePath>$(SolutionDir)\ThirdParty\DirectX-Headers\include\directx;$(SolutionDir)\ThirdParty\box2d\include;$(SolutionDir)\ThirdParty\CBGUI\include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <IncludePath>$(SolutionDir)\ThirdParty\DirectX-Headers\include\directx;$(SolutionDir)\ThirdParty\box2d\include;$(SolutionDir)\ThirdParty\CBGUI\include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+    </ClCompile>
+    <Link>
+      <SubSystem>
+      </SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+    </ClCompile>
+    <Link>
+      <SubSystem>
+      </SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>_DEBUG;_LIB;%(PreprocessorDefinitions);BT_THREADSAFE=1;BT_USE_DOUBLE_PRECISION;B3_USE_CLEW</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>$(SolutionDir)\Engine\Private;$(SolutionDir)\Engine\Public;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>
+      </SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;_LIB;%(PreprocessorDefinitions);BT_THREADSAFE=1;BT_USE_DOUBLE_PRECISION;B3_USE_CLEW</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>$(SolutionDir)\Engine\Private;$(SolutionDir)\Engine\Public;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>
+      </SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClInclude Include="Private\Engine\Audio.h" />
+    <ClInclude Include="Private\Engine\WaveBankReader.h" />
+    <ClInclude Include="Private\Engine\WAVFileReader.h" />
+    <ClInclude Include="Private\framework.h" />
+    <ClInclude Include="Private\GI\AbstractGI\AbstractGIDevice.h" />
+    <ClInclude Include="Private\GI\D3D11\D3D11Buffer.h" />
+    <ClInclude Include="Private\GI\D3D11\D3D11CommandBuffer.h" />
+    <ClInclude Include="Private\GI\D3D11\D3D11ComputeCommandContext.h" />
+    <ClInclude Include="Private\GI\D3D11\D3D11FrameBuffer.h" />
+    <ClInclude Include="Private\GI\D3D11\D3D11Pipeline.h" />
+    <ClInclude Include="Private\GI\D3D11\D3D11Shader.h" />
+    <ClInclude Include="Private\GI\D3D11\D3D11ShaderStates.h" />
+    <ClInclude Include="Private\GI\D3D11\D3D11Texture.h" />
+    <ClInclude Include="Private\GI\D3D11\D3D11Viewport.h" />
+    <ClInclude Include="Private\GI\D3D11\DDSTextureLoader_Internal.h" />
+    <ClInclude Include="Private\GI\D3D11\ScreenGrab11.h" />
+    <ClInclude Include="Private\GI\D3D11\WICTextureLoader_Internal.h" />
+    <ClInclude Include="Private\GI\D3D11\D3D11Device.h" />
+    <ClInclude Include="Private\GI\D3D12\D3D12Buffer.h" />
+    <ClInclude Include="Private\GI\D3D12\D3D12CommandBuffer.h" />
+    <ClInclude Include="Private\GI\D3D12\D3D12ComputeCommandContext.h" />
+    <ClInclude Include="Private\GI\D3D12\D3D12DescriptorHeapManager.h" />
+    <ClInclude Include="Private\GI\D3D12\D3D12Fence.h" />
+    <ClInclude Include="Private\GI\D3D12\D3D12FrameBuffer.h" />
+    <ClInclude Include="Private\GI\D3D12\D3D12Pipeline.h" />
+    <ClInclude Include="Private\GI\D3D12\D3D12Shader.h" />
+    <ClInclude Include="Private\GI\D3D12\D3D12ShaderStates.h" />
+    <ClInclude Include="Private\GI\D3D12\D3D12Texture.h" />
+    <ClInclude Include="Private\GI\D3D12\D3D12Viewport.h" />
+    <ClInclude Include="Private\GI\D3D12\DDSTextureLoader12.h" />
+    <ClInclude Include="Private\GI\D3D12\WICTextureLoader12.h" />
+    <ClInclude Include="Private\GI\D3D12\D3D12Device.h" />
+    <ClInclude Include="Private\GI\D3DShared\D3DShared.h" />
+    <ClInclude Include="Private\GI\Renderer\CanvasRenderer.h" />
+    <ClInclude Include="Private\GI\Renderer\IRenderer.h" />
+    <ClInclude Include="Private\GI\Renderer\LineRenderer.h" />
+    <ClInclude Include="Private\GI\Renderer\PostProcessRenderer.h" />
+    <ClInclude Include="Private\GI\Renderer\Renderer.h" />
+    <ClInclude Include="Private\GI\Vulkan\VulkanBuffer.h" />
+    <ClInclude Include="Private\GI\Vulkan\VulkanCommandBuffer.h" />
+    <ClInclude Include="Private\GI\Vulkan\VulkanComputeCommandContext.h" />
+    <ClInclude Include="Private\GI\Vulkan\VulkanDevice.h" />
+    <ClInclude Include="Private\GI\Vulkan\VulkanFrameBuffer.h" />
+    <ClInclude Include="Private\GI\Vulkan\VulkanPipeline.h" />
+    <ClInclude Include="Private\GI\Vulkan\VulkanShader.h" />
+    <ClInclude Include="Private\GI\Vulkan\VulkanShaderStates.h" />
+    <ClInclude Include="Private\GI\Vulkan\VulkanTexture.h" />
+    <ClInclude Include="Private\GI\Vulkan\VulkanViewport.h" />
+    <ClInclude Include="Private\pch.h" />
+    <ClInclude Include="Public\AbstractGI\Material.h" />
+    <ClInclude Include="Public\AbstractGI\MaterialManager.h" />
+    <ClInclude Include="Public\AbstractGI\PostProcess.h" />
+    <ClInclude Include="Public\AbstractGI\RendererResource.h" />
+    <ClInclude Include="Public\AbstractGI\ShaderManager.h" />
+    <ClInclude Include="Public\AbstractGI\TextureManager.h" />
+    <ClInclude Include="Public\AbstractGI\ToneMapping.h" />
+    <ClInclude Include="Public\AbstractGI\UIMaterialStyle.h" />
+    <ClInclude Include="Public\Core\Archive.h" />
+    <ClInclude Include="Public\Core\Camera.h" />
+    <ClInclude Include="Public\Core\Math\CoreMath.h" />
+    <ClInclude Include="Public\Core\MeshPrimitives.h" />
+    <ClInclude Include="Public\Core\Transform.h" />
+    <ClInclude Include="Public\Core\ThreadPool.h" />
+    <ClInclude Include="Public\Engine\AbstractEngine.h" />
+    <ClInclude Include="Public\Engine\Box2DRigidBody.h" />
+    <ClInclude Include="Public\Engine\BulletRigidBody.h" />
+    <ClInclude Include="Public\Engine\BulletWorld.h" />
+    <ClInclude Include="Public\Engine\ClassBody.h" />
+    <ClInclude Include="Public\Engine\CPU.h" />
+    <ClInclude Include="Public\Engine\Engine.h" />
+    <ClInclude Include="Public\Engine\Gamepad.h" />
+    <ClInclude Include="Public\Engine\IMetaWorld.h" />
+    <ClInclude Include="Public\Engine\InputController.h" />
+    <ClInclude Include="Public\Engine\IPhysicalWorld.h" />
+    <ClInclude Include="Public\Engine\IRigidBody.h" />
+    <ClInclude Include="Public\Engine\MemoryManager.h" />
+    <ClInclude Include="Public\Engine\PhysXRigidBody.h" />
+    <ClInclude Include="Public\Engine\PhysXWorld.h" />
+    <ClInclude Include="Public\Engine\StepTimer.h" />
+    <ClInclude Include="Public\Engine\World2D.h" />
+    <ClInclude Include="Public\Gameplay\Actor.h" />
+    <ClInclude Include="Public\Gameplay\AIController.h" />
+    <ClInclude Include="Public\Gameplay\BoxCollision2DComponent.h" />
+    <ClInclude Include="Public\Gameplay\CameraComponent.h" />
+    <ClInclude Include="Public\Gameplay\CameraManager.h" />
+    <ClInclude Include="Public\Gameplay\Controller.h" />
+    <ClInclude Include="Public\Gameplay\GameInstance.h" />
+    <ClInclude Include="Public\Gameplay\ICanvas.h" />
+    <ClInclude Include="Public\Gameplay\ILevel.h" />
+    <ClInclude Include="Public\Gameplay\IWorld.h" />
+    <ClInclude Include="Public\Gameplay\MeshComponent.h" />
+    <ClInclude Include="Public\Gameplay\Character.h" />
+    <ClInclude Include="Public\Gameplay\Player.h" />
+    <ClInclude Include="Public\Gameplay\PlayerController.h" />
+    <ClInclude Include="Public\Gameplay\PlayerState.h" />
+    <ClInclude Include="Public\Gameplay\PhysicalComponent.h" />
+    <ClInclude Include="Public\Gameplay\PrimitiveComponent.h" />
+    <ClInclude Include="Public\Gameplay\CircleCollision2DComponent.h" />
+    <ClInclude Include="Public\Gameplay\StaticMesh.h" />
+    <ClInclude Include="Public\Utilities\ConfigManager.h" />
+    <ClInclude Include="Public\Utilities\ContentManager.h" />
+    <ClInclude Include="Public\Utilities\Exception.h" />
+    <ClInclude Include="Public\Utilities\FileManager.h" />
+    <ClInclude Include="Public\Utilities\Input.h" />
+    <ClInclude Include="Public\Utilities\Log.h" />
+    <ClInclude Include="Public\Utilities\DNGEAsset.h" />
+    <ClInclude Include="Public\Utilities\ObjLoader.h" />
+    <ClInclude Include="Public\Utilities\stb_image.h" />
+    <ClInclude Include="Public\Utilities\TimerProfiler.h" />
+    <ClInclude Include="Public\Utilities\tinyxml2.h" />
+    <ClInclude Include="Public\Utilities\Utilities.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Private\Core\Archive.cpp" />
+    <ClCompile Include="Private\Core\Camera.cpp" />
+    <ClCompile Include="Private\Core\ThreadPool.cpp" />
+    <ClCompile Include="Private\Engine\Audio.cpp" />
+    <ClCompile Include="Private\Engine\Box2DRigidBody.cpp" />
+    <ClCompile Include="Private\Engine\CPU.cpp" />
+    <ClCompile Include="Private\Engine\Engine.cpp" />
+    <ClCompile Include="Private\Engine\Gamepad.cpp" />
+    <ClCompile Include="Private\Engine\InputController.cpp" />
+    <ClCompile Include="Private\Engine\IPhysicalWorld.cpp" />
+    <ClCompile Include="Private\Engine\IRigidBody.cpp" />
+    <ClCompile Include="Private\Engine\MemoryManager.cpp" />
+    <ClCompile Include="Private\Engine\WaveBankReader.cpp" />
+    <ClCompile Include="Private\Engine\WAVFileReader.cpp" />
+    <ClCompile Include="Private\Engine\World2D.cpp" />
+    <ClCompile Include="Private\Gameplay\Actor.cpp" />
+    <ClCompile Include="Private\Gameplay\AIController.cpp" />
+    <ClCompile Include="Private\Gameplay\BoxCollision2DComponent.cpp" />
+    <ClCompile Include="Private\Gameplay\CameraComponent.cpp" />
+    <ClCompile Include="Private\Gameplay\CameraManager.cpp" />
+    <ClCompile Include="Private\Gameplay\CircleCollision2DComponent.cpp" />
+    <ClCompile Include="Private\Gameplay\GameInstance.cpp" />
+    <ClCompile Include="Private\Gameplay\MeshComponent.cpp" />
+    <ClCompile Include="Private\Gameplay\Character.cpp" />
+    <ClCompile Include="Private\Gameplay\Player.cpp" />
+    <ClCompile Include="Private\Gameplay\PlayerController.cpp" />
+    <ClCompile Include="Private\Gameplay\PlayerState.cpp" />
+    <ClCompile Include="Private\Gameplay\PhysicalComponent.cpp" />
+    <ClCompile Include="Private\Gameplay\PrimitiveComponent.cpp" />
+    <ClCompile Include="Private\Gameplay\StaticMesh.cpp" />
+    <ClCompile Include="Private\GI\AbstractGI\Material.cpp" />
+    <ClCompile Include="Private\GI\AbstractGI\PostProcess.cpp" />
+    <ClCompile Include="Private\GI\AbstractGI\RendererResource.cpp" />
+    <ClCompile Include="Private\GI\AbstractGI\ToneMapping.cpp" />
+    <ClCompile Include="Private\GI\D3D11\D3D11Buffer.cpp" />
+    <ClCompile Include="Private\GI\D3D11\D3D11CommandBuffer.cpp" />
+    <ClCompile Include="Private\GI\D3D11\D3D11ComputeCommandContext.cpp" />
+    <ClCompile Include="Private\GI\D3D11\D3D11FrameBuffer.cpp" />
+    <ClCompile Include="Private\GI\D3D11\D3D11Pipeline.cpp" />
+    <ClCompile Include="Private\GI\D3D11\D3D11Shader.cpp" />
+    <ClCompile Include="Private\GI\D3D11\D3D11ShaderStates.cpp" />
+    <ClCompile Include="Private\GI\D3D11\D3D11Texture.cpp" />
+    <ClCompile Include="Private\GI\D3D11\D3D11Viewport.cpp" />
+    <ClCompile Include="Private\GI\D3D11\DDSTextureLoader_Internal.cpp" />
+    <ClCompile Include="Private\GI\D3D11\ScreenGrab11.cpp" />
+    <ClCompile Include="Private\GI\D3D11\WICTextureLoader_Internal.cpp" />
+    <ClCompile Include="Private\GI\D3D11\D3D11Device.cpp" />
+    <ClCompile Include="Private\GI\D3D12\D3D12Buffer.cpp" />
+    <ClCompile Include="Private\GI\D3D12\D3D12CommandBuffer.cpp" />
+    <ClCompile Include="Private\GI\D3D12\D3D12ComputeCommandContext.cpp" />
+    <ClCompile Include="Private\GI\D3D12\D3D12DescriptorHeapManager.cpp" />
+    <ClCompile Include="Private\GI\D3D12\D3D12Fence.cpp" />
+    <ClCompile Include="Private\GI\D3D12\D3D12FrameBuffer.cpp" />
+    <ClCompile Include="Private\GI\D3D12\D3D12Pipeline.cpp" />
+    <ClCompile Include="Private\GI\D3D12\D3D12Shader.cpp" />
+    <ClCompile Include="Private\GI\D3D12\D3D12Texture.cpp" />
+    <ClCompile Include="Private\GI\D3D12\D3D12Viewport.cpp" />
+    <ClCompile Include="Private\GI\D3D12\DDSTextureLoader12.cpp" />
+    <ClCompile Include="Private\GI\D3D12\WICTextureLoader12.cpp" />
+    <ClCompile Include="Private\GI\D3D12\D3D12Device.cpp" />
+    <ClCompile Include="Private\GI\Renderer\CanvasRenderer.cpp" />
+    <ClCompile Include="Private\GI\Renderer\LineRenderer.cpp" />
+    <ClCompile Include="Private\GI\Renderer\PostProcessRenderer.cpp" />
+    <ClCompile Include="Private\GI\Renderer\Renderer.cpp" />
+    <ClCompile Include="Private\GI\Vulkan\VulkanBuffer.cpp" />
+    <ClCompile Include="Private\GI\Vulkan\VulkanCommandBuffer.cpp" />
+    <ClCompile Include="Private\GI\Vulkan\VulkanComputeCommandContext.cpp" />
+    <ClCompile Include="Private\GI\Vulkan\VulkanDevice.cpp" />
+    <ClCompile Include="Private\GI\Vulkan\VulkanFrameBuffer.cpp" />
+    <ClCompile Include="Private\GI\Vulkan\VulkanPipeline.cpp" />
+    <ClCompile Include="Private\GI\Vulkan\VulkanShader.cpp" />
+    <ClCompile Include="Private\GI\Vulkan\VulkanShaderStates.cpp" />
+    <ClCompile Include="Private\GI\Vulkan\VulkanTexture.cpp" />
+    <ClCompile Include="Private\GI\Vulkan\VulkanViewport.cpp" />
+    <ClCompile Include="Private\pch.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="Private\Utilities\FileManager.cpp" />
+    <ClCompile Include="Private\Utilities\Log.cpp" />
+    <ClCompile Include="Private\Utilities\stb_image.cpp" />
+    <ClCompile Include="Private\Utilities\tinyxml2.cpp" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

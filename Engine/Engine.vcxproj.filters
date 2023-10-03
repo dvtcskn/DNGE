@@ -1,0 +1,660 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="GI">
+      <UniqueIdentifier>{fa1fe418-e205-4138-82c3-821f0245b447}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core">
+      <UniqueIdentifier>{73f01329-c39b-41be-98a3-da92692b2b2e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core\Public">
+      <UniqueIdentifier>{aa23554b-b694-4116-89b3-351fc0c2e60c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core\Private">
+      <UniqueIdentifier>{034bdd3f-6813-431d-8b51-007bceb60aab}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Gameplay">
+      <UniqueIdentifier>{d7326fda-33d5-4ce9-b505-971ef557b182}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Utilities">
+      <UniqueIdentifier>{900aae2a-e1c4-4cec-8049-cc3c55d63c40}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Utilities\Public">
+      <UniqueIdentifier>{a3e206e1-0d72-41e4-b9b7-e5fc083576ce}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Gameplay\Public">
+      <UniqueIdentifier>{4b7e0b70-d243-4e44-8ddd-d234d32f6423}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Gameplay\Private">
+      <UniqueIdentifier>{b087a670-899c-4c85-b422-6d891586dc83}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Utilities\Private">
+      <UniqueIdentifier>{a0c50525-a435-435e-92f1-91d2b4e3e841}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine">
+      <UniqueIdentifier>{d1ac98d7-f6c9-4f6b-a2ff-4924c35e6dab}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Public">
+      <UniqueIdentifier>{9449027f-32cf-414d-aa2b-ff04f9e7b88c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Private">
+      <UniqueIdentifier>{030776ac-4224-4c48-bf24-3d6f819ae3ce}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="GI\Public">
+      <UniqueIdentifier>{dbb18c44-f806-4be7-b8b5-6a760d97ebc9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="GI\Public\AbstractGI">
+      <UniqueIdentifier>{fee7208f-7816-4234-b6ad-999d19a90487}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Gameplay\Public\Components">
+      <UniqueIdentifier>{67227da8-73d0-4577-a64f-bd24b223ffb9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Gameplay\Private\Components">
+      <UniqueIdentifier>{82ce441f-f01a-4d5d-8a84-040f5c9ff609}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="GI\Public\AbstractGI\Renderer">
+      <UniqueIdentifier>{13e081c2-1832-4eb2-92fe-dd57da824de9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="GI\Private">
+      <UniqueIdentifier>{1c0f5547-84d8-494c-a748-6fccfa55280a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="GI\Private\D3D11">
+      <UniqueIdentifier>{1eb950fa-b648-476f-9bc6-3170cca2b2d5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="GI\Private\D3D12">
+      <UniqueIdentifier>{4304c4a0-bb09-4672-883c-e0a05aefef75}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="GI\Private\OpenGL4">
+      <UniqueIdentifier>{50e1ff69-6c32-4338-8dff-3796dafd066e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="GI\Private\Renderer">
+      <UniqueIdentifier>{a371c648-13b6-43eb-b47d-123c04c186d9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="GI\Private\Vulkan">
+      <UniqueIdentifier>{81307efd-0122-4d37-82ec-c1ac5eda461c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="GI\Private\AbstractGI">
+      <UniqueIdentifier>{2554fbce-8a83-4273-87cd-109217bc3c45}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="GI\Private\D3DShared">
+      <UniqueIdentifier>{14967a23-668e-48c7-aa46-e54902efadf2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="PCH">
+      <UniqueIdentifier>{56be4261-e211-49b3-8ebd-d2f744818829}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Public\Engine\Engine.h">
+      <Filter>Engine\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Core\Math\CoreMath.h">
+      <Filter>Core\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Utilities\Input.h">
+      <Filter>Utilities\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Engine\CPU.h">
+      <Filter>Engine\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Engine\StepTimer.h">
+      <Filter>Engine\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Engine\MemoryManager.h">
+      <Filter>Engine\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Engine\IMetaWorld.h">
+      <Filter>Engine\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Engine\ClassBody.h">
+      <Filter>Engine\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Gameplay\GameInstance.h">
+      <Filter>Gameplay\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Gameplay\Character.h">
+      <Filter>Gameplay\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Gameplay\PlayerController.h">
+      <Filter>Gameplay\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Gameplay\PlayerState.h">
+      <Filter>Gameplay\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Gameplay\ILevel.h">
+      <Filter>Gameplay\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Gameplay\Controller.h">
+      <Filter>Gameplay\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Gameplay\ICanvas.h">
+      <Filter>Gameplay\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\D3D11\D3D11Buffer.h">
+      <Filter>GI\Private\D3D11</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\D3D11\D3D11CommandBuffer.h">
+      <Filter>GI\Private\D3D11</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\D3D11\D3D11FrameBuffer.h">
+      <Filter>GI\Private\D3D11</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\D3D11\D3D11Pipeline.h">
+      <Filter>GI\Private\D3D11</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\D3D11\D3D11Shader.h">
+      <Filter>GI\Private\D3D11</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\D3D11\D3D11ShaderStates.h">
+      <Filter>GI\Private\D3D11</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\D3D11\D3D11Texture.h">
+      <Filter>GI\Private\D3D11</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\D3D11\D3D11Viewport.h">
+      <Filter>GI\Private\D3D11</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\D3D11\D3D11Device.h">
+      <Filter>GI\Private\D3D11</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\D3D12\D3D12Buffer.h">
+      <Filter>GI\Private\D3D12</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\D3D12\D3D12CommandBuffer.h">
+      <Filter>GI\Private\D3D12</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\D3D12\D3D12DescriptorHeapManager.h">
+      <Filter>GI\Private\D3D12</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\D3D12\D3D12FrameBuffer.h">
+      <Filter>GI\Private\D3D12</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\D3D12\D3D12Pipeline.h">
+      <Filter>GI\Private\D3D12</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\D3D12\D3D12Shader.h">
+      <Filter>GI\Private\D3D12</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\D3D12\D3D12ShaderStates.h">
+      <Filter>GI\Private\D3D12</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\D3D12\D3D12Texture.h">
+      <Filter>GI\Private\D3D12</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\D3D12\D3D12Viewport.h">
+      <Filter>GI\Private\D3D12</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\D3D12\D3D12Device.h">
+      <Filter>GI\Private\D3D12</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\Renderer\Renderer.h">
+      <Filter>GI\Private\Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\AbstractGI\Material.h">
+      <Filter>GI\Public\AbstractGI</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\AbstractGI\AbstractGIDevice.h">
+      <Filter>GI\Private\AbstractGI</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\D3D11\DDSTextureLoader_Internal.h">
+      <Filter>GI\Private\D3D11</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\D3D11\WICTextureLoader_Internal.h">
+      <Filter>GI\Private\D3D11</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\D3DShared\D3DShared.h">
+      <Filter>GI\Private\D3DShared</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\D3D12\DDSTextureLoader12.h">
+      <Filter>GI\Private\D3D12</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\D3D12\WICTextureLoader12.h">
+      <Filter>GI\Private\D3D12</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\Renderer\CanvasRenderer.h">
+      <Filter>GI\Private\Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\Renderer\IRenderer.h">
+      <Filter>GI\Private\Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\AbstractGI\UIMaterialStyle.h">
+      <Filter>GI\Public\AbstractGI</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\AbstractGI\TextureManager.h">
+      <Filter>GI\Public\AbstractGI</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\AbstractGI\MaterialManager.h">
+      <Filter>GI\Public\AbstractGI</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\AbstractGI\ShaderManager.h">
+      <Filter>GI\Public\AbstractGI</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Utilities\ConfigManager.h">
+      <Filter>Utilities\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Utilities\FileManager.h">
+      <Filter>Utilities\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Core\ThreadPool.h">
+      <Filter>Core\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Core\Archive.h">
+      <Filter>Core\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Utilities\Log.h">
+      <Filter>Utilities\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Gameplay\Actor.h">
+      <Filter>Gameplay\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Core\Transform.h">
+      <Filter>Core\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Gameplay\CameraManager.h">
+      <Filter>Gameplay\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Gameplay\MeshComponent.h">
+      <Filter>Gameplay\Public\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Gameplay\PhysicalComponent.h">
+      <Filter>Gameplay\Public\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Gameplay\PrimitiveComponent.h">
+      <Filter>Gameplay\Public\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Core\Camera.h">
+      <Filter>Core\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\Vulkan\VulkanBuffer.h">
+      <Filter>GI\Private\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\Vulkan\VulkanCommandBuffer.h">
+      <Filter>GI\Private\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\Vulkan\VulkanDevice.h">
+      <Filter>GI\Private\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\Vulkan\VulkanFrameBuffer.h">
+      <Filter>GI\Private\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\Vulkan\VulkanPipeline.h">
+      <Filter>GI\Private\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\Vulkan\VulkanShader.h">
+      <Filter>GI\Private\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\Vulkan\VulkanShaderStates.h">
+      <Filter>GI\Private\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\Vulkan\VulkanTexture.h">
+      <Filter>GI\Private\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\Vulkan\VulkanViewport.h">
+      <Filter>GI\Private\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\AbstractGI\PostProcess.h">
+      <Filter>GI\Public\AbstractGI</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\Renderer\PostProcessRenderer.h">
+      <Filter>GI\Private\Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\AbstractGI\ToneMapping.h">
+      <Filter>GI\Public\AbstractGI\Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Utilities\TimerProfiler.h">
+      <Filter>Utilities\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Core\MeshPrimitives.h">
+      <Filter>Core\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Gameplay\StaticMesh.h">
+      <Filter>Gameplay\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\AbstractGI\RendererResource.h">
+      <Filter>GI\Public\AbstractGI\Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\D3D11\ScreenGrab11.h">
+      <Filter>GI\Private\D3D11</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Engine\World2D.h">
+      <Filter>Engine\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Engine\IPhysicalWorld.h">
+      <Filter>Engine\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Engine\IRigidBody.h">
+      <Filter>Engine\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Engine\Box2DRigidBody.h">
+      <Filter>Engine\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Gameplay\BoxCollision2DComponent.h">
+      <Filter>Gameplay\Public\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Gameplay\CircleCollision2DComponent.h">
+      <Filter>Gameplay\Public\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Engine\BulletRigidBody.h">
+      <Filter>Engine\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Engine\BulletWorld.h">
+      <Filter>Engine\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Engine\PhysXRigidBody.h">
+      <Filter>Engine\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Engine\PhysXWorld.h">
+      <Filter>Engine\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Utilities\Utilities.h">
+      <Filter>Utilities\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Gameplay\IWorld.h">
+      <Filter>Gameplay\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\Renderer\LineRenderer.h">
+      <Filter>GI\Private\Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\D3D12\D3D12Fence.h">
+      <Filter>GI\Private\D3D12</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\D3D12\D3D12ComputeCommandContext.h">
+      <Filter>GI\Private\D3D12</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\D3D11\D3D11ComputeCommandContext.h">
+      <Filter>GI\Private\D3D11</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\Vulkan\VulkanComputeCommandContext.h">
+      <Filter>GI\Private\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Utilities\Exception.h">
+      <Filter>Utilities\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Utilities\stb_image.h">
+      <Filter>Utilities\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Gameplay\CameraComponent.h">
+      <Filter>Gameplay\Public\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Gameplay\Player.h">
+      <Filter>Gameplay\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Gameplay\AIController.h">
+      <Filter>Gameplay\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Utilities\tinyxml2.h">
+      <Filter>Utilities\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\Engine\WaveBankReader.h">
+      <Filter>Engine\Private</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\Engine\WAVFileReader.h">
+      <Filter>Engine\Private</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Engine\AbstractEngine.h">
+      <Filter>Engine\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Engine\Gamepad.h">
+      <Filter>Engine\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Engine\InputController.h">
+      <Filter>Engine\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Utilities\ContentManager.h">
+      <Filter>Utilities\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Utilities\DNGEAsset.h">
+      <Filter>Utilities\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Utilities\ObjLoader.h">
+      <Filter>Utilities\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\Engine\Audio.h">
+      <Filter>Engine\Private</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\framework.h">
+      <Filter>PCH</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\pch.h">
+      <Filter>PCH</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Private\Engine\Engine.cpp">
+      <Filter>Engine\Private</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\Engine\MemoryManager.cpp">
+      <Filter>Engine\Private</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\Engine\CPU.cpp">
+      <Filter>Engine\Private</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\Gameplay\GameInstance.cpp">
+      <Filter>Gameplay\Private</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\Gameplay\Character.cpp">
+      <Filter>Gameplay\Private</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\Gameplay\PlayerController.cpp">
+      <Filter>Gameplay\Private</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\Gameplay\PlayerState.cpp">
+      <Filter>Gameplay\Private</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\D3D11\D3D11Buffer.cpp">
+      <Filter>GI\Private\D3D11</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\D3D11\D3D11CommandBuffer.cpp">
+      <Filter>GI\Private\D3D11</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\D3D11\D3D11FrameBuffer.cpp">
+      <Filter>GI\Private\D3D11</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\D3D11\D3D11Pipeline.cpp">
+      <Filter>GI\Private\D3D11</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\D3D11\D3D11Shader.cpp">
+      <Filter>GI\Private\D3D11</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\D3D11\D3D11ShaderStates.cpp">
+      <Filter>GI\Private\D3D11</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\D3D11\D3D11Texture.cpp">
+      <Filter>GI\Private\D3D11</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\D3D11\D3D11Viewport.cpp">
+      <Filter>GI\Private\D3D11</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\D3D11\D3D11Device.cpp">
+      <Filter>GI\Private\D3D11</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\D3D12\D3D12Buffer.cpp">
+      <Filter>GI\Private\D3D12</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\D3D12\D3D12CommandBuffer.cpp">
+      <Filter>GI\Private\D3D12</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\D3D12\D3D12DescriptorHeapManager.cpp">
+      <Filter>GI\Private\D3D12</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\D3D12\D3D12FrameBuffer.cpp">
+      <Filter>GI\Private\D3D12</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\D3D12\D3D12Pipeline.cpp">
+      <Filter>GI\Private\D3D12</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\D3D12\D3D12Shader.cpp">
+      <Filter>GI\Private\D3D12</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\D3D12\D3D12Texture.cpp">
+      <Filter>GI\Private\D3D12</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\D3D12\D3D12Viewport.cpp">
+      <Filter>GI\Private\D3D12</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\D3D12\D3D12Device.cpp">
+      <Filter>GI\Private\D3D12</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\Renderer\Renderer.cpp">
+      <Filter>GI\Private\Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\AbstractGI\Material.cpp">
+      <Filter>GI\Private\AbstractGI</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\D3D11\DDSTextureLoader_Internal.cpp">
+      <Filter>GI\Private\D3D11</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\D3D11\WICTextureLoader_Internal.cpp">
+      <Filter>GI\Private\D3D11</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\D3D12\DDSTextureLoader12.cpp">
+      <Filter>GI\Private\D3D12</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\D3D12\WICTextureLoader12.cpp">
+      <Filter>GI\Private\D3D12</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\Renderer\CanvasRenderer.cpp">
+      <Filter>GI\Private\Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\Utilities\FileManager.cpp">
+      <Filter>Utilities\Private</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\Core\Archive.cpp">
+      <Filter>Core\Private</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\Utilities\Log.cpp">
+      <Filter>Utilities\Private</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\Gameplay\Actor.cpp">
+      <Filter>Gameplay\Private</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\Gameplay\CameraManager.cpp">
+      <Filter>Gameplay\Private</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\Gameplay\MeshComponent.cpp">
+      <Filter>Gameplay\Private\Components</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\Gameplay\PhysicalComponent.cpp">
+      <Filter>Gameplay\Private\Components</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\Gameplay\PrimitiveComponent.cpp">
+      <Filter>Gameplay\Private\Components</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\Core\Camera.cpp">
+      <Filter>Core\Private</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\Vulkan\VulkanBuffer.cpp">
+      <Filter>GI\Private\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\Vulkan\VulkanCommandBuffer.cpp">
+      <Filter>GI\Private\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\Vulkan\VulkanDevice.cpp">
+      <Filter>GI\Private\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\Vulkan\VulkanFrameBuffer.cpp">
+      <Filter>GI\Private\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\Vulkan\VulkanPipeline.cpp">
+      <Filter>GI\Private\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\Vulkan\VulkanShader.cpp">
+      <Filter>GI\Private\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\Vulkan\VulkanShaderStates.cpp">
+      <Filter>GI\Private\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\Vulkan\VulkanTexture.cpp">
+      <Filter>GI\Private\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\Vulkan\VulkanViewport.cpp">
+      <Filter>GI\Private\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\AbstractGI\PostProcess.cpp">
+      <Filter>GI\Private\AbstractGI</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\Renderer\PostProcessRenderer.cpp">
+      <Filter>GI\Private\Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\AbstractGI\ToneMapping.cpp">
+      <Filter>GI\Private\AbstractGI</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\Gameplay\StaticMesh.cpp">
+      <Filter>Gameplay\Private</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\AbstractGI\RendererResource.cpp">
+      <Filter>GI\Private\AbstractGI</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\D3D11\ScreenGrab11.cpp">
+      <Filter>GI\Private\D3D11</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\Engine\World2D.cpp">
+      <Filter>Engine\Private</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\Engine\Box2DRigidBody.cpp">
+      <Filter>Engine\Private</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\Gameplay\BoxCollision2DComponent.cpp">
+      <Filter>Gameplay\Private\Components</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\Gameplay\CircleCollision2DComponent.cpp">
+      <Filter>Gameplay\Private\Components</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\Renderer\LineRenderer.cpp">
+      <Filter>GI\Private\Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\D3D12\D3D12Fence.cpp">
+      <Filter>GI\Private\D3D12</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\Engine\IRigidBody.cpp">
+      <Filter>Engine\Private</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\Engine\IPhysicalWorld.cpp">
+      <Filter>Engine\Private</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\D3D12\D3D12ComputeCommandContext.cpp">
+      <Filter>GI\Private\D3D12</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\D3D11\D3D11ComputeCommandContext.cpp">
+      <Filter>GI\Private\D3D11</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\Vulkan\VulkanComputeCommandContext.cpp">
+      <Filter>GI\Private\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\Utilities\stb_image.cpp">
+      <Filter>Utilities\Private</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\Gameplay\CameraComponent.cpp">
+      <Filter>Gameplay\Private\Components</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\Gameplay\Player.cpp">
+      <Filter>Gameplay\Private</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\Gameplay\AIController.cpp">
+      <Filter>Gameplay\Private</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\Utilities\tinyxml2.cpp">
+      <Filter>Utilities\Private</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\Engine\Audio.cpp">
+      <Filter>Engine\Private</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\Engine\WaveBankReader.cpp">
+      <Filter>Engine\Private</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\Engine\WAVFileReader.cpp">
+      <Filter>Engine\Private</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\Core\ThreadPool.cpp">
+      <Filter>Core\Private</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\Engine\Gamepad.cpp">
+      <Filter>Engine\Private</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\Engine\InputController.cpp">
+      <Filter>Engine\Private</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\pch.cpp">
+      <Filter>PCH</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>
