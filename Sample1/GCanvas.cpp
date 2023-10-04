@@ -1,7 +1,7 @@
 ﻿/* ---------------------------------------------------------------------------------------
 * MIT License
 *
-* Copyright (c) 2022 Davut Coşkun.
+* Copyright (c) 2023 Davut Coşkun.
 * All rights reserved.
 *
 * Permission is hereby granted, free of charge, to any person obtaining
