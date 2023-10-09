@@ -265,7 +265,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Private\Core\Archive.cpp" />
-    <ClCompile Include="Private\Core\Camera.cpp" />
     <ClCompile Include="Private\Core\ThreadPool.cpp" />
     <ClCompile Include="Private\Engine\Audio.cpp" />
     <ClCompile Include="Private\Engine\Box2DRigidBody.cpp" />

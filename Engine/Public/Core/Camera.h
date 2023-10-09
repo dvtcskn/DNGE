@@ -331,9 +331,6 @@ public:
         m_mCameraWorld = XMMatrixInverse(nullptr, m_ViewMatrix);
     }
 
-    FVector2 ConvertScreenToWorld(const FVector2& ps) const;
-    FVector2 ConvertWorldToScreen(const FVector2& pw) const;
-
     inline virtual FVector GetPosition() const override { return m_vEye; }
     inline virtual FVector GetRotation() const override { return Rotation; }
     inline virtual FVector GetFocus() const override { return m_vLookAt; }

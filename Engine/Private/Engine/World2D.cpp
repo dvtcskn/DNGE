@@ -370,7 +370,7 @@ void sWorld2D::SetPhysicsInternalTick(std::optional<double> Tick)
 	InternalTick = Tick;
 }
 
-IRigidBody::SharedPtr sWorld2D::Create2DBoxBody(sPhysicalComponent* Owner, const sRigidBodyDesc& Desc, const FBounds2D& Bounds) const
+IRigidBody::SharedPtr sWorld2D::Create2DBoxBody(sPhysicalComponent* Owner, const sRigidBodyDesc& Desc, const FBounds2D& Bounds)
 {
 	auto BoxCenter = Bounds.GetCenter() * DOWNSCALE;
 	b2BodyDef Def;
@@ -405,11 +405,11 @@ IRigidBody::SharedPtr sWorld2D::Create2DBoxBody(sPhysicalComponent* Owner, const
 	Box.ComputeMass(&Data, Fix.density);
 	Fix.shape = &Box;
 	b2Fixture* Fixture = Body->CreateFixture(&Fix);
-	auto RigidBody2D = sBox2DRigidBody::Create(Owner, const_cast<sWorld2D*>(this), Body, ERigidBodyShape::Box2D, Desc);
+	auto RigidBody2D = sBox2DRigidBody::Create(Owner, this, Body, ERigidBodyShape::Box2D, Desc);
 	//RigidBodys.push_back(RigidBody2D.get());
 	return RigidBody2D;
 }
-IRigidBody::SharedPtr sWorld2D::Create2DPolygonBody(sPhysicalComponent* Owner, const sRigidBodyDesc& Desc, const FVector2& Origin, const std::array<FVector2, 8>& points) const
+IRigidBody::SharedPtr sWorld2D::Create2DPolygonBody(sPhysicalComponent* Owner, const sRigidBodyDesc& Desc, const FVector2& Origin, const std::array<FVector2, 8>& points)
 {
 	b2BodyDef Def;
 	switch (Desc.RigidBodyType)
@@ -453,11 +453,11 @@ IRigidBody::SharedPtr sWorld2D::Create2DPolygonBody(sPhysicalComponent* Owner, c
 	Polygon.ComputeMass(&Data, Fix.density);
 	Fix.shape = &Polygon;
 	b2Fixture* Fixture = Body->CreateFixture(&Fix);
-	auto RigidBody2D = sBox2DRigidBody::Create(Owner, const_cast<sWorld2D*>(this), Body, ERigidBodyShape::Circle2D, Desc);
+	auto RigidBody2D = sBox2DRigidBody::Create(Owner, this, Body, ERigidBodyShape::Circle2D, Desc);
 	//RigidBodys.push_back(RigidBody2D.get());
 	return RigidBody2D;
 }
-IRigidBody::SharedPtr sWorld2D::Create2DCircleBody(sPhysicalComponent* Owner, const sRigidBodyDesc& Desc, const FVector2& Origin, float InRadius) const
+IRigidBody::SharedPtr sWorld2D::Create2DCircleBody(sPhysicalComponent* Owner, const sRigidBodyDesc& Desc, const FVector2& Origin, float InRadius)
 {
 	b2BodyDef Def;
 	switch (Desc.RigidBodyType)
@@ -490,11 +490,11 @@ IRigidBody::SharedPtr sWorld2D::Create2DCircleBody(sPhysicalComponent* Owner, co
 	Circle.ComputeMass(&Data, Fix.density);
 	Fix.shape = &Circle;
 	b2Fixture* Fixture = Body->CreateFixture(&Fix);
-	auto RigidBody2D = sBox2DRigidBody::Create(Owner, const_cast<sWorld2D*>(this), Body, ERigidBodyShape::Circle2D, Desc);
+	auto RigidBody2D = sBox2DRigidBody::Create(Owner, this, Body, ERigidBodyShape::Circle2D, Desc);
 	//RigidBodys.push_back(RigidBody2D.get());
 	return RigidBody2D;
 }
-IRigidBody::SharedPtr sWorld2D::Create2DEdgeBody(sPhysicalComponent* Owner, const sRigidBodyDesc& Desc, const FVector2& Origin, const std::array<FVector2, 4>& points, bool OneSided)  const
+IRigidBody::SharedPtr sWorld2D::Create2DEdgeBody(sPhysicalComponent* Owner, const sRigidBodyDesc& Desc, const FVector2& Origin, const std::array<FVector2, 4>& points, bool OneSided)
 {
 	b2BodyDef Def;
 	switch (Desc.RigidBodyType)
@@ -530,11 +530,11 @@ IRigidBody::SharedPtr sWorld2D::Create2DEdgeBody(sPhysicalComponent* Owner, cons
 	Edge.ComputeMass(&Data, Fix.density);
 	Fix.shape = &Edge;
 	b2Fixture* Fixture = Body->CreateFixture(&Fix);
-	auto RigidBody2D = sBox2DRigidBody::Create(Owner, const_cast<sWorld2D*>(this), Body, ERigidBodyShape::Circle2D, Desc);
+	auto RigidBody2D = sBox2DRigidBody::Create(Owner, this, Body, ERigidBodyShape::Circle2D, Desc);
 	//RigidBodys.push_back(RigidBody2D.get());
 	return RigidBody2D;
 }
-IRigidBody::SharedPtr sWorld2D::Create2DChainBody(sPhysicalComponent* Owner, const sRigidBodyDesc& Desc, const FVector2& Origin, const std::vector<FVector2>& vertices) const
+IRigidBody::SharedPtr sWorld2D::Create2DChainBody(sPhysicalComponent* Owner, const sRigidBodyDesc& Desc, const FVector2& Origin, const std::vector<FVector2>& vertices)
 {
 	std::vector<b2Vec2> b2Vertices;
 	for (const auto& vert : vertices)
@@ -570,11 +570,11 @@ IRigidBody::SharedPtr sWorld2D::Create2DChainBody(sPhysicalComponent* Owner, con
 	Chain.ComputeMass(&Data, Fix.density);
 	Fix.shape = &Chain;
 	b2Fixture* Fixture = Body->CreateFixture(&Fix);
-	auto RigidBody2D = sBox2DRigidBody::Create(Owner, const_cast<sWorld2D*>(this), Body, ERigidBodyShape::Circle2D, Desc);
+	auto RigidBody2D = sBox2DRigidBody::Create(Owner, this, Body, ERigidBodyShape::Circle2D, Desc);
 	//RigidBodys.push_back(RigidBody2D.get());
 	return RigidBody2D;
 }
-IRigidBody::SharedPtr sWorld2D::Create2DChainBody(sPhysicalComponent* Owner, const sRigidBodyDesc& Desc, const FVector2& Origin, const std::vector<FVector2>& vertices, const FVector2& prevVertex, const FVector2& nextVertex) const
+IRigidBody::SharedPtr sWorld2D::Create2DChainBody(sPhysicalComponent* Owner, const sRigidBodyDesc& Desc, const FVector2& Origin, const std::vector<FVector2>& vertices, const FVector2& prevVertex, const FVector2& nextVertex)
 {
 	std::vector<b2Vec2> b2Vertices;
 	for (const auto& vert : vertices)
@@ -610,41 +610,41 @@ IRigidBody::SharedPtr sWorld2D::Create2DChainBody(sPhysicalComponent* Owner, con
 	Chain.ComputeMass(&Data, Fix.density);
 	Fix.shape = &Chain;
 	b2Fixture* Fixture = Body->CreateFixture(&Fix);
-	auto RigidBody2D = sBox2DRigidBody::Create(Owner, const_cast<sWorld2D*>(this), Body, ERigidBodyShape::Circle2D, Desc);
+	auto RigidBody2D = sBox2DRigidBody::Create(Owner, this, Body, ERigidBodyShape::Circle2D, Desc);
 	//RigidBodys.push_back(RigidBody2D.get());
 	return RigidBody2D;
 }
 
-IRigidBody::SharedPtr sWorld2D::CreateBoxBody(sPhysicalComponent* Owner, const sRigidBodyDesc& Desc, const FVector& Origin, FVector InHalf) const
+IRigidBody::SharedPtr sWorld2D::CreateBoxBody(sPhysicalComponent* Owner, const sRigidBodyDesc& Desc, const FVector& Origin, FVector InHalf)
 {
 	return nullptr;
 }
-IRigidBody::SharedPtr sWorld2D::CreateSphereBody(sPhysicalComponent* Owner, const sRigidBodyDesc& Desc, const FVector& Origin, float InRadius) const
+IRigidBody::SharedPtr sWorld2D::CreateSphereBody(sPhysicalComponent* Owner, const sRigidBodyDesc& Desc, const FVector& Origin, float InRadius)
 {
 	return nullptr;
 }
-IRigidBody::SharedPtr sWorld2D::CreateCapsuleBody(sPhysicalComponent* Owner, const sRigidBodyDesc& Desc, const FVector& Origin, float InRadius, float InHeight) const
+IRigidBody::SharedPtr sWorld2D::CreateCapsuleBody(sPhysicalComponent* Owner, const sRigidBodyDesc& Desc, const FVector& Origin, float InRadius, float InHeight)
 {
 	return nullptr;
 }
-IRigidBody::SharedPtr sWorld2D::CreateCylinderBody(sPhysicalComponent* Owner, const sRigidBodyDesc& Desc, const FVector& Origin, float InRadius, float InHeight) const
+IRigidBody::SharedPtr sWorld2D::CreateCylinderBody(sPhysicalComponent* Owner, const sRigidBodyDesc& Desc, const FVector& Origin, float InRadius, float InHeight)
 {
 	return nullptr;
 }
-IRigidBody::SharedPtr sWorld2D::CreateConeBody(sPhysicalComponent* Owner, const sRigidBodyDesc& Desc, const FVector& Origin, float InRadius, float InHeight) const
+IRigidBody::SharedPtr sWorld2D::CreateConeBody(sPhysicalComponent* Owner, const sRigidBodyDesc& Desc, const FVector& Origin, float InRadius, float InHeight)
 {
 	return nullptr;
 }
 
-IRigidBody::SharedPtr sWorld2D::CreateMultiBody(sPhysicalComponent* Owner, const sRigidBodyDesc& Desc, const FVector& Origin, FVector InInertia, float InMass) const
+IRigidBody::SharedPtr sWorld2D::CreateMultiBody(sPhysicalComponent* Owner, const sRigidBodyDesc& Desc, const FVector& Origin, FVector InInertia, float InMass)
 {
 	return nullptr;
 }
-IRigidBody::SharedPtr sWorld2D::CreateConvexHullBody(sPhysicalComponent* Owner, const sRigidBodyDesc& Desc, const FVector& Origin, const float* points, int numPoints, int stride) const
+IRigidBody::SharedPtr sWorld2D::CreateConvexHullBody(sPhysicalComponent* Owner, const sRigidBodyDesc& Desc, const FVector& Origin, const float* points, int numPoints, int stride)
 {
 	return nullptr;
 }
-IRigidBody::SharedPtr sWorld2D::CreateTriangleMesh(sPhysicalComponent* Owner, const sRigidBodyDesc& Desc, const FVector& Origin, const FVector* points, int numPoints, const std::uint32_t* indices, int numIndices) const
+IRigidBody::SharedPtr sWorld2D::CreateTriangleMesh(sPhysicalComponent* Owner, const sRigidBodyDesc& Desc, const FVector& Origin, const FVector* points, int numPoints, const std::uint32_t* indices, int numIndices)
 {
 	return nullptr;
 }

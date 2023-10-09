@@ -394,162 +394,162 @@ bool D3D11Device::GetDeviceIdentification(std::wstring& InVendorID, std::wstring
 	return true;
 }
 
-IGraphicsCommandContext::SharedPtr D3D11Device::CreateGraphicsCommandContext() const
+IGraphicsCommandContext::SharedPtr D3D11Device::CreateGraphicsCommandContext()
 {
-	return D3D11CommandBuffer::Create(const_cast<D3D11Device*>(this));
+	return D3D11CommandBuffer::Create(this);
 }
 
-IGraphicsCommandContext::UniquePtr D3D11Device::CreateUniqueGraphicsCommandContext() const
+IGraphicsCommandContext::UniquePtr D3D11Device::CreateUniqueGraphicsCommandContext()
 {
-	return D3D11CommandBuffer::CreateUnique(const_cast<D3D11Device*>(this));
+	return D3D11CommandBuffer::CreateUnique(this);
 }
 
-IComputeCommandContext::SharedPtr D3D11Device::CreateComputeCommandContext() const
+IComputeCommandContext::SharedPtr D3D11Device::CreateComputeCommandContext()
 {
-	return D3D11ComputeCommandContext::Create(const_cast<D3D11Device*>(this));
+	return D3D11ComputeCommandContext::Create(this);
 }
 
-IComputeCommandContext::UniquePtr D3D11Device::CreateUniqueComputeCommandContext() const
+IComputeCommandContext::UniquePtr D3D11Device::CreateUniqueComputeCommandContext()
 {
-	return D3D11ComputeCommandContext::CreateUnique(const_cast<D3D11Device*>(this));
+	return D3D11ComputeCommandContext::CreateUnique(this);
 }
 
-ICopyCommandContext::SharedPtr D3D11Device::CreateCopyCommandContext() const
+ICopyCommandContext::SharedPtr D3D11Device::CreateCopyCommandContext()
 {
-	return D3D11CopyCommandBuffer::Create(const_cast<D3D11Device*>(this));
+	return D3D11CopyCommandBuffer::Create(this);
 }
 
-ICopyCommandContext::UniquePtr D3D11Device::CreateUniqueCopyCommandContext() const
+ICopyCommandContext::UniquePtr D3D11Device::CreateUniqueCopyCommandContext()
 {
-	return D3D11CopyCommandBuffer::CreateUnique(const_cast<D3D11Device*>(this));
+	return D3D11CopyCommandBuffer::CreateUnique(this);
 }
 
-IConstantBuffer::SharedPtr D3D11Device::CreateConstantBuffer(std::string InName, const sBufferDesc& InDesc, std::uint32_t InRootParameterIndex) const
+IConstantBuffer::SharedPtr D3D11Device::CreateConstantBuffer(std::string InName, const sBufferDesc& InDesc, std::uint32_t InRootParameterIndex)
 {
-	return D3D11ConstantBuffer::Create(const_cast<D3D11Device*>(this), InName, InDesc, InRootParameterIndex);
+	return D3D11ConstantBuffer::Create(this, InName, InDesc, InRootParameterIndex);
 }
 
-IConstantBuffer::UniquePtr D3D11Device::CreateUniqueConstantBuffer(std::string InName, const sBufferDesc& InDesc, std::uint32_t InRootParameterIndex) const
+IConstantBuffer::UniquePtr D3D11Device::CreateUniqueConstantBuffer(std::string InName, const sBufferDesc& InDesc, std::uint32_t InRootParameterIndex)
 {
-	return D3D11ConstantBuffer::CreateUnique(const_cast<D3D11Device*>(this), InName, InDesc, InRootParameterIndex);
+	return D3D11ConstantBuffer::CreateUnique(this, InName, InDesc, InRootParameterIndex);
 }
 
-IVertexBuffer::SharedPtr D3D11Device::CreateVertexBuffer(std::string InName, const sBufferDesc& InDesc, sBufferSubresource* InSubresource) const
+IVertexBuffer::SharedPtr D3D11Device::CreateVertexBuffer(std::string InName, const sBufferDesc& InDesc, sBufferSubresource* InSubresource)
 {
-	return D3D11VertexBuffer::Create(const_cast<D3D11Device*>(this), InName, InDesc, InSubresource);
+	return D3D11VertexBuffer::Create(this, InName, InDesc, InSubresource);
 }
 
-IVertexBuffer::UniquePtr D3D11Device::CreateUniqueVertexBuffer(std::string InName, const sBufferDesc& InDesc, sBufferSubresource* InSubresource) const
+IVertexBuffer::UniquePtr D3D11Device::CreateUniqueVertexBuffer(std::string InName, const sBufferDesc& InDesc, sBufferSubresource* InSubresource)
 {
-	return D3D11VertexBuffer::CreateUnique(const_cast<D3D11Device*>(this), InName, InDesc, InSubresource);
+	return D3D11VertexBuffer::CreateUnique(this, InName, InDesc, InSubresource);
 }
 
-IIndexBuffer::SharedPtr D3D11Device::CreateIndexBuffer(std::string InName, const sBufferDesc& InDesc, sBufferSubresource* InSubresource) const
+IIndexBuffer::SharedPtr D3D11Device::CreateIndexBuffer(std::string InName, const sBufferDesc& InDesc, sBufferSubresource* InSubresource)
 {
-	return D3D11IndexBuffer::Create(const_cast<D3D11Device*>(this), InName, InDesc, InSubresource);
+	return D3D11IndexBuffer::Create(this, InName, InDesc, InSubresource);
 }
 
-IIndexBuffer::UniquePtr D3D11Device::CreateUniqueIndexBuffer(std::string InName, const sBufferDesc& InDesc, sBufferSubresource* InSubresource) const
+IIndexBuffer::UniquePtr D3D11Device::CreateUniqueIndexBuffer(std::string InName, const sBufferDesc& InDesc, sBufferSubresource* InSubresource)
 {
-	return D3D11IndexBuffer::CreateUnique(const_cast<D3D11Device*>(this), InName, InDesc, InSubresource);
+	return D3D11IndexBuffer::CreateUnique(this, InName, InDesc, InSubresource);
 }
 
-IFrameBuffer::SharedPtr D3D11Device::CreateFrameBuffer(const std::string InName, const sFrameBufferAttachmentInfo& InAttachments) const
+IFrameBuffer::SharedPtr D3D11Device::CreateFrameBuffer(const std::string InName, const sFrameBufferAttachmentInfo& InAttachments)
 {
-	return D3D11FrameBuffer::Create(const_cast<D3D11Device*>(this), InName, InAttachments);
+	return D3D11FrameBuffer::Create(this, InName, InAttachments);
 }
 
-IFrameBuffer::UniquePtr D3D11Device::CreateUniqueFrameBuffer(const std::string InName, const sFrameBufferAttachmentInfo& InAttachments) const
+IFrameBuffer::UniquePtr D3D11Device::CreateUniqueFrameBuffer(const std::string InName, const sFrameBufferAttachmentInfo& InAttachments)
 {
-	return D3D11FrameBuffer::CreateUnique(const_cast<D3D11Device*>(this), InName, InAttachments);
+	return D3D11FrameBuffer::CreateUnique(this, InName, InAttachments);
 }
 
 IRenderTarget::SharedPtr D3D11Device::CreateRenderTarget(const std::string InName, const EFormat Format, const sFBODesc& Desc)
 {
-	return D3D11RenderTarget::Create(const_cast<D3D11Device*>(this), InName, Format, Desc);
+	return D3D11RenderTarget::Create(this, InName, Format, Desc);
 }
 
 IRenderTarget::UniquePtr D3D11Device::CreateUniqueRenderTarget(const std::string InName, const EFormat Format, const sFBODesc& Desc)
 {
-	return D3D11RenderTarget::CreateUnique(const_cast<D3D11Device*>(this), InName, Format, Desc);
+	return D3D11RenderTarget::CreateUnique(this, InName, Format, Desc);
 }
 
 IDepthTarget::SharedPtr D3D11Device::CreateDepthTarget(const std::string InName, const EFormat Format, const sFBODesc& Desc)
 {
-	return D3D11DepthTarget::Create(const_cast<D3D11Device*>(this), InName, Format, Desc);
+	return D3D11DepthTarget::Create(this, InName, Format, Desc);
 }
 
 IDepthTarget::UniquePtr D3D11Device::CreateUniqueDepthTarget(const std::string InName, const EFormat Format, const sFBODesc& Desc)
 {
-	return D3D11DepthTarget::CreateUnique(const_cast<D3D11Device*>(this), InName, Format, Desc);
+	return D3D11DepthTarget::CreateUnique(this, InName, Format, Desc);
 }
 
 IUnorderedAccessTarget::SharedPtr D3D11Device::CreateUnorderedAccessTarget(const std::string InName, const EFormat Format, const sFBODesc& Desc, bool InEnableSRV)
 {
-	return D3D11UnorderedAccessTarget::Create(const_cast<D3D11Device*>(this), InName, Format, Desc, InEnableSRV);
+	return D3D11UnorderedAccessTarget::Create(this, InName, Format, Desc, InEnableSRV);
 }
 
 IUnorderedAccessTarget::UniquePtr D3D11Device::CreateUniqueUnorderedAccessTarget(const std::string InName, const EFormat Format, const sFBODesc& Desc, bool InEnableSRV)
 {
-	return D3D11UnorderedAccessTarget::CreateUnique(const_cast<D3D11Device*>(this), InName, Format, Desc, InEnableSRV);
+	return D3D11UnorderedAccessTarget::CreateUnique(this, InName, Format, Desc, InEnableSRV);
 }
 
-IPipeline::SharedPtr D3D11Device::CreatePipeline(const std::string& InName, const sPipelineDesc& InDesc) const
+IPipeline::SharedPtr D3D11Device::CreatePipeline(const std::string& InName, const sPipelineDesc& InDesc)
 {
-	return D3D11Pipeline::Create(const_cast<D3D11Device*>(this), InName, InDesc);
+	return D3D11Pipeline::Create(this, InName, InDesc);
 }
 
-IPipeline::UniquePtr D3D11Device::CreateUniquePipeline(const std::string& InName, const sPipelineDesc& InDesc) const
+IPipeline::UniquePtr D3D11Device::CreateUniquePipeline(const std::string& InName, const sPipelineDesc& InDesc)
 {
-	return D3D11Pipeline::CreateUnique(const_cast<D3D11Device*>(this), InName, InDesc);
+	return D3D11Pipeline::CreateUnique(this, InName, InDesc);
 }
 
-IComputePipeline::SharedPtr D3D11Device::CreateComputePipeline(const std::string& InName, const sComputePipelineDesc& InDesc) const
+IComputePipeline::SharedPtr D3D11Device::CreateComputePipeline(const std::string& InName, const sComputePipelineDesc& InDesc)
 {
-	return D3D11ComputePipeline::CreateUnique(const_cast<D3D11Device*>(this), InName, InDesc);
+	return D3D11ComputePipeline::CreateUnique(this, InName, InDesc);
 }
 
-IComputePipeline::UniquePtr D3D11Device::CreateUniqueComputePipeline(const std::string& InName, const sComputePipelineDesc& InDesc) const
+IComputePipeline::UniquePtr D3D11Device::CreateUniqueComputePipeline(const std::string& InName, const sComputePipelineDesc& InDesc)
 {
-	return D3D11ComputePipeline::CreateUnique(const_cast<D3D11Device*>(this), InName, InDesc);
+	return D3D11ComputePipeline::CreateUnique(this, InName, InDesc);
 }
 
-ITexture2D::SharedPtr D3D11Device::CreateTexture2D(const std::wstring FilePath, const std::string InName, std::uint32_t DefaultRootParameterIndex) const
+ITexture2D::SharedPtr D3D11Device::CreateTexture2D(const std::wstring FilePath, const std::string InName, std::uint32_t DefaultRootParameterIndex)
 {
-	return D3D11Texture::Create(const_cast<D3D11Device*>(this), FilePath, InName, DefaultRootParameterIndex);
+	return D3D11Texture::Create(this, FilePath, InName, DefaultRootParameterIndex);
 }
 
-ITexture2D::UniquePtr D3D11Device::CreateUniqueTexture2D(const std::wstring FilePath, const std::string InName, std::uint32_t DefaultRootParameterIndex) const
+ITexture2D::UniquePtr D3D11Device::CreateUniqueTexture2D(const std::wstring FilePath, const std::string InName, std::uint32_t DefaultRootParameterIndex)
 {
-	return D3D11Texture::CreateUnique(const_cast<D3D11Device*>(this), FilePath, InName, DefaultRootParameterIndex);
+	return D3D11Texture::CreateUnique(this, FilePath, InName, DefaultRootParameterIndex);
 }
 
-ITexture2D::SharedPtr D3D11Device::CreateTexture2D(const std::string InName, void* InBuffer, const std::size_t InSize, const sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex) const
+ITexture2D::SharedPtr D3D11Device::CreateTexture2D(const std::string InName, void* InBuffer, const std::size_t InSize, const sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex)
 {
-	return D3D11Texture::Create(const_cast<D3D11Device*>(this), InName, InBuffer, InSize, InDesc, DefaultRootParameterIndex);
+	return D3D11Texture::Create(this, InName, InBuffer, InSize, InDesc, DefaultRootParameterIndex);
 }
 
-ITexture2D::UniquePtr D3D11Device::CreateUniqueTexture2D(const std::string InName, void* InBuffer, const std::size_t InSize, const sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex) const
+ITexture2D::UniquePtr D3D11Device::CreateUniqueTexture2D(const std::string InName, void* InBuffer, const std::size_t InSize, const sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex)
 {
-	return D3D11Texture::CreateUnique(const_cast<D3D11Device*>(this), InName, InBuffer, InSize, InDesc, DefaultRootParameterIndex);
+	return D3D11Texture::CreateUnique(this, InName, InBuffer, InSize, InDesc, DefaultRootParameterIndex);
 }
 
-ITexture2D::SharedPtr D3D11Device::CreateEmptyTexture2D(const std::string InName, const sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex) const
+ITexture2D::SharedPtr D3D11Device::CreateEmptyTexture2D(const std::string InName, const sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex)
 {
-	return D3D11Texture::CreateUnique(const_cast<D3D11Device*>(this), InName, InDesc, DefaultRootParameterIndex);
+	return D3D11Texture::CreateUnique(this, InName, InDesc, DefaultRootParameterIndex);
 }
 
-ITexture2D::UniquePtr D3D11Device::CreateUniqueEmptyTexture2D(const std::string InName, const sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex) const
+ITexture2D::UniquePtr D3D11Device::CreateUniqueEmptyTexture2D(const std::string InName, const sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex)
 {
-	return D3D11Texture::CreateUnique(const_cast<D3D11Device*>(this), InName, InDesc, DefaultRootParameterIndex);
+	return D3D11Texture::CreateUnique(this, InName, InDesc, DefaultRootParameterIndex);
 }
 
-//ITiledTexture::SharedPtr D3D11Device::CreateTiledTexture(const std::string InName, const std::uint32_t InTileX, const std::uint32_t InTileY, const sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex) const
+//ITiledTexture::SharedPtr D3D11Device::CreateTiledTexture(const std::string InName, const std::uint32_t InTileX, const std::uint32_t InTileY, const sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex)
 //{
-//	return D3D11TiledTexture::Create(const_cast<D3D11Device*>(this), InName, InTileX, InTileY, InDesc, DefaultRootParameterIndex);
+//	return D3D11TiledTexture::Create(this, InName, InTileX, InTileY, InDesc, DefaultRootParameterIndex);
 //}
 //
-//ITiledTexture::UniquePtr D3D11Device::CreateUniqueTiledTexture(const std::string InName, const std::uint32_t InTileX, const std::uint32_t InTileY, const sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex) const
+//ITiledTexture::UniquePtr D3D11Device::CreateUniqueTiledTexture(const std::string InName, const std::uint32_t InTileX, const std::uint32_t InTileY, const sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex)
 //{
-//	return D3D11TiledTexture::CreateUnique(const_cast<D3D11Device*>(this), InName, InTileX, InTileY, InDesc, DefaultRootParameterIndex);
+//	return D3D11TiledTexture::CreateUnique(this, InName, InTileX, InTileY, InDesc, DefaultRootParameterIndex);
 //}

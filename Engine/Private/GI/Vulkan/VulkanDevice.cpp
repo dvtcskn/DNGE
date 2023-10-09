@@ -142,72 +142,72 @@ bool VulkanDevice::GetDeviceIdentification(std::wstring& InVendorID, std::wstrin
 	return true;
 }
 
-IGraphicsCommandContext::SharedPtr VulkanDevice::CreateGraphicsCommandContext() const
+IGraphicsCommandContext::SharedPtr VulkanDevice::CreateGraphicsCommandContext()
 {
 	return nullptr;
 }
 
-IGraphicsCommandContext::UniquePtr VulkanDevice::CreateUniqueGraphicsCommandContext() const
+IGraphicsCommandContext::UniquePtr VulkanDevice::CreateUniqueGraphicsCommandContext()
 {
 	return nullptr;
 }
 
-IComputeCommandContext::SharedPtr VulkanDevice::CreateComputeCommandContext() const
+IComputeCommandContext::SharedPtr VulkanDevice::CreateComputeCommandContext()
 {
 	return IComputeCommandContext::SharedPtr();
 }
 
-IComputeCommandContext::UniquePtr VulkanDevice::CreateUniqueComputeCommandContext() const
+IComputeCommandContext::UniquePtr VulkanDevice::CreateUniqueComputeCommandContext()
 {
 	return IComputeCommandContext::UniquePtr();
 }
 
-ICopyCommandContext::SharedPtr VulkanDevice::CreateCopyCommandContext() const
+ICopyCommandContext::SharedPtr VulkanDevice::CreateCopyCommandContext()
 {
 	return ICopyCommandContext::SharedPtr();
 }
 
-ICopyCommandContext::UniquePtr VulkanDevice::CreateUniqueCopyCommandContext() const
+ICopyCommandContext::UniquePtr VulkanDevice::CreateUniqueCopyCommandContext()
 {
 	return ICopyCommandContext::UniquePtr();
 }
 
-IConstantBuffer::SharedPtr VulkanDevice::CreateConstantBuffer(std::string InName, const sBufferDesc& InDesc, std::uint32_t InRootParameterIndex) const
+IConstantBuffer::SharedPtr VulkanDevice::CreateConstantBuffer(std::string InName, const sBufferDesc& InDesc, std::uint32_t InRootParameterIndex)
 {
 	return nullptr;
 }
 
-IConstantBuffer::UniquePtr VulkanDevice::CreateUniqueConstantBuffer(std::string InName, const sBufferDesc& InDesc, std::uint32_t InRootParameterIndex) const
+IConstantBuffer::UniquePtr VulkanDevice::CreateUniqueConstantBuffer(std::string InName, const sBufferDesc& InDesc, std::uint32_t InRootParameterIndex)
 {
 	return nullptr;
 }
 
-IVertexBuffer::SharedPtr VulkanDevice::CreateVertexBuffer(std::string InName, const sBufferDesc& InDesc, sBufferSubresource* InSubresource) const
+IVertexBuffer::SharedPtr VulkanDevice::CreateVertexBuffer(std::string InName, const sBufferDesc& InDesc, sBufferSubresource* InSubresource)
 {
 	return nullptr;
 }
 
-IVertexBuffer::UniquePtr VulkanDevice::CreateUniqueVertexBuffer(std::string InName, const sBufferDesc& InDesc, sBufferSubresource* InSubresource) const
+IVertexBuffer::UniquePtr VulkanDevice::CreateUniqueVertexBuffer(std::string InName, const sBufferDesc& InDesc, sBufferSubresource* InSubresource)
 {
 	return nullptr;
 }
 
-IIndexBuffer::SharedPtr VulkanDevice::CreateIndexBuffer(std::string InName, const sBufferDesc& InDesc, sBufferSubresource* InSubresource) const
+IIndexBuffer::SharedPtr VulkanDevice::CreateIndexBuffer(std::string InName, const sBufferDesc& InDesc, sBufferSubresource* InSubresource)
 {
 	return nullptr;
 }
 
-IIndexBuffer::UniquePtr VulkanDevice::CreateUniqueIndexBuffer(std::string InName, const sBufferDesc& InDesc, sBufferSubresource* InSubresource) const
+IIndexBuffer::UniquePtr VulkanDevice::CreateUniqueIndexBuffer(std::string InName, const sBufferDesc& InDesc, sBufferSubresource* InSubresource)
 {
 	return nullptr;
 }
 
-IFrameBuffer::SharedPtr VulkanDevice::CreateFrameBuffer(const std::string InName, const sFrameBufferAttachmentInfo& InAttachments) const
+IFrameBuffer::SharedPtr VulkanDevice::CreateFrameBuffer(const std::string InName, const sFrameBufferAttachmentInfo& InAttachments)
 {
 	return nullptr;
 }
 
-IFrameBuffer::UniquePtr VulkanDevice::CreateUniqueFrameBuffer(const std::string InName, const sFrameBufferAttachmentInfo& InAttachments) const
+IFrameBuffer::UniquePtr VulkanDevice::CreateUniqueFrameBuffer(const std::string InName, const sFrameBufferAttachmentInfo& InAttachments)
 {
 	return nullptr;
 }
@@ -242,62 +242,62 @@ IUnorderedAccessTarget::UniquePtr VulkanDevice::CreateUniqueUnorderedAccessTarge
 	return IUnorderedAccessTarget::UniquePtr();
 }
 
-IPipeline::SharedPtr VulkanDevice::CreatePipeline(const std::string& InName, const sPipelineDesc& InDesc) const
+IPipeline::SharedPtr VulkanDevice::CreatePipeline(const std::string& InName, const sPipelineDesc& InDesc)
 {
 	return nullptr;
 }
 
-IPipeline::UniquePtr VulkanDevice::CreateUniquePipeline(const std::string& InName, const sPipelineDesc& InDesc) const
+IPipeline::UniquePtr VulkanDevice::CreateUniquePipeline(const std::string& InName, const sPipelineDesc& InDesc)
 {
 	return nullptr;
 }
 
-IComputePipeline::SharedPtr VulkanDevice::CreateComputePipeline(const std::string& InName, const sComputePipelineDesc& InDesc) const
+IComputePipeline::SharedPtr VulkanDevice::CreateComputePipeline(const std::string& InName, const sComputePipelineDesc& InDesc)
 {
 	return nullptr;
 }
 
-IComputePipeline::UniquePtr VulkanDevice::CreateUniqueComputePipeline(const std::string& InName, const sComputePipelineDesc& InDesc) const
+IComputePipeline::UniquePtr VulkanDevice::CreateUniqueComputePipeline(const std::string& InName, const sComputePipelineDesc& InDesc)
 {
 	return nullptr;
 }
 
-ITexture2D::SharedPtr VulkanDevice::CreateTexture2D(const std::wstring FilePath, const std::string InName, std::uint32_t DefaultRootParameterIndex) const
+ITexture2D::SharedPtr VulkanDevice::CreateTexture2D(const std::wstring FilePath, const std::string InName, std::uint32_t DefaultRootParameterIndex)
 {
 	return nullptr;
 }
 
-ITexture2D::UniquePtr VulkanDevice::CreateUniqueTexture2D(const std::wstring FilePath, const std::string InName, std::uint32_t DefaultRootParameterIndex) const
+ITexture2D::UniquePtr VulkanDevice::CreateUniqueTexture2D(const std::wstring FilePath, const std::string InName, std::uint32_t DefaultRootParameterIndex)
 {
 	return nullptr;
 }
 
-ITexture2D::SharedPtr VulkanDevice::CreateTexture2D(const std::string InName, void* InBuffer, const std::size_t InSize, const sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex) const
+ITexture2D::SharedPtr VulkanDevice::CreateTexture2D(const std::string InName, void* InBuffer, const std::size_t InSize, const sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex)
 {
 	return nullptr;
 }
 
-ITexture2D::UniquePtr VulkanDevice::CreateUniqueTexture2D(const std::string InName, void* InBuffer, const std::size_t InSize, const sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex) const
+ITexture2D::UniquePtr VulkanDevice::CreateUniqueTexture2D(const std::string InName, void* InBuffer, const std::size_t InSize, const sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex)
 {
 	return nullptr;
 }
 
-ITexture2D::SharedPtr VulkanDevice::CreateEmptyTexture2D(const std::string InName, const sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex) const
+ITexture2D::SharedPtr VulkanDevice::CreateEmptyTexture2D(const std::string InName, const sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex)
 {
 	return nullptr;
 }
 
-ITexture2D::UniquePtr VulkanDevice::CreateUniqueEmptyTexture2D(const std::string InName, const sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex) const
+ITexture2D::UniquePtr VulkanDevice::CreateUniqueEmptyTexture2D(const std::string InName, const sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex)
 {
 	return nullptr;
 }
 
-//ITiledTexture::SharedPtr VulkanDevice::CreateTiledTexture(const std::string InName, const std::uint32_t InTileX, const std::uint32_t InTileY, const sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex) const
+//ITiledTexture::SharedPtr VulkanDevice::CreateTiledTexture(const std::string InName, const std::uint32_t InTileX, const std::uint32_t InTileY, const sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex)
 //{
 //	return nullptr;
 //}
 //
-//ITiledTexture::UniquePtr VulkanDevice::CreateUniqueTiledTexture(const std::string InName, const std::uint32_t InTileX, const std::uint32_t InTileY, const sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex) const
+//ITiledTexture::UniquePtr VulkanDevice::CreateUniqueTiledTexture(const std::string InName, const std::uint32_t InTileX, const std::uint32_t InTileY, const sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex)
 //{
 //	return nullptr;
 //}

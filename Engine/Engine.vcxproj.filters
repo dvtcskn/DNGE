@@ -539,9 +539,6 @@
     <ClCompile Include="Private\Gameplay\PrimitiveComponent.cpp">
       <Filter>Gameplay\Private\Components</Filter>
     </ClCompile>
-    <ClCompile Include="Private\Core\Camera.cpp">
-      <Filter>Core\Private</Filter>
-    </ClCompile>
     <ClCompile Include="Private\GI\Vulkan\VulkanBuffer.cpp">
       <Filter>GI\Private\Vulkan</Filter>
     </ClCompile>
