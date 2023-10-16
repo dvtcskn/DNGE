@@ -27,12 +27,6 @@
     <ClCompile Include="CanvasBase.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="cbScaleBox.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="cbTextBox.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="DefaultLevel.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -107,13 +101,7 @@
     <ClInclude Include="CanvasBase.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="cbScaleBox.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="cbString.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="cbTextBox.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="DefaultLevel.h">

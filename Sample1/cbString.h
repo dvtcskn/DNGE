@@ -132,6 +132,15 @@ public:
 		: cbgui::cbText(Text, TextDesc, cbFontResources::Get().GetFontFamily(0))
 	{}
 
+	cbString(const cbString& String)
+		: Super(String)
+	{}
+
+	cbWidget::SharedPtr CloneWidget()
+	{
+		return cbString::Create(*this);
+	}
+
 	void SetString(const std::string& Text, const std::optional<cbgui::cbTextDesc> TextDesc = std::nullopt) 
 	{
 		SetText(std::u32string(Text.begin(), Text.end()), TextDesc);

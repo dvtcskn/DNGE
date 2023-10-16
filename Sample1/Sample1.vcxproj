@@ -144,8 +144,6 @@
     <ClCompile Include="AssetManager.cpp" />
     <ClCompile Include="Canvas.cpp" />
     <ClCompile Include="CanvasBase.cpp" />
-    <ClCompile Include="cbScaleBox.cpp" />
-    <ClCompile Include="cbTextBox.cpp" />
     <ClCompile Include="DefaultLevel.cpp" />
     <ClCompile Include="GCanvas.cpp" />
     <ClCompile Include="GAIController.cpp" />
@@ -173,9 +171,7 @@
     <ClInclude Include="AssetManager.h" />
     <ClInclude Include="Canvas.h" />
     <ClInclude Include="CanvasBase.h" />
-    <ClInclude Include="cbScaleBox.h" />
     <ClInclude Include="cbString.h" />
-    <ClInclude Include="cbTextBox.h" />
     <ClInclude Include="DefaultLevel.h" />
     <ClInclude Include="GCanvas.h" />
     <ClInclude Include="framework.h" />
