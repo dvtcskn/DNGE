@@ -26,7 +26,6 @@
 
 #include "pch.h"
 #include "GCanvas.h"
-#include "cbScaleBox.h"
 #include "cbString.h"
 #include <cbgui.h>
 #include <AbstractGI/MaterialManager.h>
