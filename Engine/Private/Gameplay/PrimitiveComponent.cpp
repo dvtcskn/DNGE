@@ -204,7 +204,7 @@ sPrimitiveComponent* sPrimitiveComponent::GetComponentAttachmentRoot() const
 	return const_cast<sPrimitiveComponent*>(this);
 }
 
-void sPrimitiveComponent::Serialize(Archive& archive)
+void sPrimitiveComponent::Serialize(sArchive& archive)
 {
 	for (auto& Child : Children)
 		Child->Serialize(archive);

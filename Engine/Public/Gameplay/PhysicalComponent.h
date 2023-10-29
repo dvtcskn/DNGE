@@ -48,7 +48,7 @@ public:
 
 	virtual FVector GetVelocity() const override final;
 
-	virtual void Serialize(Archive& archive);
+	virtual void Serialize(sArchive& archive);
 
 	virtual void BindFunctionToCollisionStart(std::function<void(sPhysicalComponent*)> pfCollisionStart) { fCollisionStart = pfCollisionStart; }
 	virtual void BindFunctionToCollisionEnd(std::function<void(sPhysicalComponent*)> pfCollisionEnd) { fCollisionEnd = pfCollisionEnd; }

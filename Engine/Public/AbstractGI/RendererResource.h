@@ -38,7 +38,7 @@ class sRendererResource
 public:
 	virtual std::string GetName() const = 0;
 
-	virtual void Serialize(Archive& archive) = 0;
+	virtual void Serialize(sArchive& archive) = 0;
 };
 
 enum class EBasicMeshType
@@ -140,7 +140,7 @@ public:
 
 	void SetMeshTransform(const sMeshConstantBufferAttributes& ObjectConstants);
 	void SetMeshTransform(FVector Location, FVector Scale, FVector4 Rotation);
-	virtual void Serialize(Archive& archive) override;
+	virtual void Serialize(sArchive& archive) override;
 
 private:
 	std::string Name;

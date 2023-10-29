@@ -30,114 +30,66 @@
 #include <fstream>
 #include <sstream>
 
-Archive::Archive()
-{
-	readMode = false;
-	pos = 0;
-
-	version = 1;
-	dataSize = 128; // this will grow if necessary anyway...
-	DATA = new char[dataSize];
-	(*this) << version;
-}
-
-Archive::Archive(const std::string& InfileName, bool InreadMode)
-	: readMode(InreadMode)
-	, fileName(InfileName)
-	, version(1)
-	, DATA(nullptr)
-	, dataSize(128)
+sArchive::sArchive(std::optional<std::string> InFileName)
+	: FileName(InFileName.has_value() ? *InFileName : "")
 	, pos(0)
 {
-	if (!fileName.empty())
+	if (!FileName.empty())
 	{
-		if (readMode)
+		std::ifstream file(FileName, std::ios::binary | std::ios::ate);
+		if (file.is_open())
 		{
-			std::ifstream file(fileName, std::ios::binary | std::ios::ate);
-			if (file.is_open())
+			std::string line;
+			while (std::getline(file, line))
 			{
-				dataSize = (size_t)file.tellg();
-				file.seekg(0, file.beg);
-				DATA = new char[(size_t)dataSize];
-				file.read(DATA, dataSize);
-				file.close();
-				(*this) >> version;
-				if (version < 1.0f)
-				{
-					std::stringstream ss("");
-					ss << "The archive version (" << version << ") is no longer supported!";
-					Close();
-				}
-				if (version > 1.0f)
-				{
-					std::stringstream ss("");
 
-					ss << "The archive version (" << version << ") is higher than the program's (" << 1.0f << ")!";
-					Close();
-				}
 			}
-		}
-		else
-		{
-
-			readMode = false;
-			pos = 0;
-
-			version = 1;
-			dataSize = 128; // this will grow if necessary anyway...
-			DATA = new char[dataSize];
-			(*this) << version;
 		}
 	}
 }
 
-Archive::~Archive()
+sArchive::~sArchive()
 {
 	Close();
 }
 
-void Archive::SetReadModeAndResetPos(bool isReadMode)
+void sArchive::ResetPos()
 {
-	readMode = isReadMode;
 	pos = 0;
+}
 
-	if (readMode)
+void sArchive::Close()
+{
+	if (!FileName.empty())
 	{
-		(*this) >> version;
+		SaveToFile(FileName);
 	}
-	else
+	Data.clear();
+}
+
+void sArchive::OpenFile(std::string FileName)
+{
+	if (!FileName.empty())
 	{
-		(*this) << version;
+		std::ifstream file(FileName, std::ios::binary | std::ios::ate);
+		if (file.is_open())
+		{
+			std::string line;
+			while (std::getline(file, line))
+			{
+
+			}
+		}
 	}
 }
 
-bool Archive::IsOpen()
+bool sArchive::SaveToFile(const std::string& fileName)
 {
-	// when it is open, DATA is not null because it contains the version number at least!
-	return DATA != nullptr;
-}
-
-void Archive::Close()
-{
-	if (!readMode && !fileName.empty())
-	{
-		SaveFile(fileName);
-	}
-	delete (DATA);
-	(DATA) = nullptr;
-}
-
-bool Archive::SaveFile(const std::string& fileName)
-{
-	if (pos <= 0)
-	{
-		return false;
-	}
-
+	ResetPos();
 	std::ofstream file(fileName, std::ios::binary | std::ios::trunc);
 	if (file.is_open())
 	{
-		file.write(DATA, (std::streamsize)pos);
+		file.write((char*)Data.data(), (std::streamsize)pos);
 		file.close();
 		return true;
 	}
@@ -145,12 +97,7 @@ bool Archive::SaveFile(const std::string& fileName)
 	return false;
 }
 
-std::string Archive::GetSourceDirectory()
+std::string sArchive::GetFileName()
 {
-	return "..//Content";
-}
-
-std::string Archive::GetSourceFileName()
-{
-	return fileName;
+	return FileName;
 }

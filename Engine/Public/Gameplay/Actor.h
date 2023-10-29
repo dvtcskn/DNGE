@@ -110,7 +110,7 @@ public:
 	void Possess(sController* Controller);
 	void UnPossess();
 
-	virtual void Serialize(Archive& archive);
+	virtual void Serialize(sArchive& archive);
 
 	virtual void InputProcess(const GMouseInput& MouseInput, const GKeyboardChar& KeyboardChar) { };
 

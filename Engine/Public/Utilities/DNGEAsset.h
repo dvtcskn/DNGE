@@ -99,7 +99,7 @@ struct CameraAsset
 
 	bool IsOrtho;
 
-	void Write(Archive& archive) const
+	void Write(sArchive& archive) const
 	{
 		//archive << reverseZ;
 		//archive << AspectRatio;
@@ -137,7 +137,7 @@ struct CameraAsset
 
 	void Write(std::string InPath) const
 	{
-		//Archive archive(InPath, false);
+		//sArchive archive(InPath, false);
 		//archive << reverseZ;
 		//archive << AspectRatio;
 		//archive << Fov;
@@ -172,7 +172,7 @@ struct CameraAsset
 		//archive << sceneScaling;
 	}
 
-	void Read(Archive& archive)
+	void Read(sArchive& archive)
 	{
 		//archive >> reverseZ;
 		//archive >> AspectRatio;
@@ -211,7 +211,7 @@ struct CameraAsset
 
 	void Read(std::string InPath)
 	{
-		//Archive archive(InPath);
+		//sArchive archive(InPath);
 		//archive >> reverseZ;
 		//archive >> AspectRatio;
 		//archive >> Fov;
@@ -269,7 +269,7 @@ struct MeshAsset : public DNGEAsset
 
 	void Write() const
 	{
-		/*Archive archive(Path, false);
+		/*sArchive archive(Path, false);
 		archive << static_cast<std::underlying_type<DNGEAssetType>::type>(Type);
 
 		archive << Name;
@@ -306,7 +306,7 @@ struct MeshAsset : public DNGEAsset
 
 	void Read(std::string InPath, bool InSkipType = false)
 	{
-		/*Archive archive(InPath);
+		/*sArchive archive(InPath);
 		Type = DNGEAssetType::Mesh;
 
 		if (InSkipType)
@@ -376,7 +376,7 @@ struct MaterialAsset : public DNGEAsset
 		std::vector<sShaderAttachment> ShaderAttachments;
 		mutable std::uint32_t ShaderAttachmentsSize;
 
-		void Write(Archive& InArchive) const
+		void Write(sArchive& InArchive) const
 		{
 			//InArchive << Name;
 
@@ -504,7 +504,7 @@ struct MaterialAsset : public DNGEAsset
 
 	void Write() const
 	{
-		/*Archive archive(Path, false);
+		/*sArchive archive(Path, false);
 		archive << static_cast<std::underlying_type<DNGEAssetType>::type>(Type);
 
 		archive << Name;
@@ -519,7 +519,7 @@ struct MaterialAsset : public DNGEAsset
 
 	void Read(std::string InPath, bool InSkipType = false)
 	{
-		/*Archive archive(InPath);
+		/*sArchive archive(InPath);
 		Type = DNGEAssetType::Mesh;
 
 		if (InSkipType)
@@ -558,7 +558,7 @@ struct MaterialInstanceAsset : public DNGEAsset
 
 	void Write() const
 	{
-		/*Archive archive(Path, false);
+		/*sArchive archive(Path, false);
 		archive << static_cast<std::underlying_type<DNGEAssetType>::type>(Type);
 
 		archive << Name;
@@ -603,7 +603,7 @@ struct MapAsset
 		mutable std::uint32_t MaterialSize;
 		std::vector<MaterialData> Materials;
 
-		void Write(Archive& archive) const
+		void Write(sArchive& archive) const
 		{
 			/*MaterialSize = static_cast<std::uint32_t>(Materials.size());
 			archive << MaterialSize;
@@ -652,7 +652,7 @@ struct MapAsset
 		mutable std::uint32_t ActorSize;
 		std::vector<ActorData> Actors;
 
-		void Write(Archive& archive) const
+		void Write(sArchive& archive) const
 		{
 			//ActorSize = static_cast<std::uint32_t>(Actors.size());
 			//archive << ActorSize;
@@ -701,7 +701,7 @@ struct MapAsset
 
 	void Write() const
 	{
-		/*Archive archive(Path, false);
+		/*sArchive archive(Path, false);
 
 		archive << Name;
 		archive << Path;

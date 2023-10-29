@@ -87,7 +87,7 @@ public:
 		//	if (p.path().extension() == MapExt)
 		//	{
 		//		std::string Path = FileManager::WideStringToString(p.path().c_str());
-		//		Archive archive(Path);
+		//		sArchive archive(Path);
 
 		//		MapAsset Asset;
 		//		archive >> Asset.Name;
@@ -181,7 +181,7 @@ public:
 		//	if (p.path().extension() == ext)
 		//	{
 		//		std::string Path = FileManager::Get().WideStringToString(p.path().c_str());
-		//		Archive archive(Path);
+		//		sArchive archive(Path);
 		//		int Type;
 		//		archive >> Type;
 
@@ -440,7 +440,7 @@ public:
 		//	else if (p.path().extension() == MapExt)
 		//	{
 		//		std::string Path = FileManager::WideStringToString(p.path().c_str());
-		//		Archive archive(Path);
+		//		sArchive archive(Path);
 
 		//		MapAsset Asset;
 		//		archive >> Asset.Name;
@@ -536,7 +536,7 @@ public:
 			if (p.path().extension() == ext)
 			{
 				std::string Path = FileManager::WideStringToString(p.path().c_str());
-				Archive archive(Path);
+				sArchive archive(Path);
 				int Type;
 				archive >> Type;
 
@@ -597,7 +597,7 @@ public:
 		//	if (p.path().extension() == ext)
 		//	{
 		//		std::string Path = FileManager::WideStringToString(p.path().c_str());
-		//		Archive archive(Path);
+		//		sArchive archive(Path);
 		//		int Type;
 		//		archive >> Type;
 
@@ -810,7 +810,7 @@ public:
 			if (p.path().extension() == ext)
 			{
 				std::string Path = FileManager::Get().WideStringToString(p.path().c_str());
-				Archive archive(Path);
+				sArchive archive(Path);
 				int Type;
 				archive >> Type;
 

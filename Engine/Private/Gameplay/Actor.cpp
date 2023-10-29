@@ -238,6 +238,6 @@ void sActor::UnPossess()
 	}
 }
 
-void sActor::Serialize(Archive& archive)
+void sActor::Serialize(sArchive& archive)
 {
 }

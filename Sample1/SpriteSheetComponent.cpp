@@ -414,7 +414,7 @@ void sSpriteSheetComponent::BindFunction_FrameUpdated(std::function<void(std::si
 	fFrameUpdated = pf;
 }
 
-void sSpriteSheetComponent::Serialize(Archive& archive)
+void sSpriteSheetComponent::Serialize(sArchive& archive)
 {
 	//if (archive.IsReadMode())
 	//{

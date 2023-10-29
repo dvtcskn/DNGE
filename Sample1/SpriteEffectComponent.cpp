@@ -166,6 +166,6 @@ void sSpriteEffectComponent::OnDetachFromComponent()
 {
 }
 
-void sSpriteEffectComponent::Serialize(Archive& archive)
+void sSpriteEffectComponent::Serialize(sArchive& archive)
 {
 }

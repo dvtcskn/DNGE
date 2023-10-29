@@ -179,7 +179,7 @@ public:
 
 	void SetTransform(const FVector& Location, const FVector4& Rotation, const std::optional<FVector> Scale = std::nullopt);
 
-	virtual void Serialize(Archive& archive);
+	virtual void Serialize(sArchive& archive);
 
 private:
 	bool AttachComponent(sPrimitiveComponent::SharedPtr Component);

@@ -63,7 +63,7 @@ public:
 
 	void SetMaterial(/*std::int32_t Index,*/ sMaterial::sMaterialInstance* Material);
 
-	virtual void Serialize(Archive& archive) override;
+	virtual void Serialize(sArchive& archive) override;
 
 private:
 	virtual void OnUpdateTransform() override final;

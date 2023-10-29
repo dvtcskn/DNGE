@@ -69,7 +69,7 @@ public:
 	void SetSprite(sSprite* Sprite, std::uint32_t FrameTime, FVector2 Offset = FVector2::Zero());
 	void SetSpriteSheet(sSpriteSheet* Sprite, std::optional<std::uint32_t> FrameTime = std::nullopt, FVector2 Offset = FVector2::Zero());
 
-	virtual void Serialize(Archive& archive) override;
+	virtual void Serialize(sArchive& archive) override;
 
 private:
 	virtual void OnUpdateTransform() override final;

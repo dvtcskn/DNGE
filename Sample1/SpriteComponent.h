@@ -65,7 +65,7 @@ private:
 		virtual sMaterial::sMaterialInstance* GetMaterialInstance(/*std::int32_t Index = 0*/) const override final { return Owner->Sprite->GetMaterialInstance(); }
 		virtual std::string GetMaterialName(/*std::int32_t Index = 0*/) const override final { return Owner->Sprite->GetMaterialInstance()->GetName(); }
 
-		virtual void Serialize(Archive& archive) override {}
+		virtual void Serialize(sArchive& archive) override {}
 
 	private:
 		sSpriteComponent* Owner;
@@ -89,7 +89,7 @@ public:
 	bool IsFlipped() const;
 	void Flip(bool value);
 
-	virtual void Serialize(Archive& archive) override;
+	virtual void Serialize(sArchive& archive) override;
 
 	FVector Offset;
 

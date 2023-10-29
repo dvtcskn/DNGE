@@ -215,6 +215,6 @@ void sMesh::UpdateIndexBufferWithPendingSubresource(IGraphicsCommandContext* Con
 	PendingIndexBufferSubresource = std::nullopt;
 }
 
-void sMesh::Serialize(Archive& archive)
+void sMesh::Serialize(sArchive& archive)
 {
 }

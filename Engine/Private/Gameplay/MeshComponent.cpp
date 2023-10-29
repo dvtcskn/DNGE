@@ -88,7 +88,7 @@ void sMeshComponent::OnUpdateTransform()
 	Mesh->SetMeshTransform(ObjectConstants);
 }
 
-void sMeshComponent::Serialize(Archive& archive)
+void sMeshComponent::Serialize(sArchive& archive)
 {
 	Mesh->Serialize(archive);
 	//if (archive.IsReadMode())

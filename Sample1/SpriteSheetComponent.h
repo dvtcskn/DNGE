@@ -71,7 +71,7 @@ private:
 		virtual sMaterial::sMaterialInstance* GetMaterialInstance(/*std::int32_t Index = 0*/) const override final { return Owner->CurrentKeyFrame->Sprite->GetMaterialInstance(); }
 		virtual std::string GetMaterialName(/*std::int32_t Index = 0*/) const override final { return Owner->CurrentKeyFrame->Sprite->GetMaterialInstance()->GetName(); }
 
-		virtual void Serialize(Archive& archive) override {}
+		virtual void Serialize(sArchive& archive) override {}
 
 	private:
 		sSpriteSheetComponent* Owner;
@@ -111,7 +111,7 @@ public:
 
 	FVector Offset;
 
-	virtual void Serialize(Archive& archive) override;
+	virtual void Serialize(sArchive& archive) override;
 
 	void BindFunction_AnimationStarted(std::function<void()> pf);
 	void BindFunction_AnimationEnded(std::function<void()> pf);

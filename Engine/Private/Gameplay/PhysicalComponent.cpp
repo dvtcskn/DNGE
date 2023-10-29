@@ -100,6 +100,6 @@ void sPhysicalComponent::CollisionEnd(sPhysicalComponent* Component)
 	OnCollisionEnd(Component);
 }
 
-void sPhysicalComponent::Serialize(Archive& archive)
+void sPhysicalComponent::Serialize(sArchive& archive)
 {
 }

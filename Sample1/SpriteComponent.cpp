@@ -147,7 +147,7 @@ void sSpriteComponent::OnDetachFromComponent()
 {
 }
 
-void sSpriteComponent::Serialize(Archive& archive)
+void sSpriteComponent::Serialize(sArchive& archive)
 {
 	//if (archive.IsReadMode())
 	//{
