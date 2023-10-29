@@ -326,7 +326,6 @@ public:
 	}*/
 	inline sArchive& operator >> (std::string& STR)
 	{
-		std::string strdata;
 		for (std::size_t i = pos; i < Data.size(); i++)
 		{
 			char pChar = 0;
@@ -335,11 +334,8 @@ public:
 			if (pChar == 0 || pChar == '\0' || pChar == std::string::npos)
 				break;
 
-			strdata.push_back(pChar);
+			STR.push_back(pChar);
 		}
-
-		STR.assign(strdata);
-		STR.append(strdata);
 
 		return *this;
 	}
