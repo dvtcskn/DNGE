@@ -48,14 +48,28 @@ sArchive::sArchive(std::optional<std::string> InFileName)
 	}
 }
 
+sArchive::sArchive(const std::vector<std::uint8_t>& pData)
+	: FileName("")
+	, pos(0)
+	, Data(pData)
+{
+}
+
+sArchive::sArchive(const std::string& str)
+	: FileName("")
+	, pos(0)
+	, Data(std::vector<std::uint8_t>(str.begin(), str.end()))
+{
+}
+
 sArchive::~sArchive()
 {
 	Close();
 }
 
-void sArchive::ResetPos()
+void sArchive::ResetPos(std::size_t inPos) const
 {
-	pos = 0;
+	pos = inPos;
 }
 
 void sArchive::Close()
@@ -100,4 +114,34 @@ bool sArchive::SaveToFile(const std::string& fileName)
 std::string sArchive::GetFileName()
 {
 	return FileName;
+}
+
+void sArchive::SetData(const std::vector<std::uint8_t>& InData)
+{
+	ResetPos();
+	Data = InData;
+}
+
+void sArchive::SetData(const std::uint8_t* InData, std::size_t Size)
+{
+	ResetPos();
+	Data.clear();
+	Data = std::vector<std::uint8_t>(InData, InData + Size);
+}
+
+void sArchive::SetData(const std::string& InData)
+{
+	ResetPos();
+	Data.clear();
+	for (auto& pData : InData)
+		Data.push_back(pData);
+}
+
+std::string sArchive::GetDataAsString() const
+{
+	return std::string(Data.begin(), Data.end());
+	/*std::string STR;
+	for (auto& pChar : Data)
+		STR.push_back(pChar);
+	return STR;*/
 }

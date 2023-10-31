@@ -417,6 +417,9 @@
     <ClInclude Include="Private\pch.h">
       <Filter>PCH</Filter>
     </ClInclude>
+    <ClInclude Include="Public\Engine\AbstractEngineUtilities.h">
+      <Filter>Engine\Public</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Private\Engine\Engine.cpp">

@@ -29,28 +29,64 @@
 #include "Math/CoreMath.h"
 #include <string>
 #include "Engine/ClassBody.h"
+#include "Engine/AbstractEngineUtilities.h"
 
 class sArchive
 {
 	sBaseClassBody(sClassConstructor, sArchive)
 public:
+	template <typename... Args>
+	sArchive(Args&&... args)
+		: FileName("")
+		, pos(0)
+	{
+		std::tuple<Args...> Params = std::tuple<Args...>(args...);
+		for_each_tuple(Params, [&](const auto& x) {
+			(*this) << x;
+			});
+	}
 	sArchive(std::optional<std::string> FileName = std::nullopt);
+	sArchive(const std::vector<std::uint8_t>& Data);
+	sArchive(const std::string& Data);
 	~sArchive();
-	void ResetPos();
+	void ResetPos(std::size_t pos = 0) const;
 	void Close();
 	void OpenFile(std::string FileName);
 	bool SaveToFile(const std::string& FileName);
 	std::string GetFileName();
+	void SetData(const std::vector<std::uint8_t>& Data);
+	void SetData(const std::uint8_t* Data, std::size_t Size);
+	void SetData(const std::string& Data);
 
-	template<typename T>
-	inline sArchive& operator<<(T data)
+	inline std::size_t GetPosition() const { return pos; }
+	inline std::size_t GetSize() const { return Data.size(); }
+	inline std::vector<std::uint8_t> GetData() const { return Data; }
+	std::string GetDataAsString() const;
+
+	template <typename T>
+	inline sArchive& operator<<(const std::vector<T>& data)
 	{
-		Serialize((int8_t)data);
+		std::size_t Size = data.size();
+		(*this) << Size;
+		for (std::size_t i = 0; i < Size; i++)
+			(*this) << data.at(i);
 		return *this;
 	}
+	inline sArchive& operator<<(const std::string& STR)
+	{
+		for (const auto& pchar : STR)
+			(*this) << pchar;
+
+		std::size_t found = STR.find('\0');
+		if (found == std::string::npos)
+			(*this) << '\0';
+
+		return *this;
+	}
+
 	inline sArchive& operator<<(bool data)
 	{
-		Serialize((uint32_t)(data ? 1 : 0));
+		Serialize((data ? 1 : 0));
 		return *this;
 	}
 	inline sArchive& operator<<(char data)
@@ -60,37 +96,37 @@ public:
 	}
 	inline sArchive& operator<<(unsigned char data)
 	{
-		Serialize((uint8_t)data);
+		Serialize(data);
 		return *this;
 	}
 	inline sArchive& operator<<(int data)
 	{
-		Serialize((int64_t)data);
+		Serialize(data);
 		return *this;
 	}
 	inline sArchive& operator<<(unsigned int data)
 	{
-		Serialize((uint64_t)data);
+		Serialize(data);
 		return *this;
 	}
 	inline sArchive& operator<<(long data)
 	{
-		Serialize((int64_t)data);
+		Serialize(data);
 		return *this;
 	}
 	inline sArchive& operator<<(unsigned long data)
 	{
-		Serialize((uint64_t)data);
+		Serialize(data);
 		return *this;
 	}
 	inline sArchive& operator<<(long long data)
 	{
-		Serialize((int64_t)data);
+		Serialize(data);
 		return *this;
 	}
 	inline sArchive& operator<<(unsigned long long data)
 	{
-		Serialize((uint64_t)data);
+		Serialize(data);
 		return *this;
 	}
 	inline sArchive& operator<<(float data)
@@ -108,17 +144,12 @@ public:
 		Serialize(data);
 		return *this;
 	}
-	/*inline sArchive& operator<<(const DirectX::FVector2& data)
+	inline sArchive& operator<<(const FVector2& data)
 	{
 		Serialize(data);
 		return *this;
 	}
-	inline sArchive& operator<<(const DirectX::FVector3& data)
-	{
-		Serialize(data);
-		return *this;
-	}
-	inline sArchive& operator<<(const DirectX::FVector4& data)
+	inline sArchive& operator<<(const FVector4& data)
 	{
 		Serialize(data);
 		return *this;
@@ -137,193 +168,50 @@ public:
 	{
 		Serialize(data);
 		return *this;
-	}*/
-	/*inline sArchive& operator<<(const XMFLOAT3X3& data)
+	}
+	inline sArchive& operator<<(const DirectX::XMFLOAT3X3& data)
 	{
 		Serialize(data);
 		return *this;
 	}
-	inline sArchive& operator<<(const XMFLOAT4X3& data)
+	inline sArchive& operator<<(const DirectX::XMFLOAT4X3& data)
 	{
 		Serialize(data);
 		return *this;
-	}*/
-	/*inline sArchive& operator<<(const DirectX::FMatrix& data)
+	}
+	inline sArchive& operator<<(const FMatrix& data)
 	{
 		Serialize(data);
 		return *this;
-	}*/
-	//inline sArchive& operator<<(const XMUINT2& data)
-	//{
-	//	Serialize(data);
-	//	return *this;
-	//}
-	//inline sArchive& operator<<(const XMUINT3& data)
-	//{
-	//	Serialize(data);
-	//	return *this;
-	//}
-	//inline sArchive& operator<<(const XMUINT4& data)
-	//{
-	//	Serialize(data);
-	//	return *this;
-	//}
-	inline sArchive& operator<<(const std::string& STR)
-	{
-		for (const auto& pchar : STR)
-			(*this) << pchar;
-
-		std::size_t found = STR.find('\0');
-		if (found == std::string::npos)
-			(*this) << '\0';
-
-		return *this;
 	}
 
-	template<typename T>
-	inline sArchive& operator >> (T& data)
+	template <typename T>
+	inline sArchive& operator>>(std::vector<T>& data)
 	{
-		Deserialize(data);
+		std::size_t Size = 0;
+		(*this) >> Size;
+		for (std::size_t i = 0; i < Size; i++)
+		{
+			T t;
+			(*this) >> t;
+
+			data.push_back(t);
+		}
 		return *this;
 	}
-	inline sArchive& operator >> (bool& data)
+	template <typename T>
+	inline void operator>>(std::vector<T>& data) const
 	{
-		uint32_t temp;
-		Deserialize(temp);
-		data = (temp == 1);
-		return *this;
+		std::size_t Size = 0;
+		(*this) >> Size;
+		for (std::size_t i = 0; i < Size; i++)
+		{
+			T t;
+			(*this) >> t;
+
+			data.push_back(t);
+		}
 	}
-	inline sArchive& operator >> (char& data)
-	{
-		int8_t temp;
-		Deserialize(temp);
-		data = (char)temp;
-		return *this;
-	}
-	inline sArchive& operator >> (unsigned char& data)
-	{
-		uint8_t temp;
-		Deserialize(temp);
-		data = (unsigned char)temp;
-		return *this;
-	}
-	inline sArchive& operator >> (int& data)
-	{
-		int64_t temp;
-		Deserialize(temp);
-		data = (int)temp;
-		return *this;
-	}
-	inline sArchive& operator >> (unsigned int& data)
-	{
-		uint64_t temp;
-		Deserialize(temp);
-		data = (unsigned int)temp;
-		return *this;
-	}
-	inline sArchive& operator >> (long& data)
-	{
-		int64_t temp;
-		Deserialize(temp);
-		data = (long)temp;
-		return *this;
-	}
-	inline sArchive& operator >> (unsigned long& data)
-	{
-		uint64_t temp;
-		Deserialize(temp);
-		data = (unsigned long)temp;
-		return *this;
-	}
-	inline sArchive& operator >> (long long& data)
-	{
-		int64_t temp;
-		Deserialize(temp);
-		data = (long long)temp;
-		return *this;
-	}
-	inline sArchive& operator >> (unsigned long long& data)
-	{
-		uint64_t temp;
-		Deserialize(temp);
-		data = (unsigned long long)temp;
-		return *this;
-	}
-	inline sArchive& operator >> (float& data)
-	{
-		Deserialize(data);
-		return *this;
-	}
-	inline sArchive& operator >> (double& data)
-	{
-		Deserialize(data);
-		return *this;
-	}
-	inline sArchive& operator >> (FVector& data)
-	{
-		Deserialize(data);
-		return *this;
-	}
-	/*inline sArchive& operator >> (DirectX::FVector2& data)
-	{
-		Deserialize(data);
-		return *this;
-	}
-	inline sArchive& operator >> (DirectX::FVector3& data)
-	{
-		Deserialize(data);
-		return *this;
-	}
-	inline sArchive& operator >> (DirectX::FVector4& data)
-	{
-		Deserialize(data);
-		return *this;
-	}
-	inline sArchive& operator >> (DirectX::XMFLOAT2& data)
-	{
-		Deserialize(data);
-		return *this;
-	}
-	inline sArchive& operator >> (DirectX::XMFLOAT3& data)
-	{
-		Deserialize(data);
-		return *this;
-	}
-	inline sArchive& operator >> (DirectX::XMFLOAT4& data)
-	{
-		Deserialize(data);
-		return *this;
-	}*/
-	/*inline sArchive& operator >> (XMFLOAT3X3& data)
-	{
-		Deserialize(data);
-		return *this;
-	}
-	inline sArchive& operator >> (XMFLOAT4X3& data)
-	{
-		Deserialize(data);
-		return *this;
-	}*/
-	/*inline sArchive& operator >> (DirectX::FMatrix& data)
-	{
-		Deserialize(data);
-		return *this;
-	}*/
-	/*inline sArchive& operator >> (XMUINT2& data)
-	{
-		Deserialize(data);
-		return *this;
-	}
-	inline sArchive& operator >> (XMUINT3& data)
-	{
-		Deserialize(data);
-		return *this;
-	}
-	inline sArchive& operator >> (XMUINT4& data)
-	{
-		Deserialize(data);
-		return *this;
-	}*/
 	inline sArchive& operator >> (std::string& STR)
 	{
 		for (std::size_t i = pos; i < Data.size(); i++)
@@ -339,33 +227,249 @@ public:
 
 		return *this;
 	}
+	inline void operator >> (std::string& STR) const
+	{
+		for (std::size_t i = pos; i < Data.size(); i++)
+		{
+			char pChar = 0;
+			(*this) >> pChar;
+
+			if (pChar == 0 || pChar == '\0' || pChar == std::string::npos)
+				break;
+
+			STR.push_back(pChar);
+		}
+	}
+	inline sArchive& operator >> (bool& data)
+	{
+		bool temp;
+		Deserialize(temp);
+		data = (temp == 1);
+		return *this;
+	}
+	inline void operator >> (bool& data) const
+	{
+		bool temp;
+		Deserialize(temp);
+		data = (temp == 1);
+	}
+	inline sArchive& operator >> (char& data)
+	{
+		Deserialize(data);
+		return *this;
+	}
+	inline void operator >> (char& data) const
+	{
+		Deserialize(data);
+	}
+	inline sArchive& operator >> (unsigned char& data)
+	{
+		Deserialize(data);
+		return *this;
+	}
+	inline void operator >> (unsigned char& data) const
+	{
+		Deserialize(data);
+	}
+	inline sArchive& operator >> (int& data)
+	{
+		Deserialize(data);
+		return *this;
+	}
+	inline void operator >> (int& data) const
+	{
+		Deserialize(data);
+	}
+	inline sArchive& operator >> (unsigned int& data)
+	{
+		Deserialize(data);
+		return *this;
+	}
+	inline void operator >> (unsigned int& data) const
+	{
+		Deserialize(data);
+	}
+	inline sArchive& operator >> (long& data)
+	{
+		Deserialize(data);
+		return *this;
+	}
+	inline void operator >> (long& data) const
+	{
+		Deserialize(data);
+	}
+	inline sArchive& operator >> (unsigned long& data)
+	{
+		Deserialize(data);
+		return *this;
+	}
+	inline void operator >> (unsigned long& data) const
+	{
+		Deserialize(data);
+	}
+	inline sArchive& operator >> (long long& data)
+	{
+		Deserialize(data);
+		return *this;
+	}
+	inline void operator >> (long long& data) const
+	{
+		Deserialize(data);
+	}
+	inline sArchive& operator >> (unsigned long long& data)
+	{
+		Deserialize(data);
+		return *this;
+	}
+	inline void operator >> (unsigned long long& data) const
+	{
+		Deserialize(data);
+	}
+	inline sArchive& operator >> (float& data)
+	{
+		Deserialize(data);
+		return *this;
+	}
+	inline void operator >> (float& data) const
+	{
+		Deserialize(data);
+	}
+	inline sArchive& operator >> (double& data)
+	{
+		Deserialize(data);
+		return *this;
+	}
+	inline void operator >> (double& data) const
+	{
+		Deserialize(data);
+	}
+	inline sArchive& operator >> (FVector& data)
+	{
+		Deserialize(data);
+		return *this;
+	}
+	inline void operator >> (FVector& data) const
+	{
+		Deserialize(data);
+	}
+	inline sArchive& operator >> (FVector2& data)
+	{
+		Deserialize(data);
+		return *this;
+	}
+	inline void operator >> (FVector2& data) const
+	{
+		Deserialize(data);
+	}
+	inline sArchive& operator >> (FVector4& data)
+	{
+		Deserialize(data);
+		return *this;
+	}
+	inline void operator >> (FVector4& data) const
+	{
+		Deserialize(data);
+	}
+	inline sArchive& operator >> (DirectX::XMFLOAT2& data)
+	{
+		Deserialize(data);
+		return *this;
+	}
+	inline void operator >> (DirectX::XMFLOAT2& data) const
+	{
+		Deserialize(data);
+	}
+	inline sArchive& operator >> (DirectX::XMFLOAT3& data)
+	{
+		Deserialize(data);
+		return *this;
+	}
+	inline void operator >> (DirectX::XMFLOAT3& data) const
+	{
+		Deserialize(data);
+	}
+	inline sArchive& operator >> (DirectX::XMFLOAT4& data)
+	{
+		Deserialize(data);
+		return *this;
+	}
+	inline void operator >> (DirectX::XMFLOAT4& data) const
+	{
+		Deserialize(data);
+	}
+	inline sArchive& operator >> (DirectX::XMFLOAT3X3& data)
+	{
+		Deserialize(data);
+		return *this;
+	}
+	inline void operator >> (DirectX::XMFLOAT3X3& data) const
+	{
+		Deserialize(data);
+	}
+	inline sArchive& operator >> (DirectX::XMFLOAT4X3& data)
+	{
+		Deserialize(data);
+		return *this;
+	}
+	inline void operator >> (DirectX::XMFLOAT4X3& data) const
+	{
+		Deserialize(data);
+	}
+	inline sArchive& operator >> (FMatrix& data)
+	{
+		Deserialize(data);
+		return *this;
+	}
+	inline void operator >> (FMatrix& data) const
+	{
+		Deserialize(data);
+	}
 
 private:
 	template<typename T>
 	inline void Serialize(const T& data)
 	{
-		const std::size_t reqSize = pos + sizeof(data);
+		const std::size_t dataSize = sizeof(data);
+		const std::size_t reqSize = pos + dataSize;
 		if (reqSize > Data.size())
-			GrowData(reqSize * 2);
+		{
+			ResizeData(Data.size() + dataSize * 2);
+		}
 
-		memcpy((void*)(Data.data() + pos), (&data), (std::size_t)(sizeof(data)));
-		pos = reqSize;
-	}
-
-	void GrowData(std::size_t reqSize)
-	{
-		Data.resize(reqSize);
+		if (reqSize <= Data.size())
+		{
+			memcpy(&Data[pos], &data, dataSize);
+			pos = reqSize;
+		}
 	}
 
 	template<typename T>
-	inline void Deserialize(T& data)
+	inline void Deserialize(T& data) const
 	{
-		memcpy((void*)&data, (void*)(Data.data() + pos), (std::size_t)(sizeof(data)));
-		pos += (size_t)(sizeof(data));
+		const std::size_t dataSize = sizeof(data);
+		if (pos + dataSize <= Data.size())
+		{
+			memcpy(&data, &Data[pos], dataSize);
+			pos += dataSize;
+		}
+	}
+
+public:
+	inline void ResizeData(std::size_t reqSize, bool ResizeIfSmall = false)
+	{
+		if (ResizeIfSmall)
+		{
+			if (reqSize > Data.size())
+				Data.resize(reqSize);
+		}
+		else
+		{
+			Data.resize(reqSize);
+		}
 	}
 
 private:
-	std::size_t pos;
+	mutable std::size_t pos;
 	std::vector<std::uint8_t> Data;
 	std::string FileName;
 };

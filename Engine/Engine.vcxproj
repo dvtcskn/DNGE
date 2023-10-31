@@ -215,6 +215,7 @@
     <ClInclude Include="Public\Core\Transform.h" />
     <ClInclude Include="Public\Core\ThreadPool.h" />
     <ClInclude Include="Public\Engine\AbstractEngine.h" />
+    <ClInclude Include="Public\Engine\AbstractEngineUtilities.h" />
     <ClInclude Include="Public\Engine\Box2DRigidBody.h" />
     <ClInclude Include="Public\Engine\BulletRigidBody.h" />
     <ClInclude Include="Public\Engine\BulletWorld.h" />
