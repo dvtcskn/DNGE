@@ -24,7 +24,6 @@
 * ---------------------------------------------------------------------------------------
 */
 
-
 #include "pch.h"
 #include "Engine/IPhysicalWorld.h"
 #include "Gameplay/PhysicalComponent.h"

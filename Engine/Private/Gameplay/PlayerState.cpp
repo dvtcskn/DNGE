@@ -24,7 +24,6 @@
 * ---------------------------------------------------------------------------------------
 */
 
-
 #include "pch.h"
 #include "Gameplay/PlayerState.h"
 #include "Gameplay/PlayerController.h"

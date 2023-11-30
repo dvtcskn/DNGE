@@ -25,6 +25,7 @@
 */
 #pragma once
 
+#include <cbSlottedBox.h>
 #include <cbText.h>
 #include <cbFont.h>
 #include <optional>

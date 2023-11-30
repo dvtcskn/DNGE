@@ -28,13 +28,14 @@
 #include "D3D11FrameBuffer.h"
 #include "D3D11CommandBuffer.h"
 
-D3D11RenderTarget::D3D11RenderTarget(D3D11Device* InDevice, const std::string InName, const EFormat InFormat, const sFBODesc& Desc)
+D3D11RenderTarget::D3D11RenderTarget(D3D11Device* InDevice, const std::string InName, const EFormat InFormat, const sFBODesc& Desc, bool InIsSRVAllowed, bool InIsUnorderedAccessAllowed)
 	: Super()
 	, Name(InName)
 	, Format(InFormat)
 	, Texture(nullptr)
 	, RenderTarget(nullptr)
 	, ShaderResource(nullptr)
+	, UnorderedAccessView(nullptr)
 {
 	const DXGI_FORMAT DXGIFormat = (ConvertFormat_Format_To_DXGI(Format));
 
@@ -49,8 +50,10 @@ D3D11RenderTarget::D3D11RenderTarget(D3D11Device* InDevice, const std::string In
 	sTextureDesc.SampleDesc.Quality = Desc.MSLevel.Quality;
 	sTextureDesc.Usage = D3D11_USAGE::D3D11_USAGE_DEFAULT;
 	sTextureDesc.BindFlags = D3D11_BIND_RENDER_TARGET;
-	sTextureDesc.BindFlags |= D3D11_BIND_SHADER_RESOURCE;
-	//sTextureDesc.BindFlags |= D3D11_BIND_UNORDERED_ACCESS;
+	if (InIsSRVAllowed)
+		sTextureDesc.BindFlags |= D3D11_BIND_SHADER_RESOURCE;
+	if (InIsUnorderedAccessAllowed)
+		sTextureDesc.BindFlags |= D3D11_BIND_UNORDERED_ACCESS;
 	sTextureDesc.CPUAccessFlags = NULL;
 	sTextureDesc.MiscFlags = NULL;
 
@@ -67,6 +70,7 @@ D3D11RenderTarget::D3D11RenderTarget(D3D11Device* InDevice, const std::string In
 		InDevice->Get()->CreateRenderTargetView(Texture.Get(), &rtvElementDesc, RenderTarget.GetAddressOf());
 	}
 
+	if (InIsSRVAllowed)
 	{
 		CD3D11_SHADER_RESOURCE_VIEW_DESC srvDesc(
 			D3D_SRV_DIMENSION_TEXTURE2D,
@@ -77,6 +81,16 @@ D3D11RenderTarget::D3D11RenderTarget(D3D11Device* InDevice, const std::string In
 
 		InDevice->Get()->CreateShaderResourceView(Texture.Get(), &srvDesc, ShaderResource.GetAddressOf());
 	}
+
+	if (InIsUnorderedAccessAllowed)
+	{
+		D3D11_UNORDERED_ACCESS_VIEW_DESC UAVDesc;
+		UAVDesc.Format = DXGIFormat;
+		UAVDesc.ViewDimension = D3D11_UAV_DIMENSION_TEXTURE2D;
+		UAVDesc.Texture2D.MipSlice = 0;
+
+		InDevice->Get()->CreateUnorderedAccessView(Texture.Get(), &UAVDesc, UnorderedAccessView.GetAddressOf());
+	}
 }
 
 D3D11RenderTarget::~D3D11RenderTarget()
@@ -84,6 +98,7 @@ D3D11RenderTarget::~D3D11RenderTarget()
 	Texture = nullptr;
 	RenderTarget = nullptr;
 	ShaderResource = nullptr;
+	UnorderedAccessView = nullptr;
 }
 
 D3D11DepthTarget::D3D11DepthTarget(D3D11Device* InDevice, const std::string InName, const EFormat InFormat, const sFBODesc& Desc)
@@ -214,13 +229,45 @@ D3D11FrameBuffer::D3D11FrameBuffer(D3D11Device* InDevice, const std::string InNa
 	{
 		const auto& FB = AttachmentInfo.FrameBuffer[i];
 
-		if (FB.bIsUAV)
+		if (FB.AttachmentType == eFrameBufferAttachmentType::eUAV)
 		{
-			UAVs.push_back(D3D11UnorderedAccessTarget::Create(InDevice, Name + "_UAV_" + std::to_string(UAVs.size()), FB.Format, FDesc, FB.bIsShaderResource));
+			UAVs.push_back(D3D11UnorderedAccessTarget::Create(InDevice, Name + "_UAV_" + std::to_string(UAVs.size()), FB.Format, FDesc, false));
 		}
-		else
+		else if (FB.AttachmentType == eFrameBufferAttachmentType::eUAV_SRV)
 		{
-			RenderTargets.push_back(D3D11RenderTarget::Create(InDevice, Name + "_RenderTarget_" + std::to_string(RenderTargets.size()), FB.Format, FDesc));
+			UAVs.push_back(D3D11UnorderedAccessTarget::Create(InDevice, Name + "_UAV_" + std::to_string(UAVs.size()), FB.Format, FDesc, true));
+		}
+		else if (FB.AttachmentType == eFrameBufferAttachmentType::eRT)
+		{
+			RenderTargets.push_back(D3D11RenderTarget::Create(InDevice, Name + "_RenderTarget_" + std::to_string(RenderTargets.size()), FB.Format, FDesc, false, false));
+		}
+		else if (FB.AttachmentType == eFrameBufferAttachmentType::eRT_SRV)
+		{
+			RenderTargets.push_back(D3D11RenderTarget::Create(InDevice, Name + "_RenderTarget_" + std::to_string(RenderTargets.size()), FB.Format, FDesc, true, false));
+		}
+		else if (FB.AttachmentType == eFrameBufferAttachmentType::eRT_UAV)
+		{
+			RenderTargets.push_back(D3D11RenderTarget::Create(InDevice, Name + "_RenderTarget_" + std::to_string(RenderTargets.size()), FB.Format, FDesc, false, true));
+		}
+		else if (FB.AttachmentType == eFrameBufferAttachmentType::eRT_SRV_UAV)
+		{
+			RenderTargets.push_back(D3D11RenderTarget::Create(InDevice, Name + "_RenderTarget_" + std::to_string(RenderTargets.size()), FB.Format, FDesc, true, true));
+		}
+		else if (FB.AttachmentType == eFrameBufferAttachmentType::eDepth)
+		{
+
+		}
+		else if (FB.AttachmentType == eFrameBufferAttachmentType::eDepth_SRV)
+		{
+
+		}
+		else if (FB.AttachmentType == eFrameBufferAttachmentType::eDepth_UAV)
+		{
+
+		}
+		else if (FB.AttachmentType == eFrameBufferAttachmentType::eDepth_SRV_UAV)
+		{
+
 		}
 	}
 	
@@ -234,15 +281,33 @@ void D3D11FrameBuffer::AttachRenderTarget(const IRenderTarget::SharedPtr& Render
 {
 	if (auto RT = std::dynamic_pointer_cast<D3D11RenderTarget>(RenderTarget))
 	{
+		eFrameBufferAttachmentType AttachmentType;
+		if (!RT->IsSRV_Allowed() && !RT->IsUAV_Allowed())
+		{
+			AttachmentType = eFrameBufferAttachmentType::eRT;
+		}
+		else if (RT->IsSRV_Allowed() && !RT->IsUAV_Allowed())
+		{
+			AttachmentType = eFrameBufferAttachmentType::eRT_SRV;
+		}
+		else if (!RT->IsSRV_Allowed() && RT->IsUAV_Allowed())
+		{
+			AttachmentType = eFrameBufferAttachmentType::eRT_UAV;
+		}
+		else if (RT->IsSRV_Allowed() && RT->IsUAV_Allowed())
+		{
+			AttachmentType = eFrameBufferAttachmentType::eRT_SRV_UAV;
+		}
+
 		if (Index.has_value())
 			RenderTargets.insert(RenderTargets.begin() + Index.value(), RT);
 		else
 			RenderTargets.push_back(RT);
 
 		if (Index.has_value())
-			AttachmentInfo.FrameBuffer.insert(AttachmentInfo.FrameBuffer.begin() + Index.value(), sFrameBufferAttachmentInfo::sFrameBuffer(RT->GetFormat(), true, false));
+			AttachmentInfo.FrameBuffer.insert(AttachmentInfo.FrameBuffer.begin() + Index.value(), sFrameBufferAttachmentInfo::sFrameBuffer(RT->GetFormat(), AttachmentType));
 		else
-			AttachmentInfo.AddFrameBuffer(RT->GetFormat(), true, false);
+			AttachmentInfo.AddFrameBuffer(RT->GetFormat(), AttachmentType);
 	}
 }
 
@@ -250,15 +315,25 @@ void D3D11FrameBuffer::AttachUnorderedAccessTarget(const IUnorderedAccessTarget:
 {
 	if (auto ST = std::dynamic_pointer_cast<D3D11UnorderedAccessTarget>(UnorderedAccessTarget))
 	{
+		eFrameBufferAttachmentType AttachmentType;
+		if (!ST->IsSRV_Allowed())
+		{
+			AttachmentType = eFrameBufferAttachmentType::eUAV;
+		}
+		else if (ST->IsSRV_Allowed())
+		{
+			AttachmentType = eFrameBufferAttachmentType::eUAV_SRV;
+		}
+
 		if (Index.has_value())
 			UAVs.insert(UAVs.begin() + Index.value(), ST);
 		else
 			UAVs.push_back(ST);
 
 		if (Index.has_value())
-			AttachmentInfo.FrameBuffer.insert(AttachmentInfo.FrameBuffer.begin() + Index.value(), sFrameBufferAttachmentInfo::sFrameBuffer(ST->GetFormat(), ST->IsSRVSupported(), true));
+			AttachmentInfo.FrameBuffer.insert(AttachmentInfo.FrameBuffer.begin() + Index.value(), sFrameBufferAttachmentInfo::sFrameBuffer(ST->GetFormat(), AttachmentType));
 		else
-			AttachmentInfo.AddFrameBuffer(ST->GetFormat(), ST->IsSRVSupported(), true);
+			AttachmentInfo.AddFrameBuffer(ST->GetFormat(), AttachmentType);
 	}
 }
 

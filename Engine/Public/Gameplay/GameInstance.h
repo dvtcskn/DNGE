@@ -23,7 +23,6 @@
 * SOFTWARE.
 * ---------------------------------------------------------------------------------------
 */
-
 #pragma once
 
 #include "PlayerController.h"
@@ -33,10 +32,13 @@
 #include "Engine/IMetaWorld.h"
 #include "AIController.h"
 #include "Player.h"
+#include "PlayerProxy.h"
 
 class sGameInstance
 {
 	sBaseClassBody(sClassConstructor, sGameInstance)
+	friend class IServer;
+	friend class IClient;
 public:
 	sGameInstance(IMetaWorld* World);
 	virtual ~sGameInstance();
@@ -45,7 +47,9 @@ public:
 	void Tick(const double DeltaTime);
 	void FixedUpdate(const double DeltaTime);
 
-	inline sPlayer* GetPlayer(std::size_t index) const { return Players[index].get(); }
+	sPlayer* GetPlayer(std::size_t index = 0, bool ByIndex = true) const;
+	std::vector<sPlayer*> GetPlayers() const;
+	std::vector<sPlayerProxyBase*> GetPlayerProxys() const;
 	inline sPlayerController* GetPlayerController(std::size_t index) const { return Players[index]->GetPlayerController(); }
 	inline sActor* GetPlayerFocusedActor(std::size_t index) const { return Players[index]->GetPlayerFocusedActor(); }
 
@@ -57,9 +61,17 @@ public:
 	inline T* GetMetaWorld() const { return static_cast<T*>(Owner); }
 	inline IMetaWorld* GetMetaWorld() const { return Owner; }
 
+	virtual void ResetLevel();
+	void OpenLevel(std::string Level);
+	void OpenWorld(std::string World);
+
 	virtual sPlayer::SharedPtr ConstructPlayer()
 	{
-		return sPlayer::Create(this, GetPlayerCount());
+		return sPlayer::Create(this, GetNextPlayerIndex());
+	}
+	virtual sPlayerProxyBase::SharedPtr ConstructPlayerProxy(std::string PlayerName, std::string NetAddress)
+	{
+		return nullptr;
 	}
 
 	void EnableSplitScreen();
@@ -68,7 +80,8 @@ public:
 	inline ESplitScreenType GetSplitScreenType() const { return SplitScreenType; }
 	void SetSplitScreenType(ESplitScreenType InSplitScreenType);
 
-	void CreatePlayer();
+	sPlayer* CreatePlayer();
+	sPlayer* CreatePlayer(eNetworkRole Role);
 	void AddPlayer(const sPlayer::SharedPtr& InPlayer);
 	void RemovePlayer(std::size_t Idx);
 	void RemovePlayer(sPlayer* InPlayer);
@@ -79,6 +92,7 @@ public:
 
 	std::int32_t GetPlayerIndex(sPlayer* PC) const;
 	inline std::size_t GetPlayerCount() const { return Players.size(); }
+	bool IsPlayerIndexExist(std::size_t Index) const;
 
 	inline std::size_t GetAIControllersCount() const { return AIControllers.size(); }
 	sAIController* GetAIController(std::size_t Idx = 0) const { return AIControllers.at(Idx).get(); }
@@ -105,9 +119,30 @@ private:
 	virtual void OnNewAIControllerAdded() {}
 	virtual void OnAIControllerRemoved() {}
 
+	void SessionCreated();
+	void SessionDestroyed();
+	void Connected();
+	void Disconnected();
+	void PlayerConnected(std::string PlayerName, std::string NetAddress);
+	void PlayerDisconnected(std::string PlayerName, std::string NetAddress);
+
+	virtual void OnSessionCreated() {}
+	virtual void OnSessionDestroyed() {}
+	virtual void OnConnected() {}
+	virtual void OnDisconnected() {}
+	virtual void OnPlayerConnectedToServer(std::string PlayerName, std::string NetAddress) {}
+	virtual void OnPlayerDisconnectedFromServer(std::string PlayerName, std::string NetAddress) {}
+	virtual void OnPlayerConnected(std::string PlayerName, std::string NetAddress) {}
+	virtual void OnPlayerDisconnected(std::string PlayerName, std::string NetAddress) {}
+
+protected:
+	std::size_t GetNextPlayerIndex();
+
 private:
+	bool bIsInitialized;
 	IMetaWorld* Owner;
 	std::vector<sPlayer::SharedPtr> Players;
+	std::vector<sPlayerProxyBase::SharedPtr> PlayerProxys;
 	bool bIsSplitScreenEnabled;
 	ESplitScreenType SplitScreenType;
 	std::size_t PlayerLimit;

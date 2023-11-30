@@ -36,6 +36,7 @@
 #include <sstream>
 #include "TrapActor.h"
 #include "Items.h"
+#include "World.h"
 
 struct TileCollisionLayer
 {
@@ -58,6 +59,7 @@ sDefaultLevel::sDefaultLevel(IWorld* pWorld, std::string InName)
 	: Super()
 	, World(pWorld)
 	, Name(InName)
+	, bIsLevelInitialized(false)
 {
 	Layers.push_back(std::make_unique<LevelLayer>());
 	Layers.push_back(std::make_unique<LevelLayer>());
@@ -67,7 +69,10 @@ sDefaultLevel::sDefaultLevel(IWorld* pWorld, std::string InName)
 
 	auto ScreenDimension = GPU::GetInternalBaseRenderResolution();
 
-	PlayerSpawnLocations.push_back(sPlayerSpawn(0, FVector(75.0f, 250.0f, 0.0f), 3));
+	SpawnLocations.push_back(sObjectSpawnNode("PlayerSpawn", 0, FVector(75.0f, 250.0f, 0.0f), 3));
+	SpawnLocations.push_back(sObjectSpawnNode("PlayerSpawn", 1, FVector(315.699677f, 140.0f, 0.0f), 3));
+	SpawnLocations.push_back(sObjectSpawnNode("PlayerSpawn", 2, FVector(324.700043f, 260.700012f, 0.0f), 3));
+	SpawnLocations.push_back(sObjectSpawnNode("PlayerSpawn", 3, FVector(505.697540f, 260.700043, 0.0f), 3));
 
 	{
 		sMesh::SharedPtr Mesh = sMesh::Create("BackgroundMesh", EBasicMeshType::ePlane/*, FBoxDimension(1366, 768, 1)*/);
@@ -127,9 +132,8 @@ sDefaultLevel::sDefaultLevel(IWorld* pWorld, std::string InName)
 		sActor::SharedPtr Terrain = sActor::Create("Terrain");
 		sPrimitiveComponent::SharedPtr TerrainMeshParent = sPrimitiveComponent::Create("TerrainMeshParentComponent");
 		Terrain->SetRootComponent(TerrainMeshParent);
-		Terrain->SetLocation(FVector(0.0f, 0.0f, 0.0f));
 		Terrain->SetRollPitchYaw(FAngles(0.0f));
-		Terrain->AddToLevel(this, 2);
+		Terrain->AddToLevel(this, FVector(0.0f, 0.0f, 0.0f), 2);
 		//Terrain->SetEnabled(false);
 
 		std::size_t X = 0;
@@ -211,38 +215,44 @@ sDefaultLevel::sDefaultLevel(IWorld* pWorld, std::string InName)
 
 	{
 		GSawTrapActor::SharedPtr Saw = GSawTrapActor::Create("Saw1");
-		Saw->AddToLevel(this, 4);
+		Saw->AddToLevel(this, FVector(0.0f, 0.0f, 0.0f), 4);
 		Saw->SetRange(FVector2(440, 200), FVector2(440, 296));
+		Saw->Replicate(true);
 	}
 	{
 		GSawTrapActor::SharedPtr Saw = GSawTrapActor::Create("Saw2");
-		Saw->AddToLevel(this, 4);
+		Saw->AddToLevel(this, FVector(0.0f, 0.0f, 0.0f), 4);
 		Saw->SetRange(FVector2(536, 296), FVector2(584, 296));
 		Saw->SetSpeed(3.0f);
+		Saw->Replicate(true);
 	}
 	{
 		GSawTrapActor::SharedPtr Saw = GSawTrapActor::Create("Saw3");
-		Saw->AddToLevel(this, 1);
+		Saw->AddToLevel(this, FVector(0.0f, 0.0f, 0.0f), 1);
 		Saw->SetRange(FVector2(160, 304), FVector2(288, 304));
+		Saw->Replicate(true);
 	}
 	{
 		GSawTrapActor::SharedPtr Saw = GSawTrapActor::Create("Saw4");
-		Saw->AddToLevel(this, 1);
+		Saw->AddToLevel(this, FVector(0.0f, 0.0f, 0.0f), 1);
 		Saw->SetRange(FVector2(64, 160), FVector2(256, 160));
 		Saw->SetSpeed(4.0f);
+		Saw->Replicate(true);
 	}
 	{
 		GRockHeadActor::SharedPtr RockHead = GRockHeadActor::Create("RockHead");
-		RockHead->AddToLevel(this, 1);
+		RockHead->AddToLevel(this, FVector(0.0f, 0.0f, 0.0f), 1);
 		RockHead->SetRange(FVector2(400, 224), FVector2(400, 96));
+		RockHead->Replicate(true);
 	}
 
 	for (std::size_t i = 0; i < ItemCollisionLayer.size(); i++)
 	{
 		const auto& Item = ItemCollisionLayer.at(i);
-		GItem::SharedPtr Apple = GItem::Create(i%2 ? "Cherries" : "Apple");
-		Apple->AddToLevel(this, 4);
-		Apple->SetLocation(FVector(Item.X - Item.Width / 2.0f, Item.Y + Item.Height / 2.0f, 0.0f));
+		//GItem::SharedPtr Apple = GItem::Create(i%2 ? "Cherries" : "Apple");
+		GItem::SharedPtr Apple = GItem::Create("Item_" + std::to_string(i), i % 2 ? "Cherries" : "Apple");
+		Apple->AddToLevel(this, FVector(Item.X - Item.Width / 2.0f, Item.Y + Item.Height / 2.0f, 0.0f), 4);
+		Apple->Replicate(true);
 	}
 
 	ItemCollisionLayer.clear();
@@ -265,6 +275,9 @@ std::string sDefaultLevel::GetName() const
 
 void sDefaultLevel::BeginPlay()
 {
+	RegisterRPCfn("Level", Name, "Reset_Client", eRPCType::Client, true, false, std::bind(&sDefaultLevel::Reset_Client, this));
+	bIsLevelInitialized = true;
+
 	for (const auto& Layer : Layers)
 		Layer->BeginPlay();
 }
@@ -304,9 +317,19 @@ void sDefaultLevel::InitLevel()
 {
 }
 
+void sDefaultLevel::DestroyLevel()
+{
+	for (auto& Layer : Layers)
+	{
+		Layer = nullptr;
+	}
+	Layers.clear();
+	World = nullptr;
+}
+
 FBoundingBox sDefaultLevel::GetLevelBounds() const
 {
-	return FBoundingBox(FVector(0.0f, 0.0f, 0.0f), FVector(640.0f, 360.0f, 0.0f));
+	return FBoundingBox(FVector(-5000.0f, -5000.0f, 0.0f), FVector(6400.0f, 3600.0f, 0.0f));
 }
 
 void sDefaultLevel::Serialize()
@@ -338,6 +361,9 @@ void sDefaultLevel::AddActor(const std::shared_ptr<sActor>& Actor, std::size_t L
 
 	if (Layers[LayerIndex])
 		Layers[LayerIndex]->AddActor(Actor);
+
+	if (bIsLevelInitialized)
+		Actor->BeginPlay();
 }
 
 void sDefaultLevel::RemoveActor(sActor* Actor, std::size_t LayerIndex, bool bDeferredRemove)
@@ -349,20 +375,28 @@ void sDefaultLevel::RemoveActor(sActor* Actor, std::size_t LayerIndex, bool bDef
 		Layers[LayerIndex]->RemoveActor(Actor, bDeferredRemove);
 }
 
-void sDefaultLevel::SpawnPlayerActor(const std::shared_ptr<sActor>& Actor, std::size_t PlayerIndex)
-{
-	for (const auto& Spawn : PlayerSpawnLocations)
-	{
-		if (Spawn.PlayerIndex == PlayerIndex)
-		{
-			Actor->SetLocation(Spawn.Location);
-			Actor->AddToLevel(this, Spawn.LayerIndex);
-			return;
-		}
-	}
-
-	Actor->AddToLevel(this, 2);
-}
+//void sDefaultLevel::SpawnPlayerActor(const std::shared_ptr<sActor>& Actor, std::size_t PlayerIndex)
+//{
+//	if (PlayerSpawnLocations.size() > 0)
+//	{
+//		for (const auto& Spawn : PlayerSpawnLocations)
+//		{
+//			if (Spawn.PlayerIndex == PlayerIndex)
+//			{
+//				Actor->AddToLevel(this, Spawn.Location, Spawn.LayerIndex);
+//
+//				if (bIsLevelInitialized)
+//					Actor->BeginPlay();
+//			}
+//		}
+//	}
+//	else
+//	{
+//		Actor->AddToLevel(this, 2);
+//		if (bIsLevelInitialized)
+//			Actor->BeginPlay();
+//	}
+//}
 
 size_t sDefaultLevel::LayerCount() const
 {
@@ -419,7 +453,7 @@ sActor* sDefaultLevel::GetActor(const std::size_t Index, std::size_t LayerIndex)
 
 sActor* sDefaultLevel::GetPlayerFocusedActor(std::size_t Index) const
 {
-	return World->GetPlayerFocusedActor(Index);
+	return static_cast<sWorld*>(World)->GetPlayerFocusedActor(Index);
 }
 
 void sDefaultLevel::OnResizeWindow(const std::size_t Width, const std::size_t Height)
@@ -429,36 +463,46 @@ void sDefaultLevel::OnResizeWindow(const std::size_t Width, const std::size_t He
 
 void sDefaultLevel::Reset()
 {
+	if (Network::IsClient())
+		return;
+
 	Layers[1]->Release();
 	Layers[3]->Release();
 	Layers[4]->Release();
 
 	{
-		GSawTrapActor::SharedPtr Saw = GSawTrapActor::Create("Saw1");
-		Saw->AddToLevel(this, 4);
-		Saw->SetRange(FVector2(440, 200), FVector2(440, 296));
-	}
-	{
-		GSawTrapActor::SharedPtr Saw = GSawTrapActor::Create("Saw2");
-		Saw->AddToLevel(this, 4);
-		Saw->SetRange(FVector2(536, 296), FVector2(584, 296));
-		Saw->SetSpeed(3.0f);
-	}
-	{
-		GSawTrapActor::SharedPtr Saw = GSawTrapActor::Create("Saw3");
-		Saw->AddToLevel(this, 1);
-		Saw->SetRange(FVector2(160, 304), FVector2(288, 304));
-	}
-	{
-		GSawTrapActor::SharedPtr Saw = GSawTrapActor::Create("Saw4");
-		Saw->AddToLevel(this, 1);
-		Saw->SetRange(FVector2(64, 160), FVector2(256, 160));
-		Saw->SetSpeed(4.0f);
-	}
-	{
-		GRockHeadActor::SharedPtr RockHead = GRockHeadActor::Create("RockHead");
-		RockHead->AddToLevel(this, 1);
-		RockHead->SetRange(FVector2(400, 224), FVector2(400, 96));
+		{
+			GSawTrapActor::SharedPtr Saw = GSawTrapActor::Create("Saw1");
+			Saw->AddToLevel(this, FVector(0.0f, 0.0f, 0.0f), 4);
+			Saw->SetRange(FVector2(440, 200), FVector2(440, 296));
+			Saw->Replicate(true);
+		}
+		{
+			GSawTrapActor::SharedPtr Saw = GSawTrapActor::Create("Saw2");
+			Saw->AddToLevel(this, FVector(0.0f, 0.0f, 0.0f), 4);
+			Saw->SetRange(FVector2(536, 296), FVector2(584, 296));
+			Saw->SetSpeed(3.0f);
+			Saw->Replicate(true);
+		}
+		{
+			GSawTrapActor::SharedPtr Saw = GSawTrapActor::Create("Saw3");
+			Saw->AddToLevel(this, FVector(0.0f, 0.0f, 0.0f), 1);
+			Saw->SetRange(FVector2(160, 304), FVector2(288, 304));
+			Saw->Replicate(true);
+		}
+		{
+			GSawTrapActor::SharedPtr Saw = GSawTrapActor::Create("Saw4");
+			Saw->AddToLevel(this, FVector(0.0f, 0.0f, 0.0f), 1);
+			Saw->SetRange(FVector2(64, 160), FVector2(256, 160));
+			Saw->SetSpeed(4.0f);
+			Saw->Replicate(true);
+		}
+		{
+			GRockHeadActor::SharedPtr RockHead = GRockHeadActor::Create("RockHead");
+			RockHead->AddToLevel(this, FVector(0.0f, 0.0f, 0.0f), 1);
+			RockHead->SetRange(FVector2(400, 224), FVector2(400, 96));
+			RockHead->Replicate(true);
+		}
 	}
 
 	std::vector<TileCollisionLayer> ItemCollisionLayer;
@@ -472,14 +516,87 @@ void sDefaultLevel::Reset()
 		std::size_t ElementCounter = 0;
 		for (auto child = Item_Objectgroup->FirstChildElement("object"); child; child = child->NextSiblingElement("object"))
 			ItemCollisionLayer.push_back(child);
-
 	}
-	for (std::size_t i = 0; i < ItemCollisionLayer.size(); i++)
+
 	{
-		const auto& Item = ItemCollisionLayer.at(i);
-		GItem::SharedPtr Apple = GItem::Create(i % 2 ? "Cherries" : "Apple");
-		Apple->AddToLevel(this, 4);
-		Apple->SetLocation(FVector(Item.X - Item.Width / 2.0f, Item.Y + Item.Height / 2.0f, 0.0f));
+		for (std::size_t i = 0; i < ItemCollisionLayer.size(); i++)
+		{
+			const auto& Item = ItemCollisionLayer.at(i);
+			GItem::SharedPtr Apple = GItem::Create("Item_" + std::to_string(i), i % 2 ? "Cherries" : "Apple");
+			Apple->AddToLevel(this, FVector(Item.X - Item.Width / 2.0f, Item.Y + Item.Height / 2.0f, 0.0f), 4);
+			Apple->Replicate(true);
+			Apple->CheckIfExistOnServer();
+		}
+	}
+
+	ItemCollisionLayer.clear();
+
+	Network::CallRPC("Level", Name, "Reset_Client", sArchive());
+}
+
+void sDefaultLevel::Reset_Client()
+{
+	Layers[1]->Release();
+	Layers[3]->Release();
+	Layers[4]->Release();
+
+	{
+		{
+			GSawTrapActor::SharedPtr Saw = GSawTrapActor::Create("Saw1");
+			Saw->AddToLevel(this, FVector(0.0f, 0.0f, 0.0f), 4);
+			Saw->SetRange(FVector2(440, 200), FVector2(440, 296));
+			Saw->Replicate(true);
+		}
+		{
+			GSawTrapActor::SharedPtr Saw = GSawTrapActor::Create("Saw2");
+			Saw->AddToLevel(this, FVector(0.0f, 0.0f, 0.0f), 4);
+			Saw->SetRange(FVector2(536, 296), FVector2(584, 296));
+			Saw->SetSpeed(3.0f);
+			Saw->Replicate(true);
+		}
+		{
+			GSawTrapActor::SharedPtr Saw = GSawTrapActor::Create("Saw3");
+			Saw->AddToLevel(this, FVector(0.0f, 0.0f, 0.0f), 1);
+			Saw->SetRange(FVector2(160, 304), FVector2(288, 304));
+			Saw->Replicate(true);
+		}
+		{
+			GSawTrapActor::SharedPtr Saw = GSawTrapActor::Create("Saw4");
+			Saw->AddToLevel(this, FVector(0.0f, 0.0f, 0.0f), 1);
+			Saw->SetRange(FVector2(64, 160), FVector2(256, 160));
+			Saw->SetSpeed(4.0f);
+			Saw->Replicate(true);
+		}
+		{
+			GRockHeadActor::SharedPtr RockHead = GRockHeadActor::Create("RockHead");
+			RockHead->AddToLevel(this, FVector(0.0f, 0.0f, 0.0f), 1);
+			RockHead->SetRange(FVector2(400, 224), FVector2(400, 96));
+			RockHead->Replicate(true);
+		}
+	}
+
+	std::vector<TileCollisionLayer> ItemCollisionLayer;
+
+	tinyxml2::XMLDocument doc;
+	doc.LoadFile("..//Content//Pixel Adventure 1.tmx");
+	tinyxml2::XMLElement* Block_Objectgroup = doc.FirstChildElement("map")->FirstChildElement("objectgroup");
+	tinyxml2::XMLElement* Moveable_Objectgroup = Block_Objectgroup->NextSiblingElement("objectgroup");
+	tinyxml2::XMLElement* Item_Objectgroup = Moveable_Objectgroup->NextSiblingElement("objectgroup");
+	{
+		std::size_t ElementCounter = 0;
+		for (auto child = Item_Objectgroup->FirstChildElement("object"); child; child = child->NextSiblingElement("object"))
+			ItemCollisionLayer.push_back(child);
+	}
+
+	{
+		for (std::size_t i = 0; i < ItemCollisionLayer.size(); i++)
+		{
+			const auto& Item = ItemCollisionLayer.at(i);
+			GItem::SharedPtr Apple = GItem::Create("Item_" + std::to_string(i), i % 2 ? "Cherries" : "Apple");
+			Apple->AddToLevel(this, FVector(Item.X - Item.Width / 2.0f, Item.Y + Item.Height / 2.0f, 0.0f), 4);
+			Apple->Replicate(true);
+			Apple->CheckIfExistOnServer();
+		}
 	}
 
 	ItemCollisionLayer.clear();
@@ -489,4 +606,95 @@ void sDefaultLevel::InputProcess(const GMouseInput& MouseInput, const GKeyboardC
 {
 	for (const auto& Layer : Layers)
 		Layer->InputProcess(MouseInput, KeyboardChar);
+}
+
+sObjectSpawnNode sDefaultLevel::GetSpawnNode(std::string Name, std::int32_t PlayerIndex) const
+{
+	for (const auto& Spawn : SpawnLocations)
+	{
+		if (PlayerIndex != -1)
+		{
+			if (Spawn.Name == Name && Spawn.PlayerIndex == PlayerIndex)
+			{
+				return Spawn;
+			}
+		}
+		else if (Spawn.Name == Name)
+		{
+			return Spawn;
+		}
+	}
+	return sObjectSpawnNode();
+}
+
+void sDefaultLevel::OnConnectedToServer()
+{
+	Layers[1]->Release();
+	Layers[3]->Release();
+	Layers[4]->Release();
+
+	{
+		{
+			GSawTrapActor::SharedPtr Saw = GSawTrapActor::Create("Saw1");
+			Saw->AddToLevel(this, FVector(0.0f, 0.0f, 0.0f), 4);
+			Saw->SetRange(FVector2(440, 200), FVector2(440, 296));
+			Saw->Replicate(true);
+		}
+		{
+			GSawTrapActor::SharedPtr Saw = GSawTrapActor::Create("Saw2");
+			Saw->AddToLevel(this, FVector(0.0f, 0.0f, 0.0f), 4);
+			Saw->SetRange(FVector2(536, 296), FVector2(584, 296));
+			Saw->SetSpeed(3.0f);
+			Saw->Replicate(true);
+		}
+		{
+			GSawTrapActor::SharedPtr Saw = GSawTrapActor::Create("Saw3");
+			Saw->AddToLevel(this, FVector(0.0f, 0.0f, 0.0f), 1);
+			Saw->SetRange(FVector2(160, 304), FVector2(288, 304));
+			Saw->Replicate(true);
+		}
+		{
+			GSawTrapActor::SharedPtr Saw = GSawTrapActor::Create("Saw4");
+			Saw->AddToLevel(this, FVector(0.0f, 0.0f, 0.0f), 1);
+			Saw->SetRange(FVector2(64, 160), FVector2(256, 160));
+			Saw->SetSpeed(4.0f);
+			Saw->Replicate(true);
+		}
+		{
+			GRockHeadActor::SharedPtr RockHead = GRockHeadActor::Create("RockHead");
+			RockHead->AddToLevel(this, FVector(0.0f, 0.0f, 0.0f), 1);
+			RockHead->SetRange(FVector2(400, 224), FVector2(400, 96));
+			RockHead->Replicate(true);
+		}
+	}
+
+	std::vector<TileCollisionLayer> ItemCollisionLayer;
+
+	tinyxml2::XMLDocument doc;
+	doc.LoadFile("..//Content//Pixel Adventure 1.tmx");
+	tinyxml2::XMLElement* Block_Objectgroup = doc.FirstChildElement("map")->FirstChildElement("objectgroup");
+	tinyxml2::XMLElement* Moveable_Objectgroup = Block_Objectgroup->NextSiblingElement("objectgroup");
+	tinyxml2::XMLElement* Item_Objectgroup = Moveable_Objectgroup->NextSiblingElement("objectgroup");
+	{
+		std::size_t ElementCounter = 0;
+		for (auto child = Item_Objectgroup->FirstChildElement("object"); child; child = child->NextSiblingElement("object"))
+			ItemCollisionLayer.push_back(child);
+	}
+
+	{
+		for (std::size_t i = 0; i < ItemCollisionLayer.size(); i++)
+		{
+			const auto& Item = ItemCollisionLayer.at(i);
+			GItem::SharedPtr Apple = GItem::Create("Item_" + std::to_string(i), i % 2 ? "Cherries" : "Apple");
+			Apple->AddToLevel(this, FVector(Item.X - Item.Width / 2.0f, Item.Y + Item.Height / 2.0f, 0.0f), 4);
+			Apple->Replicate(true);
+			Apple->CheckIfExistOnServer();
+		}
+	}
+
+	ItemCollisionLayer.clear();
+}
+
+void sDefaultLevel::OnDisconnected()
+{
 }

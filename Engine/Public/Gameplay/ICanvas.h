@@ -23,7 +23,6 @@
 * SOFTWARE.
 * ---------------------------------------------------------------------------------------
 */
-
 #pragma once
 
 #include <string>
@@ -99,6 +98,8 @@ public:
 	virtual void Tick(const double DeltaTime) = 0;
 
 	IMetaWorld* GetMetaWorld() const { return pMetaWorld; };
+	template<typename T>
+	T* GetMetaWorld() const { return static_cast<T*>(pMetaWorld); };
 
 	virtual void InputProcess(const GMouseInput& MouseInput, const GKeyboardChar& KeyboardChar) = 0;
 

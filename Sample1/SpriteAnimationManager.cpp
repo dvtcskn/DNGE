@@ -27,6 +27,7 @@
 #include "pch.h"
 #include "SpriteAnimationManager.h"
 #include <Gameplay/Actor.h>
+#include <Gameplay/PlayerProxy.h>
 
 sSpriteAnimationManager::sSpriteAnimationManager(std::string Name)
 	: Super(Name)
@@ -103,7 +104,19 @@ void sSpriteAnimationManager::OnFixedUpdate(const double DeltaTime)
 	}
 }
 
-void sSpriteAnimationManager::SetAnimationState(const EAnimationState State)
+void sSpriteAnimationManager::Replicate(bool bReplicate)
+{
+	if (IsReplicated() == bReplicate)
+		return;
+
+	Super::Replicate(bReplicate);
+
+	if (IsReplicated())
+	{
+	}
+}
+
+void sSpriteAnimationManager::SetAnimationState(EAnimationState State)
 {
 	if (AnimationState == State && SpriteSheetComponent->GetCurrentSpriteSheet())
 		return;

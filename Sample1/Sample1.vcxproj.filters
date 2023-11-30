@@ -179,5 +179,8 @@
     <ClInclude Include="Items.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="NetComponents.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

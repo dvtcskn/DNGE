@@ -70,47 +70,41 @@ struct LevelLayer
 	inline void BeginPlay() 
 	{
 		for (const auto& Actor : Actors)
+		{
+			if (std::find(RemoveActorsByDeferred.begin(), RemoveActorsByDeferred.end(), Actor) != RemoveActorsByDeferred.end())
+				continue;
 			Actor->BeginPlay();
+		}
 	}
 	inline void Tick(const double DeltaTime)
 	{
 		DeferredRemove();
 
-		std::vector<sActor::SharedPtr>::iterator it = Actors.begin();
-		while (it != Actors.end())
+		for (const auto& Actor : Actors)
 		{
-			if ((*it))
-			{
-				(*it)->Tick(DeltaTime);
-				it++;
-			}
-			else
-			{
-				it++;
-			}
+			if (std::find(RemoveActorsByDeferred.begin(), RemoveActorsByDeferred.end(), Actor) != RemoveActorsByDeferred.end())
+				continue;
+			Actor->Tick(DeltaTime);
 		}
 	}
 	inline void FixedUpdate(const double DeltaTime)
 	{
-		std::vector<sActor::SharedPtr>::iterator it = Actors.begin();
-		while (it != Actors.end())
+		for (const auto& Actor : Actors)
 		{
-			if ((*it))
-			{
-				(*it)->FixedUpdate(DeltaTime);
-				it++;
-			}
-			else
-			{
-				it++;
-			}
+			if (std::find(RemoveActorsByDeferred.begin(), RemoveActorsByDeferred.end(), Actor) != RemoveActorsByDeferred.end())
+				continue;
+			Actor->FixedUpdate(DeltaTime);
 		}
 	}
 
 	inline void InputProcess(const GMouseInput& MouseInput, const GKeyboardChar& KeyboardChar)
 	{
 		for (const auto& Actor : Actors)
+		{
+			if (std::find(RemoveActorsByDeferred.begin(), RemoveActorsByDeferred.end(), Actor) != RemoveActorsByDeferred.end())
+				continue;
 			Actor->InputProcess(MouseInput, KeyboardChar);
+		}
 	}
 
 	inline void AddMesh(const std::shared_ptr<sMesh>& Mesh)
@@ -242,6 +236,7 @@ public:
 	virtual std::string GetName() const override final;
 
 	virtual void InitLevel() override final;
+	virtual void DestroyLevel() override final;
 
 	virtual void BeginPlay() override final;
 	virtual void Tick(const double DeltaTime) override final;
@@ -258,8 +253,6 @@ public:
 	virtual void AddActor(const std::shared_ptr<sActor>& Object, std::size_t LayerIndex = 0) override final;
 	virtual void RemoveActor(sActor* Object, std::size_t LayerIndex = 0, bool bDeferredRemove = true) override final;
 
-	virtual void SpawnPlayerActor(const std::shared_ptr<sActor>& Actor, std::size_t PlayerIndex) override final;
-
 	virtual size_t LayerCount() const override final;
 
 	virtual size_t MeshCount(std::size_t LayerIndex = 0) const override final;
@@ -269,17 +262,25 @@ public:
 	virtual	std::vector<std::shared_ptr<sActor>> GetAllActors(std::size_t LayerIndex = 0) const override final;
 	virtual sActor* GetActor(const std::size_t Index, std::size_t LayerIndex = 0) const override final;
 
-	virtual sActor* GetPlayerFocusedActor(std::size_t Index) const override final;
+	sActor* GetPlayerFocusedActor(std::size_t Index) const;
 
 	virtual void OnResizeWindow(const std::size_t Width, const std::size_t Height) override final;
 
 	virtual void Reset();
+	void Reset_Client();
 
 	virtual void InputProcess(const GMouseInput& MouseInput, const GKeyboardChar& KeyboardChar) override final;
+
+	virtual sObjectSpawnNode GetSpawnNode(std::string Name, std::int32_t PlayerIndex = -1) const override final;
+
+	virtual void OnConnectedToServer() override final;
+	virtual void OnDisconnected() override final;
 
 private:
 	IWorld* World;
 	std::string Name;
 	std::vector<std::unique_ptr<LevelLayer>> Layers;
-	std::vector<sPlayerSpawn> PlayerSpawnLocations;
+	std::vector<sObjectSpawnNode> SpawnLocations;
+
+	bool bIsLevelInitialized;
 };

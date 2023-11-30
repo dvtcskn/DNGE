@@ -24,10 +24,10 @@
 * ---------------------------------------------------------------------------------------
 */
 
-
 #include "pch.h"
 #include "Gameplay/PhysicalComponent.h"
 #include "Gameplay/Actor.h"
+#include "Gameplay/PlayerProxy.h"
 
 sPhysicalComponent::sPhysicalComponent(std::string InName, sActor* pActor)
 	: Super(InName, pActor)
@@ -41,13 +41,30 @@ sPhysicalComponent::~sPhysicalComponent()
 	fCollisionEnd = nullptr;
 }
 
+void sPhysicalComponent::Replicate(bool bReplicate)
+{
+	if (IsReplicated() == bReplicate)
+		return;
+
+	Super::Replicate(bReplicate);
+
+	if (IsReplicated())
+	{
+		RegisterRPCfn(GetClassNetworkAddress(), GetName(), "SetLinearVelocity_Client", eRPCType::Client, false, false, std::bind(&sPhysicalComponent::SetLinearVelocity_Client, this, std::placeholders::_1), FVector);
+	}
+	else
+	{
+		Network::UnregisterRPC(GetClassNetworkAddress(), GetName());
+	}
+}
+
 void sPhysicalComponent::UpdatePhysics()
 {
 	if (HasRigidBody() && bEnablePhysics)
 	{
 		IRigidBody* RigidBody = GetRigidBody();
 		if (RigidBody->GetLocation() != GetRelativeLocation() || RigidBody->GetRotation() != GetRelativeRotation())
-			SetTransform(HasComponentOwner() ? RigidBody->GetLocation() - GetRelativeLocation() + GetLocalLocation() : RigidBody->GetLocation(), RigidBody->GetRotation());
+			SetTransform(HasComponentOwner() ? RigidBody->GetLocation() - GetRelativeLocation() + GetLocalLocation() : RigidBody->GetLocation(), RigidBody->GetRotation(), GetRelativeScale());
 	}
 }
 
@@ -58,32 +75,146 @@ void sPhysicalComponent::OnUpdateTransform()
 
 void sPhysicalComponent::SetCollisionEnabled(bool val)
 {
-	GetRigidBody()->SetEnabled(val);
+	if (HasRigidBody())
+		GetRigidBody()->SetEnabled(val);
 }
 
 bool sPhysicalComponent::IsCollisionEnabled() const
 {
-	return GetRigidBody()->IsEnabled();
+	return HasRigidBody() ? GetRigidBody()->IsEnabled() : false;
 }
 
 void sPhysicalComponent::SetCollisionChannel(ECollisionChannel Type)
 {
-	GetRigidBody()->SetCollisionChannel(Type);
+	if (HasRigidBody())
+		GetRigidBody()->SetCollisionChannel(Type);
 }
 
 void sPhysicalComponent::SetCollisionChannel(ECollisionChannel Type, std::uint16_t CollideTo)
 {
-	GetRigidBody()->SetCollisionChannel(Type, CollideTo);
+	if (HasRigidBody())
+		GetRigidBody()->SetCollisionChannel(Type, CollideTo);
 }
 
 ECollisionChannel sPhysicalComponent::GetCollisionChannel() const
 {
-	return GetRigidBody()->GetCollisionChannel();
+	return HasRigidBody() ? GetRigidBody()->GetCollisionChannel() : ECollisionChannel::None;
+}
+
+void sPhysicalComponent::SetLinearVelocity(const FVector& V)
+{
+	if (IsReplicated() && Network::IsHost())
+	{
+		if (HasRigidBody())
+			GetRigidBody()->SetLinearVelocity(V);
+
+		Network::CallRPC(GetClassNetworkAddress(), GetName(), "SetLinearVelocity_Client", sArchive(V), false);
+	}
+	else if (IsReplicated() && Network::IsConnected())
+	{
+		if (GetOwner()->GetNetworkRole() == eNetworkRole::NetProxy)
+		{
+			return;
+		}
+
+		if (HasRigidBody())
+			GetRigidBody()->SetLinearVelocity(V);
+
+		//Network::CallRPC(GetClassNetworkAddress(), GetName(), "SetLinearVelocity_Server", sArchive(V), false);
+	}
+	else
+	{
+		if (HasRigidBody())
+			GetRigidBody()->SetLinearVelocity(V);
+	}
+}
+
+void sPhysicalComponent::SetLinearVelocity_Client(const FVector& V)
+{
+	if (Network::IsHost())
+		return;
+
+	if (!IsReplicated())
+		return;
+
+	if (HasRigidBody())
+		GetRigidBody()->SetLinearVelocity(V);
+
+	//Network::CallRPC(GetClassNetworkAddress(), "SetRelativeLocation_Server", sArchive(GetRelativeLocation()), false);
 }
 
 FVector sPhysicalComponent::GetVelocity() const
 {
-	return GetRigidBody()->GetLinearVelocity();
+	return HasRigidBody() ? GetRigidBody()->GetLinearVelocity() : FVector::Zero();
+}
+
+void sPhysicalComponent::SetLinearDamping(const float v)
+{
+	if (HasRigidBody())
+		GetRigidBody()->SetLinearDamping(v);
+}
+
+float sPhysicalComponent::GetLinearDamping() const
+{
+	return HasRigidBody() ? GetRigidBody()->GetLinearDamping() : 0.0f;
+}
+
+void sPhysicalComponent::SetAngularVelocity(float omega)
+{
+	if (HasRigidBody())
+		GetRigidBody()->SetAngularVelocity(omega);
+}
+
+float sPhysicalComponent::GetAngularVelocity() const
+{
+	return HasRigidBody() ? GetRigidBody()->GetAngularVelocity() : 0.0f;
+}
+
+void sPhysicalComponent::SetAngularDamping(const float v)
+{
+	if (HasRigidBody())
+		GetRigidBody()->SetAngularDamping(v);
+}
+
+float sPhysicalComponent::GetAngularDamping() const
+{
+	return HasRigidBody() ? GetRigidBody()->GetAngularDamping() : 0.0f;
+}
+
+void sPhysicalComponent::ApplyForce(const FVector& force, const FVector& point, bool wake)
+{
+	if (HasRigidBody())
+		GetRigidBody()->ApplyForce(force, point, wake);
+}
+
+void sPhysicalComponent::ApplyForceToCenter(const FVector& force, bool wake)
+{
+	if (HasRigidBody())
+		GetRigidBody()->ApplyForceToCenter(force, wake);
+}
+
+void sPhysicalComponent::ApplyTorque(float torque, bool wake)
+{
+	if (HasRigidBody())
+		GetRigidBody()->ApplyTorque(torque, wake);
+}
+
+void sPhysicalComponent::ApplyLinearImpulse(const FVector& impulse, const FVector& point, bool wake)
+{
+	if (HasRigidBody())
+		GetRigidBody()->ApplyLinearImpulse(impulse, point, wake);
+}
+
+void sPhysicalComponent::ApplyLinearImpulseToCenter(const FVector& impulse, bool wake)
+{
+	if (HasRigidBody())
+		GetRigidBody()->ApplyLinearImpulseToCenter(impulse, wake);
+}
+
+void sPhysicalComponent::ApplyAngularImpulse(float impulse, bool wake)
+{
+	if (HasRigidBody())
+		GetRigidBody()->ApplyAngularImpulse(impulse, wake);
 }
 
 void sPhysicalComponent::CollisionStart(sPhysicalComponent* Component)

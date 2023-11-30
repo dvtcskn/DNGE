@@ -24,14 +24,16 @@
 * ---------------------------------------------------------------------------------------
 */
 
-
 #include "pch.h"
 #include "Gameplay/AIController.h"
+#include "Gameplay/GameInstance.h"
 #include <Windows.h>
 
 sAIController::sAIController(sGameInstance* InOwner)
 	: Super()
 	, Owner(InOwner)
+	, Name(GetClassID())
+	, NetworkRole(eNetworkRole::None)
 {
 }
 
@@ -94,4 +96,24 @@ void sAIController::UnPossess(sActor* Actor)
 		Actor->UnPossess();
 		OnUnPossess();
 	}
+}
+
+std::string sAIController::GetClassNetworkAddress() const
+{
+	return "0::" + Name;
+}
+
+IMetaWorld* sAIController::GetMetaWorld() const
+{
+	return Owner->GetMetaWorld();
+}
+
+eNetworkRole sAIController::GetNetworkRole() const
+{
+	return NetworkRole;
+}
+
+void sAIController::SetNetworkRole(eNetworkRole Role)
+{
+	NetworkRole = Role;
 }

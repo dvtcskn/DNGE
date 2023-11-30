@@ -24,7 +24,6 @@
 * ---------------------------------------------------------------------------------------
 */
 
-
 #include "pch.h"
 #include "Gameplay/MeshComponent.h"
 #include "Gameplay/Actor.h"

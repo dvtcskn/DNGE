@@ -24,7 +24,6 @@
 * ---------------------------------------------------------------------------------------
 */
 
-
 #include "pch.h"
 #include "Gameplay/Player.h"
 #include "Gameplay/GameInstance.h"
@@ -35,6 +34,9 @@ sPlayer::sPlayer(sGameInstance* InOwner, std::size_t InPlayerIndex)
 	, PlayerFocusedActor(nullptr)
 	, PlayerIndex(InPlayerIndex)
 	, DeferredRemovePlayerActor(false)
+	, Name("Player_" + std::to_string(InPlayerIndex))
+	, bIsReplicated(false)
+	, NetworkRole(eNetworkRole::None)
 {
 	SetPlayerFocusedActor(sActor::Create("DefaultActor"));
 }
@@ -45,6 +47,9 @@ sPlayer::sPlayer(sGameInstance* InOwner, std::size_t InPlayerIndex, sPlayerContr
 	, PlayerFocusedActor(nullptr)
 	, PlayerIndex(InPlayerIndex)
 	, DeferredRemovePlayerActor(false)
+	, Name("Player_" + std::to_string(InPlayerIndex))
+	, bIsReplicated(false)
+	, NetworkRole(eNetworkRole::None)
 {
 	SetPlayerFocusedActor(InPlayerFocusedActor);
 }
@@ -55,25 +60,30 @@ sPlayer::sPlayer(sGameInstance* InOwner, sPlayerController::SharedPtr PlayerCont
 	, PlayerFocusedActor(nullptr)
 	, PlayerIndex(InOwner->GetPlayerCount())
 	, DeferredRemovePlayerActor(false)
+	, Name("Player_" + std::to_string(PlayerIndex))
+	, bIsReplicated(false)
+	, NetworkRole(eNetworkRole::None)
 {
 	SetPlayerFocusedActor(InPlayerFocusedActor);
 }
 
 sPlayer::~sPlayer()
 {
+	if (bIsReplicated)
+		Replicate(false);
+
 	Controller->UnPossess(PlayerFocusedActor.get());
-	Controller = nullptr;
+	PlayerFocusedActor->UnPossess();
+	PlayerFocusedActor->RemoveFromLevel();
 	PlayerFocusedActor = nullptr;
+	Controller = nullptr;
 	Owner = nullptr;
 }
 
 void sPlayer::BeginPlay()
 {
-	if (PlayerFocusedActor)
-		Owner->GetActiveLevel()->SpawnPlayerActor(PlayerFocusedActor, Owner->GetPlayerIndex(this));
-
-	Controller->BeginPlay();
 	OnBeginPlay();
+	Controller->BeginPlay();
 }
 
 void sPlayer::Tick(const double DeltaTime)
@@ -89,6 +99,88 @@ void sPlayer::FixedUpdate(const double DeltaTime)
 {
 	Controller->FixedUpdate(DeltaTime);
 	OnFixedUpdate(DeltaTime);
+}
+
+void sPlayer::Replicate(bool bReplicate)
+{
+	if (bIsReplicated == bReplicate)
+		return;
+
+	bIsReplicated = bReplicate;
+
+	if (bIsReplicated)
+	{
+		RegisterRPCfn(GetClassNetworkAddress(), "Player", "SpawnPlayerFocusedActor_Client", eRPCType::Client, true, false, std::bind(&sPlayer::SpawnPlayerFocusedActor_Client, this, std::placeholders::_1, std::placeholders::_2), FVector, std::size_t);
+		RegisterRPCfn(GetClassNetworkAddress(), "Player", "SpawnPlayerFocusedActor_Server", eRPCType::Server, true, false, std::bind(&sPlayer::SpawnPlayerFocusedActor_Server, this));
+	}
+	else
+	{
+		Network::UnregisterRPC(GetClassNetworkAddress());
+	}
+}
+
+void sPlayer::SpawnPlayerFocusedActor()
+{
+	if (PlayerFocusedActor)
+	{
+		DespawnPlayerFocusedActor();
+
+		if (IsReplicated() && Network::IsConnected() && !Network::IsHost())
+		{
+			//Engine::WriteToConsole("SpawnPlayerFocusedActor_Client" + GetClassNetworkAddress() + " " + GetPlayerName());
+			Network::CallRPC(GetClassNetworkAddress(), "Player", "SpawnPlayerFocusedActor_Server", sArchive(), true);
+		}
+		else if (IsReplicated() && Network::IsHost())
+		{
+			//Engine::WriteToConsole("SpawnPlayerFocusedActor_Server");
+			auto Spawn = GetGameInstance()->GetActiveLevel()->GetSpawnNode("PlayerSpawn", GetPlayerIndex());
+			if (PlayerFocusedActor->GetOwnedLevel() != GetGameInstance()->GetActiveLevel())
+				PlayerFocusedActor->AddToActiveLevel(Spawn.Location, Spawn.LayerIndex);
+
+			Network::CallRPC(GetClassNetworkAddress(), "Player", "SpawnPlayerFocusedActor_Client", sArchive(Spawn.Location, Spawn.LayerIndex), true);
+		}
+		else
+		{
+			//Engine::WriteToConsole("SpawnPlayerFocusedActor");
+			auto Spawn = GetGameInstance()->GetActiveLevel()->GetSpawnNode("PlayerSpawn", GetPlayerIndex());
+			PlayerFocusedActor->AddToActiveLevel(Spawn.Location, Spawn.LayerIndex);
+		}
+	}
+}
+
+void sPlayer::SpawnPlayerFocusedActor_Server()
+{
+	if (PlayerFocusedActor)
+	{
+		auto Spawn = GetGameInstance()->GetActiveLevel()->GetSpawnNode("PlayerSpawn", GetPlayerIndex());
+		//Engine::WriteToConsole("SpawnPlayerFocusedActor_Server Player Name : " + Name + "| Location : " + Spawn.Location.ToString() + "| Layer : " + std::to_string(Spawn.LayerIndex));
+		PlayerFocusedActor->AddToActiveLevel(Spawn.Location, Spawn.LayerIndex);
+		Network::CallRPC(GetClassNetworkAddress(), "Player", "SpawnPlayerFocusedActor_Client", sArchive(Spawn.Location, Spawn.LayerIndex), true);
+	}
+}
+
+void sPlayer::SpawnPlayerFocusedActor_Client(FVector Location, std::size_t LayerIndex)
+{
+	if (PlayerFocusedActor)
+	{
+		//Engine::WriteToConsole("SpawnPlayerFocusedActor_Client Player Name : " + Name + "| Location : " + Location.ToString() + "| Layer : " + std::to_string(LayerIndex));
+		PlayerFocusedActor->AddToActiveLevel(Location, LayerIndex);
+	}
+}
+
+void sPlayer::OnLevelReset()
+{
+	SpawnPlayerFocusedActor();
+	Controller->OnLevelReset();
+}
+
+void sPlayer::DespawnPlayerFocusedActor()
+{
+	if (!PlayerFocusedActor)
+		return;
+
+	//Engine::WriteToConsole("DespawnPlayerFocusedActor");
+	PlayerFocusedActor->RemoveFromLevel(false);
 }
 
 void sPlayer::SetPlayerFocusedActor(const sActor::SharedPtr& InPlayerFocusedActor)
@@ -112,12 +204,6 @@ void sPlayer::SetPlayerFocusedActor(const sActor::SharedPtr& InPlayerFocusedActo
 	}
 }
 
-void sPlayer::SpawnPlayerFocusedActor()
-{
-	if (PlayerFocusedActor)
-		GetGameInstance()->GetActiveLevel()->SpawnPlayerActor(PlayerFocusedActor, GetPlayerIndex());
-}
-
 void sPlayer::RemovePlayerFocusedActor(bool DeferredRemove)
 {
 	if (!PlayerFocusedActor)
@@ -138,9 +224,17 @@ void sPlayer::RemovePlayerFocusedActor(bool DeferredRemove)
 	}
 }
 
+sViewportInstance* sPlayer::GetViewportInstance() const
+{
+	if (Controller)
+		return Controller->GetViewportInstance();
+	return nullptr;
+}
+
 std::int32_t sPlayer::GetPlayerIndex() const
 {
-	return Owner->GetPlayerIndex(const_cast<sPlayer*>(this));
+	return PlayerIndex;
+	//return Owner->GetPlayerIndex(const_cast<sPlayer*>(this));
 }
 
 std::size_t sPlayer::GetPlayerCount() const
@@ -151,6 +245,36 @@ std::size_t sPlayer::GetPlayerCount() const
 ESplitScreenType sPlayer::GetSplitScreenType() const
 {
 	return Owner->GetSplitScreenType();
+}
+
+void sPlayer::SetPlayerName(std::string InName)
+{
+	Engine::WriteToConsole("Old Name : " + Name + " " + "Old Name : " + InName);
+	Name = InName;
+	Controller->OnPlayerNameChanged();
+	if (Network::IsConnected())
+	{
+		//Network::CallRPCFromClient("OnNameChanged");
+	}
+}
+
+std::string sPlayer::GetPlayerName() const
+{
+	return Name;
+}
+
+std::string sPlayer::GetClassNetworkAddress() const
+{
+	return std::to_string(PlayerIndex);
+}
+
+void sPlayer::SetNetworkRole(eNetworkRole Role)
+{
+	if (NetworkRole == Role)
+		return;
+	NetworkRole = Role;
+	OnNetworkRoleChanged();
+	Controller->OnPlayerNetworkRoleChanged();
 }
 
 void sPlayer::InputProcess(const GMouseInput& MouseInput, const GKeyboardChar& KeyboardChar)
@@ -197,4 +321,10 @@ void sPlayer::PlayerRemoved()
 void sPlayer::SetPlayerIndex(std::size_t Index)
 {
 	PlayerIndex = Index;
+}
+
+void sPlayer::OnChangeLevel()
+{
+	PlayerFocusedActor->RemoveFromLevel();
+	//SpawnPlayerFocusedActor();
 }

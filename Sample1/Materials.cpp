@@ -177,9 +177,9 @@ namespace GameMaterials
 			pPipelineDesc.RasterizerAttribute = sRasterizerAttributeDesc();
 			pPipelineDesc.RasterizerAttribute.CullMode = ERasterizerCullMode::eNone;
 
-			pPipelineDesc.NumRenderTargets = 7;
+			pPipelineDesc.NumRenderTargets = 1;
 			pPipelineDesc.RTVFormats[0] = EFormat::BGRA8_UNORM;
-			pPipelineDesc.DSVFormat = EFormat::R32G8X24_Typeless;
+			pPipelineDesc.DSVFormat = GPU::GetDefaultDepthFormat();
 
 			std::vector<sVertexAttributeDesc> VertexLayout =
 			{
@@ -230,9 +230,9 @@ namespace GameMaterials
 			pPipelineDesc.RasterizerAttribute = sRasterizerAttributeDesc();
 			pPipelineDesc.RasterizerAttribute.CullMode = ERasterizerCullMode::eNone;
 
-			pPipelineDesc.NumRenderTargets = 7;
+			pPipelineDesc.NumRenderTargets = 1;
 			pPipelineDesc.RTVFormats[0] = EFormat::BGRA8_UNORM;
-			pPipelineDesc.DSVFormat = EFormat::R32G8X24_Typeless;
+			pPipelineDesc.DSVFormat = GPU::GetDefaultDepthFormat();
 
 			std::vector<sVertexAttributeDesc> VertexLayout =
 			{
@@ -293,9 +293,9 @@ namespace GameMaterials
 			pPipelineDesc.RasterizerAttribute = sRasterizerAttributeDesc();
 			pPipelineDesc.RasterizerAttribute.CullMode = ERasterizerCullMode::eNone;
 
-			pPipelineDesc.NumRenderTargets = 7;
+			pPipelineDesc.NumRenderTargets = 1;
 			pPipelineDesc.RTVFormats[0] = EFormat::BGRA8_UNORM;
-			pPipelineDesc.DSVFormat = EFormat::R32G8X24_Typeless;
+			pPipelineDesc.DSVFormat = GPU::GetDefaultDepthFormat();
 
 			std::vector<sVertexAttributeDesc> VertexLayout =
 			{
@@ -363,7 +363,7 @@ namespace GameMaterials
 
 			pPipelineDesc.NumRenderTargets = 1;
 			pPipelineDesc.RTVFormats[0] = EFormat::BGRA8_UNORM;
-			pPipelineDesc.DSVFormat = EFormat::R32G8X24_Typeless;
+			pPipelineDesc.DSVFormat = GPU::GetDefaultDepthFormat();
 
 			std::vector<sVertexAttributeDesc> VertexLayout =
 			{
@@ -499,7 +499,7 @@ namespace GameMaterials
 
 			pPipelineDesc.NumRenderTargets = 1;
 			pPipelineDesc.RTVFormats[0] = EFormat::BGRA8_UNORM;
-			pPipelineDesc.DSVFormat = EFormat::R32G8X24_Typeless;
+			pPipelineDesc.DSVFormat = GPU::GetDefaultDepthFormat();
 
 			std::vector<sVertexAttributeDesc> VertexLayout =
 			{
@@ -546,7 +546,7 @@ namespace GameMaterials
 
 			pPipelineDesc.NumRenderTargets = 1;
 			pPipelineDesc.RTVFormats[0] = EFormat::BGRA8_UNORM;
-			pPipelineDesc.DSVFormat = EFormat::R32G8X24_Typeless;
+			pPipelineDesc.DSVFormat = GPU::GetDefaultDepthFormat();
 
 			std::vector<sVertexAttributeDesc> VertexLayout =
 			{

@@ -95,12 +95,22 @@ void sWorld::AddLevel(const ILevel::SharedPtr& Level)
 
 void sWorld::SetActiveLevel(const std::size_t index)
 {
+	if (auto Level = GetActiveLevel())
+	{
+		Level->Reset();
+	}
+
 	if (index < LevelCount())
 		ActiveLevelIndex = index;
 }
 
 void sWorld::SetActiveLevel(const std::string& Name)
 {
+	if (auto Level = GetActiveLevel())
+	{
+		Level->Reset();
+	}
+
 	for (std::size_t i = 0; i < Levels.size(); i++)
 	{
 		if (Levels[i]->GetName() == Name)

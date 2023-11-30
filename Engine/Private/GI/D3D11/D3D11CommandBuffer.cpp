@@ -38,7 +38,7 @@ D3D11CommandBuffer::D3D11CommandBuffer(D3D11Device* InDevice)
 	, DeferredCTX(nullptr)
 	, Owner(InDevice)
 	, StencilRef(0)
-	, bIsSingleThreaded(true)
+	, bIsSingleThreaded(false)
 	, ActivePipeline(nullptr)
 {
 	bIsSingleThreaded = !Owner->IsNvDeviceID();
@@ -517,6 +517,14 @@ void D3D11CommandBuffer::CopyDepthBuffer(IDepthTarget* Dest, IDepthTarget* Sourc
 	D3D11DepthTarget* SourceFB = static_cast<D3D11DepthTarget*>(Source);
 
 	DeferredCTX->CopyResource(DestFB->GetD3D11Texture(), SourceFB->GetD3D11Texture());
+}
+
+void D3D11CommandBuffer::SetUnorderedAccessBufferAsResource(IUnorderedAccessBuffer* pUAV, std::uint32_t RootParameterIndex)
+{
+}
+
+void D3D11CommandBuffer::SetUnorderedAccessBuffersAsResource(std::vector<IUnorderedAccessBuffer*> UAVs, std::uint32_t RootParameterIndex)
+{
 }
 
 void D3D11CommandBuffer::SetPipeline(IPipeline* Pipeline)

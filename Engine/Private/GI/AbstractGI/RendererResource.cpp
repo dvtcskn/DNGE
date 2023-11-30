@@ -24,7 +24,6 @@
 * ---------------------------------------------------------------------------------------
 */
 
-
 #include "pch.h"
 #include "AbstractGI/RendererResource.h"
 #include "Core/MeshPrimitives.h"

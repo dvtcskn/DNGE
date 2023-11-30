@@ -24,7 +24,6 @@
 * ---------------------------------------------------------------------------------------
 */
 
-
 #include "pch.h"
 #include "Engine/World2D.h"
 #include "Engine/Box2DRigidBody.h"
@@ -494,7 +493,7 @@ IRigidBody::SharedPtr sWorld2D::Create2DCircleBody(sPhysicalComponent* Owner, co
 	//RigidBodys.push_back(RigidBody2D.get());
 	return RigidBody2D;
 }
-IRigidBody::SharedPtr sWorld2D::Create2DEdgeBody(sPhysicalComponent* Owner, const sRigidBodyDesc& Desc, const FVector2& Origin, const std::array<FVector2, 4>& points, bool OneSided)
+IRigidBody::SharedPtr sWorld2D::Create2DEdgeBody(sPhysicalComponent* Owner, const sRigidBodyDesc& Desc, const FVector2& Origin, const std::array<FVector2, 4>& points, bool OneSided) 
 {
 	b2BodyDef Def;
 	switch (Desc.RigidBodyType)

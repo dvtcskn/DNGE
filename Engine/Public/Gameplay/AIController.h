@@ -23,7 +23,6 @@
 * SOFTWARE.
 * ---------------------------------------------------------------------------------------
 */
-
 #pragma once
 
 #include "PlayerState.h"
@@ -55,6 +54,15 @@ public:
 
 	inline sGameInstance* GetOwner() const { return Owner; }
 
+	virtual std::string GetName() const override final { return Name; }
+	inline void SetName(std::string InName) { Name = InName; }
+	virtual std::string GetClassNetworkAddress() const override;
+
+	virtual IMetaWorld* GetMetaWorld() const;
+
+	virtual eNetworkRole GetNetworkRole() const override;
+	virtual void SetNetworkRole(eNetworkRole Role);
+
 private:
 	virtual void OnPossess(sActor* Actor) {}
 	virtual void OnUnPossess() {}
@@ -64,6 +72,8 @@ private:
 	virtual void OnFixedUpdate(const double DeltaTime) {}
 
 private:
+	std::string Name;
 	sGameInstance* Owner;
 	std::vector<sActor*> PossessedActors;
+	eNetworkRole NetworkRole;
 };

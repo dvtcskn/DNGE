@@ -24,11 +24,11 @@
 * ---------------------------------------------------------------------------------------
 */
 
-
 #include "pch.h"
 #include "Gameplay/Actor.h"
 #include "Gameplay/PlayerController.h"
 #include "Gameplay/AIController.h"
+#include "Engine/IMetaWorld.h"
 
 sActor::sActor(std::string InName, sController* InController)
 	: Name(InName)
@@ -38,10 +38,12 @@ sActor::sActor(std::string InName, sController* InController)
 	, bIsHidden(false)
 	, bIsEnabled(true)
 	, LayerIndex(0)
+	, bIsReplicated(false)
 {}
 
 sActor::~sActor()
 {
+	Replicate(false);
 	UnPossess();
 	RemoveFromLevel();
 	Level = nullptr;
@@ -73,6 +75,206 @@ void sActor::FixedUpdate(const double DeltaTime)
 	RootComponent->FixedUpdate(DeltaTime);
 }
 
+void sActor::Replicate(bool bReplicate)
+{
+	if (bIsReplicated == bReplicate/* || !Controller*/)
+		return;
+
+	bIsReplicated = bReplicate;
+
+	if (bIsReplicated)
+	{
+		//RegisterRPCfn(GetClassNetworkAddress(), GetName(), "AddToActiveLevel_Server", eRPCType::Client, true, std::bind(&sActor::AddToActiveLevel_Server, this, std::placeholders::_1, std::placeholders::_2), FVector, std::size_t);
+	}
+	else
+	{
+		Network::UnregisterRPC(GetClassNetworkAddress(), GetName());
+	}
+}
+
+eNetworkRole sActor::GetNetworkRole() const
+{
+	return Controller ? Controller->GetNetworkRole() : eNetworkRole::None;
+}
+
+std::string sActor::GetClassNetworkAddress() const
+{
+	return Controller ? Controller->GetClassNetworkAddress() : "-1";
+}
+
+bool sActor::AddToLevel(ILevel* pLevel, FVector SpawnLocation, std::size_t InLayerIndex)
+{
+	if (!pLevel)
+		return false;
+
+	if (Level)
+	{
+		auto ActiveLevel = GetController()->GetMetaWorld()->GetActiveLevel();
+		if (Level == ActiveLevel)
+		{
+			if (IsReplicated() && Network::IsConnected() && !Network::IsHost())
+			{
+				Network::CallRPC(GetClassNetworkAddress(), GetName(), "AddToLevel_Server", sArchive(SpawnLocation, InLayerIndex), true);
+				return true;
+			}
+			return false;
+		}
+	}
+
+	Level = pLevel;
+
+	/*if (IsReplicated() && Network::IsConnected() && !Network::IsHost())
+	{
+		Network::CallRPC(GetClassNetworkAddress(), GetName(), "AddToLevel_Server", sArchive(SpawnLocation, InLayerIndex), true);
+		return true;
+	}*/
+
+	LayerIndex = InLayerIndex;
+	Level->AddActor(shared_from_this(), LayerIndex);
+	SetLocation(SpawnLocation);
+
+	SetEnabled(true);
+	Hide(false);
+
+	return true;
+}
+
+void sActor::AddToLevel_Server(FVector SpawnLocation, std::size_t InLayerIndex)
+{
+	LayerIndex = InLayerIndex;
+	Level->AddActor(shared_from_this(), LayerIndex);
+	SetLocation(SpawnLocation);
+
+	SetEnabled(true);
+	Hide(false);
+}
+
+bool sActor::AddToLevel(std::string InLevel, FVector SpawnLocation, std::size_t InLayerIndex)
+{
+	if (!HasController())
+		return false;
+
+	if (InLevel == "")
+		return false;
+
+	if (Level)
+	{
+		auto ActiveLevel = GetController()->GetMetaWorld()->GetActiveLevel();
+		if (Level == ActiveLevel)
+		{
+			if (IsReplicated() && Network::IsConnected() && !Network::IsHost())
+			{
+				Network::CallRPC(GetClassNetworkAddress(), GetName(), "AddToLevel_Server", sArchive(SpawnLocation, InLayerIndex), true);
+				return true;
+			}
+			return false;
+		}
+	}
+
+	Level = GetController()->GetMetaWorld()->GetActiveWorld()->GetLevel(InLevel);
+
+	if (IsReplicated() && Network::IsConnected() && !Network::IsHost())
+	{
+		Network::CallRPC(GetClassNetworkAddress(), GetName(), "AddToLevel_Server", sArchive(SpawnLocation, InLayerIndex), true);
+		return true;
+	}
+
+	LayerIndex = InLayerIndex;
+	Level->AddActor(shared_from_this(), LayerIndex);
+	SetLocation(SpawnLocation);
+
+	SetEnabled(true);
+	Hide(false);
+
+	return true;
+}
+
+void sActor::AddToNamedLevel_Server(std::string InLevel, FVector SpawnLocation, std::size_t InLayerIndex)
+{
+	if (!HasController())
+		return;
+
+	if (InLevel == "")
+		return;
+
+	if (Level)
+	{
+		auto ActiveLevel = GetController()->GetMetaWorld()->GetActiveLevel();
+		if (Level == ActiveLevel)
+			return;
+	}
+
+	Level = GetController()->GetMetaWorld()->GetActiveWorld()->GetLevel(InLevel);
+
+	LayerIndex = InLayerIndex;
+	Level->AddActor(shared_from_this(), LayerIndex);
+	SetLocation(SpawnLocation);
+
+	SetEnabled(true);
+	Hide(false);
+}
+
+bool sActor::AddToActiveLevel(FVector SpawnLocation, std::size_t InLayerIndex)
+{
+	if (!HasController())
+		return false;
+
+	if (Level)
+	{
+		auto ActiveLevel = GetController()->GetMetaWorld()->GetActiveLevel();
+		if (Level == ActiveLevel)
+			return false;
+	}
+
+	/*if (IsReplicated() && Network::IsConnected() && !Network::IsHost())
+	{
+		Network::CallRPC(GetClassNetworkAddress(), GetName(), "AddToActiveLevel_Server", sArchive(SpawnLocation, InLayerIndex), true);
+		return true;
+	}*/
+
+	Engine::WriteToConsole("AddToActiveLevel : " + SpawnLocation.ToString());
+
+	Level = GetController()->GetMetaWorld()->GetActiveLevel();
+
+	LayerIndex = InLayerIndex;
+	Level->AddActor(shared_from_this(), LayerIndex);
+	SetLocation(SpawnLocation);
+
+	SetEnabled(true);
+	Hide(false);
+
+	/*if (IsReplicated() && Network::IsConnected())
+	{
+		Network::CallRPC(GetClassNetworkAddress(), GetName(), "AddToActiveLevel_Server", sArchive(SpawnLocation, InLayerIndex), true);
+		return true;
+	}*/
+
+	return true;
+}
+
+void sActor::AddToActiveLevel_Server(FVector SpawnLocation, std::size_t InLayerIndex)
+{
+	if (!HasController())
+		return;
+
+	if (Level)
+	{
+		auto ActiveLevel = GetController()->GetMetaWorld()->GetActiveLevel();
+		if (Level == ActiveLevel)
+			return;
+	}
+
+	Engine::WriteToConsole("AddToActiveLevel_Server : " + SpawnLocation.ToString());
+	Level = GetController()->GetMetaWorld()->GetActiveLevel();
+
+	LayerIndex = InLayerIndex;
+	Level->AddActor(shared_from_this(), LayerIndex);
+	SetLocation(SpawnLocation);
+
+	SetEnabled(true);
+	Hide(false);
+}
+
 void sActor::AddTag(const std::string& InTag, const std::optional<std::size_t> i)
 {
 	if (!i.has_value())
@@ -101,15 +303,6 @@ void sActor::SetRootComponent(const sPrimitiveComponent::SharedPtr& InComponent)
 {
 	RootComponent = InComponent;
 	RootComponent->AttachToActor(this);
-}
-
-void sActor::AddToLevel(ILevel* pLevel, std::size_t InLayerIndex)
-{
-	if (!pLevel)
-		return;
-	Level = pLevel;
-	LayerIndex = InLayerIndex;
-	Level->AddActor(shared_from_this(), LayerIndex);
 }
 
 void sActor::RemoveFromLevel(bool bDeferredRemove)
@@ -225,6 +418,10 @@ void sActor::Possess(sController* InController)
 		{
 			Controller = InController;
 		}
+	}
+	else
+	{
+		Controller = InController;
 	}
 }
 

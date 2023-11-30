@@ -78,6 +78,7 @@ GSawTrapActor::GSawTrapActor(std::string InName, sController* InController)
 
 	auto SpriteComponent = sSpriteSheetComponent::Create("DefaultSpriteSheetComponent");
 	SetRootComponent(SpriteComponent);
+	SpriteComponent->Replicate(true);
 	SpriteComponent->SetSpriteSheet(Sprite);
 	SpriteComponent->Play();
 
@@ -88,7 +89,7 @@ GSawTrapActor::GSawTrapActor(std::string InName, sController* InController)
 		Desc.Restitution = 0.0f;
 		Desc.RigidBodyType = ERigidBodyType::Kinematic;
 
-		sCircleCollision2DComponent::SharedPtr Trap_BoxActorCollision = sCircleCollision2DComponent::Create("Saw_BoxActorCollision", Desc, FVector2::Zero(), Dim.Width / 2.0f);
+		sNet_CircleCollision2DComponent::SharedPtr Trap_BoxActorCollision = sNet_CircleCollision2DComponent::Create("Saw_BoxActorCollision", Desc, FVector2::Zero(), Dim.Width / 2.0f);
 		Trap_BoxActorCollision->AttachToComponent(SpriteComponent.get());
 		Trap_BoxActorCollision->AddTag("Trap");
 		Trap_BoxActorCollision->AddTag("Saw");
@@ -111,6 +112,9 @@ void GSawTrapActor::OnBeginPlay()
 
 void GSawTrapActor::OnFixedUpdate(const double DeltaTime)
 {
+	if (Network::IsClient())
+		return;
+
 	Super::OnFixedUpdate(DeltaTime);
 
 	Time = bReverse ? Time - DeltaTime / Speed : Time + DeltaTime / Speed;
@@ -143,6 +147,9 @@ void GSawTrapActor::SetSpeed(float InSpeed)
 
 void GSawTrapActor::OnCollisionStart(sPhysicalComponent* Component)
 {
+	if (Network::IsClient())
+		return;
+
 	if (Component)
 	{
 		Component->GetOwner<GPlayerCharacter>()->ApplyDamage(GetDamage(), true);
@@ -170,6 +177,7 @@ GRockHeadActor::GRockHeadActor(std::string InName, sController* InController)
 
 	auto SpriteComponent = sSpriteSheetComponent::Create("DefaultSpriteSheetComponent");
 	SetRootComponent(SpriteComponent);
+	SpriteComponent->Replicate(true);
 	SpriteComponent->SetSpriteSheet(Sprite);
 	SpriteComponent->Play();
 
@@ -178,14 +186,13 @@ GRockHeadActor::GRockHeadActor(std::string InName, sController* InController)
 	SpriteComponent->BindFunction_FrameUpdated(std::bind(&GRockHeadActor::AnimFrameUpdated, this, std::placeholders::_1));
 
 	{
-		/* Simple Collision Level */
 		sRigidBodyDesc Desc;
 		Desc.Friction = 0.0f;
 		Desc.Mass = 1.0f;
 		Desc.Restitution = 0.0f;
 		Desc.RigidBodyType = ERigidBodyType::Kinematic;
 
-		sBoxCollision2DComponent::SharedPtr Trap_BoxActorCollision = sBoxCollision2DComponent::Create("Rock_Head_BoxActorCollision", Desc, Dim);
+		sNet_BoxCollision2DComponent::SharedPtr Trap_BoxActorCollision = sNet_BoxCollision2DComponent::Create("Rock_Head_BoxActorCollision", Desc, Dim);
 		BoxCollision2DComponent = Trap_BoxActorCollision.get();
 		Trap_BoxActorCollision->AttachToComponent(SpriteComponent.get());
 		Trap_BoxActorCollision->AddTag("Trap");
@@ -210,6 +217,9 @@ void GRockHeadActor::OnBeginPlay()
 
 void GRockHeadActor::OnFixedUpdate(const double DeltaTime)
 {
+	if (Network::IsClient())
+		return;
+
 	Super::OnFixedUpdate(DeltaTime);
 
 	if (State == eRockHeadState::idle && !bIsActive && Time <= 0.0f && CheckTag(BoxCollision2DComponent->GetBounds(), eTagDirectionType::eUp, "PlayerCharacter", true, BoxCollision2DComponent->GetBounds().GetWidth()))
@@ -253,6 +263,20 @@ void GRockHeadActor::SetSpeed(float InSpeed)
 	Speed = InSpeed;
 }
 
+void GRockHeadActor::Replicate(bool bReplicate)
+{
+	if (IsReplicated() == bReplicate)
+		return;
+
+	Super::Replicate(bReplicate);
+
+	if (IsReplicated())
+	{
+		RegisterRPCfn(GetClassNetworkAddress(), GetName(), "OnHit_Top_Client", eRPCType::Client, true, false, std::bind(&GRockHeadActor::OnHit_Top_Client, this));
+		RegisterRPCfn(GetClassNetworkAddress(), GetName(), "OnHit_Bottom_Client", eRPCType::Client, true, false, std::bind(&GRockHeadActor::OnHit_Bottom_Client, this));
+	}
+}
+
 void GRockHeadActor::OnCollisionStart(sPhysicalComponent* Component)
 {
 	if (Component)
@@ -274,6 +298,8 @@ void GRockHeadActor::OnHit_Top()
 	SetLocation(FVector(Loc.X, Loc.Y - 2, 0.0f));
 	BoxCollision2DComponent->SetRelativeLocation(FVector(0.0f, -2.0f, 0.0f));
 
+	Network::CallRPC(GetClassNetworkAddress(), GetName(), "OnHit_Top_Client", sArchive());
+
 	auto Bound = BoxCollision2DComponent->GetBounds();
 	auto Dimension3D = Bound.GetDimension();
 	auto Center = Bound.GetCenter();
@@ -289,6 +315,15 @@ void GRockHeadActor::OnHit_Top()
 	}
 }
 
+void GRockHeadActor::OnHit_Top_Client()
+{
+	if (Network::IsHost())
+		return;
+
+	auto Sprite = AssetManager::Get().GetSpriteSheet("Rock_Head_Top_Hit");
+	GetRootComponent<sSpriteSheetComponent>()->SetSpriteSheet(Sprite);
+}
+
 void GRockHeadActor::OnHit_Bottom()
 {
 	auto Sprite = AssetManager::Get().GetSpriteSheet("Rock_Head_Bottom_Hit");
@@ -297,6 +332,8 @@ void GRockHeadActor::OnHit_Bottom()
 	auto Loc = GetLocation();
 	SetLocation(FVector(Loc.X, Loc.Y + 2, 0.0f));
 	BoxCollision2DComponent->SetRelativeLocation(FVector(0.0f, 2.0f, 0.0f));
+
+	Network::CallRPC(GetClassNetworkAddress(), GetName(), "OnHit_Bottom_Client", sArchive());
 
 	auto Bound = BoxCollision2DComponent->GetBounds();
 	auto Dimension3D = Bound.GetDimension();
@@ -308,9 +345,17 @@ void GRockHeadActor::OnHit_Bottom()
 		if (Res->HasTag("PlayerCharacter"))
 		{
 			Res->GetOwner<GPlayerCharacter>()->ApplyDamage(100.0f);
-			break;
 		}
 	}
+}
+
+void GRockHeadActor::OnHit_Bottom_Client()
+{
+	if (Network::IsHost())
+		return;
+
+	auto Sprite = AssetManager::Get().GetSpriteSheet("Rock_Head_Bottom_Hit");
+	GetRootComponent<sSpriteSheetComponent>()->SetSpriteSheet(Sprite);
 }
 
 void GRockHeadActor::AnimationStarted()
@@ -328,6 +373,9 @@ void GRockHeadActor::AnimationEnded()
 		bIsActive = false;
 		State = eRockHeadState::bottom;
 
+		if (Network::IsClient())
+			return;
+
 		auto Loc = GetLocation();
 		SetLocation(FVector(Loc.X, Loc.Y + 2, 0.0f));
 		BoxCollision2DComponent->SetRelativeLocation(FVector(0.0f, 2.0f, 0.0f));
@@ -337,6 +385,9 @@ void GRockHeadActor::AnimationEnded()
 		auto Sprite = AssetManager::Get().GetSpriteSheet("Rock_Head_Blink");
 		GetRootComponent<sSpriteSheetComponent>()->SetSpriteSheet(Sprite);
 		State = eRockHeadState::idle;
+
+		if (Network::IsClient())
+			return;
 
 		auto Loc = GetLocation();
 		SetLocation(FVector(Loc.X, Loc.Y - 2, 0.0f));

@@ -24,22 +24,26 @@
 * ---------------------------------------------------------------------------------------
 */
 
-
 #include "pch.h"
 #include "Gameplay/GameInstance.h"
 
 sGameInstance::sGameInstance(IMetaWorld* World)
 	: Owner(World)
-	, bIsSplitScreenEnabled(true)
+	, bIsInitialized(false)
+	, bIsSplitScreenEnabled(false)
 	, SplitScreenType(ESplitScreenType::Grid)
 	, PlayerLimit(4)
-{}
+{
+}
 
 sGameInstance::~sGameInstance()
 {
 	for (auto& Player : Players)
 		Player = nullptr;
 	Players.clear();
+	for (auto& Player : PlayerProxys)
+		Player = nullptr;
+	PlayerProxys.clear();
 	for (auto& Controllers : AIControllers)
 		Controllers = nullptr;
 	AIControllers.clear();
@@ -53,8 +57,16 @@ void sGameInstance::BeginPlay()
 	for (const auto& Player : Players)
 		Player->BeginPlay();
 
+	for (const auto& Player : PlayerProxys)
+		Player->BeginPlay();
+
 	for (const auto& Controller : AIControllers)
 		Controller->BeginPlay();
+
+	for (const auto& Player : Players)
+		Player->SpawnPlayerFocusedActor();
+
+	bIsInitialized = true;
 
 	OnBeginPlay();
 }
@@ -62,6 +74,9 @@ void sGameInstance::BeginPlay()
 void sGameInstance::Tick(const double DeltaTime)
 {
 	for (const auto& Player : Players)
+		Player->Tick(DeltaTime);
+
+	for (const auto& Player : PlayerProxys)
 		Player->Tick(DeltaTime);
 
 	for (const auto& Controller : AIControllers)
@@ -75,10 +90,47 @@ void sGameInstance::FixedUpdate(const double DeltaTime)
 	for (const auto& Player : Players)
 		Player->FixedUpdate(DeltaTime);
 
+	for (const auto& Player : PlayerProxys)
+		Player->FixedUpdate(DeltaTime);
+
 	for (const auto& Controller : AIControllers)
 		Controller->FixedUpdate(DeltaTime);
 
 	OnFixedUpdate(DeltaTime);
+}
+
+sPlayer* sGameInstance::GetPlayer(std::size_t index, bool ByIndex) const
+{
+	if (ByIndex)
+	{
+		for (const auto& Player : Players)
+		{
+			if (Player->GetPlayerIndex() == index)
+				return Player.get();
+		}
+		return nullptr;
+	}
+	else
+	{
+		return Players[index].get();
+	}
+	return nullptr;
+}
+
+std::vector<sPlayer*> sGameInstance::GetPlayers() const
+{
+	std::vector<sPlayer*> Result;
+	Result.reserve(Players.size());
+	std::transform(Players.cbegin(), Players.cend(), std::back_inserter(Result), [](auto& ptr) { return ptr.get(); });
+	return Result;
+}
+
+std::vector<sPlayerProxyBase*> sGameInstance::GetPlayerProxys() const
+{
+	std::vector<sPlayerProxyBase*> Result;
+	Result.reserve(PlayerProxys.size());
+	std::transform(PlayerProxys.cbegin(), PlayerProxys.cend(), std::back_inserter(Result), [](auto& ptr) { return ptr.get(); });
+	return Result;
 }
 
 void sGameInstance::InputProcess(const GMouseInput& MouseInput, const GKeyboardChar& KeyboardChar)
@@ -94,8 +146,123 @@ void sGameInstance::WindowResized(const std::size_t Width, const std::size_t Hei
 		Player->WindowResized(Width, Height);
 }
 
+void sGameInstance::SessionCreated()
+{
+	OnSessionCreated();
+}
+
+void sGameInstance::SessionDestroyed()
+{
+	OnSessionDestroyed();
+}
+
+void sGameInstance::Connected()
+{
+	for (auto& Player : PlayerProxys)
+		Player = nullptr;
+	PlayerProxys.clear();
+	GetActiveLevel()->OnConnectedToServer();
+	OnConnected();
+}
+
+void sGameInstance::Disconnected()
+{
+	for (auto& Player : PlayerProxys)
+		Player = nullptr;
+	PlayerProxys.clear();
+	GetActiveLevel()->OnDisconnected();
+	OnDisconnected();
+}
+
+void sGameInstance::PlayerConnected(std::string PlayerName, std::string NetAddress)
+{
+	if (Network::IsHost())
+		return;
+	if (!Network::IsConnected())
+		return;
+
+	sPlayerProxyBase::SharedPtr Player = ConstructPlayerProxy(PlayerName, NetAddress);
+	if (!Player)
+		return;
+
+	PlayerProxys.push_back(Player);
+
+	if (bIsInitialized)
+		Player->BeginPlay();
+
+	//Player->SpawnPlayerFocusedActor_Client(FVector(75.0f, 250.0f, 0.0f), 3);
+
+	OnPlayerConnected(PlayerName, NetAddress);
+}
+
+void sGameInstance::PlayerDisconnected(std::string PlayerName, std::string NetAddress)
+{
+	if (Network::IsHost())
+		return;
+	if (!Network::IsConnected())
+		return;
+
+	auto erased = std::erase_if(PlayerProxys, [&](const std::shared_ptr<sPlayerProxyBase>& pPlayer) { return pPlayer->GetPlayerName() == PlayerName && pPlayer->GetClassNetworkAddress() == NetAddress; });
+
+	if (erased > 0)
+	{
+
+	}
+	OnPlayerDisconnected(PlayerName, NetAddress);
+}
+
+std::size_t sGameInstance::GetNextPlayerIndex()
+{
+	std::sort(Players.begin(), Players.end(), [](const sPlayer::SharedPtr& a, const sPlayer::SharedPtr& b) {
+		return a->GetPlayerIndex() < b->GetPlayerIndex();
+		});
+
+	std::size_t Index = 0;
+	for (const auto& Player : Players)
+	{
+		if (Player->GetPlayerIndex() == Index)
+		{
+			Index++;
+		}
+		else
+		{
+			return Index;
+		}
+	}
+	return Index;
+}
+
+void sGameInstance::ResetLevel()
+{
+	GetActiveLevel()->Reset();
+
+	for (const auto& Player : Players)
+		Player->OnLevelReset();
+}
+
+void sGameInstance::OpenLevel(std::string Level)
+{
+	//std::lock_guard<std::mutex> locker(Mutex);
+	GetMetaWorld()->GetActiveWorld()->SetActiveLevel(Level);
+
+	for (const auto& Player : Players)
+		Player->OnChangeLevel();
+}
+
+void sGameInstance::OpenWorld(std::string World)
+{
+	//std::lock_guard<std::mutex> locker(Mutex);
+	GetMetaWorld()->SetActiveWorld(World);
+
+	for (const auto& Player : Players)
+		Player->OnChangeLevel();
+}
+
 void sGameInstance::EnableSplitScreen()
 {
+	if (Network::IsConnected() && !Network::IsHost())
+		return;
+
 	bIsSplitScreenEnabled = true;
 	OnSplitScreenEnabled();
 	for (auto& Player : Players)
@@ -112,24 +279,59 @@ void sGameInstance::DisableSplitScreen()
 
 void sGameInstance::SetSplitScreenType(ESplitScreenType InSplitScreenType)
 {
+	if (Network::IsConnected() && !Network::IsHost())
+		return;
+
 	SplitScreenType = InSplitScreenType;
 	OnSplitScreenTypeChanged(SplitScreenType);
 	for (auto& Player : Players)
 		Player->SplitScreenTypeChanged(SplitScreenType);
 }
 
-void sGameInstance::CreatePlayer()
+sPlayer* sGameInstance::CreatePlayer()
 {
-	sPlayer::SharedPtr Player = ConstructPlayer();
-	AddPlayer(Player); 
-	Player = nullptr;
+	if ((Network::IsConnected() && Players.size() == 1) && !Network::IsHost())
+		return nullptr;
+
+	if (GetPlayerCount() < PlayerLimit)
+	{
+		sPlayer::SharedPtr Player = ConstructPlayer();
+		AddPlayer(Player);
+		return Player.get();
+	}
+	return nullptr;
+}
+
+sPlayer* sGameInstance::CreatePlayer(eNetworkRole Role)
+{
+	if ((Network::IsConnected() && Players.size() == 1) && !Network::IsHost())
+		return nullptr;
+
+	if (GetPlayerCount() < PlayerLimit)
+	{
+		sPlayer::SharedPtr Player = ConstructPlayer();
+		Player->SetNetworkRole(Role);
+		AddPlayer(Player);
+		return Player.get();
+	}
+	return nullptr;
 }
 
 void sGameInstance::AddPlayer(const sPlayer::SharedPtr& InPlayer)
 {
+	if ((Network::IsConnected() && Players.size() == 1) && !Network::IsHost())
+		return;
+
 	if (GetPlayerCount() < PlayerLimit)
 	{
 		Players.push_back(InPlayer);
+
+		std::sort(Players.begin(), Players.end(), [](const sPlayer::SharedPtr& a, const sPlayer::SharedPtr& b) {
+			return a->GetPlayerIndex() < b->GetPlayerIndex();
+			});
+
+		if (bIsInitialized)
+			InPlayer->BeginPlay();
 		OnNewPlayerAdded(GetPlayerIndex(InPlayer.get()));
 		for (auto& Player : Players)
 			Player->NewPlayerAdded();
@@ -138,10 +340,17 @@ void sGameInstance::AddPlayer(const sPlayer::SharedPtr& InPlayer)
 
 void sGameInstance::RemovePlayer(std::size_t Idx)
 {
-	if (Idx < Players.size())
+	if (IsPlayerIndexExist(Idx))
 	{
-		Players[Idx] = nullptr;
-		Players.erase(Players.begin() + Idx);
+		Players.erase(std::remove_if(Players.begin(), Players.end(), [&](const sPlayer::SharedPtr& Player)
+			{
+				return Player->GetPlayerIndex() == Idx;
+			}), Players.end());
+
+		std::sort(Players.begin(), Players.end(), [](const sPlayer::SharedPtr& a, const sPlayer::SharedPtr& b) {
+			return a->GetPlayerIndex() < b->GetPlayerIndex();
+			});
+
 		OnPlayerRemoved();
 		for (auto& Player : Players)
 			Player->PlayerRemoved();
@@ -156,6 +365,10 @@ void sGameInstance::RemovePlayer(sPlayer* InPlayer)
 		}));*/
 
 	auto erased = std::erase_if(Players, [&InPlayer](const std::shared_ptr<sPlayer>& pPlayer) { return InPlayer == pPlayer.get(); });
+	std::sort(Players.begin(), Players.end(), [](const sPlayer::SharedPtr& a, const sPlayer::SharedPtr& b) {
+		return a->GetPlayerIndex() < b->GetPlayerIndex();
+		});
+
 	if (erased > 0)
 	{
 		OnPlayerRemoved();
@@ -176,6 +389,9 @@ void sGameInstance::RemoveLastPlayer()
 
 void sGameInstance::LimitPlayer(std::size_t InPlayerLimit)
 {
+	if (Network::IsConnected())
+		return;
+
 	PlayerLimit = InPlayerLimit;
 
 	if (GetPlayerCount() > PlayerLimit)
@@ -200,9 +416,23 @@ std::int32_t sGameInstance::GetPlayerIndex(sPlayer* PC) const
 	return std::int32_t(pos);
 }
 
+bool sGameInstance::IsPlayerIndexExist(std::size_t Index) const
+{
+	for (const auto& Player : Players)
+	{
+		if (Player->GetPlayerIndex() == Index)
+			return true;
+	}
+	return false;
+}
+
 void sGameInstance::AddAIController(const sAIController::SharedPtr& Controller)
 {
+	if (Network::IsConnected() && !Network::IsHost())
+		return;
+
 	AIControllers.push_back(Controller);
+	Controller->BeginPlay();
 	OnNewAIControllerAdded();
 }
 

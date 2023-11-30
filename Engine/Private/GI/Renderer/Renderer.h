@@ -23,7 +23,6 @@
 * SOFTWARE.
 * ---------------------------------------------------------------------------------------
 */
-
 #pragma once
 
 #include "Engine/IMetaWorld.h"
@@ -80,24 +79,22 @@ public:
 
 private:
 	IMetaWorld* World;
-	IGraphicsCommandContext::SharedPtr GraphicsCommandContext;
-	IRenderTarget* FinalRenderTarget;
-	EGBufferClear GBufferClearMode;
-
-	std::vector<sViewportInstance*> ViewportInstances;
-
-	sScreenDimension ScreenDimension;
-	sScreenDimension InternalBaseRenderResolution;
 
 	class sGBuffer;
 	std::unique_ptr<sGBuffer> GBuffer;
 
-	sLineRenderer::SharedPtr LineRenderer;
-
+	IGraphicsCommandContext::SharedPtr GraphicsCommandContext;
+	IRenderTarget* FinalRenderTarget;
+	std::vector<sViewportInstance*> ViewportInstances;
+	sScreenDimension ScreenDimension;
+	sScreenDimension InternalBaseRenderResolution;
 	sCanvasRenderer::SharedPtr CanvasRenderer;
-
 	sPostProcessRenderer::UniquePtr PostProcessRenderer;
 	sToneMapping::UniquePtr ToneMapping;
+
+	sLineRenderer::SharedPtr LineRenderer;
+	EGBufferClear GBufferClearMode;
+
 	bool bIsTonmapperEnabled;
 
 	std::map<EPostProcessRenderOrder, std::vector<std::shared_ptr<sPostProcess>>> PostProcess;

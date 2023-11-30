@@ -57,7 +57,7 @@ protected:
 	sBufferDesc BufferDesc;
 
 protected:
-	D3D11Buffer(D3D11Device* InDevice, const sBufferDesc& InDesc, sBufferSubresource* InSubresource = NULL, ResourceTypeFlags InType = ResourceTypeFlags::eDEFAULT, bool InDynamic = false);
+	D3D11Buffer(D3D11Device* InDevice, const sBufferDesc& InDesc, sBufferSubresource* InSubresource = NULL, ResourceTypeFlags InType = ResourceTypeFlags::eDEFAULT);
 
 public:
 	using SharedPtr = std::shared_ptr<D3D11Buffer>;
@@ -76,8 +76,8 @@ public:
 
 	bool IsMapable() const;
 
-	FORCEINLINE ComPtr<ID3D11Buffer> GetBuffer() { return Buffer; }
-	FORCEINLINE sBufferDesc GetBufferDesc() { return BufferDesc; }
+	FORCEINLINE ComPtr<ID3D11Buffer> GetBuffer() const { return Buffer; }
+	FORCEINLINE sBufferDesc GetBufferDesc() const { return BufferDesc; }
 
 	virtual void ResizeBuffer(std::size_t Size, sBufferSubresource* Subresource = nullptr);
 };
@@ -98,13 +98,13 @@ public:
 
 	virtual ~D3D11ConstantBuffer() = default;
 
-	FORCEINLINE virtual std::string GetName() const final override { return Name; };
+	FORCEINLINE virtual std::string GetName() const override final { return Name; };
 
 	virtual void SetDefaultRootParameterIndex(std::uint32_t inRootParameterIndex) override final { RootParameterIndex = inRootParameterIndex; }
 	virtual std::uint32_t GetDefaultRootParameterIndex() const override final { return RootParameterIndex; }
 	void ApplyConstantBuffer(ID3D11DeviceContext1* CMD, std::uint32_t InSlot, eShaderType InType = eShaderType::Pixel);
 
-	virtual void Map(const void* Ptr, IGraphicsCommandContext* InCMDBuffer = nullptr) final override;
+	virtual void Map(const void* Ptr, IGraphicsCommandContext* InCMDBuffer = nullptr) override final;
 };
 
 class D3D11VertexBuffer final : public D3D11Buffer, public IVertexBuffer
@@ -121,11 +121,11 @@ public:
 
 	virtual ~D3D11VertexBuffer() = default;
 
-	FORCEINLINE virtual std::string GetName() const final override { return Name; };
+	FORCEINLINE virtual std::string GetName() const override final { return Name; };
 
-	virtual std::size_t GetSize() const final override { return BufferDesc.Size; }
-	virtual bool IsMapable() const final override { return D3D11Buffer::IsMapable(); }
-	virtual void UpdateSubresource(sBufferSubresource* Subresource, IGraphicsCommandContext* InCMDBuffer = nullptr) final override;
+	virtual std::size_t GetSize() const override final { return BufferDesc.Size; }
+	virtual bool IsMapable() const override final { return D3D11Buffer::IsMapable(); }
+	virtual void UpdateSubresource(sBufferSubresource* Subresource, IGraphicsCommandContext* InCMDBuffer = nullptr) override final;
 	void UpdateSubresource(sBufferSubresource* Subresource, ID3D11DeviceContext1* Device = nullptr);
 	void ApplyBuffer(IGraphicsCommandContext* InCMDBuffer = nullptr);
 
@@ -149,11 +149,11 @@ public:
 
 	virtual ~D3D11IndexBuffer() = default;
 
-	FORCEINLINE virtual std::string GetName() const final override { return Name; };
+	FORCEINLINE virtual std::string GetName() const override final { return Name; };
 
-	virtual std::size_t GetSize() const final override { return BufferDesc.Size; }
-	virtual bool IsMapable() const final override { return D3D11Buffer::IsMapable(); }
-	virtual void UpdateSubresource(sBufferSubresource* Subresource, IGraphicsCommandContext* InCMDBuffer = nullptr) final override;
+	virtual std::size_t GetSize() const override final { return BufferDesc.Size; }
+	virtual bool IsMapable() const override final { return D3D11Buffer::IsMapable(); }
+	virtual void UpdateSubresource(sBufferSubresource* Subresource, IGraphicsCommandContext* InCMDBuffer = nullptr) override final;
 	void UpdateSubresource(sBufferSubresource* Subresource, ID3D11DeviceContext1* Device = nullptr);
 	void ApplyBuffer(IGraphicsCommandContext* InCMDBuffer = nullptr);
 
@@ -161,4 +161,34 @@ public:
 	{
 		D3D11Buffer::ResizeBuffer(Size, Subresource);
 	}
+};
+
+class D3D11UnorderedAccessBuffer final : public D3D11Buffer, public IUnorderedAccessBuffer
+{
+	sClassBody(sClassConstructor, D3D11UnorderedAccessBuffer, IUnorderedAccessBuffer)
+private:
+	std::string Name;
+
+	ID3D11UnorderedAccessView* mUnorderedAccess;
+	ID3D11ShaderResourceView* mShaderResource;
+
+public:
+	D3D11UnorderedAccessBuffer(D3D11Device* InDevice, std::string InName, const sBufferDesc& InDesc, bool bSRVAllowed = true);
+
+	virtual ~D3D11UnorderedAccessBuffer()
+	{
+		mUnorderedAccess = nullptr;
+		mShaderResource = nullptr;
+	}
+
+	FORCEINLINE virtual std::string GetName() const override final { return Name; };
+
+	virtual bool IsSRV_Allowed() const { return mShaderResource != nullptr; }
+
+	ID3D11UnorderedAccessView* GetUAV() const { return mUnorderedAccess; }
+	ID3D11ShaderResourceView* GetSRV() const { return mShaderResource; }
+
+	virtual std::size_t GetSize() const override final { return BufferDesc.Size; }
+	virtual bool IsMapable() const override final { return D3D11Buffer::IsMapable(); }
+	virtual void Map(const void* Ptr, IGraphicsCommandContext* InCMDBuffer = nullptr) override final;
 };

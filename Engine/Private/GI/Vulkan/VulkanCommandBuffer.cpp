@@ -151,6 +151,14 @@ void VulkanCommandBuffer::CopyDepthBuffer(IDepthTarget* Dest, IDepthTarget* Sour
 {
 }
 
+void VulkanCommandBuffer::SetUnorderedAccessBufferAsResource(IUnorderedAccessBuffer* pUAV, std::uint32_t RootParameterIndex)
+{
+}
+
+void VulkanCommandBuffer::SetUnorderedAccessBuffersAsResource(std::vector<IUnorderedAccessBuffer*> UAVs, std::uint32_t RootParameterIndex)
+{
+}
+
 void VulkanCommandBuffer::SetPipeline(IPipeline* Pipeline)
 {
 

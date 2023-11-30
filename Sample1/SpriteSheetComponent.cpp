@@ -31,7 +31,6 @@
 #include <Core/MeshPrimitives.h>
 #include <AbstractGI/MaterialManager.h>
 #include <Gameplay/BoxCollision2DComponent.h>
-#include <Utilities/Utilities.h>
 #include "SpriteEffectComponent.h"
 #include "SpriteAnimationManager.h"
 
@@ -95,7 +94,7 @@ sSpriteSheetComponent::sSpriteSheetComponent(sSpriteSheet* pSpriteSheet)
 	pSpriteEffectComponent->AttachToComponent(this);
 	SpriteEffectComponent = pSpriteEffectComponent.get();
 
-	MeshConstantBuffer = IConstantBuffer::Create(Name, sBufferDesc(sizeof(sMeshConstantBufferAttributes), 0), 1);
+	MeshConstantBuffer = IConstantBuffer::Create(GetName(), sBufferDesc(sizeof(sMeshConstantBufferAttributes), 0), 1);
 	{
 		ObjectConstants.modelMatrix = FMatrix::Identity();
 		ObjectConstants.PrevModelMatrix = FMatrix::Identity();

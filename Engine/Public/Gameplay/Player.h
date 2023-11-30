@@ -23,7 +23,6 @@
 * SOFTWARE.
 * ---------------------------------------------------------------------------------------
 */
-
 #pragma once
 
 #include "Engine/ClassBody.h"
@@ -42,10 +41,6 @@ public:
 	sPlayer(sGameInstance* InOwner, std::size_t InPlayerIndex, sPlayerController::SharedPtr PlayerController, sActor::SharedPtr PlayerFocusedActor);
 	sPlayer(sGameInstance* InOwner, sPlayerController::SharedPtr PlayerController, sActor::SharedPtr PlayerFocusedActor);
 	virtual ~sPlayer();
-
-	void BeginPlay();
-	void Tick(const double DeltaTime);
-	void FixedUpdate(const double DeltaTime);
 
 	template<class T>
 	inline T* GetGameInstance(const bool Dynamic = false) const
@@ -69,11 +64,24 @@ public:
 	}
 	inline sActor* GetPlayerFocusedActor() const { return PlayerFocusedActor.get(); }
 	void SpawnPlayerFocusedActor();
+	void DespawnPlayerFocusedActor();
 	void RemovePlayerFocusedActor(bool DeferredRemove = true);
+
+	sViewportInstance* GetViewportInstance() const;
 
 	std::int32_t GetPlayerIndex() const;
 	std::size_t GetPlayerCount() const;
 	ESplitScreenType GetSplitScreenType() const;
+
+	void SetPlayerName(std::string Name);
+	std::string GetPlayerName() const;
+	std::string GetClassNetworkAddress() const;
+
+	virtual void Replicate(bool bReplicate);
+	inline bool IsReplicated() const { return bIsReplicated; }
+
+	inline eNetworkRole GetNetworkRole() const { return NetworkRole; }
+	void SetNetworkRole(eNetworkRole Role);
 
 	virtual void InputProcess(const GMouseInput& MouseInput, const GKeyboardChar& KeyboardChar);
 
@@ -92,11 +100,24 @@ private:
 	virtual void OnNewPlayerAdded() {}
 	virtual void OnPlayerRemoved() {}
 
+	void BeginPlay();
+	void Tick(const double DeltaTime);
+	void FixedUpdate(const double DeltaTime);
+
 	virtual void OnBeginPlay() {}
 	virtual void OnTick(const double DeltaTime) {}
 	virtual void OnFixedUpdate(const double DeltaTime) {}
 
 	void SetPlayerIndex(std::size_t Index);
+
+	void OnChangeLevel();
+
+	void SpawnPlayerFocusedActor_Server();
+	void SpawnPlayerFocusedActor_Client(FVector Location, std::size_t LayerIndex);
+
+	virtual void OnNetworkRoleChanged() {}
+
+	virtual void OnLevelReset();
 
 private:
 	sGameInstance* Owner;
@@ -104,4 +125,7 @@ private:
 	sPlayerController::SharedPtr Controller;
 	sActor::SharedPtr PlayerFocusedActor;
 	bool DeferredRemovePlayerActor;
+	std::string Name;
+	bool bIsReplicated;
+	eNetworkRole NetworkRole;
 };

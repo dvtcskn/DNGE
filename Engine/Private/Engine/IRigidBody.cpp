@@ -24,7 +24,6 @@
 * ---------------------------------------------------------------------------------------
 */
 
-
 #include "pch.h"
 #include "Engine/IRigidBody.h"
 #include "Gameplay/PhysicalComponent.h"

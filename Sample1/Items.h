@@ -36,11 +36,19 @@ class GItem : public sActor
 {
 	sClassBody(sClassConstructor, GItem, sActor)
 public:
-	GItem(std::string Fruit);
+	GItem(std::string Name, std::string Fruit);
 	virtual ~GItem();
 
 	virtual void OnBeginPlay() override;
 	virtual void OnFixedUpdate(const double DeltaTime) override;
+
+	std::string GetFruitType() const { return Type; }
+
+	virtual std::string GetClassNetworkAddress() const override { return "Level::" + GetName(); }
+
+	virtual void Replicate(bool bReplicate) override;
+
+	void CheckIfExistOnServer();
 
 private:
 	void AnimationStarted();
@@ -48,11 +56,16 @@ private:
 	void AnimFrameUpdated(std::size_t Frame);
 
 	void OnDestroyed();
+	void OnCollected();
+	void OnCollected_Client();
 
 	virtual void OnTransformUpdated() override;
+
+	void CheckIfExistOnServer_Client(bool val);
 
 private:
 	sSpriteSheetComponent* SpriteSheetComponent;
 	FBounds2D Bound;
 	bool bDestroyed;
+	std::string Type;
 };

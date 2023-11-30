@@ -23,7 +23,6 @@
 * SOFTWARE.
 * ---------------------------------------------------------------------------------------
 */
-
 #pragma once
 
 #include <memory>
@@ -31,10 +30,16 @@
 
 class sActor;
 class sPlayer;
+class IMetaWorld;
 class sController
 {
 	sBaseClassBody(sClassDefaultProtectedConstructor, sController)
 public:
+	virtual std::string GetName() const = 0;
+	virtual std::string GetClassNetworkAddress() const = 0;
+	virtual IMetaWorld* GetMetaWorld() const = 0;
+	virtual eNetworkRole GetNetworkRole() const = 0;
+
 	virtual void Possess(sActor* Actor) = 0;
 	virtual void UnPossess(sActor* Actor) = 0;
 };
