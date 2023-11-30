@@ -23,7 +23,6 @@
 * SOFTWARE.
 * ---------------------------------------------------------------------------------------
 */
-
 #pragma once
 
 #include <memory>
@@ -72,7 +71,6 @@ public:
 	virtual void RemoveLevel(const std::string& Name) = 0;
 
 	virtual sGameInstance* GetGameInstance() const = 0;
-	virtual sActor* GetPlayerFocusedActor(std::size_t Index) const = 0;
 
 	virtual void PauseActiveLevel(bool Pause) {}
 

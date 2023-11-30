@@ -23,7 +23,6 @@
 * SOFTWARE.
 * ---------------------------------------------------------------------------------------
 */
-
 #pragma once
 
 #include <vector>
@@ -32,6 +31,7 @@
 #include "AbstractGI/Material.h"
 #include "Core/Math/CoreMath.h"
 #include "PrimitiveComponent.h"
+#include "Engine/AbstractEngine.h"
 #include "ILevel.h"
 
 class sController;
@@ -56,6 +56,7 @@ public:
 
 	inline void SetName(std::string InName) { Name = InName; };
 	inline std::string GetName() const { return Name; };
+	virtual std::string GetClassNetworkAddress() const;
 
 	FBoundingBox GetBounds() const;
 	FVector GetLocation() const;
@@ -67,6 +68,10 @@ public:
 	void SetScale(FVector InScale);
 	void SetScale(float InScale);
 	virtual FVector GetVelocity() const;
+
+	virtual void Replicate(bool bReplicate);
+	inline bool IsReplicated() const { return bIsReplicated; }
+	virtual eNetworkRole GetNetworkRole() const;
 
 	void Hide(bool value);
 	void SetEnabled(bool value);
@@ -97,7 +102,9 @@ public:
 		return Components;
 	}
 
-	void AddToLevel(ILevel* pLevel, std::size_t LayerIndex = 0);
+	bool AddToLevel(ILevel* pLevel, FVector SpawnLocation, std::size_t LayerIndex = 0);
+	bool AddToLevel(std::string Level, FVector SpawnLocation, std::size_t LayerIndex = 0);
+	bool AddToActiveLevel(FVector SpawnLocation, std::size_t LayerIndex = 0);
 	inline ILevel* GetOwnedLevel() const { return Level; };
 	inline std::size_t GetLayerIndex() const { return LayerIndex; };
 	void RemoveFromLevel(bool bDeferredRemove = true);
@@ -126,6 +133,10 @@ private:
 
 	virtual void OnTransformUpdated() {};
 
+	void AddToLevel_Server(FVector SpawnLocation, std::size_t LayerIndex);
+	void AddToActiveLevel_Server(FVector SpawnLocation, std::size_t LayerIndex);
+	void AddToNamedLevel_Server(std::string Level, FVector SpawnLocation, std::size_t LayerIndex);
+
 private:
 	sPrimitiveComponent::SharedPtr RootComponent;
 	std::string Name;
@@ -143,4 +154,6 @@ private:
 
 	bool bIsHidden;
 	bool bIsEnabled;
+
+	bool bIsReplicated;
 };

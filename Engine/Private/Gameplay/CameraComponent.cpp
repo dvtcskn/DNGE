@@ -24,7 +24,6 @@
 * ---------------------------------------------------------------------------------------
 */
 
-
 #include "pch.h"
 #include "Gameplay/CameraComponent.h"
 #include "Gameplay/Actor.h"

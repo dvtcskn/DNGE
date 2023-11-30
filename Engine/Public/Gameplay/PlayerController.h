@@ -23,7 +23,6 @@
 * SOFTWARE.
 * ---------------------------------------------------------------------------------------
 */
-
 #pragma once
 
 #include "PlayerState.h"
@@ -47,6 +46,10 @@ public:
 	void Tick(const double DeltaTime);
 	void FixedUpdate(const double DeltaTime);
 
+	virtual std::string GetName() const override final { return Name; }
+	inline void SetName(std::string InName) { Name = InName; }
+	virtual std::string GetClassNetworkAddress() const override;
+
 	FORCEINLINE sPlayerState* GetPlayerState() const { return pPlayerState.get(); }
 
 	template<class T>
@@ -57,8 +60,13 @@ public:
 	sFORCEINLINE sPlayer* GetPlayer() { return Owner; };
 
 	sActor* GetPossessedActor() const;
+	template<class T>
+	inline T* GetPossessedActor() const
+	{
+		return static_cast<T*>(PossessedActor);
+	}
 	virtual void Possess(sActor* Actor) override;
-	virtual void UnPossess(sActor* Actor) override;
+	virtual void UnPossess(sActor* Actor = nullptr) override;
 
 	bool AddCanvasToViewport(ICanvas* Canvas);
 	bool RemoveCanvasFromViewport(ICanvas* Canvas);
@@ -71,12 +79,19 @@ public:
 	void SetPlayerState(sPlayerState::SharedPtr PS);
 
 	FORCEINLINE sCameraManager* GetCameraManager() const { return pCameraManager.get(); };
+	sViewportInstance* GetViewportInstance() const;
 
 	std::int32_t GetPlayerIndex() const;
 	std::size_t GetPlayerCount() const;
 	ESplitScreenType GetSplitScreenType() const;
 
+	virtual IMetaWorld* GetMetaWorld() const override final;
+
 	virtual void InputProcess(const GMouseInput& MouseInput, const GKeyboardChar& KeyboardChar);
+
+	virtual void Replicate(bool bReplicate);
+	inline bool IsReplicated() const { return bIsReplicated; }
+	virtual eNetworkRole GetNetworkRole() const override;
 
 private:
 	void WindowResized(const std::size_t Width, const std::size_t Height);
@@ -100,7 +115,15 @@ private:
 	virtual void OnTick(const double DeltaTime) {}
 	virtual void OnFixedUpdate(const double DeltaTime) {}
 
+	virtual void OnPlayerNameChanged();
+
+	virtual void OnPlayerNetworkRoleChanged() {}
+
+	virtual void OnLevelReset() {}
+
 private:
+	std::string Name;
+	bool bIsReplicated;
 	sPlayer* Owner;
 	sActor* PossessedActor;
 	sCameraManager::UniquePtr pCameraManager;

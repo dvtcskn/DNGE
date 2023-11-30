@@ -24,7 +24,6 @@
 * ---------------------------------------------------------------------------------------
 */
 
-
 #include "pch.h"
 #include "Gameplay/BoxCollision2DComponent.h"
 #include "Engine/AbstractEngine.h"
@@ -53,6 +52,9 @@ void sBoxCollision2DComponent::OnFixedUpdate(const double DT)
 
 FBoundingBox sBoxCollision2DComponent::GetBounds() const
 {
+	if (!RigidBody)
+		return FBoundingBox();
+
 	FVector Min;
 	FVector Max;
 	RigidBody->GetAabb(Min, Max);
@@ -61,6 +63,9 @@ FBoundingBox sBoxCollision2DComponent::GetBounds() const
 
 void sBoxCollision2DComponent::OnUpdateTransform()
 {
+	if (!RigidBody)
+		return;
+
 	if (RigidBody->GetLocation() != GetRelativeLocation() || RigidBody->GetRotation() != GetRelativeRotation())
 		RigidBody->SetTransform(GetRelativeLocation(), GetRelativeRotation());
 }

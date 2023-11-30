@@ -152,6 +152,8 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="Private\Engine\Audio.h" />
+    <ClInclude Include="Private\Engine\Network.h" />
+    <ClInclude Include="Private\Engine\RemoteProcedureCall.h" />
     <ClInclude Include="Private\Engine\WaveBankReader.h" />
     <ClInclude Include="Private\Engine\WAVFileReader.h" />
     <ClInclude Include="Private\framework.h" />
@@ -246,6 +248,7 @@
     <ClInclude Include="Public\Gameplay\Character.h" />
     <ClInclude Include="Public\Gameplay\Player.h" />
     <ClInclude Include="Public\Gameplay\PlayerController.h" />
+    <ClInclude Include="Public\Gameplay\PlayerProxy.h" />
     <ClInclude Include="Public\Gameplay\PlayerState.h" />
     <ClInclude Include="Public\Gameplay\PhysicalComponent.h" />
     <ClInclude Include="Public\Gameplay\PrimitiveComponent.h" />
@@ -262,7 +265,6 @@
     <ClInclude Include="Public\Utilities\stb_image.h" />
     <ClInclude Include="Public\Utilities\TimerProfiler.h" />
     <ClInclude Include="Public\Utilities\tinyxml2.h" />
-    <ClInclude Include="Public\Utilities\Utilities.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Private\Core\Archive.cpp" />
@@ -276,6 +278,8 @@
     <ClCompile Include="Private\Engine\IPhysicalWorld.cpp" />
     <ClCompile Include="Private\Engine\IRigidBody.cpp" />
     <ClCompile Include="Private\Engine\MemoryManager.cpp" />
+    <ClCompile Include="Private\Engine\Network.cpp" />
+    <ClCompile Include="Private\Engine\RemoteProcedureCall.cpp" />
     <ClCompile Include="Private\Engine\WaveBankReader.cpp" />
     <ClCompile Include="Private\Engine\WAVFileReader.cpp" />
     <ClCompile Include="Private\Engine\World2D.cpp" />
@@ -290,6 +294,7 @@
     <ClCompile Include="Private\Gameplay\Character.cpp" />
     <ClCompile Include="Private\Gameplay\Player.cpp" />
     <ClCompile Include="Private\Gameplay\PlayerController.cpp" />
+    <ClCompile Include="Private\Gameplay\PlayerProxy.cpp" />
     <ClCompile Include="Private\Gameplay\PlayerState.cpp" />
     <ClCompile Include="Private\Gameplay\PhysicalComponent.cpp" />
     <ClCompile Include="Private\Gameplay\PrimitiveComponent.cpp" />

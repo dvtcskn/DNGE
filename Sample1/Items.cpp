@@ -31,15 +31,18 @@
 #include "GPlayerCharacter.h"
 #include "HelperFunctions.h"
 
-GItem::GItem(std::string Fruit)
-	: Super(Fruit)
+GItem::GItem(std::string Name, std::string Fruit)
+	: Super(Name)
 	, bDestroyed(false)
+	, Type(Fruit)
 {
-	auto Sprite = AssetManager::Get().GetSpriteSheet(Fruit);
+	Replicate(true);
+	auto Sprite = AssetManager::Get().GetSpriteSheet(Type);
 	auto Dim = Sprite->GetSpriteBound(0).GetDimension();
 
 	auto SpriteComponent = sSpriteSheetComponent::Create("DefaultSpriteSheetComponent");
 	SetRootComponent(SpriteComponent);
+	SpriteComponent->Replicate(true);
 	SpriteSheetComponent = SpriteComponent.get();
 	SpriteComponent->SetSpriteSheet(Sprite);
 	SpriteComponent->Play();
@@ -62,6 +65,9 @@ void GItem::OnBeginPlay()
 
 void GItem::OnFixedUpdate(const double DeltaTime)
 {
+	if (Network::IsClient())
+		return;
+
 	if (bDestroyed)
 		return;
 
@@ -75,13 +81,25 @@ void GItem::OnFixedUpdate(const double DeltaTime)
 		{
 			Res->GetOwner<GPlayerCharacter>()->ReceiveItem(this);
 
-			bDestroyed = true;
-			auto Sprite = AssetManager::Get().GetSpriteSheet("Collected");
-			SpriteSheetComponent->SetSpriteSheet(Sprite);
-			SpriteSheetComponent->Play();
+			OnCollected();
 
 			break;
 		}
+	}
+}
+
+void GItem::Replicate(bool bReplicate)
+{
+	if (IsReplicated() == bReplicate)
+		return;
+
+	Super::Replicate(bReplicate);
+
+	if (IsReplicated())
+	{
+		RegisterRPCfn(GetClassNetworkAddress(), GetName(), "OnCollected_Client", eRPCType::Client, true, false, std::bind(&GItem::OnCollected_Client, this));
+		RegisterRPCfn(GetClassNetworkAddress(), GetName(), "CheckIfExistOnServer", eRPCType::Server, true, false, std::bind(&GItem::CheckIfExistOnServer, this));
+		RegisterRPCfn(GetClassNetworkAddress(), GetName(), "CheckIfExistOnServer_Client", eRPCType::Client, true, false, std::bind(&GItem::CheckIfExistOnServer_Client, this, std::placeholders::_1), bool);
 	}
 }
 
@@ -103,13 +121,66 @@ void GItem::AnimFrameUpdated(std::size_t Frame)
 
 void GItem::OnDestroyed()
 {
+	bDestroyed = true;
 	SetEnabled(false);
 	Hide(true);
-	RemoveFromLevel();
+	//if (Network::IsHost() || Network::IsClient())
+	//	return;
+	//RemoveFromLevel();
+}
+
+void GItem::OnCollected()
+{
+	if (Network::IsHost())
+	{
+		Network::CallRPC(GetClassNetworkAddress(), GetName(), "OnCollected_Client", sArchive());
+	}
+
+	if (bDestroyed)
+		return;
+
+	bDestroyed = true;
+	auto Sprite = AssetManager::Get().GetSpriteSheet("Collected");
+	SpriteSheetComponent->SetSpriteSheet(Sprite);
+	SpriteSheetComponent->Play();
+}
+
+void GItem::OnCollected_Client()
+{
+	if (Network::IsHost())
+		return;
+
+	if (bDestroyed)
+		return;
+
+	bDestroyed = true;
+	auto Sprite = AssetManager::Get().GetSpriteSheet("Collected");
+	SpriteSheetComponent->SetSpriteSheet(Sprite);
+	SpriteSheetComponent->Play();
 }
 
 void GItem::OnTransformUpdated()
 {
 	auto Loc = GetLocation();
 	Bound.SetPosition(FVector2(Loc.X, Loc.Y));
+}
+
+void GItem::CheckIfExistOnServer()
+{
+	if (Network::IsClient())
+	{
+		Network::CallRPC(GetClassNetworkAddress(), GetName(), "CheckIfExistOnServer", sArchive());
+	}
+	else if (Network::IsHost())
+	{
+		Network::CallRPC(GetClassNetworkAddress(), GetName(), "CheckIfExistOnServer_Client", sArchive(bDestroyed));
+	}
+}
+
+void GItem::CheckIfExistOnServer_Client(bool val)
+{
+	if (val)
+	{
+		OnDestroyed();
+	}
 }

@@ -158,3 +158,26 @@ public:
 
     D3D12_RESOURCE_STATES CurrentState;
 };
+
+class D3D12UnorderedAccessBuffer final : public IUnorderedAccessBuffer
+{
+    sClassBody(sClassConstructor, D3D12UnorderedAccessBuffer, IUnorderedAccessBuffer)
+private:
+    std::string Name;
+
+public:
+    D3D12UnorderedAccessBuffer(D3D12Device* InDevice, std::string InName, const sBufferDesc& InDesc, bool bSRVAllowed = true);
+
+    virtual ~D3D12UnorderedAccessBuffer()
+    {
+
+    }
+
+    FORCEINLINE virtual std::string GetName() const override final { return Name; };
+
+    virtual bool IsSRV_Allowed() const { return false; }
+
+    virtual std::size_t GetSize() const override final { return 0; }
+    virtual bool IsMapable() const override final { return false; }
+    virtual void Map(const void* Ptr, IGraphicsCommandContext* InCMDBuffer = nullptr) override final;
+};

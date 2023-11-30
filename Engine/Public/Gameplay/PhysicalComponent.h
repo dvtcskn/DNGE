@@ -23,7 +23,6 @@
 * SOFTWARE.
 * ---------------------------------------------------------------------------------------
 */
-
 #pragma once
 
 #include "PrimitiveComponent.h"
@@ -46,8 +45,6 @@ public:
 	virtual bool HasRigidBody() const = 0;
 	virtual IRigidBody* GetRigidBody() const = 0;
 
-	virtual FVector GetVelocity() const override final;
-
 	virtual void Serialize(sArchive& archive);
 
 	virtual void BindFunctionToCollisionStart(std::function<void(sPhysicalComponent*)> pfCollisionStart) { fCollisionStart = pfCollisionStart; }
@@ -58,6 +55,27 @@ public:
 	void SetCollisionChannel(ECollisionChannel Type);
 	void SetCollisionChannel(ECollisionChannel Type, std::uint16_t CollideTo);
 	ECollisionChannel GetCollisionChannel() const;
+
+	void SetLinearVelocity(const FVector& v);
+	virtual FVector GetVelocity() const override final;
+
+	void SetLinearDamping(const float v);
+	float GetLinearDamping() const;
+
+	void SetAngularVelocity(float omega);
+	float GetAngularVelocity() const;
+
+	void SetAngularDamping(const float v);
+	float GetAngularDamping() const;
+
+	void ApplyForce(const FVector& force, const FVector& point, bool wake = true);
+	void ApplyForceToCenter(const FVector& force, bool wake = true);
+	void ApplyTorque(float torque, bool wake = true);
+	void ApplyLinearImpulse(const FVector& impulse, const FVector& point, bool wake = true);
+	void ApplyLinearImpulseToCenter(const FVector& impulse, bool wake = true);
+	void ApplyAngularImpulse(float impulse, bool wake = true);
+
+	virtual void Replicate(bool bReplicate) override;
 
 private:
 	void UpdatePhysics();
@@ -70,6 +88,9 @@ private:
 
 	virtual void OnCollisionStart(sPhysicalComponent* Component) {}
 	virtual void OnCollisionEnd(sPhysicalComponent* Component) {}
+
+private:
+	void SetLinearVelocity_Client(const FVector& v);
 
 private:
 	bool bEnablePhysics;

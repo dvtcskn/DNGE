@@ -62,7 +62,7 @@ public:
 	virtual void RemoveLevel(const std::string& Name) override final;
 
 	virtual sGameInstance* GetGameInstance() const override final;
-	virtual sActor* GetPlayerFocusedActor(std::size_t Index) const override final;
+	sActor* GetPlayerFocusedActor(std::size_t Index) const;
 
 	virtual void PauseActiveLevel(bool Pause) override final;
 

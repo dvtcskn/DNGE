@@ -24,7 +24,6 @@
 * ---------------------------------------------------------------------------------------
 */
 
-
 #include "pch.h"
 #include "Engine/Engine.h"
 #include "GI/D3D11/D3D11Device.h"
@@ -42,6 +41,9 @@
 #include "Engine/InputController.h"
 #include "Engine/Audio.h"
 #include "Core/ThreadPool.h"
+#include "Network.h"
+#include "RemoteProcedureCall.h"
+#include "Utilities/ConfigManager.h"
 
 namespace
 {
@@ -51,6 +53,9 @@ namespace
 	static std::unique_ptr<sInputController> InputController = nullptr;
 	static std::unique_ptr<XAudio> pAudio = nullptr;
 	static ThreadPool mThreadPool;
+	static IServer::UniquePtr Server = nullptr;
+	static IClient::UniquePtr Client = nullptr;
+	static sDateTime AppStartTime = sDateTime();
 
 	static bool bPauseInput = false;
 	static bool bPausePhysics = false;
@@ -86,7 +91,7 @@ namespace GPU
 
 	EFormat GetDefaultDepthFormat()
 	{
-		return EFormat::R32G8X24_Typeless;
+		return EFormat::R32G8X24_Typeless; //EFormat::R32G8X24_Typeless; // EFormat::R32_Typeless
 	}
 
 	void SetGBufferClearMode(EGBufferClear Mode)
@@ -268,9 +273,269 @@ namespace Audio
 	}
 }
 
+namespace Network
+{
+	bool CreateSession(std::string Name, sGameInstance* Instance, std::string Level, std::size_t PlayerCount, std::uint16_t Port)
+	{
+		if (!Instance)
+			return false;
+		if (Instance->GetPlayerCount() == 0)
+			return false;
+
+		if (Client)
+		{
+			if (Client->IsConnected())
+				Client->Disconnect();
+		}
+
+		if (!Server)
+		{
+			Server = CreateServer();
+		}
+		else
+		{
+			if (Server->IsServerRunning())
+			{
+				//Server->DestroySession();
+				return false;
+			}
+		}
+		bool Result = Server->CreateSession(Name, Instance, Level, Port, PlayerCount);
+		if (!Result)
+			return false;
+
+		if (!Client)
+		{
+			Client = CreateClient();
+		}
+		else
+		{
+			if (Client->IsConnected())
+				Client->Disconnect();
+		}
+		Result = Client->Connect(Instance, "127.0.0.1", Port);
+		if (!Result)
+		{
+			Server->DestroySession();
+			return false;
+		}
+		return true;
+	}
+
+	void DestroySession()
+	{
+		if (!Server)
+			return;
+		Server->DestroySession();
+	}
+
+	bool IsServerRunning()
+	{
+		if (!Server)
+			return false;
+		return Server->IsServerRunning();
+	}
+
+	std::size_t GetPlayerSize()
+	{
+		if (!Server)
+			return 0;
+		return Server->GetPlayerSize();
+	}
+
+	bool IsHost()
+	{
+		if (!Server/* || !Client*/)
+			return false;
+		return Server->IsServerRunning()/* && Client->IsConnected()*/;
+	}
+
+	bool IsClient()
+	{
+		if (!Client)
+			return false;
+		if (Server)
+			return !Server->IsServerRunning() && Client->IsConnected();
+		return Client->IsConnected();
+	}
+
+	bool ServerChangeLevel(std::string Level)
+	{
+		if (!Server)
+			return false;
+		return Server->ChangeLevel(Level);
+	}
+
+	void SetServerName(std::string Name)
+	{
+		if (!Server)
+			Server->SetServerName(Name);
+	}
+
+	void SetServerMaximumMessagePerTick(std::size_t Size)
+	{
+		if (!Server)
+			return;
+		return Server->SetMaximumMessagePerTick(Size);
+	}
+
+	std::size_t GetServerMaximumMessagePerTick()
+	{
+		if (!Server)
+			return 0;
+		return Server->GetMaximumMessagePerTick();
+	}
+
+	void SetClientMaximumMessagePerTick(std::size_t Size)
+	{
+		if (!Client)
+			return;
+		return Client->SetMaximumMessagePerTick(Size);
+	}
+
+	std::size_t GetClientMaximumMessagePerTick()
+	{
+		if (!Client)
+			return 0;
+		return Client->GetMaximumMessagePerTick();
+	}
+
+	std::string GetServerLevel()
+	{
+		if (!Server)
+			return "";
+		return Server->GetLevel();
+	}
+
+	bool Connect(sGameInstance* Instance)
+	{
+		if (Server)
+		{
+			if (Server->IsServerRunning())
+				Server->DestroySession();
+		}
+
+		if (!Client)
+		{
+			Client = CreateClient();
+		}
+		else
+		{
+			if (Client->IsConnected())
+				Client->Disconnect();
+		}
+
+		std::string ip = ConfigManager::Get().GetGameConfig().IP;
+		std::uint16_t Port = ConfigManager::Get().GetGameConfig().Port;
+
+		return Client->Connect(Instance, ip, Port);
+	}
+
+	bool Connect(sGameInstance* Instance, std::string ip, std::uint16_t Port)
+	{
+		if (Server)
+		{
+			if (Server->IsServerRunning())
+				Server->DestroySession();
+		}
+
+		if (!Client)
+		{
+			Client = CreateClient();
+		}
+		else
+		{
+			if (Client->IsConnected())
+				Client->Disconnect();
+		}
+
+		return Client->Connect(Instance, ip, Port);
+	}
+
+	bool Disconnect()
+	{
+		if (!Client)
+			return false;
+		return Client->Disconnect();
+	}
+
+	bool IsConnected()
+	{
+		if (!Client)
+			return false;
+		return Client->IsConnected();
+	}
+
+	void RegisterRPC(std::string Address, std::string ClassName, RemoteProcedureCallBase* RPC)
+	{
+		RemoteProcedureCallManager::Get().Register(Address, ClassName, RPC);
+	}
+
+	void UnregisterRPC(std::string Address)
+	{
+		RemoteProcedureCallManager::Get().Unregister(Address);
+	}
+
+	void UnregisterRPC(std::string Address, std::string ClassName)
+	{
+		RemoteProcedureCallManager::Get().Unregister(Address, ClassName);
+	}
+
+	void UnregisterRPC(std::string Address, std::string ClassName, const std::string& rpcName)
+	{
+		RemoteProcedureCallManager::Get().Unregister(Address, ClassName, rpcName);
+	}
+	
+	void CallRPC(std::string Address, std::string ClassName, std::string Name, std::optional<bool> reliable)
+	{
+		CallRPC(Address, ClassName, Name, sArchive(), reliable);
+	}
+	
+	void CallRPC(std::string Address, std::string ClassName, std::string Name, const sArchive& Params, std::optional<bool> reliable)
+	{
+		if (Server)
+		{
+			Server->CallRPC(Address, ClassName, Name, Params, reliable);
+		}
+		else if (Client)
+		{
+			Client->CallRPC(Address, ClassName, Name, Params, reliable);
+		}
+	}
+	
+	/*bool CallRPCFromClient(std::string Name, bool reliable)
+	{
+		if (!Client)
+			return false;
+		return Client->CallRPC("0::GNSClient", Name, reliable);
+	}
+
+	bool CallRPCFromClient(std::string Name, const sArchive& Params, bool reliable)
+	{
+		if (!Client)
+			return false;
+		return Client->CallRPC("0::GNSClient", Name, Params, reliable);
+	}*/
+	
+	std::uint64_t GetLatency()
+	{
+		return Client ? Client->GetLatency() : 0.0;
+	}
+}
+
 namespace Engine
 {
-	void SystemTime(std::int32_t& Year, int32_t& Month, int32_t& DayOfWeek, int32_t& Day, int32_t& Hour, int32_t& Min, int32_t& Sec, int32_t& MSec)
+	void WriteToConsole(const std::string& STR)
+	{
+		if (Server)
+			std::cout << "Server : " << STR << std::endl;
+		else if (Client)
+			std::cout << "Client : " << STR << std::endl;
+		else
+			std::cout << STR << std::endl;
+	}
+
+	void LocalUTCTimeNow(std::int32_t& Year, int32_t& Month, int32_t& DayOfWeek, int32_t& Day, int32_t& Hour, int32_t& Min, int32_t& Sec, int32_t& MSec)
 	{
 		SYSTEMTIME st;
 		GetLocalTime(&st);
@@ -285,7 +550,7 @@ namespace Engine
 		MSec = st.wMilliseconds;
 	}
 
-	void UtcTime(std::int32_t& Year, std::int32_t& Month, std::int32_t& DayOfWeek, std::int32_t& Day, std::int32_t& Hour, std::int32_t& Min, std::int32_t& Sec, std::int32_t& MSec)
+	void UTCTimeNow(std::int32_t& Year, std::int32_t& Month, std::int32_t& DayOfWeek, std::int32_t& Day, std::int32_t& Hour, std::int32_t& Min, std::int32_t& Sec, std::int32_t& MSec)
 	{
 		SYSTEMTIME st;
 		GetSystemTime(&st);
@@ -300,18 +565,38 @@ namespace Engine
 		MSec = st.wMilliseconds;
 	}
 
-	sDateTime GetSystemTime()
+	sDateTime GetLocalUTCTimeNow()
 	{
 		sDateTime Time;
-		SystemTime(Time.Year, Time.Month, Time.DayOfWeek, Time.Day, Time.Hour, Time.Minute, Time.Second, Time.Millisecond);
+		LocalUTCTimeNow(Time.Year, Time.Month, Time.DayOfWeek, Time.Day, Time.Hour, Time.Minute, Time.Second, Time.Millisecond);
 		return Time;
 	}
 
-	sDateTime UtcTime()
+	sDateTime GetUTCTimeNow()
 	{
 		sDateTime Time;
-		UtcTime(Time.Year, Time.Month, Time.DayOfWeek, Time.Day, Time.Hour, Time.Minute, Time.Second, Time.Millisecond);
+		UTCTimeNow(Time.Year, Time.Month, Time.DayOfWeek, Time.Day, Time.Hour, Time.Minute, Time.Second, Time.Millisecond);
 		return Time;
+	}
+
+	sDateTime GetAppStartTime()
+	{
+		return AppStartTime;
+	}
+
+	sDateTime GetExecutionTime()
+	{
+		return Engine::GetUTCTimeNow() - AppStartTime;
+	}
+
+	std::uint64_t GetExecutionTimeInMS()
+	{
+		return GetExecutionTime().GetTotalMillisecond();
+	}
+
+	std::uint64_t GetExecutionTimeInSecond()
+	{
+		return GetExecutionTime().GetTotalSeconds();
 	}
 
 	void QueueJob(const std::function<void()>& job)
@@ -356,7 +641,7 @@ namespace Physics
 {
 	EPhysicsEngine GetActivePhysicsEngineType()
 	{
-		return PhysicalWorld->GetPhysicsEngineType();
+		return PhysicalWorld ? PhysicalWorld->GetPhysicsEngineType() : EPhysicsEngine::eNone;
 	}
 
 	bool IsPhysicsPaused()
@@ -370,36 +655,39 @@ namespace Physics
 
 	void SetPhysicsInternalTick(std::optional<double> Tick)
 	{
-		return PhysicalWorld->SetPhysicsInternalTick(Tick);
+		if (PhysicalWorld)
+			return PhysicalWorld->SetPhysicsInternalTick(Tick);
 	}
 
 	void SetGravity(const FVector& Gravity)
 	{
-		return PhysicalWorld->SetGravity(Gravity);
+		if (PhysicalWorld)
+			return PhysicalWorld->SetGravity(Gravity);
 	}
 
 	FVector GetGravity()
 	{
-		return PhysicalWorld->GetGravity();
+		return PhysicalWorld ? PhysicalWorld->GetGravity() : FVector::Zero();
 	}
 
 	void SetWorldOrigin(const FVector& newOrigin)
 	{
-		return PhysicalWorld->SetWorldOrigin(newOrigin);
+		if (PhysicalWorld)
+			return PhysicalWorld->SetWorldOrigin(newOrigin);
 	}
 
 	sPhysicalComponent* LineTraceToViewPort(const FVector& InOrigin, const FVector& InDirection)
 	{
-		return PhysicalWorld->LineTraceToViewPort(InOrigin, InDirection);
+		return PhysicalWorld ? PhysicalWorld->LineTraceToViewPort(InOrigin, InDirection) : nullptr;
 	}
 	std::vector<sPhysicalComponent*> QueryAABB(const FBoundingBox& Bounds)
 	{
-		return PhysicalWorld->QueryAABB(Bounds);
+		return PhysicalWorld ? PhysicalWorld->QueryAABB(Bounds) : std::vector<sPhysicalComponent*>();
 	}
 
 	float Physics::GetPhysicalWorldScale()
 	{
-		return PhysicalWorld->GetPhysicalWorldScale();
+		return PhysicalWorld ? PhysicalWorld->GetPhysicalWorldScale() : -1.0f;
 	}
 }
 
@@ -463,6 +751,26 @@ IIndexBuffer::UniquePtr IIndexBuffer::CreateUnique(std::string InName, const sBu
 	return Device->CreateUniqueIndexBuffer(InName, InDesc, InSubresource);
 }
 
+IUnorderedAccessBuffer::SharedPtr IUnorderedAccessBuffer::Create(std::string InName, const sBufferDesc& InDesc, bool bSRVAllowed)
+{
+	return IUnorderedAccessBuffer::SharedPtr();
+}
+
+IUnorderedAccessBuffer::UniquePtr IUnorderedAccessBuffer::CreateUnique(std::string InName, const sBufferDesc& InDesc, bool bSRVAllowed)
+{
+	return IUnorderedAccessBuffer::UniquePtr();
+}
+
+IIndirectBuffer::SharedPtr IIndirectBuffer::Create(std::string InName)
+{
+	return IIndirectBuffer::UniquePtr();
+}
+
+IIndirectBuffer::UniquePtr IIndirectBuffer::CreateUnique(std::string InName)
+{
+	return IIndirectBuffer::UniquePtr();
+}
+
 IRenderTarget::SharedPtr IRenderTarget::Create(const std::string InName, const EFormat Format, const sFBODesc& Desc)
 {
 	return Device->CreateRenderTarget(InName, Format, Desc);
@@ -491,16 +799,6 @@ IUnorderedAccessTarget::SharedPtr IUnorderedAccessTarget::Create(const std::stri
 IUnorderedAccessTarget::UniquePtr IUnorderedAccessTarget::CreateUnique(const std::string InName, const EFormat Format, const sFBODesc& Desc, bool InEnableSRV)
 {
 	return Device->CreateUniqueUnorderedAccessTarget(InName, Format, Desc, InEnableSRV);
-}
-
-IUnorderedAccessTarget::SharedPtr IUnorderedAccessTarget::CreateFromRenderTarget(IRenderTarget* RenderTarget, bool InEnableSRV)
-{
-	return nullptr; //Device->CreateUniqueUnorderedAccessTarget(RenderTarget, InEnableSRV);
-}
-
-IUnorderedAccessTarget::UniquePtr IUnorderedAccessTarget::CreateUniqueFromRenderTarget(IRenderTarget* RenderTarget, bool InEnableSRV)
-{
-	return nullptr; //Device->CreateUniqueUnorderedAccessTarget(RenderTarget, InEnableSRV);
 }
 
 IFrameBuffer::SharedPtr IFrameBuffer::Create(const std::string InName, const sFrameBufferAttachmentInfo& InAttachments)
@@ -596,67 +894,69 @@ ITexture2D::UniquePtr ITexture2D::CreateUniqueEmpty(const std::string InName, co
 
 IRigidBody::SharedPtr IRigidBody::Create2DBoxBody(sPhysicalComponent* Owner, const sRigidBodyDesc& Desc, const FBounds2D& Bounds)
 {
-	return PhysicalWorld->Create2DBoxBody(Owner, Desc, Bounds);
+	return PhysicalWorld ? PhysicalWorld->Create2DBoxBody(Owner, Desc, Bounds) : nullptr;
 }
 IRigidBody::SharedPtr IRigidBody::Create2DPolygonBody(sPhysicalComponent* Owner, const sRigidBodyDesc& Desc, const FVector2& Origin, const std::array<FVector2, 8>& points)
 {
-	return PhysicalWorld->Create2DPolygonBody(Owner, Desc, Origin, points);
+	return PhysicalWorld ? PhysicalWorld->Create2DPolygonBody(Owner, Desc, Origin, points) : nullptr;
 }
 IRigidBody::SharedPtr IRigidBody::Create2DCircleBody(sPhysicalComponent* Owner, const sRigidBodyDesc& Desc, const FVector2& Origin, float InRadius)
 {
-	return PhysicalWorld->Create2DCircleBody(Owner, Desc, Origin, InRadius);
+	return PhysicalWorld ? PhysicalWorld->Create2DCircleBody(Owner, Desc, Origin, InRadius) : nullptr;
 }
 IRigidBody::SharedPtr IRigidBody::Create2DEdgeBody(sPhysicalComponent* Owner, const sRigidBodyDesc& Desc, const FVector2& Origin, const std::array<FVector2, 4>& points, bool OneSided)
 {
-	return PhysicalWorld->Create2DEdgeBody(Owner, Desc, Origin, points, OneSided);
+	return PhysicalWorld ? PhysicalWorld->Create2DEdgeBody(Owner, Desc, Origin, points, OneSided) : nullptr;
 }
 IRigidBody::SharedPtr IRigidBody::Create2DChainBody(sPhysicalComponent* Owner, const sRigidBodyDesc& Desc, const FVector2& Origin, const std::vector<FVector2>& vertices)
 {
-	return PhysicalWorld->Create2DChainBody(Owner, Desc, Origin, vertices);
+	return PhysicalWorld ? PhysicalWorld->Create2DChainBody(Owner, Desc, Origin, vertices) : nullptr;
 }
 IRigidBody::SharedPtr IRigidBody::Create2DChainBody(sPhysicalComponent* Owner, const sRigidBodyDesc& Desc, const FVector2& Origin, const std::vector<FVector2>& vertices, const FVector2& prevVertex, const FVector2& nextVertex)
 {
-	return PhysicalWorld->Create2DChainBody(Owner, Desc, Origin, vertices, prevVertex, nextVertex);
+	return PhysicalWorld ? PhysicalWorld->Create2DChainBody(Owner, Desc, Origin, vertices, prevVertex, nextVertex) : nullptr;
 }
 
 IRigidBody::SharedPtr IRigidBody::CreateBoxBody(sPhysicalComponent* Owner, const sRigidBodyDesc& Desc, const FVector& Origin, FVector InHalf)
 {
-	return PhysicalWorld->CreateBoxBody(Owner, Desc, Origin, InHalf);
+	return PhysicalWorld ? PhysicalWorld->CreateBoxBody(Owner, Desc, Origin, InHalf) : nullptr;
 }
 IRigidBody::SharedPtr IRigidBody::CreateSphereBody(sPhysicalComponent* Owner, const sRigidBodyDesc& Desc, const FVector& Origin, float InRadius)
 {
-	return PhysicalWorld->CreateSphereBody(Owner, Desc, Origin, InRadius);
+	return PhysicalWorld ? PhysicalWorld->CreateSphereBody(Owner, Desc, Origin, InRadius) : nullptr;
 }
 IRigidBody::SharedPtr IRigidBody::CreateCapsuleBody(sPhysicalComponent* Owner, const sRigidBodyDesc& Desc, const FVector& Origin, float InRadius, float InHeight)
 {
-	return PhysicalWorld->CreateCapsuleBody(Owner, Desc, Origin, InRadius, InHeight);
+	return PhysicalWorld ? PhysicalWorld->CreateCapsuleBody(Owner, Desc, Origin, InRadius, InHeight) : nullptr;
 }
 IRigidBody::SharedPtr IRigidBody::CreateCylinderBody(sPhysicalComponent* Owner, const sRigidBodyDesc& Desc, const FVector& Origin, float InRadius, float InHeight)
 {
-	return PhysicalWorld->CreateCylinderBody(Owner, Desc, Origin, InRadius, InHeight);
+	return PhysicalWorld ? PhysicalWorld->CreateCylinderBody(Owner, Desc, Origin, InRadius, InHeight) : nullptr;
 }
 IRigidBody::SharedPtr IRigidBody::CreateConeBody(sPhysicalComponent* Owner, const sRigidBodyDesc& Desc, const FVector& Origin, float InRadius, float InHeight)
 {
-	return PhysicalWorld->CreateConeBody(Owner, Desc, Origin, InRadius, InHeight);
+	return PhysicalWorld ? PhysicalWorld->CreateConeBody(Owner, Desc, Origin, InRadius, InHeight) : nullptr;
 }
 
 IRigidBody::SharedPtr IRigidBody::CreateMultiBody(sPhysicalComponent* Owner, const sRigidBodyDesc& Desc, const FVector& Origin, FVector InInertia, float InMass)
 {
-	return PhysicalWorld->CreateMultiBody(Owner, Desc, Origin, InInertia, InMass);
+	return PhysicalWorld ? PhysicalWorld->CreateMultiBody(Owner, Desc, Origin, InInertia, InMass) : nullptr;
 }
 IRigidBody::SharedPtr IRigidBody::CreateConvexHullBody(sPhysicalComponent* Owner, const sRigidBodyDesc& Desc, const FVector& Origin, const float* points, int numPoints, int stride)
 {
-	return PhysicalWorld->CreateConvexHullBody(Owner, Desc, Origin, points, numPoints, stride);
+	return PhysicalWorld ? PhysicalWorld->CreateConvexHullBody(Owner, Desc, Origin, points, numPoints, stride) : nullptr;
 }
 IRigidBody::SharedPtr IRigidBody::CreateTriangleMesh(sPhysicalComponent* Owner, const sRigidBodyDesc& Desc, const FVector& Origin, const FVector* points, int numPoints, const std::uint32_t* indices, int numIndices)
 {
-	return PhysicalWorld->CreateTriangleMesh(Owner, Desc, Origin, points, numPoints, indices, numIndices);
+	return PhysicalWorld ? PhysicalWorld->CreateTriangleMesh(Owner, Desc, Origin, points, numPoints, indices, numIndices) : nullptr;
 }
 
 sEngine::sEngine(const EGITypes GIType, const IPhysicalWorld::SharedPtr& InPhysicalWorld, std::optional<short> GPUIndex)
 	: MetaWorld(nullptr)
 	, ScreenDimension(sScreenDimension())
 {
+	AppStartTime = Engine::GetUTCTimeNow();
+
 	mThreadPool.Start();
 	pAudio = std::make_unique<XAudio>();
 
@@ -685,6 +985,11 @@ sEngine::sEngine(const EGITypes GIType, const IPhysicalWorld::SharedPtr& InPhysi
 
 sEngine::~sEngine()
 {
+	if (Server)
+		Server->DestroySession();
+
+	Client = nullptr;
+	Server = nullptr;
 	InputController = nullptr;
 	sMaterialManager::Get().Destroy();
 	sTextureManager::Get().Destroy();
@@ -694,6 +999,7 @@ sEngine::~sEngine()
 	Renderer = nullptr;
 	pAudio = nullptr;
 	mThreadPool.Stop();
+	RemoteProcedureCallManager::Get().Destroy();
 	Device = nullptr;
 }
 
@@ -735,7 +1041,8 @@ void sEngine::EngineInternalTick()
 
 void sEngine::BeginPlay()
 {
-	PhysicalWorld->BeginPlay();
+	if (PhysicalWorld)
+		PhysicalWorld->BeginPlay();
 	if (MetaWorld)
 		MetaWorld->BeginPlay();
 	if (InputController)
@@ -748,7 +1055,7 @@ void sEngine::BeginPlay()
 
 void sEngine::PhysicsTick(const double DeltaTime)
 {
-	if (!bPausePhysics)
+	if (PhysicalWorld && !bPausePhysics)
 		PhysicalWorld->Tick(DeltaTime);
 }
 
@@ -767,6 +1074,11 @@ void sEngine::Tick(const double DeltaTime)
 {
 	if (bPauseTick)
 		return;
+
+	if (Server)
+		Server->Tick(DeltaTime);
+	if (Client)
+		Client->Tick(DeltaTime);
 
 	if (MetaWorld && !bPauseTick)
 		MetaWorld->Tick(DeltaTime);

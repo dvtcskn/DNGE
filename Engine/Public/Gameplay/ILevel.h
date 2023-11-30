@@ -23,7 +23,6 @@
 * SOFTWARE.
 * ---------------------------------------------------------------------------------------
 */
-
 #pragma once
 
 #include "IWorld.h"
@@ -35,17 +34,19 @@ class sMaterial;
 class sActorComponent;
 class sMeshComponent;
 
-struct sPlayerSpawn
+struct sObjectSpawnNode
 {
-	std::size_t PlayerIndex = 0;
+	std::string Name = "";
+	std::int32_t PlayerIndex = -1;
 	FVector Location = FVector::Zero();
 	std::size_t LayerIndex = 0;
 
-	sPlayerSpawn() = default;
-	sPlayerSpawn(std::size_t PlayerIdx, FVector Loc, std::size_t Layer)
-		: PlayerIndex(PlayerIdx)
+	sObjectSpawnNode() = default;
+	sObjectSpawnNode(std::string InName, std::int32_t PlayerIdx, FVector Loc, std::size_t Layer)
+		: Name(InName)
 		, Location(Loc)
 		, LayerIndex(Layer)
+		, PlayerIndex(PlayerIdx)
 	{}
 };
 
@@ -56,6 +57,7 @@ public:
 	virtual std::string GetName() const = 0;
 
 	virtual void InitLevel() = 0;
+	virtual void DestroyLevel() {}
 
 	virtual void BeginPlay() = 0;
 	virtual void Tick(const double DeltaTime) = 0;
@@ -70,12 +72,12 @@ public:
 	
 	virtual void Serialize() = 0;
 
+	virtual sObjectSpawnNode GetSpawnNode(std::string Name, std::int32_t PlayerIndex = -1) const = 0;
+
 	virtual void AddMesh(const std::shared_ptr<sMesh>& Object, std::size_t LayerIndex = 0) = 0;
 	virtual void RemoveMesh(sMesh* Object, std::size_t LayerIndex = 0) = 0;
 	virtual void AddActor(const std::shared_ptr<sActor>& Object, std::size_t LayerIndex = 0) = 0;
 	virtual void RemoveActor(sActor* Object, std::size_t LayerIndex = 0, bool bDeferredRemove = true) = 0;
-
-	virtual void SpawnPlayerActor(const std::shared_ptr<sActor>& Actor, std::size_t PlayerIndex) = 0;
 
 	virtual size_t LayerCount() const { return 1; }
 
@@ -86,9 +88,10 @@ public:
 	virtual	std::vector<std::shared_ptr<sActor>> GetAllActors(std::size_t LayerIndex = 0) const = 0;
 	virtual sActor* GetActor(const std::size_t Index, std::size_t LayerIndex = 0) const = 0;
 
-	virtual sActor* GetPlayerFocusedActor(std::size_t Index) const = 0;
-
 	virtual void OnResizeWindow(const std::size_t Width, const std::size_t Height) = 0;
+
+	virtual void OnConnectedToServer() {}
+	virtual void OnDisconnected() {}
 
 	virtual void InputProcess(const GMouseInput& MouseInput, const GKeyboardChar& KeyboardChar) = 0;
 };

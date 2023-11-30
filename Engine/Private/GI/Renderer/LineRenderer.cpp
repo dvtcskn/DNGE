@@ -26,7 +26,6 @@
 
 #include "pch.h"
 #include "LineRenderer.h"
-#include "Utilities/Utilities.h"
 
 sLineRenderer::sLineRenderer(std::size_t Width, std::size_t Height)
 	: Super()
@@ -94,8 +93,8 @@ void sLineRenderer::Tick(const double DeltaTime)
 	{
 		if ((*it).Time.has_value())
 		{
-			(*it).Time = *(*it).Time - (float)DeltaTime;
-			if (*(*it).Time <= 0.0f)
+			(*it).Time = (*it).Time.value() - DeltaTime;
+			if ((*it).Time.value() <= 0.0f)
 			{
 				auto LineType = (*it).LineType;
 				it = Lines.VertexData.erase(it);

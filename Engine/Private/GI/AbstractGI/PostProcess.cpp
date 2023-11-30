@@ -24,7 +24,6 @@
 * ---------------------------------------------------------------------------------------
 */
 
-
 #include "pch.h"
 #include "AbstractGI/PostProcess.h"
 
@@ -61,10 +60,11 @@ sPostProcess::sPostProcess(const sShaderAttachment& PostProcessShader, const std
 
 	pPipelineDesc.NumRenderTargets = 1;
 	pPipelineDesc.RTVFormats[0] = EFormat::BGRA8_UNORM;
-	//pPipelineDesc.DSVFormat = EFormat::R32G8X24_Typeless;
+	//pPipelineDesc.DSVFormat = GPU::GetDefaultDepthFormat();
 
 	pPipelineDesc.DescriptorSetLayout = DescriptorSetLayout;
 
+	std::vector<sShaderAttachment> ShaderAttachments;
 	pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment((void*)vertexShader.data(), vertexShader.length(), "mainVS", eShaderType::Vertex));
 	//pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment(L"..//Content\\Shaders\\PostProcess.hlsl", "FullScreenTriangleVS", eShaderType::Vertex));
 	pPipelineDesc.ShaderAttachments.push_back(PostProcessShader);
@@ -91,10 +91,11 @@ void sPostProcess::SetPipeline(const sShaderAttachment& PostProcessShader, const
 
 	pPipelineDesc.NumRenderTargets = 1;
 	pPipelineDesc.RTVFormats[0] = EFormat::BGRA8_UNORM;
-	//pPipelineDesc.DSVFormat = EFormat::R32G8X24_Typeless;
+	//pPipelineDesc.DSVFormat = GPU::GetDefaultDepthFormat();
 
 	pPipelineDesc.DescriptorSetLayout = DescriptorSetLayout;
 
+	std::vector<sShaderAttachment> ShaderAttachments;
 	pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment((void*)vertexShader.data(), vertexShader.length(), "mainVS", eShaderType::Vertex));
 	//pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment(L"..//Content\\Shaders\\PostProcess.hlsl", "FullScreenTriangleVS", eShaderType::Vertex));
 	pPipelineDesc.ShaderAttachments.push_back(PostProcessShader);

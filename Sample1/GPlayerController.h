@@ -27,6 +27,7 @@
 
 #include <Gameplay/PlayerController.h>
 #include "GPlayerCharacter.h"
+#include "GCanvas.h"
 
 class sGameInstance;
 class GPlayerController : public sPlayerController
@@ -45,7 +46,9 @@ public:
 
 	virtual void InputProcess(const GMouseInput& MouseInput, const GKeyboardChar& KeyboardChar) override final;
 
-	virtual void OnCharacterDead();
+	void OnCharacterDead();
+
+	virtual void Replicate(bool bReplicate);
 
 private:
 	//virtual void OnNewPlayerAdded() {}
@@ -53,4 +56,30 @@ private:
 
 	virtual void OnPossess(sActor* Actor);
 	virtual void OnUnPossess();
+
+	void GameOverFadeOut();
+	void StartScreenFadeOut();
+
+	virtual void OnPlayerNetworkRoleChanged();
+
+	virtual void OnSplitScreenEnabled() override;
+	virtual void OnSplitScreenDisabled() override;
+
+	virtual void OnLevelReset() override;
+	void OnLevelReset_Client();
+
+private:
+	cbgui::GCanvas::SharedPtr Canvas;
+};
+
+class GProxyController : public sProxyController
+{
+	sClassBody(sClassConstructor, GProxyController, sProxyController)
+public:
+	GProxyController(sPlayerProxyBase* Proxy = nullptr);
+	virtual ~GProxyController();
+
+	virtual void BeginPlay();
+
+	void OnLevelReset_Client();
 };

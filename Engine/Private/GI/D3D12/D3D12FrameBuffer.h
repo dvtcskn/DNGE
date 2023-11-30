@@ -38,7 +38,7 @@ class D3D12RenderTarget final : public IRenderTarget
 {
 	sClassBody(sClassConstructor, D3D12RenderTarget, IRenderTarget)
 public:
-	D3D12RenderTarget(D3D12Device* InOwner, const std::string InName, const EFormat Format, const sFBODesc& Desc);
+	D3D12RenderTarget(D3D12Device* InOwner, const std::string InName, const EFormat Format, const sFBODesc& Desc, bool InIsSRVAllowed = true, bool InIsUnorderedAccessAllowed = false);
 	virtual ~D3D12RenderTarget();
 
 	virtual void SetDefaultRootParameterIndex(std::uint32_t RootParameterIndex) override final {}
@@ -50,16 +50,19 @@ public:
 
 	inline const D3D12DescriptorHandle* GetRTV() const { return &RTV; }
 	inline const D3D12DescriptorHandle* GetSRV() const { return &SRV; }
+	inline const D3D12DescriptorHandle* GetUAV() const { return &UAV; }
 
 	inline D3D12_CPU_DESCRIPTOR_HANDLE GetRTVCPU() const { return RTV.GetCPU(); }
 	inline D3D12_GPU_DESCRIPTOR_HANDLE GetRTVGPU() const { return RTV.GetGPU(); }
 	inline D3D12_CPU_DESCRIPTOR_HANDLE GetSRVCPU() const { return SRV.GetCPU(); }
 	inline D3D12_GPU_DESCRIPTOR_HANDLE GetSRVGPU() const { return SRV.GetGPU();	}
+	inline D3D12_CPU_DESCRIPTOR_HANDLE GetUAVCPU() const { return UAV.GetCPU(); }
+	inline D3D12_GPU_DESCRIPTOR_HANDLE GetUAVGPU() const { return UAV.GetGPU(); }
 
 	EFormat GetFormat() const { return Format; }
 
-	virtual bool IsSRV_Allowed() const override final { return true; }
-	virtual bool IsUAV_Allowed() const override final { return false; }
+	virtual bool IsSRV_Allowed() const override final { return bIsSRVSupported; }
+	virtual bool IsUAV_Allowed() const override final { return bIsUAVSupported; }
 
 	D3D12_RESOURCE_STATES CurrentState;
 
@@ -70,6 +73,10 @@ private:
 	ComPtr<ID3D12Resource> Texture;
 	D3D12DescriptorHandle RTV;
 	D3D12DescriptorHandle SRV;
+	D3D12DescriptorHandle UAV;
+
+	bool bIsSRVSupported;
+	bool bIsUAVSupported;
 };
 
 class D3D12DepthTarget final : public IDepthTarget

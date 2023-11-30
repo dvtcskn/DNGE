@@ -180,10 +180,15 @@ D3D12Texture::D3D12Texture(D3D12Device* InOwner, const std::string InName, void*
     textureDesc.Width = InDesc.Dimensions.X;
     textureDesc.Height = InDesc.Dimensions.Y;
     textureDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-    textureDesc.DepthOrArraySize = 1;
+    textureDesc.DepthOrArraySize = InDesc.ArraySize;
     textureDesc.SampleDesc.Count = 1;
     textureDesc.SampleDesc.Quality = 0;
-    textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    if (textureDesc.Height == 1)
+        textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE1D;
+    else if (textureDesc.DepthOrArraySize > 0)
+        textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    else
+        textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE3D;
 
     auto TextureHeap = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_CUSTOM);
     TextureHeap.MemoryPoolPreference = D3D12_MEMORY_POOL_L0;
@@ -260,10 +265,15 @@ D3D12Texture::D3D12Texture(D3D12Device* InOwner, const std::string InName, const
     textureDesc.Width = InDesc.Dimensions.X;
     textureDesc.Height = InDesc.Dimensions.Y;
     textureDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-    textureDesc.DepthOrArraySize = 1;
+    textureDesc.DepthOrArraySize = InDesc.ArraySize;
     textureDesc.SampleDesc.Count = 1;
     textureDesc.SampleDesc.Quality = 0;
-    textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    if (textureDesc.Height == 1)
+        textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE1D;
+    else if (textureDesc.DepthOrArraySize > 0)
+        textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    else
+        textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE3D;
 
     auto TextureHeap = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_CUSTOM);
     TextureHeap.MemoryPoolPreference = D3D12_MEMORY_POOL_L0;

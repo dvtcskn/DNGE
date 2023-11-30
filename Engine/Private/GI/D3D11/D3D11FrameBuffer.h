@@ -36,7 +36,7 @@ class D3D11RenderTarget final : public IRenderTarget
 {
 	sClassBody(sClassConstructor, D3D11RenderTarget, IRenderTarget)
 public:
-	D3D11RenderTarget(D3D11Device* InDevice, const std::string InName, const EFormat Format, const sFBODesc& Desc);
+	D3D11RenderTarget(D3D11Device* InDevice, const std::string InName, const EFormat Format, const sFBODesc& Desc, bool InIsSRVAllowed = true, bool InIsUnorderedAccessAllowed = false);
 	virtual ~D3D11RenderTarget();
 
 	virtual void* GetNativeTexture() const override final { return Texture.Get(); }
@@ -47,9 +47,10 @@ public:
 	ID3D11Texture2D* GetD3D11Texture() const { return Texture.Get(); }
 	ID3D11RenderTargetView* GetD3D11RTV() const { return RenderTarget.Get(); }
 	ID3D11ShaderResourceView* GetD3D11SRV() const { return ShaderResource.Get(); }
+	ID3D11UnorderedAccessView* GetD3D11UAV() const { return UnorderedAccessView.Get(); }
 
-	virtual bool IsSRV_Allowed() const override final { return true; }
-	virtual bool IsUAV_Allowed() const override final { return false; }
+	virtual bool IsSRV_Allowed() const override final { return ShaderResource != nullptr; }
+	virtual bool IsUAV_Allowed() const override final { return UnorderedAccessView != nullptr; }
 
 	EFormat GetFormat() const { return Format; }
 
@@ -60,6 +61,7 @@ private:
 	ComPtr<ID3D11Texture2D> Texture;
 	ComPtr<ID3D11RenderTargetView> RenderTarget;
 	ComPtr<ID3D11ShaderResourceView> ShaderResource;
+	ComPtr<ID3D11UnorderedAccessView> UnorderedAccessView;
 };
 
 class D3D11DepthTarget final : public IDepthTarget

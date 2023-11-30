@@ -31,8 +31,11 @@
 #include <vector>
 #include <string>
 #include <optional>
+#include <mutex>
 #include "Core/Math/CoreMath.h"
 #include "Engine/ClassBody.h"
+#include "AbstractEngineUtilities.h"
+#include "Core/Archive.h"
 
 class IFrameBuffer;
 class IGraphicsCommandContext;
@@ -194,6 +197,7 @@ struct sViewportInstance
 	sViewportInstance() = default;
 	inline ~sViewportInstance();
 
+	bool bIsEnabled = true;
 	std::optional<sViewport> Viewport = std::nullopt;
 	std::shared_ptr<sCamera> pCamera = nullptr;
 	std::vector<ICanvas*> Canvases;
@@ -356,18 +360,32 @@ public:
 	virtual void UpdateSubresource(sBufferSubresource* Subresource, IGraphicsCommandContext* InCMDBuffer = nullptr) = 0;
 };
 
-class IIndirectBuffer
-{
-	sBaseClassBody(sClassDefaultProtectedConstructor, IIndirectBuffer)
-public:
-public:
-};
-
 class IUnorderedAccessBuffer
 {
 	sBaseClassBody(sClassDefaultProtectedConstructor, IUnorderedAccessBuffer)
 public:
+	static IUnorderedAccessBuffer::SharedPtr Create(std::string InName, const sBufferDesc& InDesc, bool bSRVAllowed = true);
+	static IUnorderedAccessBuffer::UniquePtr CreateUnique(std::string InName, const sBufferDesc& InDesc, bool bSRVAllowed = true);
+
 public:
+	virtual std::string GetName() const = 0;
+
+	virtual bool IsSRV_Allowed() const = 0;
+	virtual std::size_t GetSize() const = 0;
+
+	virtual bool IsMapable() const = 0;
+	virtual void Map(const void* Ptr, IGraphicsCommandContext* InCMDBuffer = nullptr) = 0;
+};
+
+class IIndirectBuffer
+{
+	sBaseClassBody(sClassDefaultProtectedConstructor, IIndirectBuffer)
+public:
+	static IIndirectBuffer::SharedPtr Create(std::string InName);
+	static IIndirectBuffer::UniquePtr CreateUnique(std::string InName);
+
+public:
+
 };
 
 struct sFBODesc
@@ -410,17 +428,29 @@ struct sFBODesc
 	{}
 };
 
+enum class eFrameBufferAttachmentType
+{
+	eRT,
+	eRT_SRV,
+	eRT_UAV,
+	eRT_SRV_UAV,
+	eDepth,
+	eDepth_SRV,
+	eDepth_UAV,
+	eDepth_SRV_UAV,
+	eUAV,
+	eUAV_SRV
+};
+
 struct sFrameBufferAttachmentInfo
 {
 	struct sFrameBuffer
 	{
 		EFormat Format;
-		bool bIsUAV;
-		bool bIsShaderResource;
-		sFrameBuffer(const EFormat& InFormat, const bool InIsShaderResource = true, const bool InIsUAV = false)
+		eFrameBufferAttachmentType AttachmentType;
+		sFrameBuffer(const EFormat& InFormat, const eFrameBufferAttachmentType InAttachmentType = eFrameBufferAttachmentType::eRT_SRV)
 			: Format(InFormat)
-			, bIsUAV(InIsUAV)
-			, bIsShaderResource(InIsShaderResource)
+			, AttachmentType(InAttachmentType)
 		{}
 	};
 
@@ -437,9 +467,9 @@ struct sFrameBufferAttachmentInfo
 
 	std::size_t GetAttachmentCount() const { return FrameBuffer.size() + (DepthFormat != EFormat::UNKNOWN ? 1 : 0); }
 	std::size_t GetRenderTargetAttachmentCount() const { return FrameBuffer.size(); }
-	void AddFrameBuffer(const EFormat Format, const bool IsShaderResource = true, const bool IsUAV = false)
+	void AddFrameBuffer(const EFormat Format, const eFrameBufferAttachmentType InAttachmentType = eFrameBufferAttachmentType::eRT_SRV)
 	{
-		FrameBuffer.push_back(sFrameBuffer(Format, IsShaderResource, IsUAV));
+		FrameBuffer.push_back(sFrameBuffer(Format, InAttachmentType));
 	}
 };
 
@@ -484,8 +514,6 @@ class IUnorderedAccessTarget
 public:
 	static IUnorderedAccessTarget::SharedPtr Create(const std::string InName, const EFormat Format, const sFBODesc& Desc, bool InEnableSRV = true);
 	static IUnorderedAccessTarget::UniquePtr CreateUnique(const std::string InName, const EFormat Format, const sFBODesc& Desc, bool InEnableSRV = true);
-	static IUnorderedAccessTarget::SharedPtr CreateFromRenderTarget(IRenderTarget* RenderTarget, bool InEnableSRV = true);
-	static IUnorderedAccessTarget::UniquePtr CreateUniqueFromRenderTarget(IRenderTarget* RenderTarget, bool InEnableSRV = true);
 
 public:
 	virtual bool IsSRV_Allowed() const = 0;
@@ -787,10 +815,10 @@ enum class EColorWriteMask
 	eBLUE = 0x04,
 	eALPHA = 0x08,
 
-	eRG = eRED | eGREEN,
 	eRGB = eRED | eGREEN | eBLUE,
-	eBA = eBLUE | eALPHA,
 	eRGBA = eRED | eGREEN | eBLUE | eALPHA,
+	eRG = eRED | eGREEN,
+	eBA = eBLUE | eALPHA,
 };
 
 enum class EBlendOperation
@@ -1164,8 +1192,7 @@ public:
 
 	virtual void UpdateTexture(ITexture2D* SourceTexture, std::size_t SourceArrayIndex, std::size_t ArrayIndex, const std::optional<IntVector2> Dest = std::nullopt, const std::optional<FBounds2D> TargetBounds = std::nullopt) = 0;
 	virtual void UpdateTexture(const std::wstring FilePath, std::size_t ArrayIndex, const std::optional<IntVector2> Dest = std::nullopt, const std::optional<FBounds2D> TargetBounds = std::nullopt) = 0;
-	virtual void UpdateTexture( const void* pSrcData, const std::size_t InSize, const FDimension2D& Dimension, std::size_t ArrayIndex, 
-								const std::optional<IntVector2> Dest = std::nullopt, const std::optional<FBounds2D> TargetBounds = std::nullopt) = 0;
+	virtual void UpdateTexture(const void* pSrcData, const std::size_t InSize, const FDimension2D& Dimension, std::size_t ArrayIndex, const std::optional<IntVector2> Dest = std::nullopt, const std::optional<FBounds2D> TargetBounds = std::nullopt) = 0;
 
 	virtual void UpdateTexture(const void* pSrcData, std::size_t RowPitch, std::size_t MinX, std::size_t MinY, std::size_t MaxX, std::size_t MaxY, IGraphicsCommandContext* InCommandBuffer = nullptr) = 0;
 
@@ -1206,6 +1233,8 @@ public:
 	virtual void SetFrameBufferAsResource(IFrameBuffer* pFB, std::uint32_t FBOIndex, std::uint32_t RootParameterIndex) = 0;
 	virtual void SetRenderTargetAsResource(IRenderTarget* pRT, std::uint32_t RootParameterIndex) = 0;
 	virtual void SetRenderTargetsAsResource(std::vector<IRenderTarget*> RTs, std::uint32_t RootParameterIndex) = 0;
+	virtual void SetUnorderedAccessBufferAsResource(IUnorderedAccessBuffer* pUAV, std::uint32_t RootParameterIndex) = 0;
+	virtual void SetUnorderedAccessBuffersAsResource(std::vector<IUnorderedAccessBuffer*> UAVs, std::uint32_t RootParameterIndex) = 0;
 	virtual void CopyFrameBuffer(IFrameBuffer* Dest, std::size_t DestFBOIndex, IFrameBuffer* Source, std::uint32_t SourceFBOIndex) = 0;
 	virtual void CopyFrameBufferDepth(IFrameBuffer* Dest, IFrameBuffer* Source) = 0;
 	virtual void CopyRenderTarget(IRenderTarget* Dest, IRenderTarget* Source) = 0;
@@ -1258,6 +1287,10 @@ public:
 	virtual void SetRenderTargetsAsUAV(std::vector<IRenderTarget*> RTs, std::uint32_t RootParameterIndex) = 0;
 	virtual void SetUnorderedAccessTargetAsSRV(IUnorderedAccessTarget* pST, std::uint32_t RootParameterIndex) = 0;
 	virtual void SetUnorderedAccessTargetsAsSRV(std::vector<IUnorderedAccessTarget*> pSTs, std::uint32_t RootParameterIndex) = 0;
+	virtual void SetUnorderedAccessBuffer(IUnorderedAccessBuffer* pUAV, std::uint32_t RootParameterIndex) = 0;
+	virtual void SetUnorderedAccessBuffers(std::vector<IUnorderedAccessBuffer*> UAVs, std::uint32_t RootParameterIndex) = 0;
+	virtual void SetUnorderedAccessBufferAsResource(IUnorderedAccessBuffer* pUAV, std::uint32_t RootParameterIndex) = 0;
+	virtual void SetUnorderedAccessBuffersAsResource(std::vector<IUnorderedAccessBuffer*> UAVs, std::uint32_t RootParameterIndex) = 0;
 
 	virtual void SetPipeline(IComputePipeline* Pipeline) = 0;
 	virtual void SetConstantBuffer(IConstantBuffer* CB, std::optional<std::uint32_t> RootParameterIndex = std::nullopt) = 0;
@@ -1292,17 +1325,17 @@ public:
 
 struct sDateTime
 {
-	std::int32_t Year;
-	std::int32_t Month;
-	std::int32_t Day;
-	std::int32_t DayOfWeek;
-	std::int32_t Hour;
-	std::int32_t Minute;
-	std::int32_t Second;
-	std::int32_t Millisecond;
+	std::int32_t Year = 0;
+	std::int32_t Month = 0;
+	std::int32_t Day = 0;
+	std::int32_t DayOfWeek = 0;
+	std::int32_t Hour = 0;
+	std::int32_t Minute = 0;
+	std::int32_t Second = 0;
+	std::int32_t Millisecond = 0;
 
-	sDateTime() = default;
-	sDateTime(std::int32_t InYear, std::int32_t InMonth, std::int32_t InDay, int32_t InDayOfWeek,
+	constexpr sDateTime() = default;
+	constexpr sDateTime(std::int32_t InYear, std::int32_t InMonth, std::int32_t InDay, int32_t InDayOfWeek,
 		std::int32_t InHour = 0, std::int32_t InMinute = 0, std::int32_t InSecond = 0, std::int32_t InMillisecond = 0)
 		: Year(InYear)
 		, Month(InMonth)
@@ -1314,15 +1347,75 @@ struct sDateTime
 		, Millisecond(InMillisecond)
 	{}
 
-	std::int32_t GetCurrentDayTimeInSeconds() const
+	friend void operator<<(sArchive& Archive, const sDateTime& data)
+	{
+		Archive << data.Year;
+		Archive << data.Month;
+		Archive << data.Day;
+		Archive << data.DayOfWeek;
+		Archive << data.Hour;
+		Archive << data.Minute;
+		Archive << data.Second;
+		Archive << data.Millisecond;
+	}
+
+	friend void operator>>(const sArchive& Archive, sDateTime& data)
+	{
+		Archive >> data.Year;
+		Archive >> data.Month;
+		Archive >> data.Day;
+		Archive >> data.DayOfWeek;
+		Archive >> data.Hour;
+		Archive >> data.Minute;
+		Archive >> data.Second;
+		Archive >> data.Millisecond;
+	}
+
+	constexpr std::uint64_t GetCurrentDayTimeInSeconds() const
 	{
 		return Second + (Minute * 60) + (Hour * 3600);
 	}
 
-	std::int32_t GetTotalSeconds() const
+	constexpr std::uint64_t GetTotalSeconds() const
 	{
 		return Second + (Minute * 60) + (Hour * 3600) + (Day * 86400) + (Month * 604800) + (Year * 31556926);
 	}
+
+	constexpr std::uint64_t GetCurrentDayTimeInMillisecond() const
+	{
+		return GetCurrentDayTimeInSeconds() * 1000 + Millisecond;
+		//return Millisecond + (Second * 1000) + (Minute * 60000) + (Hour * 3600000);
+	}
+
+	constexpr std::uint64_t GetTotalMillisecond() const
+	{
+		return GetTotalSeconds() * 1000 + Millisecond;
+		//return Millisecond + (Second * 1000) + (Minute * 60000) + (Hour * 3600000) + (Day * 86400000) + (Month * 2629746000) + (Year * 31556952000);
+	}
+
+	constexpr double GetCurrentDayTimeAsDouble() const
+	{
+		return Second + (Minute * 60.0) + (Hour * 3600.0) + (Millisecond / 1000.0);
+	}
+
+	FORCEINLINE constexpr std::string ToString() const
+	{
+		return std::string("Year : " + std::to_string(Year) + " | Month: " + std::to_string(Month) + " | Day : " + std::to_string(Day) + " | DayOfWeek : " + std::to_string(DayOfWeek) + " | Hour : " + std::to_string(Hour) + " | Minute : " + std::to_string(Minute) + " | Second : " + std::to_string(Second) + " | Millisecond : " + std::to_string(Millisecond));
+	};
+
+#if _MSVC_LANG >= 202002L
+	constexpr auto operator<=>(const sDateTime&) const = default;
+#endif
+};
+
+FORCEINLINE constexpr sDateTime operator +(const sDateTime& value1, const sDateTime& value2)
+{
+	return sDateTime(value1.Year + value2.Year, value1.Month + value2.Month, value1.Day + value2.Day, value1.DayOfWeek + value2.DayOfWeek, value1.Hour + value2.Hour, value1.Minute + value2.Minute, value1.Second + value2.Second, value1.Millisecond + value2.Millisecond);
+};
+
+FORCEINLINE constexpr sDateTime operator -(const sDateTime& value1, const sDateTime& value2)
+{
+	return sDateTime(value1.Year - value2.Year, value1.Month - value2.Month, value1.Day - value2.Day, value1.DayOfWeek - value2.DayOfWeek, value1.Hour - value2.Hour, value1.Minute - value2.Minute, value1.Second - value2.Second, value1.Millisecond - value2.Millisecond);
 };
 
 struct sGPUInfo
@@ -1404,6 +1497,7 @@ struct sGPUInfo
 
 enum class EPhysicsEngine
 {
+	eNone,
 	//eBulletPhysics,
 	eBox2D,
 	//ePhysX,
@@ -1428,6 +1522,177 @@ enum class ESplitScreenType
 {
 	Grid,
 	Horizontal,
+};
+
+enum class eNetworkRole : std::uint8_t
+{
+	None,
+	Host,
+	SimulatedProxy,
+	NetProxy,
+	Client,
+};
+
+enum class eRPCType
+{
+	Server,
+	Client,
+	ServerAndClient
+};
+
+/*
+* WIP
+*/
+template<typename T>
+class ReplicatedVariable
+{
+protected:
+	ReplicatedVariable(const std::string& InName, bool bReliable, bool IsReqTimeStamp)
+		: Name(InName)
+		, bIsReliable(bReliable)
+		, ReqTimeStamp(IsReqTimeStamp)
+	{}
+
+public:
+	virtual ~ReplicatedVariable()
+	{
+		Name = "";
+	}
+
+	inline bool IsReqTimeStamp() const { return ReqTimeStamp; }
+	inline std::string GetName() const { return Name; }
+	inline bool IsReliable() const { return bIsReliable; }
+
+	void Sync()
+	{
+
+	}
+
+	T Variable;
+
+private:
+	std::string Name;
+	bool bIsReliable;
+	bool ReqTimeStamp;
+};
+
+class RemoteProcedureCallBase
+{
+protected:
+	RemoteProcedureCallBase(eRPCType InType, const std::string& InName, bool bReliable, bool IsReqTimeStamp)
+		: Name(InName)
+		, Type(InType)
+		, bIsReliable(bReliable)
+		, ReqTimeStamp(IsReqTimeStamp)
+	{}
+
+public:
+	virtual ~RemoteProcedureCallBase()
+	{
+		Name = "";
+	}
+
+	inline bool IsReqTimeStamp() const { return ReqTimeStamp; }
+	inline std::string GetName() const { return Name; }
+	inline eRPCType GetType() const { return Type; }
+	inline bool IsReliable() const { return bIsReliable; }
+	//inline virtual std::vector<eParamType> GetParamTypes() const = 0;
+	inline virtual bool SetParams(const sArchive& sArchive) = 0;
+
+	virtual void Call() = 0;
+	virtual void Call(const sArchive& pArchive) = 0;
+
+private:
+	std::string Name;
+	eRPCType Type;
+	bool bIsReliable;
+	bool ReqTimeStamp;
+};
+
+template<typename... Args>
+class RemoteProcedureCall : public RemoteProcedureCallBase
+{
+public:
+	RemoteProcedureCall(eRPCType InType, const std::string& InName, bool bReliable, bool IsReqTimeStamp, const std::function<void(Args...)>& pfn)
+		: RemoteProcedureCallBase(InType, InName, bReliable, IsReqTimeStamp)
+		, function(pfn)
+		, ParamCount(0)
+	{
+		for_each_tuple(Params, [&](const auto& x) {
+			//ParamTypes.push_back(GetParamType(x));
+			ParamCount++;
+		});
+	}
+
+	virtual ~RemoteProcedureCall()
+	{
+		function = nullptr;
+		Params = std::tuple<Args...>();
+		//ParamTypes.clear();
+	}
+
+	virtual void Call() override
+	{
+		std::lock_guard<std::mutex> lock(mutex);
+		std::apply([&](auto...xs) { function(std::forward<decltype(xs)>(xs)...); }, Params);
+		Params = std::tuple<Args...>();
+	}
+
+	virtual void Call(const sArchive& pArchive) override
+	{
+		std::lock_guard<std::mutex> lock(mutex);
+
+		if (ParamCount > 0)
+		{
+			pArchive.ResetPos();
+			for_each_tuple(Params, [&](auto& x) {
+				pArchive >> x;
+				});
+		}
+
+		std::apply([&](auto...xs) { function(std::forward<decltype(xs)>(xs)...); }, Params);
+		Params = std::tuple<Args...>();
+	}
+
+	//inline virtual std::vector<eParamType> GetParamTypes() const override { return ParamTypes; }
+
+	inline virtual void SetParamsAsTuple(std::tuple<Args...>& t)
+	{
+		std::lock_guard<std::mutex> lock(mutex);
+		Params = t;
+	}
+
+	inline virtual bool SetParams(const sArchive& pArchive)
+	{
+		std::lock_guard<std::mutex> lock(mutex);
+		if (ParamCount == 0)
+			return false;
+
+		//if (ParamTypes.size() == 0)
+		//	return false;
+
+		pArchive.ResetPos();
+		for_each_tuple(Params, [&](auto& x) {
+			pArchive >> x;
+			});
+		return true;
+	}
+
+	/*template<ParamType p>
+	constexpr decltype(auto) GetParam() noexcept
+	{
+		if constexpr (p == ParamType::eInt) return P2;
+		else if constexpr (p == ParamType::eFloat) return P3;
+		else if constexpr (p == ParamType::eDouble) return P4;
+		else if constexpr (p == ParamType::eFVector) return P1;
+	}*/
+
+private:
+	std::mutex mutex;
+	std::function<void(Args...)> function;
+	//std::vector<eParamType> ParamTypes;
+	int ParamCount;
+	std::tuple<Args...> Params;
 };
 
 class sPostProcess;
@@ -1472,6 +1737,7 @@ namespace GPU
 
 sViewportInstance::~sViewportInstance()
 {
+	bIsEnabled = false;
 	GPU::RemoveViewportInstance(this);
 	pCamera = nullptr;
 	Canvases.clear();
@@ -1536,14 +1802,63 @@ namespace Audio
 	void BindFunctionOnVoiceStop(std::function<void(std::string)> fOnVoiceStop);
 }
 
+class sGameInstance;
+class sPlayer;
+namespace Network
+{
+	bool CreateSession(std::string Name, sGameInstance* Instance, std::string Level, std::size_t PlayerCount = 8, std::uint16_t Port = 27020);
+	void DestroySession();
+	bool IsServerRunning();
+	void SetServerName(std::string Name);
+	bool ServerChangeLevel(std::string Level);
+	void SetServerMaximumMessagePerTick(std::size_t Size);
+	std::size_t GetServerMaximumMessagePerTick();
+	std::string GetServerLevel();
+	std::size_t GetPlayerSize();
+	std::uint64_t GetLatency();
+
+	bool IsHost();
+	bool IsClient();
+
+	bool Connect(sGameInstance* Instance);
+	bool Connect(sGameInstance* Instance, std::string ip = "127.0.0.1", std::uint16_t Port = 27020);
+	bool Disconnect();
+	bool IsConnected();
+	void SetClientMaximumMessagePerTick(std::size_t Size);
+	std::size_t GetClientMaximumMessagePerTick();
+
+	void CallRPC(std::string Address, std::string ClassName, std::string Name, std::optional<bool> reliable = std::nullopt);
+	void CallRPC(std::string Address, std::string ClassName, std::string Name, const sArchive& Params, std::optional<bool> reliable = std::nullopt);
+
+	template <typename... Args>
+	bool CallRPCEx(std::string Address, std::string ClassName, std::string Name, bool reliable, Args&&... args)
+	{
+		return CallRPC(Address, ClassName, Name, sArchive(args...), reliable);
+	}
+
+	void RegisterRPC(std::string Address, std::string ClassName, RemoteProcedureCallBase* RPC);
+#ifndef RegisterRPCfn
+#define RegisterRPCfn(Add,c,s,x,y,t,f,...) Network::RegisterRPC(Add,c, new RemoteProcedureCall<__VA_ARGS__>(x, s, y, t, f))
+#endif
+	void UnregisterRPC(std::string Address);
+	void UnregisterRPC(std::string Address, std::string ClassName);
+	void UnregisterRPC(std::string Address, std::string ClassName, const std::string& rpcName);
+}
+
 class sInputController;
 namespace Engine
 {
-	void SystemTime(std::int32_t& Year, int32_t& Month, int32_t& DayOfWeek, int32_t& Day, int32_t& Hour, int32_t& Min, int32_t& Sec, int32_t& MSec);
-	void UtcTime(std::int32_t& Year, std::int32_t& Month, std::int32_t& DayOfWeek, std::int32_t& Day, std::int32_t& Hour, std::int32_t& Min, std::int32_t& Sec, std::int32_t& MSec);
+	void WriteToConsole(const std::string& STR);
 
-	sDateTime GetSystemTime();
-	sDateTime UtcTime();
+	void LocalUTCTimeNow(std::int32_t& Year, int32_t& Month, int32_t& DayOfWeek, int32_t& Day, int32_t& Hour, int32_t& Min, int32_t& Sec, int32_t& MSec);
+	void UTCTimeNow(std::int32_t& Year, std::int32_t& Month, std::int32_t& DayOfWeek, std::int32_t& Day, std::int32_t& Hour, std::int32_t& Min, std::int32_t& Sec, std::int32_t& MSec);
+
+	sDateTime GetLocalUTCTimeNow();
+	sDateTime GetUTCTimeNow();
+	sDateTime GetAppStartTime();
+	sDateTime GetExecutionTime();
+	std::uint64_t GetExecutionTimeInMS();
+	std::uint64_t GetExecutionTimeInSecond();
 
 	sInputController* GetInputController();
 

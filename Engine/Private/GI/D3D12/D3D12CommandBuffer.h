@@ -58,6 +58,8 @@ public:
 	bool IsClosed() const { return bIsClosed; }
 
 	void ResourceBarrier(UINT NumBarriers, const D3D12_RESOURCE_BARRIER* pBarriers);
+	void TransitionTo(D3D12RenderTarget* RT, D3D12_RESOURCE_STATES State);
+	void TransitionTo(D3D12DepthTarget* Depth, D3D12_RESOURCE_STATES State);
 	void CopyResource(ID3D12Resource* pDstResource, D3D12_RESOURCE_STATES DestState, ID3D12Resource* pSrcResource, D3D12_RESOURCE_STATES SrcState);
 	void WaitForGPU();
 
@@ -82,6 +84,9 @@ public:
 	virtual void CopyFrameBufferDepth(IFrameBuffer* Dest, IFrameBuffer* Source) override final;
 	virtual void CopyRenderTarget(IRenderTarget* Dest, IRenderTarget* Source) override final;
 	virtual void CopyDepthBuffer(IDepthTarget* Dest, IDepthTarget* Source) override final;
+
+	virtual void SetUnorderedAccessBufferAsResource(IUnorderedAccessBuffer* pUAV, std::uint32_t RootParameterIndex) override final;
+	virtual void SetUnorderedAccessBuffersAsResource(std::vector<IUnorderedAccessBuffer*> UAVs, std::uint32_t RootParameterIndex) override final;
 
 	void UpdateSubresource(ID3D12Resource* Buffer, D3D12_RESOURCE_STATES State, D3D12UploadBuffer* UploadBuffer, sBufferSubresource* Subresource);
 
@@ -119,6 +124,9 @@ private:
 
 	bool bIsRenderPassEnabled;
 	bool bIsRenderPassActive;
+
+	std::map<D3D12_RESOURCE_STATES, std::vector<D3D12RenderTarget*>> RT_ToTransition;
+	std::map<D3D12_RESOURCE_STATES, std::vector<D3D12DepthTarget*>> Depth_ToTransition;
 };
 
 class D3D12CopyCommandBuffer : public ICopyCommandContext

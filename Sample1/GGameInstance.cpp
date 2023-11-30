@@ -29,6 +29,7 @@
 #include "GPlayerController.h"
 #include "GPlayerCharacter.h"
 #include "GAIController.h"
+#include <Utilities/ConfigManager.h>
 
 GGameInstance::GGameInstance(IMetaWorld* World)
 	: Super(World)
@@ -38,19 +39,53 @@ GGameInstance::GGameInstance(IMetaWorld* World)
 
 GGameInstance::~GGameInstance()
 {
+	Network::UnregisterRPC("Instance", "GGameInstance");
 }
 
 void GGameInstance::OnBeginPlay()
 {
+	RegisterRPCfn("Instance", "GGameInstance", "ResetLevel_Client", eRPCType::Client, true, false, std::bind(&GGameInstance::ResetLevel_Client, this));
 
+	std::string Role = ConfigManager::Get().GetGameConfig().NetworkRole;
+	if (Role == "Host")
+	{
+		Network::CreateSession("My Session", this, "DefaultLevel", GetLimitPlayer());
+	}
+	else if (Role == "Client")
+	{
+		Network::Connect(this, ConfigManager::Get().GetGameConfig().IP, ConfigManager::Get().GetGameConfig().Port);
+	}
 }
 
 void GGameInstance::OnTick(const double DeltaTime)
 {
+}
 
+sPlayerProxyBase::SharedPtr GGameInstance::ConstructPlayerProxy(std::string PlayerName, std::string NetAddress)
+{
+	return sPlayerProxyBase::Create(this, PlayerName, NetAddress, GProxyController::Create(), GPlayerCharacter::Create("GPlayerCharacter"));
 }
 
 void GGameInstance::InputProcess(const GMouseInput& MouseInput, const GKeyboardChar& KeyboardChar)
 {
 	Super::InputProcess(MouseInput, KeyboardChar);
+}
+
+void GGameInstance::ResetLevel()
+{
+	if (Network::IsClient())
+		return;
+
+	Network::CallRPC("Instance", "GGameInstance", "ResetLevel_Client", sArchive());
+	Super::ResetLevel();
+}
+
+void GGameInstance::ResetLevel_Client()
+{
+	if (Network::IsHost())
+		return;
+
+	//auto Players = GetPlayers();
+	//for (const auto& Player : Players)
+	//	Player->SpawnPlayerFocusedActor();
 }

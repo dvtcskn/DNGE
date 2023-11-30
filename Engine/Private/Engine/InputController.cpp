@@ -24,7 +24,6 @@
 * ---------------------------------------------------------------------------------------
 */
 
-
 #include "pch.h"
 #include "Engine/InputController.h"
 #include <iostream>
@@ -69,6 +68,8 @@ void sInputController::Tick(const double DeltaTime)
 
 void sInputController::FixedUpdate(const double DeltaTime)
 {
+	if (pHWND != GetForegroundWindow())
+		return;
 	Update();
 }
 
@@ -598,8 +599,13 @@ void sInputController::Update()
 					}
 					else if (bIsPressed)
 					{
-						if (InputDesc.bHoldable && InputDesc.fOnHeld)
-							InputDesc.fOnHeld(InputDesc.Key);
+						if (InputDesc.bHoldable)
+						{
+							if (InputDesc.fOnHeld)
+								InputDesc.fOnHeld(InputDesc.Key);
+							else if (InputDesc.fOnPressed)
+								InputDesc.fOnPressed(InputDesc.Key);
+						}
 					}
 				}
 			}

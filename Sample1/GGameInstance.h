@@ -41,11 +41,15 @@ public:
 
 	virtual sPlayer::SharedPtr ConstructPlayer() override final
 	{
-		return GPlayer::Create(this, GetPlayerCount());
+		return GPlayer::Create(this, GetNextPlayerIndex());
 	}
+	virtual sPlayerProxyBase::SharedPtr ConstructPlayerProxy(std::string PlayerName, std::string NetAddress) override final;
 
 	virtual void InputProcess(const GMouseInput& MouseInput, const GKeyboardChar& KeyboardChar) override final;
 
+	virtual void ResetLevel() override;
+
 private:
+	void ResetLevel_Client();
 
 };

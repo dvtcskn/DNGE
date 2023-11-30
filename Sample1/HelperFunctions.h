@@ -117,6 +117,8 @@ namespace
 		{
 			if (!Res)
 				continue;
+			if (!Res->IsEnabled() || Res->IsHidden())
+				continue;
 
 			if (JumpTest && Res->HasTag("PlayerCharacter"))
 			{

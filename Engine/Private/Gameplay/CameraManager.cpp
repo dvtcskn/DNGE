@@ -24,12 +24,10 @@
 * ---------------------------------------------------------------------------------------
 */
 
-
 #include "pch.h"
 #include "Gameplay/CameraManager.h"
 #include "Gameplay/PlayerController.h"
 #include "Gameplay/GameInstance.h"
-#include "Utilities/Utilities.h"
 #include "Gameplay/CameraComponent.h"
 #include <Windows.h>
 #include "Gameplay/ICanvas.h"
@@ -60,7 +58,7 @@ sCameraManager::sCameraManager(sPlayerController* InOwner)
 	, bIsInputMovementEnabled(true)
 {
 	ViewportInstance->pCamera = pCamera;
-	GPU::AddViewportInstance(ViewportInstance.get());
+	//GPU::AddViewportInstance(ViewportInstance.get());
 }
 
 sCameraManager::~sCameraManager()
@@ -166,14 +164,14 @@ void sCameraManager::AttachToActor(sActor* InActor)
 		{
 			PossessedCameraComponent = CameraComponents[0];
 
-			GPU::RemoveViewportInstance(ViewportInstance.get());
+			//GPU::RemoveViewportInstance(ViewportInstance.get());
 			ViewportInstance = nullptr;
 			ViewportInstance = PossessedCameraComponent->GetViewportInstance();
 
 			pCamera = nullptr;
 			pCamera = PossessedCameraComponent->GetCamera();
 
-			GPU::AddViewportInstance(ViewportInstance.get());
+			//GPU::AddViewportInstance(ViewportInstance.get());
 		}
 	}
 }
@@ -194,11 +192,11 @@ void sCameraManager::DetachActorCamera()
 
 		pCamera = nullptr;
 		pCamera = sCamera::Create();
-		GPU::RemoveViewportInstance(ViewportInstance.get());
+		//GPU::RemoveViewportInstance(ViewportInstance.get());
 		ViewportInstance = nullptr;
 		ViewportInstance = sViewportInstance::Create();
 		ViewportInstance->pCamera = pCamera;
-		GPU::AddViewportInstance(ViewportInstance.get());
+		//GPU::AddViewportInstance(ViewportInstance.get());
 	}
 }
 
@@ -207,15 +205,18 @@ void sCameraManager::EnableCamera()
 	if (ViewportInstance)
 	{
 		bIsCameraEnabled = true;
-		GPU::AddViewportInstance(ViewportInstance.get());
+		ViewportInstance->bIsEnabled = bIsCameraEnabled;
+		//GPU::AddViewportInstance(ViewportInstance.get());
 	}
 }
 
 void sCameraManager::DisableCamera()
 {
-	if (ViewportInstance)
-		GPU::RemoveViewportInstance(ViewportInstance.get());
+	//if (ViewportInstance)
+	//	GPU::RemoveViewportInstance(ViewportInstance.get());
 	bIsCameraEnabled = false;
+	if (ViewportInstance)
+		ViewportInstance->bIsEnabled = bIsCameraEnabled;
 }
 
 void sCameraManager::SplitViewport()
@@ -226,6 +227,8 @@ void sCameraManager::SplitViewport()
 		if (PlayerCount == 1)
 		{
 			ViewportInstance->Viewport = sViewport(GPU::GetInternalBaseRenderResolution());
+			if (IsOrthographic())
+				SetOrthographic(ViewportInstance->Viewport->Width, ViewportInstance->Viewport->Height);
 			return;
 		}
 		std::size_t PlayerIndex = PCOwner->GetPlayerIndex();
@@ -237,22 +240,36 @@ void sCameraManager::SplitViewport()
 		case ESplitScreenType::Grid:
 		{
 			/*
-			* To Do:
-			* Make better
+			* 8 Player Support
+			* 4 Top
+			* 4 Bottom
 			*/
-			std::size_t Horizontal = PlayerCount >= 3 ? (std::uint32_t)std::ceil((float)PlayerCount / 2.0f) : (std::uint32_t)PlayerCount;
-			std::size_t Vertical = PlayerCount >= 3 ? 2 : 1;
+			std::size_t Horizontal = PlayerCount == 2 ? 2 : std::ceil((float)PlayerCount / 2.0f);
+			std::size_t Vertical = PlayerCount > 2 ? 2 : 1;
 
-			ViewportInstance->Viewport = sViewport((std::uint32_t)(BaseDimension.Width / Horizontal), (std::uint32_t)(BaseDimension.Height / Vertical),
-				(std::uint32_t)(BaseDimension.Width / Horizontal * (PlayerIndex > (Horizontal - 1)) ? (std::uint32_t)(PlayerIndex - Horizontal) : (std::uint32_t)(PlayerIndex)),
-				(PlayerIndex > (Horizontal - 1) ? (std::uint32_t)(BaseDimension.Height / Vertical) : 0));
+			ViewportInstance->Viewport = sViewport(GPU::GetInternalBaseRenderResolution());
+			if (IsOrthographic())
+				SetOrthographic(ViewportInstance->Viewport->Width / Horizontal, ViewportInstance->Viewport->Height / Vertical);
+
+			std::size_t TopLeftX = (std::uint32_t)(BaseDimension.Width / Horizontal) * ((PlayerIndex > (Horizontal - 1)) ? (std::uint32_t)(PlayerIndex - Horizontal) : (std::uint32_t)(PlayerIndex));
+			std::size_t TopLeftY = (PlayerIndex > (Horizontal - 1) ? (std::uint32_t)(BaseDimension.Height / Vertical) : 0);
+
+			ViewportInstance->Viewport = sViewport((std::uint32_t)(BaseDimension.Width / Horizontal), (std::uint32_t)(BaseDimension.Height / Vertical), TopLeftX, TopLeftY);
 		}
 			break;
 		case ESplitScreenType::Horizontal:
+			ViewportInstance->Viewport = sViewport(GPU::GetInternalBaseRenderResolution());
+			if (IsOrthographic())
+				SetOrthographic(ViewportInstance->Viewport->Width / PlayerCount, ViewportInstance->Viewport->Height);
 			ViewportInstance->Viewport = sViewport((std::uint32_t)(BaseDimension.Width / PlayerCount), (std::uint32_t)(BaseDimension.Height), (std::uint32_t)(BaseDimension.Width / PlayerCount * PlayerIndex), 0);
 			break;
 		}
 	}
+}
+
+void sCameraManager::DisableSplitScreen()
+{
+	ViewportInstance->Viewport = sViewport(GPU::GetInternalBaseRenderResolution());
 }
 
 sPlayerController* sCameraManager::GetPlayerController() const
@@ -344,7 +361,7 @@ void sCameraManager::UpdateCamera(float DeltaTime)
 
 			MouseDelta = MouseDelta * fPercentOfOld + ptCurMouseDelta * fPercentOfNew;
 
-			RotVelocity = (MouseDelta * -1) * 0.01f;
+			RotVelocity = (MouseDelta * -1.0f) * 0.01f;
 
 			float fYawDelta = DirectX::XMVectorGetX(RotVelocity);
 			float fPitchDelta = DirectX::XMVectorGetY(RotVelocity);

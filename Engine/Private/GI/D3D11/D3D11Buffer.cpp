@@ -28,7 +28,7 @@
 #include "D3D11Buffer.h"
 #include "D3D11CommandBuffer.h"
 
-D3D11Buffer::D3D11Buffer(D3D11Device* InDevice, const sBufferDesc& InDesc, sBufferSubresource* InSubresource, ResourceTypeFlags InType, bool InDynamic)
+D3D11Buffer::D3D11Buffer(D3D11Device* InDevice, const sBufferDesc& InDesc, sBufferSubresource* InSubresource, ResourceTypeFlags InType)
 	: Owner(InDevice)
 	, Buffer(nullptr)
 {
@@ -49,7 +49,7 @@ D3D11Buffer::D3D11Buffer(D3D11Device* InDevice, const sBufferDesc& InDesc, sBuff
 			return D3D11_BIND_FLAG::D3D11_BIND_CONSTANT_BUFFER;
 			break;
 		case D3D11Buffer::ResourceTypeFlags::eUnorderedAccess_BUFFER:
-			return /*D3D11_BIND_FLAG::D3D11_BIND_UNORDERED_ACCESS |*/ D3D11_BIND_FLAG::D3D11_BIND_SHADER_RESOURCE;
+			return D3D11_BIND_FLAG::D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_FLAG::D3D11_BIND_SHADER_RESOURCE;
 			break;
 		}
 		return NULL;
@@ -65,8 +65,8 @@ D3D11Buffer::D3D11Buffer(D3D11Device* InDevice, const sBufferDesc& InDesc, sBuff
 	DESC.ByteWidth = static_cast<std::uint32_t>(BufferDesc.Size);
 	DESC.StructureByteStride = static_cast<std::uint32_t>(BufferDesc.Stride);
 	DESC.BindFlags = BindFlag(InType);
-	DESC.Usage = InDynamic ? D3D11_USAGE::D3D11_USAGE_DYNAMIC : D3D11_USAGE::D3D11_USAGE_DEFAULT;
-	DESC.CPUAccessFlags = InDynamic ? D3D11_CPU_ACCESS_WRITE : NULL;
+	DESC.Usage = D3D11_USAGE::D3D11_USAGE_DEFAULT;
+	DESC.CPUAccessFlags = NULL;
 
 	if (InType == ResourceTypeFlags::eCONSTANT_BUFFER || InType == ResourceTypeFlags::eUnorderedAccess_BUFFER)
 	{
@@ -220,4 +220,36 @@ void D3D11IndexBuffer::ApplyBuffer(IGraphicsCommandContext* InCMDBuffer)
 		std::uint32_t offset = NULL;
 		GetOwner()->GetDeviceIMContext()->IASetIndexBuffer(Buffer.Get(), DXGI_FORMAT::DXGI_FORMAT_R32_UINT, offset);
 	}
+}
+
+D3D11UnorderedAccessBuffer::D3D11UnorderedAccessBuffer(D3D11Device* InDevice, std::string InName, const sBufferDesc& InDesc, bool bSRVAllowed)
+	: D3D11Buffer(InDevice, InDesc, NULL, ResourceTypeFlags::eUnorderedAccess_BUFFER)
+	, Name(InName)
+	, mUnorderedAccess(nullptr)
+	, mShaderResource(nullptr)
+{
+	ID3D11Device1* d3dDevice = GetOwner()->GetDevice();
+
+	{
+		d3dDevice->CreateUnorderedAccessView(Buffer.Get(), NULL, &mUnorderedAccess);
+	}
+
+	if (bSRVAllowed)
+	{
+		CD3D11_SHADER_RESOURCE_VIEW_DESC shaderResourceDesc( Buffer.Get(), DXGI_FORMAT_UNKNOWN, 0, InDesc.Size / InDesc.Stride, 0);
+		d3dDevice->CreateShaderResourceView(Buffer.Get(), &shaderResourceDesc, &mShaderResource);
+	}
+}
+
+void D3D11UnorderedAccessBuffer::Map(const void* Ptr, IGraphicsCommandContext* InCMDBuffer)
+{
+	ID3D11DeviceContext1* CTX = InCMDBuffer ? static_cast<D3D11CommandBuffer*>(InCMDBuffer)->Get() : GetOwner()->GetDeviceIMContext();
+
+	HRESULT HR;
+	D3D11_MAPPED_SUBRESOURCE mappedResource;
+	ZeroMemory(&mappedResource, sizeof(D3D11_MAPPED_SUBRESOURCE));
+
+	HR = CTX->Map(Buffer.Get(), 0, D3D11_MAP::D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+	memcpy(mappedResource.pData, Ptr, BufferDesc.Size);
+	CTX->Unmap(Buffer.Get(), 0);
 }

@@ -300,6 +300,13 @@ public:
 		if (!IsEnabled())
 			return;
 
+		if (Network::IsClient())
+		{
+			if (Text->IsVisible())
+				Text->SetVisibilityState(eVisibility::Hidden);
+			return;
+		}
+
 		if (!bWait)
 		{
 			Color.A -= DeltaTime * Modifier;
@@ -559,8 +566,37 @@ namespace cbgui
 			PlayerInterface->AddToCanvas(this);
 			PlayerInterface->Wrap();
 
-			PlayerInterface->SetVerticalAlignment(eVerticalAlignment::Align_Fill);
-			PlayerInterface->SetHorizontalAlignment(eHorizontalAlignment::Align_Fill);
+			sPlayerController* PC = dynamic_cast<sPlayerController*>(InCharacter->GetController());
+			auto SplitScreenEnabled = PC->GetPlayer()->GetGameInstance()->IsSplitScreenEnabled();
+			if (!SplitScreenEnabled)
+			{
+				auto Index = PC->GetPlayerIndex();
+				if (Index == 0)
+				{
+					PlayerInterface->SetVerticalAlignment(eVerticalAlignment::Align_Top);
+					PlayerInterface->SetHorizontalAlignment(eHorizontalAlignment::Align_Left);
+				}
+				else if (Index == 1)
+				{
+					PlayerInterface->SetVerticalAlignment(eVerticalAlignment::Align_Top);
+					PlayerInterface->SetHorizontalAlignment(eHorizontalAlignment::Align_Right);
+				}
+				else if (Index == 2)
+				{
+					PlayerInterface->SetVerticalAlignment(eVerticalAlignment::Align_Bottom);
+					PlayerInterface->SetHorizontalAlignment(eHorizontalAlignment::Align_Left);
+				}
+				else if (Index == 3)
+				{
+					PlayerInterface->SetVerticalAlignment(eVerticalAlignment::Align_Bottom);
+					PlayerInterface->SetHorizontalAlignment(eHorizontalAlignment::Align_Right);
+				}
+			}
+			else
+			{
+				PlayerInterface->SetVerticalAlignment(eVerticalAlignment::Align_Top);
+				PlayerInterface->SetHorizontalAlignment(eHorizontalAlignment::Align_Left);
+			}
 			PlayerInterface->SetAlignToCanvas(true);
 		}
 	}

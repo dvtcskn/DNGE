@@ -75,6 +75,9 @@ public:
 	virtual void CopyRenderTarget(IRenderTarget* Dest, IRenderTarget* Source) override final;
 	virtual void CopyDepthBuffer(IDepthTarget* Dest, IDepthTarget* Source) override final;
 
+	virtual void SetUnorderedAccessBufferAsResource(IUnorderedAccessBuffer* pUAV, std::uint32_t RootParameterIndex) override final;
+	virtual void SetUnorderedAccessBuffersAsResource(std::vector<IUnorderedAccessBuffer*> UAVs, std::uint32_t RootParameterIndex) override final;
+
 	virtual void SetPipeline(IPipeline* Pipeline) override final;
 
 	virtual void SetVertexBuffer(IVertexBuffer* VB) override final;

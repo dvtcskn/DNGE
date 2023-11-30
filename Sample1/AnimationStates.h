@@ -25,7 +25,9 @@
 */
 #pragma once
 
-enum class EAnimationState
+#include <memory>
+
+enum class EAnimationState : std::uint8_t
 {
 	eIdle,
 	eMoving,

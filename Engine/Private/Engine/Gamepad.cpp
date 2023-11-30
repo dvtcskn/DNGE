@@ -22,12 +22,6 @@
 using namespace DirectX;
 using Microsoft::WRL::ComPtr;
 
-namespace DirectX
-{
-    struct handle_closer { void operator()(HANDLE h) noexcept { if (h) CloseHandle(h); } };
-    using ScopedHandle = std::unique_ptr<void, handle_closer>;
-}
-
 namespace
 {
     constexpr float c_XboxOneThumbDeadZone = .24f;  // Recommended Xbox One controller deadzone

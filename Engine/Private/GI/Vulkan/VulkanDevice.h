@@ -134,27 +134,27 @@ private:
 	void SetupQueueGraphicsFamily();
 
 private:
-	/*struct QueueFamilyProperties
+	struct QueueFamilyProperties
 	{
 		size_t graphicsQueueFamilyIndex;
 		size_t presentQueueFamilyIndex;
 	};
 
-	vk::Device device;
-	vk::PhysicalDevice PhysicalDevice;
-	vk::PhysicalDeviceType PhysicalDevice_Type;
-	vk::Instance instance;
-	vk::Queue GraphicsQueue;
-	vk::UniqueCommandPool CMDBufferPool;
-	vk::PhysicalDeviceMemoryProperties PhysicalDeviceMemoryProperties;
+	//vk::Device device;
+	//vk::PhysicalDevice PhysicalDevice;
+	//vk::PhysicalDeviceType PhysicalDevice_Type;
+	//vk::Instance instance;
+	//vk::Queue GraphicsQueue;
+	//vk::UniqueCommandPool CMDBufferPool;
+	//vk::PhysicalDeviceMemoryProperties PhysicalDeviceMemoryProperties;
 	std::uint64_t uniform_buffer_alignment;
 
-	vk::PhysicalDeviceProperties PhysicalDeviceProperties;
-	vk::PhysicalDeviceLimits deviceLimits;
+	//vk::PhysicalDeviceProperties PhysicalDeviceProperties;
+	//vk::PhysicalDeviceLimits deviceLimits;
 
 	QueueFamilyProperties FamilyProperties;
 
-	std::unique_ptr<VulkanViewport> Viewport;*/
+	std::unique_ptr<VulkanViewport> Viewport;
 
 	std::uint32_t VendorId;
 };

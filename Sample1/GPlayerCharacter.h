@@ -34,14 +34,59 @@
 #include "SpriteComponent.h"
 #include "SpriteSheetComponent.h"
 #include <Engine/InputController.h>
+#include "NetComponents.h"
 #include "Items.h"
+
+struct GNetInputManager
+{
+public:
+	enum class eInput
+	{
+		eLeft,
+		eRight,
+		eUp,
+	};
+
+	struct GNetInput
+	{
+		sBaseClassBody(sClassConstructor, GNetInput)
+	public:
+		GNetInput(eInput InType, std::uint32_t InKey = 0, FVector2 InInputModifier = FVector2::Zero(), std::optional<std::uint32_t> InEndFrameCount = std::nullopt)
+			: Type(InType)
+			, key(InKey)
+			, InputModifier(InInputModifier)
+			, FrameCounter(0)
+			, EndFrameCount(InEndFrameCount)
+		{}
+		~GNetInput() = default;
+
+		eInput Type;
+		std::uint32_t key;
+		FVector2 InputModifier;
+		std::uint32_t FrameCounter;
+		std::optional<std::uint32_t> EndFrameCount;
+	};
+	sBaseClassBody(sClassConstructor, GNetInputManager)
+public:
+	GNetInputManager();
+	virtual ~GNetInputManager();
+
+	void Reset();
+
+	void Tick(const double DeltaTime);
+
+	void PushBackInput(eInput Type, std::uint32_t key, FVector2 InputModifier);
+	void SetFrameCountForCurrentOrNextInput(eInput Type, std::uint32_t FrameCount);
+
+	std::vector<GNetInput*> Inputs;
+	GNetInput* CurrentInput;
+};
 
 class GPlayerCharacter final : public sCharacter
 {
 	sClassBody(sClassConstructor, GPlayerCharacter, sCharacter)
 public:
-	GPlayerCharacter(std::string InName = "");
-
+	GPlayerCharacter(std::string InName);
 	virtual ~GPlayerCharacter();
 
 	virtual void OnBeginPlay() override final;
@@ -70,11 +115,13 @@ public:
 	void MoveJump();
 	void Stop();
 
-	float GetHorizontal_Move_Direction() const { return Horizontal_Move_Direction; }
+	float GetHorizontal_Move_Direction() const { return HorizontalMoveDirection; }
 
 	bool GetIsFalling() const;
 	bool GetIsJumping() const { return bIsJumping; }
 	bool GetIsOnGround() const;
+
+	virtual void Replicate(bool bReplicate) override;
 
 //private:
 	void OnGrounded();
@@ -94,9 +141,25 @@ public:
 
 	bool IsDead() const { return Health <= 0.0f; }
 
+	void Net_OnBindKey_RightMovementKey(sDateTime Time, int key);
+	void Net_OnBindKey_RightMovementKey_Released(sDateTime Time, int key, std::uint32_t FrameCounter);
+	void Net_OnBindKey_LeftMovementKey(sDateTime Time, int key);
+	void Net_OnBindKey_LeftMovementKey_Released(sDateTime Time, int key, std::uint32_t FrameCounter);
+	void Net_OnBindKey_JumpMovementKey(sDateTime Time, int key);
+	void Net_OnBindKey_JumpMovementKey_Released(sDateTime Time, int key);
+
 private:
 	void OnCharacterDead();
 
+	void ReceiveItem_Client(std::string Item, std::uint32_t Count);
+	void ApplyDamage_Client(float Health, bool HitReaction = false);
+
+	void Net_CheckIfRightMovementKeyPressed();
+	void Net_CheckIfLeftMovementKeyPressed();
+	void Net_CheckIfRightMovementKeyPressed_Client();
+	void Net_CheckIfLeftMovementKeyPressed_Client();
+	void Net_CheckIfRightMovementKeyPressed_Server(bool val);
+	void Net_CheckIfLeftMovementKeyPressed_Server(bool val);
 private:
 	sBoxCollision2DComponent* pBoxCollision2DComponent;
 
@@ -108,6 +171,8 @@ private:
 	//	//float FlipMinX = 0;
 	//};
 
+	std::int32_t GetHorizontalMoveDirection() const;
+
 	bool bIsAI;
 
 	bool SpaceBTN = false;
@@ -115,7 +180,8 @@ private:
 	bool bIsOnGround = true;
 	bool K_Pressed = false;
 
-	short Horizontal_Move_Direction;
+	short HorizontalMoveDirection;
+	std::uint32_t FrameCounter;
 	float Move_Speed;
 
 	float JumpForce;
@@ -125,4 +191,6 @@ private:
 	float Health;
 
 	sSpriteAnimationManager* AnimManager;
+
+	GNetInputManager InputManager;
 };

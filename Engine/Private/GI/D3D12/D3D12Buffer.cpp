@@ -357,3 +357,12 @@ void D3D12IndexBuffer::UpdateSubresource(sBufferSubresource* Subresource, IGraph
         Owner->GetIMCommandList()->ExecuteCommandList();
     }
 }
+
+D3D12UnorderedAccessBuffer::D3D12UnorderedAccessBuffer(D3D12Device* InDevice, std::string InName, const sBufferDesc& InDesc, bool bSRVAllowed)
+    : Super()
+{
+}
+
+void D3D12UnorderedAccessBuffer::Map(const void* Ptr, IGraphicsCommandContext* InCMDBuffer)
+{
+}

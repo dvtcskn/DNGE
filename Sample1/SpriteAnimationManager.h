@@ -70,7 +70,7 @@ public:
 	virtual void OnFixedUpdate(const double DeltaTime) override final;
 
 	EAnimationState GetAnimationState() const { return AnimationState; }
-	void SetAnimationState(const EAnimationState State);
+	void SetAnimationState(EAnimationState State);
 
 	void SetGraph(const sSpriteAnimationGraph& Graph);
 
@@ -87,6 +87,8 @@ public:
 	void BindFunction_AnimationStarted(std::function<void()> pf);
 	void BindFunction_AnimationEnded(std::function<void()> pf);
 	void BindFunction_FrameUpdated(std::function<void(std::size_t)> pf);
+
+	virtual void Replicate(bool bReplicate) override;
 
 private:
 	EAnimationState AnimationState;

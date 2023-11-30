@@ -57,10 +57,11 @@ D3D12ComputeCommandContext::~D3D12ComputeCommandContext()
 
 void D3D12ComputeCommandContext::BeginRecordCommandList()
 {
+	WaitForGPU();
 	Open();
 
 	{
-		//WaitForGPU();
+		Owner->SetHeaps(CommandList.Get());
 	}
 }
 
@@ -107,8 +108,7 @@ void D3D12ComputeCommandContext::WaitForGPU()
 
 void D3D12ComputeCommandContext::SetFrameBuffer(IFrameBuffer* pFB, std::optional<std::size_t> FBOIndex)
 {
-	//CommandList->SetComputeRootUnorderedAccessView(0, static_cast<D3D12UnorderedAccessTarget*>(pFB->GetUnorderedAccessTarget(0))->GetGPUVirtualAddress());
-	//CommandList->SetComputeRootShaderResourceView(0, static_cast<D3D12RenderTarget*>(pFB->GetRenderTarget(0))->GetGPUVirtualAddress());
+
 }
 
 void D3D12ComputeCommandContext::SetPipeline(IComputePipeline* Pipeline)
@@ -123,62 +123,238 @@ void D3D12ComputeCommandContext::SetConstantBuffer(IConstantBuffer* CB, std::opt
 {
 	if (CB)
 	{
-		auto GPU = static_cast<D3D12ConstantBuffer*>(CB)->GetGPUVirtualAddress();
+		/*auto GPU = static_cast<D3D12ConstantBuffer*>(CB)->GetGPUVirtualAddress();
 		if (RootParameterIndex.has_value())
 			CommandList->SetComputeRootConstantBufferView(*RootParameterIndex, GPU);
 		else
-			CommandList->SetComputeRootConstantBufferView(CB->GetDefaultRootParameterIndex(), GPU);
+			CommandList->SetComputeRootConstantBufferView(CB->GetDefaultRootParameterIndex(), GPU);*/
+
+		if (RootParameterIndex.has_value())
+			CommandList->SetComputeRootDescriptorTable(*RootParameterIndex, static_cast<D3D12ConstantBuffer*>(CB)->GetHeapHandle().GetGPU());
+		else
+			CommandList->SetComputeRootDescriptorTable(CB->GetDefaultRootParameterIndex(), static_cast<D3D12ConstantBuffer*>(CB)->GetHeapHandle().GetGPU());
 	}
 }
 
 void D3D12ComputeCommandContext::SetRenderTargetAsResource(IRenderTarget* pRT, std::uint32_t RootParameterIndex)
 {
+	if (pRT)
+	{
+		D3D12RenderTarget* FBuffer = static_cast<D3D12RenderTarget*>(pRT);
 
+		if (FBuffer->CurrentState != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
+		{
+			D3D12_RESOURCE_BARRIER Barriers[1];
+			Barriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(FBuffer->GetD3D12Texture(), FBuffer->CurrentState, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+			CommandList->ResourceBarrier(ARRAYSIZE(Barriers), Barriers);
+			FBuffer->CurrentState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+		}
+
+		CommandList->SetComputeRootDescriptorTable(RootParameterIndex, FBuffer->GetSRVGPU());
+	}
 }
 
 void D3D12ComputeCommandContext::SetRenderTargetsAsResource(std::vector<IRenderTarget*> RTs, std::uint32_t RootParameterIndex)
 {
+	if (RTs.size() > 0)
+	{
+		int i = RootParameterIndex;
+		for (IRenderTarget* pRT : RTs)
+		{
+			D3D12RenderTarget* FBuffer = static_cast<D3D12RenderTarget*>(pRT);
+			if (FBuffer->CurrentState != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
+			{
+				D3D12_RESOURCE_BARRIER Barriers[1];
+				Barriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(FBuffer->GetD3D12Texture(), FBuffer->CurrentState, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+				CommandList->ResourceBarrier(ARRAYSIZE(Barriers), Barriers);
+				FBuffer->CurrentState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+			}
 
+			CommandList->SetComputeRootShaderResourceView(i, FBuffer->GetGPUVirtualAddress());
+
+			i++;
+		}
+	}
 }
 
 void D3D12ComputeCommandContext::SetRenderTargetAsUAV(IRenderTarget* pRT, std::uint32_t RootParameterIndex)
 {
+	if (pRT)
+	{
+		D3D12RenderTarget* FBuffer = static_cast<D3D12RenderTarget*>(pRT);
 
+		if (FBuffer->CurrentState != D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
+		{
+			D3D12_RESOURCE_BARRIER Barriers[1];
+			Barriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(FBuffer->GetD3D12Texture(), FBuffer->CurrentState, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+			CommandList->ResourceBarrier(ARRAYSIZE(Barriers), Barriers);
+			FBuffer->CurrentState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+		}
+
+		CommandList->SetComputeRootDescriptorTable(RootParameterIndex, FBuffer->GetUAVGPU());
+	}
 }
 
 void D3D12ComputeCommandContext::SetRenderTargetsAsUAV(std::vector<IRenderTarget*> RTs, std::uint32_t RootParameterIndex)
 {
+	if (RTs.size() > 0)
+	{
+		int i = RootParameterIndex;
+		for (IRenderTarget* pRT : RTs)
+		{
+			D3D12RenderTarget* FBuffer = static_cast<D3D12RenderTarget*>(pRT);
+			if (FBuffer->CurrentState != D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
+			{
+				D3D12_RESOURCE_BARRIER Barriers[1];
+				Barriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(FBuffer->GetD3D12Texture(), FBuffer->CurrentState, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+				CommandList->ResourceBarrier(ARRAYSIZE(Barriers), Barriers);
+				FBuffer->CurrentState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+			}
 
+			CommandList->SetComputeRootDescriptorTable(RootParameterIndex, FBuffer->GetUAVGPU());
+
+			i++;
+		}
+	}
 }
 
 void D3D12ComputeCommandContext::SetUnorderedAccessTarget(IUnorderedAccessTarget* pST, std::uint32_t RootParameterIndex)
 {
+	if (pST)
+	{
+		D3D12UnorderedAccessTarget* FBuffer = static_cast<D3D12UnorderedAccessTarget*>(pST);
 
+		if (FBuffer->CurrentState != D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
+		{
+			D3D12_RESOURCE_BARRIER Barriers[1];
+			Barriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(FBuffer->GetD3D12Texture(), FBuffer->CurrentState, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+			CommandList->ResourceBarrier(ARRAYSIZE(Barriers), Barriers);
+			FBuffer->CurrentState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+		}
+
+		CommandList->SetComputeRootDescriptorTable(RootParameterIndex, FBuffer->GetUAVGPU());
+	}
 }
 
 void D3D12ComputeCommandContext::SetUnorderedAccessTargets(std::vector<IUnorderedAccessTarget*> pSTs, std::uint32_t RootParameterIndex)
 {
+	if (pSTs.size() > 0)
+	{
+		int i = RootParameterIndex;
+		for (IUnorderedAccessTarget* pRT : pSTs)
+		{
+			D3D12UnorderedAccessTarget* FBuffer = static_cast<D3D12UnorderedAccessTarget*>(pRT);
+			if (FBuffer->CurrentState != D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
+			{
+				D3D12_RESOURCE_BARRIER Barriers[1];
+				Barriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(FBuffer->GetD3D12Texture(), FBuffer->CurrentState, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+				CommandList->ResourceBarrier(ARRAYSIZE(Barriers), Barriers);
+				FBuffer->CurrentState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+			}
 
+			CommandList->SetComputeRootDescriptorTable(RootParameterIndex, FBuffer->GetUAVGPU());
+
+			i++;
+		}
+	}
 }
 
 void D3D12ComputeCommandContext::SetUnorderedAccessTargetAsSRV(IUnorderedAccessTarget* pST, std::uint32_t RootParameterIndex)
 {
+	if (pST)
+	{
+		D3D12UnorderedAccessTarget* FBuffer = static_cast<D3D12UnorderedAccessTarget*>(pST);
 
+		if (FBuffer->CurrentState != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
+		{
+			D3D12_RESOURCE_BARRIER Barriers[1];
+			Barriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(FBuffer->GetD3D12Texture(), FBuffer->CurrentState, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+			CommandList->ResourceBarrier(ARRAYSIZE(Barriers), Barriers);
+			FBuffer->CurrentState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+		}
+
+		CommandList->SetComputeRootDescriptorTable(RootParameterIndex, FBuffer->GetSRVGPU());
+	}
 }
 
 void D3D12ComputeCommandContext::SetUnorderedAccessTargetsAsSRV(std::vector<IUnorderedAccessTarget*> pSTs, std::uint32_t RootParameterIndex)
 {
+	if (pSTs.size() > 0)
+	{
+		int i = RootParameterIndex;
+		for (IUnorderedAccessTarget* pRT : pSTs)
+		{
+			D3D12UnorderedAccessTarget* FBuffer = static_cast<D3D12UnorderedAccessTarget*>(pRT);
+			if (FBuffer->CurrentState != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
+			{
+				D3D12_RESOURCE_BARRIER Barriers[1];
+				Barriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(FBuffer->GetD3D12Texture(), FBuffer->CurrentState, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+				CommandList->ResourceBarrier(ARRAYSIZE(Barriers), Barriers);
+				FBuffer->CurrentState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+			}
 
+			CommandList->SetComputeRootDescriptorTable(RootParameterIndex, FBuffer->GetSRVGPU());
+
+			i++;
+		}
+	}
+}
+
+void D3D12ComputeCommandContext::SetUnorderedAccessBuffer(IUnorderedAccessBuffer* pUAV, std::uint32_t RootParameterIndex)
+{
+}
+
+void D3D12ComputeCommandContext::SetUnorderedAccessBuffers(std::vector<IUnorderedAccessBuffer*> UAVs, std::uint32_t RootParameterIndex)
+{
+}
+
+void D3D12ComputeCommandContext::SetUnorderedAccessBufferAsResource(IUnorderedAccessBuffer* pUAV, std::uint32_t RootParameterIndex)
+{
+}
+
+void D3D12ComputeCommandContext::SetUnorderedAccessBuffersAsResource(std::vector<IUnorderedAccessBuffer*> UAVs, std::uint32_t RootParameterIndex)
+{
 }
 
 void D3D12ComputeCommandContext::SetDepthTargetAsResource(IDepthTarget* pDT, std::uint32_t RootParameterIndex)
 {
+	if (pDT)
+	{
+		D3D12DepthTarget* FBuffer = static_cast<D3D12DepthTarget*>(pDT);
 
+		if (FBuffer->CurrentState != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
+		{
+			D3D12_RESOURCE_BARRIER Barriers[1];
+			Barriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(FBuffer->GetD3D12Texture(), FBuffer->CurrentState, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+			CommandList->ResourceBarrier(ARRAYSIZE(Barriers), Barriers);
+			FBuffer->CurrentState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+		}
+
+		CommandList->SetComputeRootDescriptorTable(RootParameterIndex, FBuffer->GetSRVGPU());
+	}
 }
 
 void D3D12ComputeCommandContext::SetDepthTargetsAsResource(std::vector<IDepthTarget*> DTs, std::uint32_t RootParameterIndex)
 {
+	if (DTs.size() > 0)
+	{
+		int i = RootParameterIndex;
+		for (IDepthTarget* pRT : DTs)
+		{
+			D3D12DepthTarget* FBuffer = static_cast<D3D12DepthTarget*>(pRT);
+			if (FBuffer->CurrentState != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
+			{
+				D3D12_RESOURCE_BARRIER Barriers[1];
+				Barriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(FBuffer->GetD3D12Texture(), FBuffer->CurrentState, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+				CommandList->ResourceBarrier(ARRAYSIZE(Barriers), Barriers);
+				FBuffer->CurrentState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+			}
 
+			CommandList->SetComputeRootDescriptorTable(RootParameterIndex, FBuffer->GetSRVGPU());
+
+			i++;
+		}
+	}
 }
 
 void D3D12ComputeCommandContext::SetConstants(std::uint32_t RootEntry, std::uint32_t X, std::uint32_t Y, std::uint32_t Z, std::uint32_t W)
@@ -196,6 +372,7 @@ void D3D12ComputeCommandContext::Dispatch(std::uint32_t ThreadGroupCountX, std::
 
 void D3D12ComputeCommandContext::ExecuteIndirect(IIndirectBuffer* IndirectBuffer)
 {
+
 }
 
 void D3D12ComputeCommandContext::ClearState()

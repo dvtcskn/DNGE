@@ -24,11 +24,34 @@
 * ---------------------------------------------------------------------------------------
 */
 
-
 #include "pch.h"
 #include "Gameplay/PrimitiveComponent.h"
 #include "Gameplay/Actor.h"
 #include <functional>
+
+sPrimitiveComponent::sPrimitiveComponent(std::string InName, sActor* pActor)
+	: Name(InName)
+	, Owner(pActor)
+	, bIsHidden(false)
+	, bIsEnabled(true)
+	, ComponentOwner(nullptr)
+	, Location(FVector::Zero())
+	, Rotation(FVector4(0.0f, 0.0f, 0.0f, 1.0f))
+	, Scale(FVector(1.0f, 1.0f, 1.0f))
+	, bIsReplicated(false)
+{
+}
+
+sPrimitiveComponent::~sPrimitiveComponent()
+{
+	ComponentOwner = nullptr;
+
+	for (auto& Child : Children)
+		Child = nullptr;
+	Children.clear();
+
+	Owner = nullptr;
+}
 
 void sPrimitiveComponent::BeginPlay()
 {
@@ -49,6 +72,11 @@ void sPrimitiveComponent::FixedUpdate(const double DeltaTime)
 	OnFixedUpdate(DeltaTime);
 	for (auto& Child : Children)
 		Child->FixedUpdate(DeltaTime);
+}
+
+std::string sPrimitiveComponent::GetClassNetworkAddress() const
+{
+	return Owner ? Owner->GetClassNetworkAddress() : ComponentOwner->GetClassNetworkAddress();
 }
 
 bool sPrimitiveComponent::HasOwner() const
@@ -110,6 +138,24 @@ void sPrimitiveComponent::SetTag(const std::size_t i, const std::string& InTag)
 bool sPrimitiveComponent::HasTag(std::string InTag)
 {
 	return std::find(Tags.begin(), Tags.end(), InTag) != Tags.end();
+}
+
+void sPrimitiveComponent::Replicate(bool bReplicate)
+{
+	if (bIsReplicated == bReplicate)
+		return;
+
+	bIsReplicated = bReplicate;
+
+	if (bIsReplicated)
+	{
+		RegisterRPCfn(GetClassNetworkAddress(), GetName(), "SetRelativeLocation_Client", eRPCType::Client, false, false, std::bind(&sPrimitiveComponent::SetRelativeLocation_Client, this, std::placeholders::_1), FVector);
+		RegisterRPCfn(GetClassNetworkAddress(), GetName(), "SetTransform_Client", eRPCType::Client, false, false, std::bind(&sPrimitiveComponent::SetTransform_Client, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3), FVector, FVector4, FVector);
+	}
+	else
+	{
+		Network::UnregisterRPC(GetClassNetworkAddress(), GetName());
+	}
 }
 
 void sPrimitiveComponent::Enable()
@@ -212,7 +258,34 @@ void sPrimitiveComponent::Serialize(sArchive& archive)
 
 void sPrimitiveComponent::SetRelativeLocation(const FVector& V)
 {
-	Location = V; 
+	if (IsReplicated() && Network::IsHost())
+	{
+		Location = V;
+		UpdateTransform();
+
+		Network::CallRPC(GetClassNetworkAddress(), GetName(), "SetRelativeLocation_Client", sArchive(V), false);
+	}
+	else if (IsReplicated() && Network::IsConnected())
+	{
+		Location = V;
+		UpdateTransform();
+	}
+	else
+	{
+		Location = V;
+		UpdateTransform();
+	}
+}
+
+void sPrimitiveComponent::SetRelativeLocation_Client(const FVector& V)
+{
+	if (Network::IsHost())
+		return;
+
+	if (!IsReplicated())
+		return;
+
+	Location = V;
 	UpdateTransform();
 }
 
@@ -264,33 +337,66 @@ FVector sPrimitiveComponent::GetRelativeScale() const
 
 FVector sPrimitiveComponent::GetVelocity() const
 {
-	//if (!HasComponentOwner())
-		return FVector::Zero();
+	if (HasComponentOwner())
+		return GetComponentOwner()->GetVelocity();
 
-	//return GetComponentOwner()->GetVelocity();
+	return FVector::Zero();
 }
 
-void sPrimitiveComponent::SetTransform(const FVector& InLocation, const FVector4& InRotation, const std::optional<FVector> InScale)
+void sPrimitiveComponent::SetTransform(const FVector& InLocation, const FVector4& InRotation, const FVector InScale)
 {
-	if (Location != InLocation || Rotation != InRotation)
+	if (IsReplicated() && Network::IsHost())
+	{
+		if (Location != InLocation || Rotation != InRotation || Scale != InScale)
+		{
+			Location = InLocation;
+			Rotation = InRotation;
+			Scale = InScale;
+
+			UpdateTransform();
+		}
+
+		Network::CallRPC(GetClassNetworkAddress(), GetName(), "SetTransform_Client", sArchive(InLocation, InRotation, InScale), false);
+	}
+	else if (IsReplicated() && Network::IsConnected())
+	{
+		if (Location != InLocation || Rotation != InRotation || Scale != InScale)
+		{
+			Location = InLocation;
+			Rotation = InRotation;
+			Scale = InScale;
+
+			UpdateTransform();
+		}
+	}
+	else
+	{
+		if (Location != InLocation || Rotation != InRotation || Scale != InScale)
+		{
+			Location = InLocation;
+			Rotation = InRotation;
+			Scale = InScale;
+
+			UpdateTransform();
+		}
+	}
+}
+
+void sPrimitiveComponent::SetTransform_Client(const FVector& InLocation, const FVector4& InRotation, const FVector InScale)
+{
+	if (Network::IsHost())
+		return;
+
+	if (!IsReplicated())
+		return;
+
+	if (Location != InLocation || Rotation != InRotation || Scale != InScale)
 	{
 		Location = InLocation;
 		Rotation = InRotation;
+		Scale = InScale;
 
-		if (InScale.has_value())
-		{
-			if (Scale != *InScale)
-				Scale = *InScale;
-		}
 		UpdateTransform();
-	}
-	else if (InScale.has_value())
-	{
-		if (Scale != *InScale)
-		{
-			Scale = *InScale;
-			UpdateTransform();
-		}
 	}
 }
 

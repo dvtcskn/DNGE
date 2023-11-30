@@ -23,7 +23,6 @@
 * SOFTWARE.
 * ---------------------------------------------------------------------------------------
 */
-
 #pragma once
 
 #include <vector>
@@ -37,29 +36,12 @@ class sPrimitiveComponent : public std::enable_shared_from_this<sPrimitiveCompon
 	sBaseClassBody(sClassConstructor, sPrimitiveComponent)
 	friend class sActor;
 public:
-	sPrimitiveComponent(std::string InName, sActor* pActor = nullptr)
-		: Name(InName)
-		, Owner(pActor)
-		, bIsHidden(false)
-		, bIsEnabled(true) 
-		, ComponentOwner(nullptr)
-		, Location(FVector::Zero())
-		, Rotation(FVector4(0.0f, 0.0f, 0.0f, 1.0f))
-		, Scale(FVector(1.0f, 1.0f, 1.0f))
-	{}
-	virtual ~sPrimitiveComponent()
-	{
-		ComponentOwner = nullptr;
-
-		for (auto& Child : Children)
-			Child = nullptr;
-		Children.clear();
-
-		Owner = nullptr;
-	}
+	sPrimitiveComponent(std::string InName, sActor* pActor = nullptr);
+	virtual ~sPrimitiveComponent();
 
 	inline std::string GetName() const { return Name; };
 	inline void SetName(std::string inName) { Name = inName; };
+	virtual std::string GetClassNetworkAddress() const;
 
 	void BeginPlay();
 	void Tick(const double DeltaTime);
@@ -71,6 +53,9 @@ public:
 	void SetTag(const std::size_t i, const std::string& InTag);
 	inline void RemoveTag(const std::size_t i) { Tags.erase(Tags.begin() + i); }
 	bool HasTag(std::string InTag);
+
+	virtual void Replicate(bool bReplicate);
+	inline bool IsReplicated() const { return bIsReplicated; }
 
 	bool HasOwner() const;
 	sActor* GetOwner() const;
@@ -177,7 +162,7 @@ public:
 
 	inline virtual FBoundingBox GetBounds() const { return FBoundingBox(FBoxDimension(), GetRelativeLocation()); }
 
-	void SetTransform(const FVector& Location, const FVector4& Rotation, const std::optional<FVector> Scale = std::nullopt);
+	void SetTransform(const FVector& Location, const FVector4& Rotation, const FVector Scale);
 
 	virtual void Serialize(sArchive& archive);
 
@@ -210,13 +195,18 @@ private:
 	virtual void OnChildAttached(sPrimitiveComponent* ChildComponent) {}
 	virtual void OnChildDetached() {}
 
-protected:
+private:
+	void SetRelativeLocation_Client(const FVector& V);
+	void SetTransform_Client(const FVector& Location, const FVector4& Rotation, const FVector Scale);
+
+private:
 	sActor* Owner;
 	std::string Name;
 	std::vector<std::string> Tags;
 
 	bool bIsHidden;
 	bool bIsEnabled;
+	bool bIsReplicated;
 
 	sPrimitiveComponent* ComponentOwner;
 	FVector Location;

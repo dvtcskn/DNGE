@@ -61,7 +61,7 @@ public:
 			pPipelineDesc.PrimitiveTopologyType = EPrimitiveType::eTRIANGLE_LIST;
 			pPipelineDesc.RasterizerAttribute = sRasterizerAttributeDesc();
 
-			pPipelineDesc.NumRenderTargets = 7;
+			pPipelineDesc.NumRenderTargets = 1;
 			pPipelineDesc.RTVFormats[0] = EFormat::BGRA8_UNORM;
 			pPipelineDesc.DSVFormat = EFormat::R32G8X24_Typeless;
 
@@ -278,18 +278,28 @@ public:
 		CameraCBs[index]->Map(&CameraBuffer, CMD);
 	}
 	
-	void AddCameraConstantBuffer()
+	void AddCameraConstantBuffer(std::size_t Count = 1)
 	{
-		sBufferDesc BufferDesc;
-		BufferDesc.Size = sizeof(sCameraBuffer);
-		IConstantBuffer::SharedPtr CameraCB = IConstantBuffer::Create("CameraCB_" + std::to_string(CameraCBs.size()), BufferDesc, 0);
-		CameraCBs.push_back(CameraCB);
+		for (std::size_t i = 0; i < Count; i++)
+		{
+			sBufferDesc BufferDesc;
+			BufferDesc.Size = sizeof(sCameraBuffer);
+			IConstantBuffer::SharedPtr CameraCB = IConstantBuffer::Create("CameraCB_" + std::to_string(CameraCBs.size()), BufferDesc, 0);
+			CameraCBs.push_back(CameraCB);
+		}
 	}
 
-	void RemoveCameraConstantBuffer()
+	void RemoveLastCameraConstantBuffer()
 	{
 		CameraCBs[CameraCBs.size() - 1] = nullptr;
 		CameraCBs.pop_back();
+	}
+
+	void DestroyAllCameraConstantBuffers()
+	{
+		for (auto& CameraCB : CameraCBs)
+			CameraCB = nullptr;
+		CameraCBs.clear();
 	}
 
 	void SetRenderSize(std::size_t InWidth, std::size_t InHeight)
@@ -309,6 +319,7 @@ public:
 	IRenderTarget* GetMotionVector() const { return GBuffer->GetRenderTarget(4); };
 	IDepthTarget* GetDepth() const { return GBuffer->GetDepthTarget(); };
 	IConstantBuffer* GetCameraConstantBuffer(std::size_t index) const { return CameraCBs[index].get(); }
+	std::size_t GetCameraConstantBufferSize() const { return CameraCBs.size(); }
 	sScreenDimension GetScreenDimension() const { return ScreenDimension; }
 
 private:
@@ -415,7 +426,7 @@ void sRenderer::RemoveViewportInstance(sViewportInstance* ViewportInstance)
 	if (std::find(ViewportInstances.begin(), ViewportInstances.end(), ViewportInstance) != ViewportInstances.end())
 	{
 		ViewportInstances.erase(std::find(ViewportInstances.begin(), ViewportInstances.end(), ViewportInstance));
-		GBuffer->RemoveCameraConstantBuffer();
+		GBuffer->RemoveLastCameraConstantBuffer();
 	}
 }
 
@@ -424,7 +435,7 @@ void sRenderer::RemoveViewportInstance(std::size_t Index)
 	if (Index < ViewportInstances.size())
 	{
 		ViewportInstances.erase(ViewportInstances.begin() + Index);
-		GBuffer->RemoveCameraConstantBuffer();
+		GBuffer->RemoveLastCameraConstantBuffer();
 	}
 }
 
@@ -462,18 +473,43 @@ void sRenderer::Render()
 	{
 		GBuffer->ClearGBuffer();
 	}
+	FinalRenderTarget = GBuffer->GetGBuffer()->GetRenderTarget(0);
+
+	auto GameInstance = World->GetGameInstance();
+	std::size_t PlayerCount = GameInstance->GetPlayerCount();
+
+	if ((PlayerCount + ViewportInstances.size()) != GBuffer->GetCameraConstantBufferSize())
+	{
+		GBuffer->DestroyAllCameraConstantBuffers();
+		GBuffer->AddCameraConstantBuffer(PlayerCount + ViewportInstances.size());
+	}
 
 	/*
 	* To Do:
 	* Batch Command Context 
 	*/
-	std::size_t i = 0;
-	FinalRenderTarget = GBuffer->GetGBuffer()->GetRenderTarget(0);
-	for (sViewportInstance* ViewportInstance : ViewportInstances/*std::ranges::views::reverse(ViewportInstances)*/)
+	if (PlayerCount > 0)
 	{
-		FinalRenderTarget = GBuffer->Render(World->GetActiveLevel(), i, ViewportInstance->pCamera.get(), ViewportInstance->Viewport);
-		LineRenderer->Render(FinalRenderTarget, GBuffer->GetCameraConstantBuffer(i), ViewportInstance->pCamera.get(), ViewportInstance->Viewport);
-		i++;
+		std::size_t Count = GameInstance->IsSplitScreenEnabled() ? PlayerCount : PlayerCount > 0 ? 1 : 0;
+		for (std::size_t i = 0; i < Count; i++)
+		{
+			auto Player = GameInstance->GetPlayer(i, false);
+			sViewportInstance* ViewportInstance = Player->GetViewportInstance();
+			if (!ViewportInstance)
+				continue;
+			if (!ViewportInstance->bIsEnabled)
+				continue;
+
+			FinalRenderTarget = GBuffer->Render(World->GetActiveLevel(), i, ViewportInstance->pCamera.get(), ViewportInstance->Viewport);
+			LineRenderer->Render(FinalRenderTarget, GBuffer->GetCameraConstantBuffer(i), ViewportInstance->pCamera.get(), ViewportInstance->Viewport);
+		}
+	}
+	{
+		for (std::size_t i = 0; i < ViewportInstances.size(); i++)
+		{
+			sViewportInstance* ViewportInstance = ViewportInstances[i];
+			FinalRenderTarget = GBuffer->Render(World->GetActiveLevel(), i, ViewportInstance->pCamera.get(), ViewportInstance->Viewport);
+		}
 	}
 
 	for (const auto& PP : PostProcess[EPostProcessRenderOrder::BeforeTonemap])
@@ -500,6 +536,37 @@ void sRenderer::Render()
 		FinalRenderTarget = PP->GetFrameBuffer();
 	}
 
+	if (PlayerCount > 0)
+	{
+		for (std::size_t i = 0; i < PlayerCount; i++)
+		{
+			auto Player = GameInstance->GetPlayer(i, false);
+			if (Player->GetNetworkRole() == eNetworkRole::SimulatedProxy || Player->GetNetworkRole() == eNetworkRole::NetProxy)
+				continue;
+			sViewportInstance* ViewportInstance = Player->GetViewportInstance();
+			if (!ViewportInstance)
+				continue;
+			if (!ViewportInstance->bIsEnabled)
+				continue;
+
+			if (ViewportInstance->Canvases.size() > 0)
+			{
+				if (ViewportInstance->Viewport.has_value())
+				{
+					std::uint32_t X = (std::uint32_t)ScreenDimension.Width / (std::uint32_t)InternalBaseRenderResolution.Width;
+					std::uint32_t Y = (std::uint32_t)ScreenDimension.Height / (std::uint32_t)InternalBaseRenderResolution.Height;
+					sViewport Viewport = sViewport((std::uint32_t)ScreenDimension.Width, (std::uint32_t)ScreenDimension.Height,
+						ViewportInstance->Viewport->TopLeftX * X, ViewportInstance->Viewport->TopLeftY * Y);
+
+					CanvasRenderer->Render(ViewportInstance->Canvases, FinalRenderTarget, Viewport);
+				}
+				else
+				{
+					CanvasRenderer->Render(ViewportInstance->Canvases, FinalRenderTarget, ViewportInstance->Viewport);
+				}
+			}
+		}
+	}
 	for (sViewportInstance* ViewportInstance : ViewportInstances/*std::ranges::views::reverse(ViewportInstances)*/)
 	{
 		if (ViewportInstance->Canvases.size() > 0)

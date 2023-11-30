@@ -23,7 +23,6 @@
 * SOFTWARE.
 * ---------------------------------------------------------------------------------------
 */
-
 #pragma once
 
 #include <DirectXMath.h>
@@ -52,6 +51,7 @@ public:
 	void EnableCamera();
 	void DisableCamera();
 	void SplitViewport();
+	void DisableSplitScreen();
 
 	sPlayerController* GetPlayerController() const;
 
@@ -81,7 +81,7 @@ public:
 	bool RemoveCanvasFromViewport(std::size_t Index);
 	ICanvas* GetCanvas(std::size_t Index);
 
-	FORCEINLINE sViewportInstance* GetViewportInstance() const { return ViewportInstance.get(); }
+	FORCEINLINE sViewportInstance* GetViewportInstance() const { return /*bIsCameraEnabled ? */ViewportInstance.get()/* : nullptr*/; }
 	void SetViewport(std::optional<sViewport> Viewport);
 
 	void WindowResized(const std::size_t Width, const std::size_t Height);

@@ -82,6 +82,9 @@
     <Filter Include="PCH">
       <UniqueIdentifier>{56be4261-e211-49b3-8ebd-d2f744818829}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Engine\Private\Network">
+      <UniqueIdentifier>{eb268265-68ec-4eaa-aac6-c91ba4fc82c5}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Public\Engine\Engine.h">
@@ -345,9 +348,6 @@
     <ClInclude Include="Public\Engine\PhysXWorld.h">
       <Filter>Engine\Public</Filter>
     </ClInclude>
-    <ClInclude Include="Public\Utilities\Utilities.h">
-      <Filter>Utilities\Public</Filter>
-    </ClInclude>
     <ClInclude Include="Public\Gameplay\IWorld.h">
       <Filter>Gameplay\Public</Filter>
     </ClInclude>
@@ -419,6 +419,15 @@
     </ClInclude>
     <ClInclude Include="Public\Engine\AbstractEngineUtilities.h">
       <Filter>Engine\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\Engine\Network.h">
+      <Filter>Engine\Private\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\Engine\RemoteProcedureCall.h">
+      <Filter>Engine\Private\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Gameplay\PlayerProxy.h">
+      <Filter>Gameplay\Public</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -655,6 +664,15 @@
     </ClCompile>
     <ClCompile Include="Private\pch.cpp">
       <Filter>PCH</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\Engine\Network.cpp">
+      <Filter>Engine\Private\Network</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\Engine\RemoteProcedureCall.cpp">
+      <Filter>Engine\Private\Network</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\Gameplay\PlayerProxy.cpp">
+      <Filter>Gameplay\Private</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

@@ -24,7 +24,6 @@
 * ---------------------------------------------------------------------------------------
 */
 
-
 #include "pch.h"
 #include "Gameplay/PlayerController.h"
 #include "Gameplay/GameInstance.h"
@@ -37,6 +36,7 @@ sPlayerController::sPlayerController(sPlayer* InOwner, const sPlayerState::Share
 	, Owner(InOwner)
 	, pPlayerState(InPlayerState)
 	, PossessedActor(nullptr)
+	, Name(GetClassID())
 {
 	if (!pPlayerState)
 		pPlayerState = sPlayerState::Create(this);
@@ -79,6 +79,11 @@ void sPlayerController::FixedUpdate(const double DeltaTime)
 		pCameraManager->FixedUpdate(DeltaTime);
 
 	OnFixedUpdate(DeltaTime);
+}
+
+std::string sPlayerController::GetClassNetworkAddress() const
+{
+	return Owner->GetClassNetworkAddress();
 }
 
 sActor* sPlayerController::GetPossessedActor() const
@@ -156,6 +161,13 @@ void sPlayerController::SetPlayerState(sPlayerState::SharedPtr PS)
 	pPlayerState = PS;
 }
 
+sViewportInstance* sPlayerController::GetViewportInstance() const
+{
+	if (pCameraManager)
+		return pCameraManager->GetViewportInstance();
+	return nullptr;
+}
+
 std::int32_t sPlayerController::GetPlayerIndex() const
 {
 	return Owner->GetPlayerIndex();
@@ -169,6 +181,11 @@ std::size_t sPlayerController::GetPlayerCount() const
 ESplitScreenType sPlayerController::GetSplitScreenType() const
 {
 	return Owner->GetSplitScreenType();
+}
+
+IMetaWorld* sPlayerController::GetMetaWorld() const
+{
+	return Owner->GetGameInstance()->GetMetaWorld();
 }
 
 void sPlayerController::Save()
@@ -185,6 +202,28 @@ void sPlayerController::InputProcess(const GMouseInput& MouseInput, const GKeybo
 {
 	if (pCameraManager)
 		pCameraManager->InputProcess(MouseInput, KeyboardChar);
+}
+
+void sPlayerController::Replicate(bool bReplicate)
+{
+	if (bIsReplicated == bReplicate)
+		return;
+
+	bIsReplicated = bReplicate;
+
+	if (bIsReplicated)
+	{
+
+	}
+	else
+	{
+		Network::UnregisterRPC(GetClassNetworkAddress(), GetName());
+	}
+}
+
+eNetworkRole sPlayerController::GetNetworkRole() const
+{
+	return Owner ? Owner->GetNetworkRole() : eNetworkRole::None;
 }
 
 void sPlayerController::WindowResized(const std::size_t Width, const std::size_t Height)
@@ -204,7 +243,7 @@ void sPlayerController::SplitScreenTypeChanged(ESplitScreenType InSplitScreenTyp
 void sPlayerController::SplitScreenEnabled()
 {
 	OnSplitScreenEnabled();
-	if (pCameraManager)
+	if (pCameraManager && Owner->GetGameInstance()->IsSplitScreenEnabled())
 	{
 		if (!pCameraManager->IsCameraEnabled())
 			pCameraManager->EnableCamera();
@@ -215,21 +254,30 @@ void sPlayerController::SplitScreenEnabled()
 void sPlayerController::SplitScreenDisabled()
 {
 	OnSplitScreenDisabled();
-	if (GetPlayerIndex() != 0)
-		if (pCameraManager)
-			pCameraManager->DisableCamera();
+	if (GetPlayerIndex() == 0)
+		pCameraManager->DisableSplitScreen();
+	else if (pCameraManager)
+		pCameraManager->DisableCamera();
 }
 
 void sPlayerController::NewPlayerAdded()
 {
 	OnNewPlayerAdded();
-	if (pCameraManager)
-		pCameraManager->SplitViewport();
+	if (GetPlayer()->GetGameInstance()->IsSplitScreenEnabled())
+	{
+		if (pCameraManager && Owner->GetGameInstance()->IsSplitScreenEnabled())
+			pCameraManager->SplitViewport();
+	}
 }
 
 void sPlayerController::PlayerRemoved()
 {
 	OnPlayerRemoved();
-	if (pCameraManager)
+	if (pCameraManager && Owner->GetGameInstance()->IsSplitScreenEnabled())
 		pCameraManager->SplitViewport();
+}
+
+void sPlayerController::OnPlayerNameChanged()
+{
+
 }

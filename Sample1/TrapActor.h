@@ -31,6 +31,7 @@
 #include "SpriteAnimationManager.h"
 #include "SpriteComponent.h"
 #include "SpriteSheetComponent.h"
+#include "NetComponents.h"
 
 class GTrapActorBase : public sActor
 {
@@ -53,6 +54,8 @@ public:
 
 	inline float GetDamage() const { return Damage; }
 	inline void SetDamage(float dmg) { Damage = dmg; }
+
+	virtual std::string GetClassNetworkAddress() const override { return "Level::" + GetName(); }
 
 private:
 	float Damage;
@@ -97,12 +100,16 @@ public:
 	void SetRange(FVector2 StartLoc, FVector2 EndLoc);
 	void SetSpeed(float Speed);
 
+	virtual void Replicate(bool bReplicate) override;
+
 private:
 	void OnCollisionStart(sPhysicalComponent* Component);
 	void OnCollisionEnd(sPhysicalComponent* Component);
 
 	void OnHit_Top();
+	void OnHit_Top_Client();
 	void OnHit_Bottom();
+	void OnHit_Bottom_Client();
 
 	void AnimationStarted();
 	void AnimationEnded();

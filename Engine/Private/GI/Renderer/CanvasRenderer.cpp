@@ -118,6 +118,19 @@ sCanvasRenderer::sCanvasRenderer(std::size_t Width, std::size_t Height)
 							{															\
 								return Input.Color;										\
 							}";
+
+	std::string WidgetBasePS_FlatBlack = "												\
+							struct GeometryVSOut										\
+							{															\
+								float4 position : SV_Position;							\
+								float2 texCoord : TEXCOORD;								\
+								float4 Color : COLOR;									\
+							};															\
+																						\
+							float4 WidgetFlatColorPS(GeometryVSOut Input) : SV_TARGET	\
+							{															\
+								return float4(0.0f, 0.0f, 0.0f, 1.0f);					\
+							}";
 	{
 		sPipelineDesc pPipelineDesc;
 		pPipelineDesc.BlendAttribute = sBlendAttributeDesc();
@@ -130,7 +143,7 @@ sCanvasRenderer::sCanvasRenderer(std::size_t Width, std::size_t Height)
 
 		pPipelineDesc.NumRenderTargets = 1;
 		pPipelineDesc.RTVFormats[0] = EFormat::BGRA8_UNORM;
-		pPipelineDesc.DSVFormat = EFormat::R32G8X24_Typeless;
+		pPipelineDesc.DSVFormat = GPU::GetDefaultDepthFormat();
 
 		std::vector<sVertexAttributeDesc> VertexLayout =
 		{
@@ -142,8 +155,9 @@ sCanvasRenderer::sCanvasRenderer(std::size_t Width, std::size_t Height)
 
 		pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Vertex, 0));
 
+		std::vector<sShaderAttachment> ShaderAttachments;
 		pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment((void*)WidgetBaseVS.data(), WidgetBaseVS.length(), "GeometryVS", eShaderType::Vertex));
-		pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment((void*)WidgetBasePS_Flat.data(), WidgetBasePS_Flat.length(), "WidgetFlatColorPS", eShaderType::Pixel));
+		pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment((void*)WidgetBasePS_FlatBlack.data(), WidgetBasePS_FlatBlack.length(), "WidgetFlatColorPS", eShaderType::Pixel));
 
 		DefaultUILineMaterial = sMaterial::Create("Line", EMaterialBlendMode::Opaque, pPipelineDesc);
 
@@ -196,7 +210,7 @@ sCanvasRenderer::sCanvasRenderer(std::size_t Width, std::size_t Height)
 		pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Vertex, 0));
 
 		pPipelineDesc.NumRenderTargets = 0;
-		pPipelineDesc.DSVFormat = EFormat::R32G8X24_Typeless;
+		pPipelineDesc.DSVFormat = GPU::GetDefaultDepthFormat();
 
 		pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment((void*)DepthTestVSShader.data(), DepthTestVSShader.length(), "mainVS", eShaderType::Vertex));
 
@@ -234,7 +248,7 @@ sCanvasRenderer::sCanvasRenderer(std::size_t Width, std::size_t Height)
 		pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Vertex, 0));
 
 		pPipelineDesc.NumRenderTargets = 0;
-		pPipelineDesc.DSVFormat = EFormat::R32G8X24_Typeless;
+		pPipelineDesc.DSVFormat = GPU::GetDefaultDepthFormat();
 
 		pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment((void*)DepthTestVSShader.data(), DepthTestVSShader.length(), "mainVS", eShaderType::Vertex));
 
@@ -515,6 +529,8 @@ void sCanvasRenderer::Draw(IVertexBuffer* VertexBuffer, IIndexBuffer* IndexBuffe
 			return;
 		}
 
+		//CMD->SetScissorRect(0, 0, 9999, 9999);
+
 		const auto& GeometryDrawData = Node->Widget->GetGeometryDrawData();
 		const auto& pMat = Node->MaterialStyle;
 		const auto& pMaterialInstace = pMat->GetMaterial(GeometryDrawData.StyleState)->Material;
@@ -646,7 +662,7 @@ bool sCanvasRenderer::DepthPass(cbgui::cbWidgetObj* Widget, const sViewport& VP)
 		Data.push_back(cbgui::cbVector4(Bounds.GetCorner(3), cbgui::cbVector(0.0f, 1.0f)));
 		Data.push_back(cbgui::cbVector4(Bounds.GetCorner(2), cbgui::cbVector(0.0f, 1.0f)));
 		for (auto& pData : Data)
-			pData = cbgui::RotateVectorAroundPoint(pData, Widget->GetOrigin(), Widget->GetRotation());
+			pData = cbgui::RotateVectorAroundPoint(pData, Widget->GetRotatorOrigin(), Widget->GetRotation());
 		CMD->UpdateBufferSubresource(DepthVertexBuffer.get(), 0 * sizeof(cbgui::cbVector4), Data.size() * sizeof(cbgui::cbVector4), Data.data());
 
 		CMD->SetConstantBuffer(WidgetConstantBuffer.get());

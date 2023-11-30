@@ -212,6 +212,11 @@ D3D12Device::D3D12Device(std::optional<short> InGPUIndex)
 	CheckD3DFeature(D3D12_FEATURE_D3D12_OPTIONS5, Feature5);
 	RenderPassTier = Feature5.RenderPassesTier;
 
+	D3D12_FEATURE_DATA_D3D12_OPTIONS7 Feature7;
+	CheckD3DFeature(D3D12_FEATURE_D3D12_OPTIONS7, Feature7);
+	auto MeshShaderTier = Feature7.MeshShaderTier;
+	auto SamplerFeedbackTier = Feature7.SamplerFeedbackTier;
+
 	{
 		if (GPUIndex.has_value())
 		{
@@ -414,7 +419,7 @@ void D3D12Device::ExecuteComputeCommandLists(ID3D12CommandList* pCommandList, bo
 {
 	ComputeQueue->ExecuteCommandLists(1, &pCommandList);
 	GPUSignal(D3D12_COMMAND_LIST_TYPE_COMPUTE);
-	if (WaitForCompletion)
+	//if (WaitForCompletion)
 		CPUWait(D3D12_COMMAND_LIST_TYPE_COMPUTE);
 }
 
