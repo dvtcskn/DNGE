@@ -9,6 +9,9 @@ DNGE is a free and open source Game Engine.
 * Box2D physics
 * Local Split-Screen Coop
 * Canvas based GUI
+* Network(Winsock2, GameNetworkingSockets)
+* Replication
+* Remote Procedure Call
 
 ## Example
 See Sample1
