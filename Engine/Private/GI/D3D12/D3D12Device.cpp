@@ -42,6 +42,8 @@
 #include "GI/D3DShared/D3DShared.h"
 #include "D3D12Fence.h"
 
+#include "dx12.h"
+
 #define DEBUG_D3DDEVICE 1
 #define CheckD3DFeature(FeatureLevel, var) Direct3DDevice->CheckFeatureSupport(FeatureLevel, &var, sizeof(var))
 

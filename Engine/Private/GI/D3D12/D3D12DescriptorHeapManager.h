@@ -30,7 +30,7 @@
 #include <vector>
 #include <algorithm>
 #include <functional>
-#include "d3dx12.h"
+#include "dx12.h"
 
 class D3D12Device;
 

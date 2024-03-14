@@ -35,9 +35,7 @@
 
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3d12.lib")
-#if _DEBUG
-	#pragma comment(lib, "dxguid.lib")
-#endif
+#pragma comment(lib, "dxguid.lib")
 
 D3D12Viewport::SharedPtr D3D12Viewport::Create(D3D12Device* InOwner, ComPtr<IDXGIFactory4> InFactory, std::uint32_t InSizeX, std::uint32_t InSizeY, bool bInIsFullscreen, HWND InHandle)
 {

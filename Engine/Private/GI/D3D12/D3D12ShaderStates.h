@@ -32,6 +32,7 @@
 #include "D3D12Shader.h"
 #include "Engine/AbstractEngine.h"
 #include "GI/D3DShared/D3DShared.h"
+#include "dx12.h"
 
 class D3D12Rasterizer
 {
