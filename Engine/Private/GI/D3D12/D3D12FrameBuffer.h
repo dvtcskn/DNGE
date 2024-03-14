@@ -27,7 +27,7 @@
 
 #include <assert.h>
 #include <optional>
-#include "d3dx12.h"
+#include "dx12.h"
 #include "D3D12DescriptorHeapManager.h"
 #include "Engine/AbstractEngine.h"
 

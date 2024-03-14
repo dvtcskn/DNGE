@@ -429,6 +429,9 @@
     <ClInclude Include="Public\Gameplay\PlayerProxy.h">
       <Filter>Gameplay\Public</Filter>
     </ClInclude>
+    <ClInclude Include="Private\GI\D3D12\dx12.h">
+      <Filter>GI\Private\D3D12</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Private\Engine\Engine.cpp">

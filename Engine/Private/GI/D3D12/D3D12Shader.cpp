@@ -29,6 +29,7 @@
 #include <vector>
 #include <fstream>
 #include <iostream>
+#include "dx12.h"
 
 D3D12Shader::D3D12Shader(const sShaderAttachment& Attachment)
 	: FunctionName(Attachment.FunctionName)

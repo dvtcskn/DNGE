@@ -25,10 +25,6 @@
 */
 #pragma once
 
-#include <d3d12.h>
-#include <wrl\client.h>
-using namespace Microsoft::WRL;
-
 #include "D3D12Device.h"
 #include "D3D12FrameBuffer.h"
 #include "Engine/AbstractEngine.h"

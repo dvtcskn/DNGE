@@ -29,12 +29,18 @@
 #include <map>
 #include <mutex>
 #include <queue>
-#include <dxgi.h>
-#include <dxgi1_6.h>
 #include <wrl/client.h>
 #include <string>
+
+#ifdef USING_DIRECTX_HEADERS
+#include <directx/d3d12.h>
+#else
 #include <d3d12.h>
-#include "D3DX12.h"
+#endif
+
+#include <dxgi.h>
+#include <dxgi1_6.h>
+
 #include "GI/AbstractGI/AbstractGIDevice.h"
 
 using namespace Microsoft::WRL;

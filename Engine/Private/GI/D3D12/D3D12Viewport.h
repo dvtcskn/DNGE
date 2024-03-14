@@ -29,10 +29,11 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include <d3d12.h>
+#include "dx12.h"
+#include <DXGIDebug.h>
+
 #include <dxgi.h>
 #include <dxgi1_6.h>
-#include <DXGIDebug.h>
 
 #include <wrl\client.h>
 using namespace Microsoft::WRL;

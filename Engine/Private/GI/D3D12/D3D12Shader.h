@@ -26,10 +26,10 @@
 #pragma once
 
 #include <string>
-#include <d3d12shader.h>
 #include "D3D12Device.h"
 #include "Engine/AbstractEngine.h"
 
+#include <d3d12shader.h>
 #include <d3dcompiler.h>
 #pragma comment( lib, "d3dcompiler.lib")
 

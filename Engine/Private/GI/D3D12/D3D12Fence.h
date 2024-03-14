@@ -25,8 +25,7 @@
 */
 #pragma once
 
-#include <d3d12.h>
-#include "D3DX12.h"
+#include "dx12.h"
 #include <Engine/ClassBody.h>
 #include <mutex>
 
