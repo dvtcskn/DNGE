@@ -28,22 +28,78 @@
 #include <fstream>
 #include <sstream>
 #include <vector>
+#include <map>
 #include "Core/Math/CoreMath.h"
 #include "Engine/AbstractEngine.h"
 
-class ObjLoader
+class OBJImporter
 {
-    sBaseClassBody(sClassConstructor, ObjLoader)
 public:
-    ObjLoader(const std::string& filename)
-    {
-        Load(filename);
-    }
+	struct OBJ
+	{
+		struct ObjMesh
+		{
+			std::vector<FVector> Positions;
+			std::vector<FVector> Normals;
+			std::vector<FVector2> TextureCoords;
 
-    bool Load(const std::string& filename)
-    {
+			std::vector<std::uint32_t> Indices;
+		};
 
-    }
+		struct Face
+		{
+			std::uint32_t Position;
+			std::uint32_t TextureCoord;
+			std::uint32_t Normals;
+		};
 
-    sMeshData MeshData;
+		struct OBJPart
+		{
+			std::string PartName;
+			ObjMesh Mesh;
+			std::vector<FVector> Verts;
+			std::vector<FVector> Normals;
+			std::vector<FVector2> TextureCoords;
+			std::vector<Face> Faces;
+			std::vector<std::string> MaterialNames;
+			std::map<std::string, std::vector<Face>> FacesByMaterial;
+			int s; // ???
+		};
+
+		struct MTL
+		{
+			std::string Name;
+			float Ns;
+			FVector Ka;
+			FVector Kd = FVector::One();
+			FVector Ks;
+			FVector Ke;
+			float Ni;
+			float D;
+			int illum;
+
+			std::map<std::string, std::string> Maps;
+		};
+
+		std::string Name;
+		ObjMesh Mesh;
+		std::string MTLibName;
+		std::vector<FVector> Verts;
+		std::vector<FVector> Normals;
+		std::vector<FVector2> TextureCoords;
+		std::vector<Face> Faces;
+		std::vector<std::string> MaterialNames;
+		std::vector<OBJPart> Parts;
+		std::vector<MTL> MTLs;
+	};
+public:
+	OBJImporter();
+	~OBJImporter();
+
+	bool Import(const std::string& path);
+
+	OBJ obj;
+
+private:
+
 };

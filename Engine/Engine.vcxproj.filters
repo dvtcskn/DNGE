@@ -402,7 +402,7 @@
     <ClInclude Include="Public\Utilities\DNGEAsset.h">
       <Filter>Utilities\Public</Filter>
     </ClInclude>
-    <ClInclude Include="Public\Utilities\ObjLoader.h">
+    <ClInclude Include="Public\Utilities\OBJImporter.h">
       <Filter>Utilities\Public</Filter>
     </ClInclude>
     <ClInclude Include="Private\Engine\Audio.h">
@@ -694,6 +694,9 @@
     </ClCompile>
     <ClCompile Include="Private\Gameplay\ParticleComponent.cpp">
       <Filter>Gameplay\Private\Components</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\Utilities\OBJImporter.cpp">
+      <Filter>Utilities\Private</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

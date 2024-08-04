@@ -265,7 +265,7 @@
     <ClInclude Include="Public\Utilities\Input.h" />
     <ClInclude Include="Public\Utilities\Log.h" />
     <ClInclude Include="Public\Utilities\DNGEAsset.h" />
-    <ClInclude Include="Public\Utilities\ObjLoader.h" />
+    <ClInclude Include="Public\Utilities\OBJImporter.h" />
     <ClInclude Include="Public\Utilities\stb_image.h" />
     <ClInclude Include="Public\Utilities\TimerProfiler.h" />
     <ClInclude Include="Public\Utilities\tinyxml2.h" />
@@ -356,6 +356,7 @@
     </ClCompile>
     <ClCompile Include="Private\Utilities\FileManager.cpp" />
     <ClCompile Include="Private\Utilities\Log.cpp" />
+    <ClCompile Include="Private\Utilities\OBJImporter.cpp" />
     <ClCompile Include="Private\Utilities\stb_image.cpp" />
     <ClCompile Include="Private\Utilities\tinyxml2.cpp" />
   </ItemGroup>

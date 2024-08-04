@@ -36,7 +36,7 @@ class sArchive
 {
 	sBaseClassBody(sClassConstructor, sArchive)
 public:
-	sArchive(std::optional<std::string> FileName = std::nullopt);
+	sArchive();
 	template <typename... Args>
 	constexpr inline sArchive(Args&&... args)
 		: FileName("")
@@ -61,8 +61,8 @@ public:
 
 	~sArchive();
 	void Close();
-	void OpenFile(std::string FileName);
-	bool SaveToFile(const std::string& FileName);
+	void OpenFile(std::string FilePath);
+	bool SaveToFile(const std::string& FilePath);
 	std::string GetFileName();
 
 	constexpr inline void Clean()
@@ -511,7 +511,7 @@ private:
 	{
 		const std::size_t dataSize = sizeof(data);
 		const std::size_t reqSize = pos + dataSize;
-		if (reqSize > Data.size()) 
+		if (reqSize > Data.size())
 		{
 			ResizeData(Data.size() + dataSize /** 2*/);
 		}

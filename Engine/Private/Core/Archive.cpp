@@ -30,23 +30,10 @@
 #include <fstream>
 #include <sstream>
 
-sArchive::sArchive(std::optional<std::string> InFileName)
-	: FileName(InFileName.has_value() ? *InFileName : "")
+sArchive::sArchive()
+	: FileName("")
 	, pos(0)
-{
-	if (!FileName.empty())
-	{
-		std::ifstream file(FileName, std::ios::binary | std::ios::ate);
-		if (file.is_open())
-		{
-			std::string line;
-			while (std::getline(file, line))
-			{
-
-			}
-		}
-	}
-}
+{}
 
 sArchive::~sArchive()
 {
@@ -62,17 +49,25 @@ void sArchive::Close()
 	Data.clear();
 }
 
-void sArchive::OpenFile(std::string FileName)
+void sArchive::OpenFile(std::string FilePath)
 {
-	if (!FileName.empty())
+	if (!FilePath.empty())
 	{
-		std::ifstream file(FileName, std::ios::binary | std::ios::ate);
+		std::string str = FilePath;
+		std::size_t found = str.find_last_of("//\\");
+		FileName = std::string(str.begin() + found + 1, str.end());
+
+		std::ifstream file(FilePath, std::ios::binary | std::ios::ate);
 		if (file.is_open())
 		{
-			std::string line;
-			while (std::getline(file, line)) 
-			{
+			//file.seekg(0, std::ios::end);
+			//uint64_t size = file.tellg();
+			file.seekg(0, std::ios::beg);
 
+			std::string line;
+			while (std::getline(file, line))
+			{
+				Data.insert(Data.end(), line.begin(), line.end());
 			}
 		}
 	}
