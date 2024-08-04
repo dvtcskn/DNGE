@@ -6,6 +6,7 @@ DNGE is a free and open source Game Engine.
 * Audio
 * Component Based
 * Gameplay Framework
+* Particle System
 * Box2D physics
 * Local Split-Screen Coop
 * Canvas based GUI
