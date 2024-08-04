@@ -601,51 +601,51 @@ namespace GameMaterials
 			}
 		}
 
-		{
-			sPipelineDesc pPipelineDesc;
-			pPipelineDesc.BlendAttribute = sBlendAttributeDesc(EBlendStateMode::eNonPremultiplied);
-			pPipelineDesc.DepthStencilAttribute = sDepthStencilAttributeDesc(true, true);
-			pPipelineDesc.DepthStencilAttribute.DepthTest = ECompareFunction::eGreaterEqual;
-			//pPipelineDesc.DepthStencilAttribute.DepthTest = ECompareFunction::eLess;
-			//pPipelineDesc.DepthStencilAttribute.DepthTest = ECompareFunction::eAlways;
-			pPipelineDesc.PrimitiveTopologyType = EPrimitiveType::eTRIANGLE_LIST;
-			pPipelineDesc.RasterizerAttribute = sRasterizerAttributeDesc();
+		//{
+		//	sPipelineDesc pPipelineDesc;
+		//	pPipelineDesc.BlendAttribute = sBlendAttributeDesc(EBlendStateMode::eNonPremultiplied);
+		//	pPipelineDesc.DepthStencilAttribute = sDepthStencilAttributeDesc(true, true);
+		//	pPipelineDesc.DepthStencilAttribute.DepthTest = ECompareFunction::eGreaterEqual;
+		//	//pPipelineDesc.DepthStencilAttribute.DepthTest = ECompareFunction::eLess;
+		//	//pPipelineDesc.DepthStencilAttribute.DepthTest = ECompareFunction::eAlways;
+		//	pPipelineDesc.PrimitiveTopologyType = EPrimitiveType::eTRIANGLE_LIST;
+		//	pPipelineDesc.RasterizerAttribute = sRasterizerAttributeDesc();
 
-			pPipelineDesc.NumRenderTargets = 1;
-			pPipelineDesc.RTVFormats[0] = EFormat::BGRA8_UNORM;
-			pPipelineDesc.DSVFormat = GPU::GetDefaultDepthFormat();
+		//	pPipelineDesc.NumRenderTargets = 1;
+		//	pPipelineDesc.RTVFormats[0] = EFormat::BGRA8_UNORM;
+		//	pPipelineDesc.DSVFormat = GPU::GetDefaultDepthFormat();
 
-			std::vector<sVertexAttributeDesc> VertexLayout =
-			{
-				{ "POSITION",		 EFormat::RGB32_FLOAT,   0, offsetof(sParticleVertexLayout, position),	false },
-				{ "TEXCOORD",		 EFormat::RG32_FLOAT,    0, offsetof(sParticleVertexLayout, texCoord),	false },
-				{ "COLOR",			 EFormat::RGBA32_FLOAT,  0, offsetof(sParticleVertexLayout, Color),		false },
-				{ "INSTANCEPOS",	 EFormat::RGB32_FLOAT,	 1, offsetof(sParticleVertexLayout::sParticleInstanceLayout, position),		true },
-				{ "INSTANCECOLOR",	 EFormat::RGBA32_FLOAT,	 1, offsetof(sParticleVertexLayout::sParticleInstanceLayout, Color),		true },
-			};
-			pPipelineDesc.VertexLayout = VertexLayout;
+		//	std::vector<sVertexAttributeDesc> VertexLayout =
+		//	{
+		//		{ "POSITION",		 EFormat::RGB32_FLOAT,   0, offsetof(sParticleVertexLayout, position),	false },
+		//		{ "TEXCOORD",		 EFormat::RG32_FLOAT,    0, offsetof(sParticleVertexLayout, texCoord),	false },
+		//		{ "COLOR",			 EFormat::RGBA32_FLOAT,  0, offsetof(sParticleVertexLayout, Color),		false },
+		//		{ "INSTANCEPOS",	 EFormat::RGB32_FLOAT,	 1, offsetof(sParticleVertexLayout::sParticleInstanceLayout, position),		true },
+		//		{ "INSTANCECOLOR",	 EFormat::RGBA32_FLOAT,	 1, offsetof(sParticleVertexLayout::sParticleInstanceLayout, Color),		true },
+		//	};
+		//	pPipelineDesc.VertexLayout = VertexLayout;
 
-			pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Vertex, 0));
-			pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Vertex, 10));
-			pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eTexture, eShaderType::Pixel, 0));
-			pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eSampler, eShaderType::Pixel, 0));
-			pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Pixel, 0));
-			//pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eTexture, eShaderType::Pixel, 1));
-			//pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eTexture, eShaderType::Pixel, 2));
-			//pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eTexture, eShaderType::Pixel, 3));
-			//pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eTexture, eShaderType::Pixel, 4));
+		//	pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Vertex, 0));
+		//	pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Vertex, 10));
+		//	pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eTexture, eShaderType::Pixel, 0));
+		//	pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eSampler, eShaderType::Pixel, 0));
+		//	pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Pixel, 0));
+		//	//pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eTexture, eShaderType::Pixel, 1));
+		//	//pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eTexture, eShaderType::Pixel, 2));
+		//	//pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eTexture, eShaderType::Pixel, 3));
+		//	//pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eTexture, eShaderType::Pixel, 4));
 
-			std::vector<sShaderAttachment> ShaderAttachments;
-			pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment(L"..//Content\\Shaders\\Particle.hlsl", "ParticleVS", eShaderType::Vertex));
-			pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment(L"..//Content\\Shaders\\Particle.hlsl", "ParticlePS", eShaderType::Pixel));
+		//	std::vector<sShaderAttachment> ShaderAttachments;
+		//	pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment(L"..//Content\\Shaders\\Particle.hlsl", "ParticleVS", eShaderType::Vertex));
+		//	pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment(L"..//Content\\Shaders\\Particle.hlsl", "ParticlePS", eShaderType::Pixel));
 
-			sMaterial::SharedPtr ParticleMat;
-			ParticleMat = sMaterial::Create("ParticleMat", EMaterialBlendMode::Opaque, pPipelineDesc);
-			//DefaultEngineMat->BindConstantBuffer(CameraCB);
-			auto DefaultParticle_MatInstance = ParticleMat->CreateInstance("ParticleMat_MatInstance");
-			DefaultParticle_MatInstance->AddTexture(L"..//Content\\smoke-particle.png", "ParticleMat_Texture", 2);
-			//DefaultParticle_MatInstance->AddTexture(L"..//Content\\Textures\\DefaultWhiteGrid.DDS", "DefaultEngineTexture", 2);
-			sMaterialManager::Get().StoreMaterial(ParticleMat);
-		}
+		//	sMaterial::SharedPtr ParticleMat;
+		//	ParticleMat = sMaterial::Create("ParticleMat", EMaterialBlendMode::Opaque, pPipelineDesc);
+		//	//DefaultEngineMat->BindConstantBuffer(CameraCB);
+		//	auto DefaultParticle_MatInstance = ParticleMat->CreateInstance("ParticleMat_MatInstance");
+		//	DefaultParticle_MatInstance->AddTexture(L"..//Content\\smoke-particle.png", "ParticleMat_Texture", 2);
+		//	//DefaultParticle_MatInstance->AddTexture(L"..//Content\\Textures\\DefaultWhiteGrid.DDS", "DefaultEngineTexture", 2);
+		//	sMaterialManager::Get().StoreMaterial(ParticleMat);
+		//}
 	};
 }
