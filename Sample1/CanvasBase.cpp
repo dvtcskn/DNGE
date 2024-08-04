@@ -48,13 +48,13 @@ namespace cbgui
 		Transform.SetLocation(cbVector(Dimension.Width / 2.0f, Dimension.Height / 2.0f));
 
 		{
-			sBufferDesc Desc;
+			BufferLayout Desc;
 			Desc.Size = 3000000;// (std::uint32_t)(sizeof(cbGeometryVertexData));
 			Desc.Stride = sizeof(cbgui::cbGeometryVertexData);
 			VertexBuffer = IVertexBuffer::Create("sCanvasBaseVB", Desc, nullptr);
 		}
 		{
-			sBufferDesc Desc;
+			BufferLayout Desc;
 			Desc.Size = 300000;// (std::uint32_t)(sizeof(int));
 			Desc.Stride = 0;
 			IndexBuffer = IIndexBuffer::Create("sCanvasBaseIB", Desc, nullptr);

@@ -519,7 +519,7 @@ namespace Network
 	
 	std::uint64_t GetLatency()
 	{
-		return Client ? Client->GetLatency() : 0.0;
+		return Client ? Client->GetLatency() : 0;
 	}
 }
 
@@ -721,42 +721,42 @@ ICopyCommandContext::UniquePtr ICopyCommandContext::CreateUnique()
 	return Device->CreateUniqueCopyCommandContext();
 }
 
-IConstantBuffer::SharedPtr IConstantBuffer::Create(std::string InName, const sBufferDesc& InDesc, std::uint32_t InRootParameterIndex)
+IConstantBuffer::SharedPtr IConstantBuffer::Create(std::string InName, const BufferLayout& InDesc, std::uint32_t InRootParameterIndex)
 {
 	return Device->CreateConstantBuffer(InName, InDesc, InRootParameterIndex);
 }
 
-IConstantBuffer::UniquePtr IConstantBuffer::CreateUnique(std::string InName, const sBufferDesc& InDesc, std::uint32_t InRootParameterIndex)
+IConstantBuffer::UniquePtr IConstantBuffer::CreateUnique(std::string InName, const BufferLayout& InDesc, std::uint32_t InRootParameterIndex)
 {
 	return Device->CreateUniqueConstantBuffer(InName, InDesc, InRootParameterIndex);
 }
 
-IVertexBuffer::SharedPtr IVertexBuffer::Create(std::string InName, const sBufferDesc& InDesc, sBufferSubresource* InSubresource)
+IVertexBuffer::SharedPtr IVertexBuffer::Create(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource)
 {
 	return Device->CreateVertexBuffer(InName, InDesc, InSubresource);
 }
 
-IVertexBuffer::UniquePtr IVertexBuffer::CreateUnique(std::string InName, const sBufferDesc& InDesc, sBufferSubresource* InSubresource)
+IVertexBuffer::UniquePtr IVertexBuffer::CreateUnique(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource)
 {
 	return Device->CreateUniqueVertexBuffer(InName, InDesc, InSubresource);
 }
 
-IIndexBuffer::SharedPtr IIndexBuffer::Create(std::string InName, const sBufferDesc& InDesc, sBufferSubresource* InSubresource)
+IIndexBuffer::SharedPtr IIndexBuffer::Create(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource)
 {
 	return Device->CreateIndexBuffer(InName, InDesc, InSubresource);
 }
 
-IIndexBuffer::UniquePtr IIndexBuffer::CreateUnique(std::string InName, const sBufferDesc& InDesc, sBufferSubresource* InSubresource)
+IIndexBuffer::UniquePtr IIndexBuffer::CreateUnique(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource)
 {
 	return Device->CreateUniqueIndexBuffer(InName, InDesc, InSubresource);
 }
 
-IUnorderedAccessBuffer::SharedPtr IUnorderedAccessBuffer::Create(std::string InName, const sBufferDesc& InDesc, bool bSRVAllowed)
+IUnorderedAccessBuffer::SharedPtr IUnorderedAccessBuffer::Create(std::string InName, const BufferLayout& InDesc, bool bSRVAllowed)
 {
 	return IUnorderedAccessBuffer::SharedPtr();
 }
 
-IUnorderedAccessBuffer::UniquePtr IUnorderedAccessBuffer::CreateUnique(std::string InName, const sBufferDesc& InDesc, bool bSRVAllowed)
+IUnorderedAccessBuffer::UniquePtr IUnorderedAccessBuffer::CreateUnique(std::string InName, const BufferLayout& InDesc, bool bSRVAllowed)
 {
 	return IUnorderedAccessBuffer::UniquePtr();
 }

@@ -338,6 +338,10 @@ IDXGIAdapter1* D3D11Device::GetAdapter(std::optional<short> Index)
 	{
 		return vAdapters.at(Index.value() >= vAdapters.size() ? vAdapters.size() - 1 : Index.value());
 	}
+	
+	D3D_FEATURE_LEVEL featureLevels[] = { D3D_FEATURE_LEVEL_11_1 };
+	UINT numFeatureLevels = ARRAYSIZE(featureLevels);
+	D3D_FEATURE_LEVEL m_d3dFeatureLevel;
 
 	SIZE_T videoMemory = 0;
 	for (auto& Adapter : vAdapters)
@@ -351,7 +355,8 @@ IDXGIAdapter1* D3D11Device::GetAdapter(std::optional<short> Index)
 		{
 			videoMemory = desc.DedicatedVideoMemory;
 
-			if (SUCCEEDED(D3D12CreateDevice(Adapter, D3D_FEATURE_LEVEL_11_0, _uuidof(ID3D12Device), nullptr)))
+			if (SUCCEEDED(D3D11CreateDevice(Adapter, D3D_DRIVER_TYPE_UNKNOWN, nullptr, 0, featureLevels, numFeatureLevels,
+				D3D11_SDK_VERSION, nullptr, &m_d3dFeatureLevel, nullptr)))
 			{
 				pAdapter = Adapter;
 			}
@@ -424,32 +429,32 @@ ICopyCommandContext::UniquePtr D3D11Device::CreateUniqueCopyCommandContext()
 	return D3D11CopyCommandBuffer::CreateUnique(this);
 }
 
-IConstantBuffer::SharedPtr D3D11Device::CreateConstantBuffer(std::string InName, const sBufferDesc& InDesc, std::uint32_t InRootParameterIndex)
+IConstantBuffer::SharedPtr D3D11Device::CreateConstantBuffer(std::string InName, const BufferLayout& InDesc, std::uint32_t InRootParameterIndex)
 {
 	return D3D11ConstantBuffer::Create(this, InName, InDesc, InRootParameterIndex);
 }
 
-IConstantBuffer::UniquePtr D3D11Device::CreateUniqueConstantBuffer(std::string InName, const sBufferDesc& InDesc, std::uint32_t InRootParameterIndex)
+IConstantBuffer::UniquePtr D3D11Device::CreateUniqueConstantBuffer(std::string InName, const BufferLayout& InDesc, std::uint32_t InRootParameterIndex)
 {
 	return D3D11ConstantBuffer::CreateUnique(this, InName, InDesc, InRootParameterIndex);
 }
 
-IVertexBuffer::SharedPtr D3D11Device::CreateVertexBuffer(std::string InName, const sBufferDesc& InDesc, sBufferSubresource* InSubresource)
+IVertexBuffer::SharedPtr D3D11Device::CreateVertexBuffer(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource)
 {
 	return D3D11VertexBuffer::Create(this, InName, InDesc, InSubresource);
 }
 
-IVertexBuffer::UniquePtr D3D11Device::CreateUniqueVertexBuffer(std::string InName, const sBufferDesc& InDesc, sBufferSubresource* InSubresource)
+IVertexBuffer::UniquePtr D3D11Device::CreateUniqueVertexBuffer(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource)
 {
 	return D3D11VertexBuffer::CreateUnique(this, InName, InDesc, InSubresource);
 }
 
-IIndexBuffer::SharedPtr D3D11Device::CreateIndexBuffer(std::string InName, const sBufferDesc& InDesc, sBufferSubresource* InSubresource)
+IIndexBuffer::SharedPtr D3D11Device::CreateIndexBuffer(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource)
 {
 	return D3D11IndexBuffer::Create(this, InName, InDesc, InSubresource);
 }
 
-IIndexBuffer::UniquePtr D3D11Device::CreateUniqueIndexBuffer(std::string InName, const sBufferDesc& InDesc, sBufferSubresource* InSubresource)
+IIndexBuffer::UniquePtr D3D11Device::CreateUniqueIndexBuffer(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource)
 {
 	return D3D11IndexBuffer::CreateUnique(this, InName, InDesc, InSubresource);
 }

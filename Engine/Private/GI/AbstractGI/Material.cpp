@@ -109,9 +109,8 @@ sMaterial::sMaterialInstance::SharedPtr sMaterial::CreateInstance(std::string In
 	return Instance;
 }
 
-sMaterial::sMaterial(std::string InName, EMaterialBlendMode InBlendMode, sPipelineDesc InPipelineDesc, EMaterialType InType)
+sMaterial::sMaterial(std::string InName, EMaterialBlendMode InBlendMode, sPipelineDesc InPipelineDesc)
 	: Name(InName)
-	, MaterialType(InType)
 	, MaterialUsage(EMaterialUsage::BeforPostProcess)
 	, BlendMode(InBlendMode)
 	, Path(InName)
@@ -120,9 +119,8 @@ sMaterial::sMaterial(std::string InName, EMaterialBlendMode InBlendMode, sPipeli
 }
 
 sMaterial::sMaterial(std::string InName, EMaterialBlendMode InBlendMode, sPipelineDesc InPipelineDesc, std::vector<sDescriptorSetLayoutBinding> InDescriptorSetLayout,
-	std::vector<sShaderAttachment> InAttachments, std::vector<sVertexAttributeDesc> InVertexLayout, EMaterialType InType)
+	std::vector<sShaderAttachment> InAttachments, std::vector<sVertexAttributeDesc> InVertexLayout)
 	: Name(InName)
-	, MaterialType(InType)
 	, MaterialUsage(EMaterialUsage::BeforPostProcess)
 	, BlendMode(InBlendMode)
 	, Path(InName)

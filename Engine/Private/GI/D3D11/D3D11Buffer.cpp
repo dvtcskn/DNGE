@@ -28,7 +28,7 @@
 #include "D3D11Buffer.h"
 #include "D3D11CommandBuffer.h"
 
-D3D11Buffer::D3D11Buffer(D3D11Device* InDevice, const sBufferDesc& InDesc, sBufferSubresource* InSubresource, ResourceTypeFlags InType)
+D3D11Buffer::D3D11Buffer(D3D11Device* InDevice, const BufferLayout& InDesc, BufferSubresource* InSubresource, ResourceTypeFlags InType)
 	: Owner(InDevice)
 	, Buffer(nullptr)
 {
@@ -90,7 +90,7 @@ bool D3D11Buffer::IsMapable() const
 	return DESC.Usage == D3D11_USAGE::D3D11_USAGE_DYNAMIC && DESC.CPUAccessFlags == D3D11_CPU_ACCESS_WRITE;
 }
 
-void D3D11Buffer::ResizeBuffer(std::size_t Size, sBufferSubresource* InSubresource)
+void D3D11Buffer::ResizeBuffer(std::size_t Size, BufferSubresource* InSubresource)
 {
 	Buffer = nullptr;
 
@@ -146,12 +146,12 @@ void D3D11ConstantBuffer::ApplyConstantBuffer(ID3D11DeviceContext1* CMD, std::ui
 	}
 }
 
-void D3D11VertexBuffer::UpdateSubresource(sBufferSubresource* Subresource, IGraphicsCommandContext* InCMDBuffer)
+void D3D11VertexBuffer::UpdateSubresource(BufferSubresource* Subresource, IGraphicsCommandContext* InCMDBuffer)
 {
 	UpdateSubresource(Subresource, InCMDBuffer ? static_cast<D3D11CommandBuffer*>(InCMDBuffer)->Get() : GetOwner()->GetDeviceIMContext());
 }
 
-void D3D11VertexBuffer::UpdateSubresource(sBufferSubresource* Subresource, ID3D11DeviceContext1* Device)
+void D3D11VertexBuffer::UpdateSubresource(BufferSubresource* Subresource, ID3D11DeviceContext1* Device)
 {
 	D3D11_BOX box{};
 	box.left = (std::uint32_t)Subresource->Location;
@@ -168,29 +168,29 @@ void D3D11VertexBuffer::UpdateSubresource(sBufferSubresource* Subresource, ID3D1
 	Device->UpdateSubresource1(Buffer.Get(), 0, &box, Subresource->pSysMem, 0, 0, 0);
 }
 
-void D3D11VertexBuffer::ApplyBuffer(IGraphicsCommandContext* InCMDBuffer)
+void D3D11VertexBuffer::ApplyBuffer(std::uint32_t Slot, IGraphicsCommandContext* InCMDBuffer)
 {
 	if (InCMDBuffer)
 	{
 		const auto& CTX = static_cast<D3D11CommandBuffer*>(InCMDBuffer)->Get();
 		std::uint32_t offset = NULL;
 		std::uint32_t Stride = static_cast<std::uint32_t>(BufferDesc.Stride);
-		CTX->IASetVertexBuffers(0, 1, Buffer.GetAddressOf(), &Stride, &offset);
+		CTX->IASetVertexBuffers(Slot, 1, Buffer.GetAddressOf(), &Stride, &offset);
 	}
 	else
 	{
 		std::uint32_t offset = NULL;
 		std::uint32_t Stride = static_cast<std::uint32_t>(BufferDesc.Stride);
-		GetOwner()->GetDeviceIMContext()->IASetVertexBuffers(0, 1, Buffer.GetAddressOf(), &Stride, &offset);
+		GetOwner()->GetDeviceIMContext()->IASetVertexBuffers(Slot, 1, Buffer.GetAddressOf(), &Stride, &offset);
 	}
 }
 
-void D3D11IndexBuffer::UpdateSubresource(sBufferSubresource* Subresource, IGraphicsCommandContext* InCMDBuffer)
+void D3D11IndexBuffer::UpdateSubresource(BufferSubresource* Subresource, IGraphicsCommandContext* InCMDBuffer)
 {
 	UpdateSubresource(Subresource, InCMDBuffer ? static_cast<D3D11CommandBuffer*>(InCMDBuffer)->Get() : GetOwner()->GetDeviceIMContext());
 }
 
-void D3D11IndexBuffer::UpdateSubresource(sBufferSubresource* Subresource, ID3D11DeviceContext1* Device)
+void D3D11IndexBuffer::UpdateSubresource(BufferSubresource* Subresource, ID3D11DeviceContext1* Device)
 {
 	D3D11_BOX box{};
 	box.left = (std::uint32_t)Subresource->Location;
@@ -222,7 +222,7 @@ void D3D11IndexBuffer::ApplyBuffer(IGraphicsCommandContext* InCMDBuffer)
 	}
 }
 
-D3D11UnorderedAccessBuffer::D3D11UnorderedAccessBuffer(D3D11Device* InDevice, std::string InName, const sBufferDesc& InDesc, bool bSRVAllowed)
+D3D11UnorderedAccessBuffer::D3D11UnorderedAccessBuffer(D3D11Device* InDevice, std::string InName, const BufferLayout& InDesc, bool bSRVAllowed)
 	: D3D11Buffer(InDevice, InDesc, NULL, ResourceTypeFlags::eUnorderedAccess_BUFFER)
 	, Name(InName)
 	, mUnorderedAccess(nullptr)

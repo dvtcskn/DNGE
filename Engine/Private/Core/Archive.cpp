@@ -70,7 +70,7 @@ void sArchive::OpenFile(std::string FileName)
 		if (file.is_open())
 		{
 			std::string line;
-			while (std::getline(file, line))
+			while (std::getline(file, line)) 
 			{
 
 			}

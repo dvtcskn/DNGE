@@ -25,7 +25,7 @@
 */
 
 #include "pch.h"
-#include "AbstractGI/RendererResource.h"
+#include "AbstractGI/Mesh.h"
 #include "Core/MeshPrimitives.h"
 
 sMesh::sMesh(const std::string InName, EBasicMeshType MeshType, std::optional<FBoxDimension> Dimension)
@@ -45,7 +45,7 @@ sMesh::sMesh(const std::string InName, EBasicMeshType MeshType, std::optional<FB
 		{
 			auto& Verts = Plane.at(i);
 			auto& TC = PlaneTC.at(i);
-			sVertexBufferEntry VBE;
+			sVertexLayout VBE;
 			VBE.position = FVector(Verts.X, Verts.Y, 0.0f);
 			VBE.texCoord = TC;
 			VBE.Color = FColor::White();
@@ -61,16 +61,16 @@ sMesh::sMesh(const std::string InName, EBasicMeshType MeshType, std::optional<FB
 
 	{
 		auto Vertices = Data.Vertices;
-		sBufferSubresource Subresource = sBufferSubresource(Vertices.data(), Vertices.size() * sizeof(sVertexBufferEntry));
-		VertexBuffer = (IVertexBuffer::Create(Name, sBufferDesc(Vertices.size() * sizeof(sVertexBufferEntry), sizeof(sVertexBufferEntry)), &Subresource));
+		BufferSubresource Subresource = BufferSubresource(Vertices.data(), Vertices.size() * sizeof(sVertexLayout));
+		VertexBuffer = (IVertexBuffer::Create(Name, BufferLayout(Vertices.size() * sizeof(sVertexLayout), sizeof(sVertexLayout)), &Subresource));
 	}
 	{
 		auto Indices = Data.Indices;
-		sBufferSubresource Subresource = sBufferSubresource(Indices.data(), Indices.size() * sizeof(std::uint32_t));
-		IndexBuffer = (IIndexBuffer::Create(Name, sBufferDesc(Indices.size() * sizeof(std::uint32_t), sizeof(std::uint32_t)), &Subresource));
+		BufferSubresource Subresource = BufferSubresource(Indices.data(), Indices.size() * sizeof(std::uint32_t));
+		IndexBuffer = (IIndexBuffer::Create(Name, BufferLayout(Indices.size() * sizeof(std::uint32_t), sizeof(std::uint32_t)), &Subresource));
 	}
 	{
-		MeshConstantBuffer = IConstantBuffer::Create(Name, sBufferDesc(sizeof(sMeshConstantBufferAttributes), 0), 1);
+		MeshConstantBuffer = IConstantBuffer::Create(Name, BufferLayout(sizeof(sMeshConstantBufferAttributes), 0), 1);
 		{
 			sMeshConstantBufferAttributes ObjectConstants;
 			ObjectConstants.modelMatrix = FMatrix::Identity();
@@ -90,7 +90,7 @@ sMesh::sMesh(const std::string InName, const std::string InPath)
 	, RenderPriority(EMeshRenderPriority::eDefault)
 {
 	{
-		MeshConstantBuffer = IConstantBuffer::Create(Name, sBufferDesc(sizeof(sMeshConstantBufferAttributes), 0), 1);
+		MeshConstantBuffer = IConstantBuffer::Create(Name, BufferLayout(sizeof(sMeshConstantBufferAttributes), 0), 1);
 		{
 			sMeshConstantBufferAttributes ObjectConstants;
 			ObjectConstants.modelMatrix = FMatrix::Identity();
@@ -109,16 +109,16 @@ sMesh::sMesh(const std::string InName, const std::string InPath, const sMeshData
 {
 	{
 		auto Vertices = Data.Vertices;
-		sBufferSubresource Subresource = sBufferSubresource(Vertices.data(), Vertices.size() * sizeof(sVertexBufferEntry));
-		VertexBuffer = (IVertexBuffer::Create(Name, sBufferDesc(Vertices.size() * sizeof(sVertexBufferEntry), sizeof(sVertexBufferEntry)), &Subresource));
+		BufferSubresource Subresource = BufferSubresource(Vertices.data(), Vertices.size() * sizeof(sVertexLayout));
+		VertexBuffer = (IVertexBuffer::Create(Name, BufferLayout(Vertices.size() * sizeof(sVertexLayout), sizeof(sVertexLayout)), &Subresource));
 	}
 	{
 		auto Indices = Data.Indices;
-		sBufferSubresource Subresource = sBufferSubresource(Indices.data(), Indices.size() * sizeof(std::uint32_t));
-		IndexBuffer = (IIndexBuffer::Create(Name, sBufferDesc(Indices.size() * sizeof(std::uint32_t), sizeof(std::uint32_t)), &Subresource));
+		BufferSubresource Subresource = BufferSubresource(Indices.data(), Indices.size() * sizeof(std::uint32_t));
+		IndexBuffer = (IIndexBuffer::Create(Name, BufferLayout(Indices.size() * sizeof(std::uint32_t), sizeof(std::uint32_t)), &Subresource));
 	}
 	{
-		MeshConstantBuffer = IConstantBuffer::Create(Name, sBufferDesc(sizeof(sMeshConstantBufferAttributes), 0), 1);
+		MeshConstantBuffer = IConstantBuffer::Create(Name, BufferLayout(sizeof(sMeshConstantBufferAttributes), 0), 1);
 		{
 			sMeshConstantBufferAttributes ObjectConstants;
 			ObjectConstants.modelMatrix = FMatrix::Identity();
@@ -146,13 +146,13 @@ void sMesh::SetMeshData(const sMeshData& pData, const std::string InPath)
 	Path = InPath;
 	{
 		auto Vertices = Data.Vertices;
-		sBufferSubresource Subresource = sBufferSubresource(Vertices.data(), Vertices.size() * sizeof(sVertexBufferEntry));
-		VertexBuffer = (IVertexBuffer::Create(Name, sBufferDesc(Vertices.size() * sizeof(sVertexBufferEntry), sizeof(sVertexBufferEntry)), &Subresource));
+		BufferSubresource Subresource = BufferSubresource(Vertices.data(), Vertices.size() * sizeof(sVertexLayout));
+		VertexBuffer = (IVertexBuffer::Create(Name, BufferLayout(Vertices.size() * sizeof(sVertexLayout), sizeof(sVertexLayout)), &Subresource));
 	}
 	{
 		auto Indices = Data.Indices;
-		sBufferSubresource Subresource = sBufferSubresource(Indices.data(), Indices.size() * sizeof(std::uint32_t));
-		IndexBuffer = (IIndexBuffer::Create(Name, sBufferDesc(Indices.size() * sizeof(std::uint32_t), sizeof(std::uint32_t)), &Subresource));
+		BufferSubresource Subresource = BufferSubresource(Indices.data(), Indices.size() * sizeof(std::uint32_t));
+		IndexBuffer = (IIndexBuffer::Create(Name, BufferLayout(Indices.size() * sizeof(std::uint32_t), sizeof(std::uint32_t)), &Subresource));
 	}
 }
 
@@ -190,12 +190,12 @@ void sMesh::SetMeshTransform(FVector Location, FVector Scale, FVector4 Rotation)
 	MeshConstantBuffer->Map(&ObjectConstants);
 }
 
-void sMesh::UpdateVertexSubresource(sBufferSubresource* Subresource, IGraphicsCommandContext* Context)
+void sMesh::UpdateVertexSubresource(BufferSubresource* Subresource, IGraphicsCommandContext* Context)
 {
 	VertexBuffer->UpdateSubresource(Subresource, Context);
 }
 
-void sMesh::UpdateIndexSubresource(sBufferSubresource* Subresource, IGraphicsCommandContext* Context)
+void sMesh::UpdateIndexSubresource(BufferSubresource* Subresource, IGraphicsCommandContext* Context)
 {
 	IndexBuffer->UpdateSubresource(Subresource, Context);
 }

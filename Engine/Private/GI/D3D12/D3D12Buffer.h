@@ -40,7 +40,7 @@ public:
     inline ID3D12Resource* Get() const { return Buffer.Get(); }
     inline D3D12_GPU_VIRTUAL_ADDRESS GetGPU() const { return Buffer->GetGPUVirtualAddress(); }
 
-    void UpdateSubresource(ID3D12Resource* InResource, D3D12_RESOURCE_STATES State, sBufferSubresource* Subresource, D3D12CommandBuffer* InCMDBuffer = nullptr);
+    void UpdateSubresource(ID3D12Resource* InResource, D3D12_RESOURCE_STATES State, BufferSubresource* Subresource, D3D12CommandBuffer* InCMDBuffer = nullptr);
     void Map(const void* Ptr = nullptr);
     void Unmap();
 
@@ -63,14 +63,14 @@ class D3D12ConstantBuffer : public IConstantBuffer
 
     std::string Name;
     D3D12DescriptorHandle ViewHeap;
-    sBufferDesc BufferDesc;
+    BufferLayout BufferDesc;
     D3D12Device* Owner;
     std::uint32_t RootParameterIndex;
 
     D3D12UploadBuffer::UniquePtr UploadBuffer;
 
 public:
-    D3D12ConstantBuffer(D3D12Device* InOwner, std::string Name, const sBufferDesc& InDesc, std::uint32_t RootParameterIndex);
+    D3D12ConstantBuffer(D3D12Device* InOwner, std::string Name, const BufferLayout& InDesc, std::uint32_t RootParameterIndex);
     virtual ~D3D12ConstantBuffer();
 
     FORCEINLINE virtual std::string GetName() const final override { return Name; };
@@ -97,14 +97,14 @@ class D3D12VertexBuffer : public IVertexBuffer
 
     ComPtr<ID3D12Resource> m_pResource;
 
-    sBufferDesc BufferDesc;
+    BufferLayout BufferDesc;
     D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
     D3D12Device* Owner;
 
     D3D12UploadBuffer::UniquePtr UploadBuffer;
 
 public:
-    D3D12VertexBuffer(D3D12Device* InOwner, std::string Name, const sBufferDesc& InDesc, sBufferSubresource* Subresource);
+    D3D12VertexBuffer(D3D12Device* InOwner, std::string Name, const BufferLayout& InDesc, BufferSubresource* Subresource);
     virtual ~D3D12VertexBuffer();
 
     FORCEINLINE virtual std::string GetName() const final override { return Name; };
@@ -115,9 +115,9 @@ public:
     ID3D12Resource* GetBuffer() const { return m_pResource.Get(); }
     D3D12UploadBuffer* GetUploadBuffer() const { return UploadBuffer.get(); }
 
-    void ApplyBuffer(ID3D12GraphicsCommandList* CommandList);
-    void ResizeBuffer(std::size_t Size, sBufferSubresource* InSubresource = nullptr);
-    virtual void UpdateSubresource(sBufferSubresource* Subresource, IGraphicsCommandContext* InCMDBuffer = nullptr) override final;
+    void ApplyBuffer(ID3D12GraphicsCommandList* CommandList, std::uint32_t Slot = 0);
+    void ResizeBuffer(std::size_t Size, BufferSubresource* InSubresource = nullptr);
+    virtual void UpdateSubresource(BufferSubresource* Subresource, IGraphicsCommandContext* InCMDBuffer = nullptr) override final;
 
     inline D3D12_VERTEX_BUFFER_VIEW GetBufferView() const { return m_vertexBufferView; }
 
@@ -132,14 +132,14 @@ class D3D12IndexBuffer : public IIndexBuffer
 
     ComPtr<ID3D12Resource> m_pResource;
 
-    sBufferDesc BufferDesc;
+    BufferLayout BufferDesc;
     D3D12_INDEX_BUFFER_VIEW IBView;
     D3D12Device* Owner;
 
     D3D12UploadBuffer::UniquePtr UploadBuffer;
 
 public:
-    D3D12IndexBuffer(D3D12Device* InOwner, std::string Name, const sBufferDesc& InDesc, sBufferSubresource* Subresource);
+    D3D12IndexBuffer(D3D12Device* InOwner, std::string Name, const BufferLayout& InDesc, BufferSubresource* Subresource);
     virtual ~D3D12IndexBuffer();
 
     FORCEINLINE virtual std::string GetName() const final override { return Name; };
@@ -151,8 +151,8 @@ public:
     D3D12UploadBuffer* GetUploadBuffer() const { return UploadBuffer.get(); }
 
     void ApplyBuffer(ID3D12GraphicsCommandList* CommandList);
-    void ResizeBuffer(std::size_t Size, sBufferSubresource* InSubresource = nullptr);
-    virtual void UpdateSubresource(sBufferSubresource* Subresource, IGraphicsCommandContext* InCMDBuffer = nullptr) override final;
+    void ResizeBuffer(std::size_t Size, BufferSubresource* InSubresource = nullptr);
+    virtual void UpdateSubresource(BufferSubresource* Subresource, IGraphicsCommandContext* InCMDBuffer = nullptr) override final;
 
     inline D3D12_INDEX_BUFFER_VIEW GetBufferView() const { return IBView; }
 
@@ -166,7 +166,7 @@ private:
     std::string Name;
 
 public:
-    D3D12UnorderedAccessBuffer(D3D12Device* InDevice, std::string InName, const sBufferDesc& InDesc, bool bSRVAllowed = true);
+    D3D12UnorderedAccessBuffer(D3D12Device* InDevice, std::string InName, const BufferLayout& InDesc, bool bSRVAllowed = true);
 
     virtual ~D3D12UnorderedAccessBuffer()
     {

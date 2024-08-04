@@ -31,6 +31,7 @@
 #include <set>
 #include <memory>
 #include <functional>
+#include "Utilities/Hash.h"
 
 #ifndef sFORCEINLINE
 #define sFORCEINLINE __forceinline

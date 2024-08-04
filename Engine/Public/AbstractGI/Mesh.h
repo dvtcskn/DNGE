@@ -31,15 +31,6 @@
 #include "Material.h"
 #include "Core/Math/CoreMath.h"
 
-class sRendererResource
-{
-	sBaseClassBody(sClassDefaultProtectedConstructor, sRendererResource)
-public:
-	virtual std::string GetName() const = 0;
-
-	virtual void Serialize(sArchive& archive) = 0;
-};
-
 enum class EBasicMeshType
 {
 	ePlane,
@@ -54,10 +45,12 @@ enum class EMeshRenderPriority
 	Latest,
 };
 
-class IMesh : public sRendererResource
+class IMesh
 {
-	sClassBody(sClassDefaultProtectedConstructor, IMesh, sRendererResource)
+	sBaseClassBody(sClassDefaultProtectedConstructor, IMesh)
 public:
+	virtual std::string GetName() const = 0;
+
 	virtual IConstantBuffer* GetMeshConstantBuffer() const = 0;
 	virtual IVertexBuffer* GetVertexBuffer() const = 0;
 	virtual IIndexBuffer* GetIndexBuffer() const = 0;
@@ -76,6 +69,8 @@ public:
 	virtual std::vector<sMaterial::sMaterialInstance*> GetMaterialInstances() const = 0;
 	virtual std::int32_t GetNumMaterials() const = 0;
 	virtual sMaterial::sMaterialInstance* GetMaterialInstance(/*std::int32_t Index = 0*/) const = 0;
+
+	virtual void Serialize(sArchive& archive) = 0;
 };
 
 class sMesh : public IMesh
@@ -102,15 +97,15 @@ public:
 
 	std::vector<std::uint32_t> GetIndices() const { return Data.Indices; };
 	std::size_t GetIndicesSize() const { return Data.Indices.size(); };
-	std::vector<sVertexBufferEntry> GetVertices() const { return Data.Vertices; };
+	std::vector<sVertexLayout> GetVertices() const { return Data.Vertices; };
 	std::size_t GetVerticesSize() const { return Data.Vertices.size(); };
 	virtual sObjectDrawParameters GetDrawParameters() const override final { return Data.DrawParameters; };
 
 	virtual EMeshRenderPriority GeMeshRenderPriority() const override final { return RenderPriority; }
 	void SeMeshRenderPriority(const EMeshRenderPriority Priority) { RenderPriority = Priority; }
 
-	void UpdateVertexSubresource(sBufferSubresource* Subresource, IGraphicsCommandContext* Context = nullptr);
-	void UpdateIndexSubresource(sBufferSubresource* Subresource, IGraphicsCommandContext* Context = nullptr);
+	void UpdateVertexSubresource(BufferSubresource* Subresource, IGraphicsCommandContext* Context = nullptr);
+	void UpdateIndexSubresource(BufferSubresource* Subresource, IGraphicsCommandContext* Context = nullptr);
 
 	virtual bool IsUpdateRequired() const { return PendingVertexBufferSubresource.has_value() || PendingIndexBufferSubresource.has_value(); }
 	virtual void UpdateMesh(IGraphicsCommandContext* Context) 
@@ -122,8 +117,8 @@ public:
 	void UpdateVertexBufferWithPendingSubresource(IGraphicsCommandContext* Context);
 	void UpdateIndexBufferWithPendingSubresource(IGraphicsCommandContext* Context);
 
-	std::optional<sBufferSubresource> PendingVertexBufferSubresource;
-	std::optional<sBufferSubresource> PendingIndexBufferSubresource;
+	std::optional<BufferSubresource> PendingVertexBufferSubresource;
+	std::optional<BufferSubresource> PendingIndexBufferSubresource;
 
 	void SetIndexOffset(std::size_t Offset) { Data.DrawParameters.StartIndexLocation = (std::uint32_t)Offset; };
 	void SetVertexOffset(std::size_t Offset) { Data.DrawParameters.BaseVertexLocation = (std::int32_t)Offset; };

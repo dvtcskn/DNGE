@@ -64,7 +64,7 @@ sToneMapping::sToneMapping(std::size_t Width, std::size_t Height)
     SetPipeline(PostProcessShader, DescriptorSetLayout, DepthStencil, Blend);
 
     {
-        sBufferDesc BufferDesc;
+        BufferLayout BufferDesc;
         BufferDesc.Size = sizeof(sToneMapping::sToneMappingConstants);
         ToneMappingCB = IConstantBuffer::Create("ToneMappingCB", BufferDesc, 0);
 

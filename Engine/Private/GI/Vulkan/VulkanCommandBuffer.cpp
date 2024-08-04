@@ -172,7 +172,7 @@ void VulkanCommandBuffer::SetTexture2D(ITexture2D* Texture2D, std::optional<std:
 {
 }
 
-void VulkanCommandBuffer::SetVertexBuffer(IVertexBuffer* VBuffer)
+void VulkanCommandBuffer::SetVertexBuffer(IVertexBuffer* VBuffer, std::uint32_t Slot)
 {
 }
 
@@ -180,7 +180,7 @@ void VulkanCommandBuffer::SetIndexBuffer(IIndexBuffer* IBuffer)
 {
 }
 
-void VulkanCommandBuffer::UpdateBufferSubresource(IVertexBuffer* Buffer, sBufferSubresource* Subresource)
+void VulkanCommandBuffer::UpdateBufferSubresource(IVertexBuffer* Buffer, BufferSubresource* Subresource)
 {
 }
 
@@ -188,7 +188,7 @@ void VulkanCommandBuffer::UpdateBufferSubresource(IVertexBuffer* Buffer, std::si
 {
 }
 
-void VulkanCommandBuffer::UpdateBufferSubresource(IIndexBuffer* Buffer, sBufferSubresource* Subresource)
+void VulkanCommandBuffer::UpdateBufferSubresource(IIndexBuffer* Buffer, BufferSubresource* Subresource)
 {
 }
 

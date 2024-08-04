@@ -39,8 +39,9 @@ public:
 		: GBuffer(nullptr)
 		, GraphicsCommandContext(CMD ? CMD : IGraphicsCommandContext::Create())
 		, ScreenDimension(sScreenDimension(Width, Height))
+		, TimeBuffer(sTimeBuffer())
 	{
-		sBufferDesc BufferDesc;
+		BufferLayout BufferDesc;
 		BufferDesc.Size = sizeof(sTimeBuffer);
 		TimeCB = IConstantBuffer::Create("TimeCB", BufferDesc, 3);
 
@@ -61,19 +62,19 @@ public:
 			pPipelineDesc.PrimitiveTopologyType = EPrimitiveType::eTRIANGLE_LIST;
 			pPipelineDesc.RasterizerAttribute = sRasterizerAttributeDesc();
 
-			pPipelineDesc.NumRenderTargets = 1;
+			pPipelineDesc.NumRenderTargets = 7;
 			pPipelineDesc.RTVFormats[0] = EFormat::BGRA8_UNORM;
-			pPipelineDesc.DSVFormat = EFormat::R32G8X24_Typeless;
+			pPipelineDesc.DSVFormat = GPU::GetDefaultDepthFormat();
 
 			std::vector<sVertexAttributeDesc> VertexLayout =
 			{
-				{ "POSITION",	EFormat::RGB32_FLOAT,   0, offsetof(sVertexBufferEntry, position),    false },
-				{ "NORMAL",		EFormat::RGB32_FLOAT,   0, offsetof(sVertexBufferEntry, normal),      false },
-				{ "TEXCOORD",	EFormat::RG32_FLOAT,    0, offsetof(sVertexBufferEntry, texCoord),    false },
-				{ "COLOR",		EFormat::RGBA32_FLOAT,  0, offsetof(sVertexBufferEntry, Color),		  false },
-				{ "TANGENT",	EFormat::RGB32_FLOAT,   0, offsetof(sVertexBufferEntry, tangent),     false },
-				{ "BINORMAL",	EFormat::RGB32_FLOAT,   0, offsetof(sVertexBufferEntry, binormal),    false },
-				{ "ARRAYINDEX",	EFormat::R32_UINT,	    0, offsetof(sVertexBufferEntry, ArrayIndex),  false },
+				{ "POSITION",	EFormat::RGB32_FLOAT,   0, offsetof(sVertexLayout, position),    false },
+				{ "NORMAL",		EFormat::RGB32_FLOAT,   0, offsetof(sVertexLayout, normal),      false },
+				{ "TEXCOORD",	EFormat::RG32_FLOAT,    0, offsetof(sVertexLayout, texCoord),    false },
+				{ "COLOR",		EFormat::RGBA32_FLOAT,  0, offsetof(sVertexLayout, Color),		  false },
+				{ "TANGENT",	EFormat::RGB32_FLOAT,   0, offsetof(sVertexLayout, tangent),     false },
+				{ "BINORMAL",	EFormat::RGB32_FLOAT,   0, offsetof(sVertexLayout, binormal),    false },
+				{ "ARRAYINDEX",	EFormat::R32_UINT,	    0, offsetof(sVertexLayout, ArrayIndex),  false },
 			};
 			pPipelineDesc.VertexLayout = VertexLayout;
 
@@ -90,7 +91,7 @@ public:
 		}
 
 		DefaultMatInstance = DefaultEngineMat->CreateInstance("DefaultEngineMatInstance");
-		//DefaultMatInstance->AddTexture(L"..//Content\\Textures\\DefaultGrid.DDS", "DefaultEngineTexture", 2);
+		//DefaultMatInstance->AddTexture(L"..//Content\\Textures\\DefaultWhiteGrid.DDS", "DefaultEngineTexture", 2);
 	}
 	~sGBuffer()
 	{
@@ -282,7 +283,7 @@ public:
 	{
 		for (std::size_t i = 0; i < Count; i++)
 		{
-			sBufferDesc BufferDesc;
+			BufferLayout BufferDesc;
 			BufferDesc.Size = sizeof(sCameraBuffer);
 			IConstantBuffer::SharedPtr CameraCB = IConstantBuffer::Create("CameraCB_" + std::to_string(CameraCBs.size()), BufferDesc, 0);
 			CameraCBs.push_back(CameraCB);
@@ -363,6 +364,7 @@ sRenderer::sRenderer(std::size_t Width, std::size_t Height)
 	, PostProcessRenderer(sPostProcessRenderer::CreateUnique(Width, Height))
 	, ToneMapping(sToneMapping::CreateUnique(Width, Height))
 	, bIsTonmapperEnabled(true)
+	, pParticleRenderer(ParticleRenderer::Create(Width, Height))
 {
 }
 
@@ -386,6 +388,7 @@ sRenderer::~sRenderer()
 	ToneMapping = nullptr;
 	PostProcessRenderer = nullptr;
 	LineRenderer = nullptr;
+	pParticleRenderer = nullptr;
 }
 
 void sRenderer::BeginPlay()
@@ -393,6 +396,7 @@ void sRenderer::BeginPlay()
 	LineRenderer->BeginPlay();
 	CanvasRenderer->BeginPlay();
 	PostProcessRenderer->BeginPlay();
+	pParticleRenderer->BeginPlay();
 }
 
 void sRenderer::Tick(const double DeltaTime)
@@ -402,6 +406,7 @@ void sRenderer::Tick(const double DeltaTime)
 
 	GBuffer->Tick(DeltaTime);
 	LineRenderer->Tick(DeltaTime);
+	pParticleRenderer->Tick(DeltaTime);
 }
 
 void sRenderer::AddViewportInstance(sViewportInstance* ViewportInstance, std::optional<std::size_t> Priority)
@@ -476,12 +481,16 @@ void sRenderer::Render()
 	FinalRenderTarget = GBuffer->GetGBuffer()->GetRenderTarget(0);
 
 	auto GameInstance = World->GetGameInstance();
-	std::size_t PlayerCount = GameInstance->GetPlayerCount();
-
-	if ((PlayerCount + ViewportInstances.size()) != GBuffer->GetCameraConstantBufferSize())
+	std::size_t PlayerCount = 0;
+	if (GameInstance)
 	{
-		GBuffer->DestroyAllCameraConstantBuffers();
-		GBuffer->AddCameraConstantBuffer(PlayerCount + ViewportInstances.size());
+		PlayerCount = GameInstance->GetPlayerCount();
+
+		if ((PlayerCount + ViewportInstances.size()) != GBuffer->GetCameraConstantBufferSize())
+		{
+			GBuffer->DestroyAllCameraConstantBuffers();
+			GBuffer->AddCameraConstantBuffer(PlayerCount + ViewportInstances.size());
+		}
 	}
 
 	/*
@@ -502,6 +511,7 @@ void sRenderer::Render()
 
 			FinalRenderTarget = GBuffer->Render(World->GetActiveLevel(), i, ViewportInstance->pCamera.get(), ViewportInstance->Viewport);
 			LineRenderer->Render(FinalRenderTarget, GBuffer->GetCameraConstantBuffer(i), ViewportInstance->pCamera.get(), ViewportInstance->Viewport);
+			pParticleRenderer->Render(World->GetActiveLevel(), ViewportInstance->pCamera.get(), FinalRenderTarget, ViewportInstance->Viewport);
 		}
 	}
 	{
@@ -509,6 +519,7 @@ void sRenderer::Render()
 		{
 			sViewportInstance* ViewportInstance = ViewportInstances[i];
 			FinalRenderTarget = GBuffer->Render(World->GetActiveLevel(), i, ViewportInstance->pCamera.get(), ViewportInstance->Viewport);
+			pParticleRenderer->Render(World->GetActiveLevel(), ViewportInstance->pCamera.get(), FinalRenderTarget, ViewportInstance->Viewport);
 		}
 	}
 

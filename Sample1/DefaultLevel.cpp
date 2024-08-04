@@ -37,6 +37,7 @@
 #include "TrapActor.h"
 #include "Items.h"
 #include "World.h"
+#include "Gameplay/ParticleSystem.h"
 
 struct TileCollisionLayer
 {
@@ -256,6 +257,33 @@ sDefaultLevel::sDefaultLevel(IWorld* pWorld, std::string InName)
 	}
 
 	ItemCollisionLayer.clear();
+
+	{
+		sEmitter::SharedPtr Emitter = sEmitter::Create("Particle System Test");
+		AddEmitter(Emitter);
+
+		Emitter->SetLocation(FVector(300, 300, 0));
+		sMeshParticleDesc Desc;
+		Desc.SetLifeTime(4.0f);
+		Desc.SpawnRate = 1;
+		Desc.MinVelocity = FVector(1.0f, -5.0f, 0.0f);
+		Desc.MaxVelocity = FVector(-1.0f, -10.0f, 0.0f);
+		Desc.StartColor = FColor(1.0f, 1.0f, 0.0f, 1.0f);
+		Desc.EndColor = FColor(1.0f, 0.0f, 0.0f, 1.0f);
+		{			
+			sParticleShape Shape;
+			auto Plane = MeshPrimitives::Create2DPlaneVerticesFromDimension(FDimension2D(8, 8));
+			const std::vector<FVector2> TC = MeshPrimitives::GeneratePlaneTextureCoordinate();
+			Shape.ShapeIndexes = MeshPrimitives::GeneratePlaneIndices();
+			for (std::size_t i = 0; i < 4; i++)
+				Shape.Shape.push_back(sParticleVertexLayout(FVector(Plane[i]), TC[i]));
+			//Desc.Shapes.push_back(Shape);
+			Desc.Shape = Shape;
+		}
+		MeshParticle::SharedPtr pMeshParticle = MeshParticle::Create(Desc);
+		pMeshParticle->MaterialInstance = sMaterialManager::Get().GetMaterialInstance("ParticleMat", "ParticleMat_MatInstance");
+		Emitter->AddParticle(pMeshParticle);
+	}
 }
 
 sDefaultLevel::~sDefaultLevel()
@@ -375,6 +403,27 @@ void sDefaultLevel::RemoveActor(sActor* Actor, std::size_t LayerIndex, bool bDef
 		Layers[LayerIndex]->RemoveActor(Actor, bDeferredRemove);
 }
 
+void sDefaultLevel::AddEmitter(const std::shared_ptr<sEmitter>& Object, std::size_t LayerIndex)
+{
+	if (Layers.size() <= LayerIndex)
+		return;
+
+	if (Layers[LayerIndex])
+		Layers[LayerIndex]->AddEmitter(Object);
+
+	if (bIsLevelInitialized)
+		Object->BeginPlay();
+}
+
+void sDefaultLevel::RemoveEmitter(sEmitter* Object, std::size_t LayerIndex, bool bDeferredRemove)
+{
+	if (Layers.size() <= LayerIndex)
+		return;
+
+	if (Layers[LayerIndex])
+		Layers[LayerIndex]->RemoveEmitter(Object);
+}
+
 //void sDefaultLevel::SpawnPlayerActor(const std::shared_ptr<sActor>& Actor, std::size_t PlayerIndex)
 //{
 //	if (PlayerSpawnLocations.size() > 0)
@@ -449,6 +498,24 @@ sActor* sDefaultLevel::GetActor(const std::size_t Index, std::size_t LayerIndex)
 		return nullptr;
 
 	return Layers[LayerIndex]->GetActor(Index);
+}
+
+size_t sDefaultLevel::EmitterCount(std::size_t LayerIndex) const
+{
+	if (Layers.size() <= LayerIndex)
+		return 0;
+
+	return Layers[LayerIndex]->EmitterCount();
+}
+
+std::vector<std::shared_ptr<sEmitter>> sDefaultLevel::GetAllEmitters(std::size_t LayerIndex) const
+{
+	return Layers[LayerIndex]->GetAllEmitters();
+}
+
+sEmitter* sDefaultLevel::GetEmitter(const std::size_t Index, std::size_t LayerIndex) const
+{
+	return Layers[LayerIndex]->GetEmitter(Index);
 }
 
 sActor* sDefaultLevel::GetPlayerFocusedActor(std::size_t Index) const

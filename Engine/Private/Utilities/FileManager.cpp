@@ -32,13 +32,47 @@
 #include <sstream>
 #include <Windows.h>
 #include <cderr.h>
+#include <assert.h>
 #include <shellapi.h>
+#include "Engine/AbstractEngine.h"
 #include <wrl/wrappers/corewrappers.h>
 
 using namespace std::filesystem;
 
 namespace FileManager
 {
+	static int enumerateNativeFiles(const char* pattern, bool directories)
+	{
+		WIN32_FIND_DATAA findData;
+		HANDLE hFind = FindFirstFileA(pattern, &findData);
+
+		if (hFind == INVALID_HANDLE_VALUE)
+		{
+			if (GetLastError() == ERROR_FILE_NOT_FOUND)
+				return 0;
+
+			return -1;
+		}
+
+		int numEntries = 0;
+
+		do
+		{
+			bool isDirectory = (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+			bool isDot = strcmp(findData.cFileName, ".") == 0;
+			bool isDotDot = strcmp(findData.cFileName, "..") == 0;
+
+			if ((isDirectory == directories) && !isDot && !isDotDot)
+			{
+				++numEntries;
+			}
+		} while (FindNextFileA(hFind, &findData) != 0);
+
+		FindClose(hFind);
+
+		return numEntries;
+	}
+
 	std::wstring GetContentDirectory()
 	{
 		return L"..//Content//";
@@ -819,5 +853,104 @@ namespace FileManager
 			str.append(std::string(cstr));
 		}
 		return str;
+	}
+
+	bool folderExists(const std::filesystem::path& name)
+	{
+		return std::filesystem::exists(name) && std::filesystem::is_directory(name);
+	}
+
+	bool fileExists(const std::filesystem::path& name)
+	{
+		return std::filesystem::exists(name) && std::filesystem::is_regular_file(name);
+	}
+
+	std::shared_ptr<UntypedData> readFile(const std::filesystem::path& name)
+	{
+		std::ifstream file(name, std::ios::binary);
+
+		if (!file.is_open())
+		{
+			return nullptr;
+		}
+
+		file.seekg(0, std::ios::end);
+		uint64_t size = file.tellg();
+		file.seekg(0, std::ios::beg);
+
+		if (size > static_cast<uint64_t>(std::numeric_limits<size_t>::max()))
+		{
+			assert(false);
+			return nullptr;
+		}
+
+		char* data = static_cast<char*>(malloc(size));
+
+		if (data == nullptr)
+		{
+			assert(false);
+			return nullptr;
+		}
+
+		file.read(data, size);
+
+		if (!file.good())
+		{
+			assert(false);
+			return nullptr;
+		}
+
+		return std::make_shared<UntypedData>(data, size);
+	}
+
+	bool writeFile(const std::filesystem::path& name, const void* data, size_t size)
+	{
+		std::ofstream file(name, std::ios::binary);
+
+		if (!file.is_open())
+		{
+			return false;
+		}
+
+		if (size > 0)
+		{
+			file.write(static_cast<const char*>(data), static_cast<std::streamsize>(size));
+		}
+
+		if (!file.good())
+		{
+			return false;
+		}
+
+		return true;
+	}
+
+	int enumerateFiles(const std::filesystem::path& path, const std::vector<std::string>& extensions)
+	{
+		if (extensions.empty())
+		{
+			std::string pattern = (path / "*").generic_string();
+			return enumerateNativeFiles(pattern.c_str(), false);
+		}
+
+		int numEntries = 0;
+		for (const auto& ext : extensions)
+		{
+			std::string pattern = (path / ("*" + ext)).generic_string();
+			int result = enumerateNativeFiles(pattern.c_str(), false);
+
+			if (result < 0)
+				return result;
+
+			numEntries += result;
+		}
+
+		return numEntries;
+	}
+
+	int enumerateDirectories(const std::filesystem::path& path)
+	{
+		std::string pattern = (path / "*").generic_string();
+		return enumerateNativeFiles(pattern.c_str(), true);
 	}
 }

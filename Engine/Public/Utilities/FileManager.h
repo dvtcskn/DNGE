@@ -33,9 +33,12 @@
 #include <vector>
 #include <cuchar>
 #include <iostream>
+#include <filesystem>
 #include <Windows.h>
 
 #pragma comment(lib, "Shell32.lib")
+
+struct UntypedData;
 
 namespace FileManager
 {
@@ -104,4 +107,11 @@ namespace FileManager
 	std::string WideStringToString(const std::wstring& s);
 	std::u16string StringtoU16(const std::string& str);
 	std::string U16toString(const std::u16string& wstr);
+
+	bool folderExists(const std::filesystem::path& name);
+	bool fileExists(const std::filesystem::path& name);
+	std::shared_ptr<UntypedData> readFile(const std::filesystem::path& name);
+	bool writeFile(const std::filesystem::path& name, const void* data, size_t size);
+	int enumerateFiles(const std::filesystem::path& path, const std::vector<std::string>& extensions);
+	int enumerateDirectories(const std::filesystem::path& path);
 };

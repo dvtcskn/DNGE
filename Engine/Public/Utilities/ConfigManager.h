@@ -90,6 +90,16 @@ public:
 
 	void ReadGameConfig()
 	{
+		/*
+		bütün satýrlarý std::vector<std::string> containerýna koy
+		sonra her satýrý for loop ile araþtýr
+		[] -> her zaman baþlýk
+		baþlýk bulununca baþlýk tipini çöz
+		sonra alt satýra in 
+		alt satýrý for loop ile harf harf çözümle
+		hangi deðiþken olduðunu bul sonra "=" bul ve gameCFG.deðiþken set et
+		*/
+
 		std::ifstream fin("..//Config//" + gameCFG.Name);
 		std::string line;
 		while (getline(fin, line)) 

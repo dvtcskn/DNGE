@@ -31,7 +31,7 @@
 #include "Core/Math/CoreMath.h"
 #include "Engine/AbstractEngine.h"
 
-class ObjLoader 
+class ObjLoader
 {
     sBaseClassBody(sClassConstructor, ObjLoader)
 public:
@@ -40,9 +40,9 @@ public:
         Load(filename);
     }
 
-    bool Load(const std::string& filename) 
+    bool Load(const std::string& filename)
     {
-        
+
     }
 
     sMeshData MeshData;

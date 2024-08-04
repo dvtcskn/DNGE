@@ -63,11 +63,11 @@
 #endif
 
 #if Enable_GameNetworkingSockets
-#include <steam/steamnetworkingsockets.h>
-#include <steam/isteamnetworkingutils.h>
-#ifndef STEAMNETWORKINGSOCKETS_OPENSOURCE
-#include <steam/steam_api.h>
-#endif
+	#include <steam/steamnetworkingsockets.h>
+	#include <steam/isteamnetworkingutils.h>
+	#ifndef STEAMNETWORKINGSOCKETS_OPENSOURCE
+	#include <steam/steam_api.h>
+	#endif
 #endif
 
 enum class eNetworkPacketType : std::uint8_t
@@ -143,7 +143,7 @@ struct sServerInfo
 	std::size_t ConnectedPlayerCount;
 	std::size_t MaximumConnectedPlayerSize;
 	std::string LevelName;
-
+	
 	struct sConnectedPlayerInfo
 	{
 		std::uint32_t ID = 0;
@@ -479,7 +479,7 @@ private:
 private:
 	std::mutex Mutex;
 	bool bIsConnected;
-
+	
 	HSteamNetConnection m_hConnection;
 	ISteamNetworkingSockets* m_pInterface;
 	SteamNetworkingIPAddr addrServer;

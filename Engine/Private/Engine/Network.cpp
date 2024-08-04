@@ -252,7 +252,7 @@ GNSServer::~GNSServer()
 	ServerInfo.ConnectedPlayerInfos.clear();
 
 	//if (bIsInitialized)
-	ShutdownSteamDatagramConnectionSockets();
+		ShutdownSteamDatagramConnectionSockets();
 
 	s_pServerCallbackInstance = nullptr;
 }
@@ -1229,7 +1229,7 @@ GNSClient::~GNSClient()
 	m_pInterface = nullptr;
 
 	//if (bIsInitialized)
-	ShutdownSteamDatagramConnectionSockets();
+		ShutdownSteamDatagramConnectionSockets();
 
 	s_pClientCallbackInstance = nullptr;
 }
@@ -1277,7 +1277,7 @@ void GNSClient::PollIncomingMessages()
 			pArchive >> Packet;
 
 			HandleMessages(Packet);
-
+			
 			pIncomingMsg->Release();
 		}
 	}
@@ -1977,33 +1977,33 @@ bool WSServer::CreateSession(std::string Name, sGameInstance* pInstance, std::st
 	}
 
 	// Create a SOCKET for the server to listen for client connections.
-	ListenSocket = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
-	if (ListenSocket == INVALID_SOCKET) {
-		printf("socket failed with error: %ld\n", WSAGetLastError());
-		freeaddrinfo(result);
-		WSACleanup();
-		return 1;
-	}
+    ListenSocket = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
+    if (ListenSocket == INVALID_SOCKET) {
+        printf("socket failed with error: %ld\n", WSAGetLastError());
+        freeaddrinfo(result);
+        WSACleanup();
+        return 1;
+    }
 
-	// Setup the TCP listening socket
-	iResult = bind(ListenSocket, result->ai_addr, (int)result->ai_addrlen);
-	if (iResult == SOCKET_ERROR) {
-		printf("bind failed with error: %d\n", WSAGetLastError());
-		freeaddrinfo(result);
-		closesocket(ListenSocket);
-		WSACleanup();
-		return 1;
-	}
+    // Setup the TCP listening socket
+    iResult = bind( ListenSocket, result->ai_addr, (int)result->ai_addrlen);
+    if (iResult == SOCKET_ERROR) {
+        printf("bind failed with error: %d\n", WSAGetLastError());
+        freeaddrinfo(result);
+        closesocket(ListenSocket);
+        WSACleanup();
+        return 1;
+    }
 
-	freeaddrinfo(result);
+    freeaddrinfo(result);
 
-	iResult = listen(ListenSocket, SOMAXCONN);
-	if (iResult == SOCKET_ERROR) {
-		printf("listen failed with error: %d\n", WSAGetLastError());
-		closesocket(ListenSocket);
-		WSACleanup();
-		return 1;
-	}
+    iResult = listen(ListenSocket, SOMAXCONN);
+    if (iResult == SOCKET_ERROR) {
+        printf("listen failed with error: %d\n", WSAGetLastError());
+        closesocket(ListenSocket);
+        WSACleanup();
+        return 1;
+    }
 
 	bIsServerRunning.store(true, std::memory_order_release);
 
@@ -2039,7 +2039,7 @@ bool WSServer::CreateSession(std::string Name, sGameInstance* pInstance, std::st
 				for (const auto& Client : Clients)
 				{
 					// Attempt to receive data (non-blocking)
-					bytesReceived = recv(Client.second.Socket, (char*)buffer.data(), buffer.size(), 0);
+					bytesReceived = recv(Client.second.Socket, (char*)buffer.data(), (int)buffer.size(), 0);
 					//bytesReceived = recvfrom(Client.second, buffer, sizeof(buffer), 0, NULL, NULL);
 
 					if (bytesReceived == SOCKET_ERROR) {
@@ -2096,7 +2096,7 @@ bool WSServer::DestroySession()
 	closesocket(ListenSocket);
 
 	PrintToConsole("Closing connections...");
-
+	
 	//m_mapClients.clear();
 	ServerInfo.ConnectedPlayerInfos.clear();
 
@@ -2142,7 +2142,7 @@ void WSServer::SendBufferToClient(std::uint32_t clientID, const void* buffer, st
 	if (!Clients.contains(clientID))
 		return;
 
-	int result = send(Clients[clientID].Socket, (char*)buffer, Size, 0);
+	int result = send(Clients[clientID].Socket, (char*)buffer, (int)Size, 0);
 
 	/*sockaddr_in serverAddr;
 	serverAddr.sin_family = AF_INET;
@@ -2151,7 +2151,7 @@ void WSServer::SendBufferToClient(std::uint32_t clientID, const void* buffer, st
 
 	//int result = sendto(ListenSocket, (char*)buffer, Size, 0, (struct sockaddr*)&serverAddr, sizeof(serverAddr));
 
-	if (result == SOCKET_ERROR)
+	if (result == SOCKET_ERROR) 
 	{
 		int error = WSAGetLastError();
 		if (error == 10053)
@@ -2177,7 +2177,7 @@ void WSServer::SendBufferToClient(std::uint32_t clientID, const void* buffer, st
 			PrintToConsole("Error in sendto: " + std::to_string(error));
 		}
 	}
-	else
+	else 
 	{
 		// 'result' contains the number of bytes sent
 		Clients[clientID].TimeOutTest = 0;
@@ -2874,7 +2874,7 @@ bool WSClient::Connect(sGameInstance* pInstance, std::string ip, std::uint16_t P
 
 			while (bIsConnected.load(std::memory_order_acquire))
 			{
-				bytesReceived = recv(ConnectSocket, (char*)buffer.data(), buffer.size(), 0);
+				bytesReceived = recv(ConnectSocket, (char*)buffer.data(), (int)buffer.size(), 0);
 				//bytesReceived = recvfrom(ConnectSocket, buffer, sizeof(buffer), 0, NULL, NULL);
 
 				if (bytesReceived == SOCKET_ERROR)
@@ -2971,9 +2971,9 @@ void WSClient::SendBufferToServer(const void* buffer, std::size_t Size, bool rel
 		return;
 	}
 
-	int result = send(ConnectSocket, (char*)buffer, Size, 0);
+	int result = send(ConnectSocket, (char*)buffer, (int)Size, 0);
 
-	if (result == SOCKET_ERROR)
+	if (result == SOCKET_ERROR) 
 	{
 		int error = WSAGetLastError();
 		// Handle the error based on the value of 'error'

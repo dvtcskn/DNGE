@@ -190,6 +190,7 @@
     <ClInclude Include="Private\GI\Renderer\CanvasRenderer.h" />
     <ClInclude Include="Private\GI\Renderer\IRenderer.h" />
     <ClInclude Include="Private\GI\Renderer\LineRenderer.h" />
+    <ClInclude Include="Private\GI\Renderer\ParticleRenderer.h" />
     <ClInclude Include="Private\GI\Renderer\PostProcessRenderer.h" />
     <ClInclude Include="Private\GI\Renderer\Renderer.h" />
     <ClInclude Include="Private\GI\Vulkan\VulkanBuffer.h" />
@@ -205,8 +206,8 @@
     <ClInclude Include="Private\pch.h" />
     <ClInclude Include="Public\AbstractGI\Material.h" />
     <ClInclude Include="Public\AbstractGI\MaterialManager.h" />
+    <ClInclude Include="Public\AbstractGI\Mesh.h" />
     <ClInclude Include="Public\AbstractGI\PostProcess.h" />
-    <ClInclude Include="Public\AbstractGI\RendererResource.h" />
     <ClInclude Include="Public\AbstractGI\ShaderManager.h" />
     <ClInclude Include="Public\AbstractGI\TextureManager.h" />
     <ClInclude Include="Public\AbstractGI\ToneMapping.h" />
@@ -247,6 +248,8 @@
     <ClInclude Include="Public\Gameplay\IWorld.h" />
     <ClInclude Include="Public\Gameplay\MeshComponent.h" />
     <ClInclude Include="Public\Gameplay\Character.h" />
+    <ClInclude Include="Public\Gameplay\ParticleComponent.h" />
+    <ClInclude Include="Public\Gameplay\ParticleSystem.h" />
     <ClInclude Include="Public\Gameplay\Player.h" />
     <ClInclude Include="Public\Gameplay\PlayerController.h" />
     <ClInclude Include="Public\Gameplay\PlayerProxy.h" />
@@ -293,6 +296,8 @@
     <ClCompile Include="Private\Gameplay\GameInstance.cpp" />
     <ClCompile Include="Private\Gameplay\MeshComponent.cpp" />
     <ClCompile Include="Private\Gameplay\Character.cpp" />
+    <ClCompile Include="Private\Gameplay\ParticleComponent.cpp" />
+    <ClCompile Include="Private\Gameplay\ParticleSystem.cpp" />
     <ClCompile Include="Private\Gameplay\Player.cpp" />
     <ClCompile Include="Private\Gameplay\PlayerController.cpp" />
     <ClCompile Include="Private\Gameplay\PlayerProxy.cpp" />
@@ -301,8 +306,8 @@
     <ClCompile Include="Private\Gameplay\PrimitiveComponent.cpp" />
     <ClCompile Include="Private\Gameplay\StaticMesh.cpp" />
     <ClCompile Include="Private\GI\AbstractGI\Material.cpp" />
+    <ClCompile Include="Private\GI\AbstractGI\Mesh.cpp" />
     <ClCompile Include="Private\GI\AbstractGI\PostProcess.cpp" />
-    <ClCompile Include="Private\GI\AbstractGI\RendererResource.cpp" />
     <ClCompile Include="Private\GI\AbstractGI\ToneMapping.cpp" />
     <ClCompile Include="Private\GI\D3D11\D3D11Buffer.cpp" />
     <ClCompile Include="Private\GI\D3D11\D3D11CommandBuffer.cpp" />
@@ -332,6 +337,7 @@
     <ClCompile Include="Private\GI\D3D12\D3D12Device.cpp" />
     <ClCompile Include="Private\GI\Renderer\CanvasRenderer.cpp" />
     <ClCompile Include="Private\GI\Renderer\LineRenderer.cpp" />
+    <ClCompile Include="Private\GI\Renderer\ParticleRenderer.cpp" />
     <ClCompile Include="Private\GI\Renderer\PostProcessRenderer.cpp" />
     <ClCompile Include="Private\GI\Renderer\Renderer.cpp" />
     <ClCompile Include="Private\GI\Vulkan\VulkanBuffer.cpp" />

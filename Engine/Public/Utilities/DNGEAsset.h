@@ -488,7 +488,7 @@ struct MaterialAsset : public DNGEAsset
 
 	MaterialAsset()
 		: DNGEAsset(DNGEAssetType::Material)
-		, MaterialType(EMaterialType::Actor)
+		//, MaterialType(EMaterialType::Actor)
 		, MaterialUsage(EMaterialUsage::BeforPostProcess)
 		, BlendMode(EMaterialBlendMode::Opaque)
 	{};
@@ -496,7 +496,7 @@ struct MaterialAsset : public DNGEAsset
 	std::string Name;
 	std::string Path;
 
-	EMaterialType MaterialType;
+	//EMaterialType MaterialType;
 	EMaterialUsage MaterialUsage;
 	EMaterialBlendMode BlendMode;
 

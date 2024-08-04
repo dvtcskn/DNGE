@@ -364,7 +364,7 @@ public:
             InputLayout[i].SemanticName = VertexAttributeDescData[i].name.c_str();
             InputLayout[i].SemanticIndex = 0;
             InputLayout[i].Format = ConvertFormat_Format_To_DXGI(VertexAttributeDescData[i].format);
-            InputLayout[i].InputSlot = 0;// VertexAttributeDescData[i].bufferIndex;
+            InputLayout[i].InputSlot = VertexAttributeDescData[i].InputSlot;
             InputLayout[i].AlignedByteOffset = VertexAttributeDescData[i].offset;
             InputLayout[i].InputSlotClass = VertexAttributeDescData[i].isInstanced ?
                 D3D12_INPUT_CLASSIFICATION::D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA : D3D12_INPUT_CLASSIFICATION::D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;

@@ -312,9 +312,6 @@
     <ClInclude Include="Public\Gameplay\StaticMesh.h">
       <Filter>Gameplay\Public</Filter>
     </ClInclude>
-    <ClInclude Include="Public\AbstractGI\RendererResource.h">
-      <Filter>GI\Public\AbstractGI\Renderer</Filter>
-    </ClInclude>
     <ClInclude Include="Private\GI\D3D11\ScreenGrab11.h">
       <Filter>GI\Private\D3D11</Filter>
     </ClInclude>
@@ -431,6 +428,18 @@
     </ClInclude>
     <ClInclude Include="Private\GI\D3D12\dx12.h">
       <Filter>GI\Private\D3D12</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\AbstractGI\Mesh.h">
+      <Filter>GI\Public\AbstractGI\Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\Renderer\ParticleRenderer.h">
+      <Filter>GI\Private\Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Gameplay\ParticleComponent.h">
+      <Filter>Gameplay\Public\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Gameplay\ParticleSystem.h">
+      <Filter>Gameplay\Public</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -593,9 +602,6 @@
     <ClCompile Include="Private\Gameplay\StaticMesh.cpp">
       <Filter>Gameplay\Private</Filter>
     </ClCompile>
-    <ClCompile Include="Private\GI\AbstractGI\RendererResource.cpp">
-      <Filter>GI\Private\AbstractGI</Filter>
-    </ClCompile>
     <ClCompile Include="Private\GI\D3D11\ScreenGrab11.cpp">
       <Filter>GI\Private\D3D11</Filter>
     </ClCompile>
@@ -676,6 +682,18 @@
     </ClCompile>
     <ClCompile Include="Private\Gameplay\PlayerProxy.cpp">
       <Filter>Gameplay\Private</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\AbstractGI\Mesh.cpp">
+      <Filter>GI\Private\AbstractGI</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\Renderer\ParticleRenderer.cpp">
+      <Filter>GI\Private\Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\Gameplay\ParticleSystem.cpp">
+      <Filter>Gameplay\Private</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\Gameplay\ParticleComponent.cpp">
+      <Filter>Gameplay\Private\Components</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

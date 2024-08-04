@@ -39,7 +39,7 @@ sSpriteComponent::sSpriteComponent(const std::string Name)
 	, Sprite(nullptr)
 	, Offset(FVector::Zero())
 {
-	MeshConstantBuffer = IConstantBuffer::Create(Name, sBufferDesc(sizeof(sMeshConstantBufferAttributes), 0), 1);
+	MeshConstantBuffer = IConstantBuffer::Create(Name, BufferLayout(sizeof(sMeshConstantBufferAttributes), 0), 1);
 	{
 		ObjectConstants.modelMatrix = FMatrix::Identity();
 		ObjectConstants.PrevModelMatrix = FMatrix::Identity();
@@ -56,7 +56,7 @@ sSpriteComponent::sSpriteComponent(sSprite* pSprite)
 	, Sprite(pSprite)
 	, Offset(FVector::Zero())
 {
-	MeshConstantBuffer = IConstantBuffer::Create(GetName(), sBufferDesc(sizeof(sMeshConstantBufferAttributes), 0), 1);
+	MeshConstantBuffer = IConstantBuffer::Create(GetName(), BufferLayout(sizeof(sMeshConstantBufferAttributes), 0), 1);
 	{
 		ObjectConstants.modelMatrix = FMatrix::Identity();
 		ObjectConstants.PrevModelMatrix = FMatrix::Identity();

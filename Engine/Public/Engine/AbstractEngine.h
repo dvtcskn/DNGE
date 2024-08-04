@@ -131,6 +131,62 @@ enum class eShaderType : std::uint8_t
 	Amplification,
 };
 
+struct IBuffer
+{
+	IBuffer() = default;
+	virtual ~IBuffer() = default;
+	[[nodiscard]] virtual const void* GetData() const = 0;
+	[[nodiscard]] virtual size_t GetSize() const = 0;
+};
+
+struct UntypedData : public IBuffer
+{
+private:
+	void* Data;
+	size_t Size;
+
+public:
+	UntypedData(void* data, size_t size)
+		: Data(data)
+		, Size(size)
+	{}
+
+	virtual ~UntypedData()
+	{
+		if (Data)
+		{
+			free(Data);
+			Data = nullptr;
+		}
+
+		Size = 0;
+	}
+
+	[[nodiscard]] virtual const void* GetData() const override
+	{
+		return Data;
+	}
+	template<class T>
+	[[nodiscard]] T* GetData() const
+	{
+		return static_cast<T*>(Data);
+	}
+	[[nodiscard]] virtual size_t GetSize() const override
+	{
+		return Size;
+	}
+};
+
+namespace
+{
+	inline bool IsBufferEmpty(const IBuffer* Buffer)
+	{
+		if (!Buffer)
+			return false;
+		return Buffer->GetData() == nullptr || Buffer->GetSize() == 0;
+	}
+}
+
 struct sScreenDimension
 {
 	std::size_t Width = 0;
@@ -216,7 +272,7 @@ struct sDisplayMode
 	sRefreshRate RefreshRate;
 };
 
-struct sVertexBufferEntry
+struct sVertexLayout
 {
 	FVector position;
 	FVector normal;
@@ -226,7 +282,7 @@ struct sVertexBufferEntry
 	FVector binormal;
 	std::uint32_t ArrayIndex;
 
-	sVertexBufferEntry()
+	sVertexLayout()
 		: position(FVector::Zero())
 		, normal(FVector::Zero())
 		, texCoord(FVector2::Zero())
@@ -235,13 +291,65 @@ struct sVertexBufferEntry
 		, binormal(FVector::Zero())
 		, ArrayIndex(NULL)
 	{}
+	sVertexLayout(FVector InPosition, FVector2 InTexCoord, FColor InColor = FColor::White())
+		: position(InPosition)
+		, normal(FVector::Zero())
+		, texCoord(InTexCoord)
+		, Color(InColor)
+		, tangent(FVector::Zero())
+		, binormal(FVector::Zero())
+		, ArrayIndex(NULL)
+	{}
+	sVertexLayout(FVector InPosition, FVector InNormal, FVector2 InTexCoord, FColor InColor, 
+		FVector InTangent, FVector InBinormal, std::uint32_t InArrayIndex)
+		: position(InPosition)
+		, normal(InNormal)
+		, texCoord(InTexCoord)
+		, Color(InColor)
+		, tangent(InTangent)
+		, binormal(InBinormal)
+		, ArrayIndex(InArrayIndex)
+	{}
+};
+
+struct sParticleVertexLayout
+{
+	struct sParticleInstanceLayout
+	{
+		FVector position;
+		FColor Color;
+
+		sParticleInstanceLayout()
+			: position(FVector::Zero())
+			, Color(FColor::White())
+		{}
+		sParticleInstanceLayout(FVector InPosition, FColor InColor = FColor::White())
+			: position(InPosition)
+			, Color(InColor)
+		{}
+	};
+	FVector position;
+	FVector2 texCoord;
+	FColor Color;
+
+	sParticleVertexLayout()
+		: position(FVector::Zero())
+		, texCoord(FVector2::Zero())
+		, Color(FColor::White())
+	{}
+	sParticleVertexLayout(FVector InPosition, FVector2 InTexCoord, FColor InColor = FColor::White())
+		: position(InPosition)
+		, texCoord(InTexCoord)
+		, Color(InColor)
+	{}
 };
 
 struct sVertexAttributeDesc
 {
 	std::string name;
 	EFormat format;
-	uint32_t bufferIndex;
+	//uint32_t Index;
+	uint32_t InputSlot;
 	uint32_t offset;
 	bool isInstanced;
 };
@@ -254,8 +362,8 @@ struct sObjectDrawParameters
 	std::int32_t BaseVertexLocation;
 	std::uint32_t StartInstanceLocation;
 
-	explicit sObjectDrawParameters()
-		: IndexCountPerInstance(NULL)
+	explicit sObjectDrawParameters(std::uint32_t InIndexCountPerInstance = NULL)
+		: IndexCountPerInstance(InIndexCountPerInstance)
 		, InstanceCount(1)
 		, StartIndexLocation(NULL)
 		, BaseVertexLocation(NULL)
@@ -266,39 +374,39 @@ struct sObjectDrawParameters
 struct sMeshData
 {
 	std::vector<std::uint32_t> Indices;
-	std::vector<sVertexBufferEntry> Vertices;
+	std::vector<sVertexLayout> Vertices;
 	sObjectDrawParameters DrawParameters;
 };
 
-struct sBufferDesc
+struct BufferLayout
 {
 	std::uint64_t Size;
 	std::uint64_t Stride;
 
-	explicit sBufferDesc()
+	explicit BufferLayout()
 		: Size(NULL)
 		, Stride(NULL)
 	{}
 
-	sBufferDesc(std::uint64_t InBufferSize, std::uint64_t InStride = NULL)
+	BufferLayout(std::uint64_t InBufferSize, std::uint64_t InStride = NULL)
 		: Size(InBufferSize)
 		, Stride(InStride)
 	{}
 
-	~sBufferDesc()
+	~BufferLayout()
 	{
 		Size = NULL;
 		Stride = NULL;
 	}
 };
 
-struct sBufferSubresource
+struct BufferSubresource
 {
 	void* pSysMem;
 	std::size_t Size;
 	std::size_t Location;
 
-	constexpr sBufferSubresource(void* InSysMem = nullptr, std::size_t InSize = NULL, std::size_t InLocation = NULL)
+	constexpr BufferSubresource(void* InSysMem = nullptr, std::size_t InSize = NULL, std::size_t InLocation = NULL)
 		: pSysMem(InSysMem)
 		, Size(InSize)
 		, Location(InLocation)
@@ -322,8 +430,8 @@ class IConstantBuffer
 {
 	sBaseClassBody(sClassDefaultProtectedConstructor, IConstantBuffer)
 public:
-	static IConstantBuffer::SharedPtr Create(std::string InName, const sBufferDesc& InDesc, std::uint32_t InRootParameterIndex);
-	static IConstantBuffer::UniquePtr CreateUnique(std::string InName, const sBufferDesc& InDesc, std::uint32_t InRootParameterIndex);
+	static IConstantBuffer::SharedPtr Create(std::string InName, const BufferLayout& InDesc, std::uint32_t InRootParameterIndex);
+	static IConstantBuffer::UniquePtr CreateUnique(std::string InName, const BufferLayout& InDesc, std::uint32_t InRootParameterIndex);
 
 public:
 	virtual std::string GetName() const = 0;
@@ -336,36 +444,36 @@ class IVertexBuffer
 {
 	sBaseClassBody(sClassDefaultProtectedConstructor, IVertexBuffer)
 public:
-	static IVertexBuffer::SharedPtr Create(std::string InName, const sBufferDesc& InDesc, sBufferSubresource* InSubresource = nullptr);
-	static IVertexBuffer::UniquePtr CreateUnique(std::string InName, const sBufferDesc& InDesc, sBufferSubresource* InSubresource = nullptr);
+	static IVertexBuffer::SharedPtr Create(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource = nullptr);
+	static IVertexBuffer::UniquePtr CreateUnique(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource = nullptr);
 
 public:
 	virtual std::string GetName() const = 0;
 	virtual std::size_t GetSize() const = 0;
 	virtual bool IsMapable() const = 0;
-	virtual void UpdateSubresource(sBufferSubresource* Subresource, IGraphicsCommandContext* InCMDBuffer = nullptr) = 0;
+	virtual void UpdateSubresource(BufferSubresource* Subresource, IGraphicsCommandContext* InCMDBuffer = nullptr) = 0;
 };
 
 class IIndexBuffer
 {
 	sBaseClassBody(sClassDefaultProtectedConstructor, IIndexBuffer)
 public:
-	static IIndexBuffer::SharedPtr Create(std::string InName, const sBufferDesc& InDesc, sBufferSubresource* InSubresource = nullptr);
-	static IIndexBuffer::UniquePtr CreateUnique(std::string InName, const sBufferDesc& InDesc, sBufferSubresource* InSubresource = nullptr);
+	static IIndexBuffer::SharedPtr Create(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource = nullptr);
+	static IIndexBuffer::UniquePtr CreateUnique(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource = nullptr);
 
 public:
 	virtual std::string GetName() const = 0;
 	virtual std::size_t GetSize() const = 0;
 	virtual bool IsMapable() const = 0;
-	virtual void UpdateSubresource(sBufferSubresource* Subresource, IGraphicsCommandContext* InCMDBuffer = nullptr) = 0;
+	virtual void UpdateSubresource(BufferSubresource* Subresource, IGraphicsCommandContext* InCMDBuffer = nullptr) = 0;
 };
 
 class IUnorderedAccessBuffer
 {
 	sBaseClassBody(sClassDefaultProtectedConstructor, IUnorderedAccessBuffer)
 public:
-	static IUnorderedAccessBuffer::SharedPtr Create(std::string InName, const sBufferDesc& InDesc, bool bSRVAllowed = true);
-	static IUnorderedAccessBuffer::UniquePtr CreateUnique(std::string InName, const sBufferDesc& InDesc, bool bSRVAllowed = true);
+	static IUnorderedAccessBuffer::SharedPtr Create(std::string InName, const BufferLayout& InDesc, bool bSRVAllowed = true);
+	static IUnorderedAccessBuffer::UniquePtr CreateUnique(std::string InName, const BufferLayout& InDesc, bool bSRVAllowed = true);
 
 public:
 	virtual std::string GetName() const = 0;
@@ -731,7 +839,9 @@ struct sSamplerAttributeDesc
 	ESamplerAddressMode AddressV;
 	ESamplerAddressMode AddressW;
 	int MipBias;
+	/** Smallest mip map level that will be used, where 0 is the highest resolution mip level. */
 	float MinMipLevel;
+	/** Largest mip map level that will be used, where 0 is the highest resolution mip level. */
 	float MaxMipLevel;
 	int MaxAnisotropy;
 	FColor BorderColor;
@@ -1242,15 +1352,15 @@ public:
 
 	virtual void SetPipeline(IPipeline* Pipeline) = 0;
 
-	virtual void SetVertexBuffer(IVertexBuffer* VB) = 0;
+	virtual void SetVertexBuffer(IVertexBuffer* VB, std::uint32_t Slot = 0) = 0;
 	virtual void SetIndexBuffer(IIndexBuffer* IB) = 0;
 	virtual void SetConstantBuffer(IConstantBuffer* CB, std::optional<std::uint32_t> RootParameterIndex = std::nullopt) = 0;
 
 	virtual void SetTexture2D(ITexture2D* Texture2D, std::optional<std::uint32_t> RootParameterIndex = std::nullopt) = 0;
 
-	virtual void UpdateBufferSubresource(IVertexBuffer* Buffer, sBufferSubresource* Subresource) = 0;
+	virtual void UpdateBufferSubresource(IVertexBuffer* Buffer, BufferSubresource* Subresource) = 0;
 	virtual void UpdateBufferSubresource(IVertexBuffer* Buffer, std::size_t Location, std::size_t Size, const void* pSrcData) = 0;
-	virtual void UpdateBufferSubresource(IIndexBuffer* Buffer, sBufferSubresource* Subresource) = 0;
+	virtual void UpdateBufferSubresource(IIndexBuffer* Buffer, BufferSubresource* Subresource) = 0;
 	virtual void UpdateBufferSubresource(IIndexBuffer* Buffer, std::size_t Location, std::size_t Size, const void* pSrcData) = 0;
 
 	virtual void Draw(std::uint32_t VertexCount, std::uint32_t VertexStartOffset = 0) = 0;
@@ -1317,9 +1427,9 @@ public:
 	virtual void CopyFrameBuffer(IFrameBuffer* Dest, std::size_t DestFBOIndex, IFrameBuffer* Source, std::uint32_t SourceFBOIndex) = 0;
 	virtual void CopyFrameBufferDepth(IFrameBuffer* Dest, IFrameBuffer* Source) = 0;
 
-	virtual void UpdateBufferSubresource(IVertexBuffer* Buffer, sBufferSubresource* Subresource) = 0;
+	virtual void UpdateBufferSubresource(IVertexBuffer* Buffer, BufferSubresource* Subresource) = 0;
 	virtual void UpdateBufferSubresource(IVertexBuffer* Buffer, std::size_t Location, std::size_t Size, const void* pSrcData) = 0;
-	virtual void UpdateBufferSubresource(IIndexBuffer* Buffer, sBufferSubresource* Subresource) = 0;
+	virtual void UpdateBufferSubresource(IIndexBuffer* Buffer, BufferSubresource* Subresource) = 0;
 	virtual void UpdateBufferSubresource(IIndexBuffer* Buffer, std::size_t Location, std::size_t Size, const void* pSrcData) = 0;
 };
 
@@ -1495,12 +1605,18 @@ struct sGPUInfo
 	}
 };
 
+enum class EParticleType
+{
+	eCPU,
+	eGPU,
+};
+
 enum class EPhysicsEngine
 {
 	eNone,
-	//eBulletPhysics,
+	eBulletPhysics,
 	eBox2D,
-	//ePhysX,
+	ePhysX,
 };
 
 enum class EPostProcessRenderOrder
@@ -1515,7 +1631,7 @@ enum class EGBufferClear
 {
 	Driver,
 	Disabled,
-	//Sky,
+	Sky,
 };
 
 enum class ESplitScreenType
@@ -1871,4 +1987,16 @@ namespace Engine
 	void PauseTick(bool value);
 
 	sScreenDimension GetScreenDimension();
+
+	template<typename T>
+	inline T RandomValueInRange(T Min, T Max)
+	{
+		//return (double)rand() / RAND_MAX;
+
+		std::random_device rd; // obtain a random number from hardware
+		std::mt19937 gen(rd()); // seed the generator
+		std::uniform_real_distribution<> dist(Min, Max); // define the range
+
+		return dist(gen);
+	}
 }

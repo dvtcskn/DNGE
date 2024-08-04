@@ -100,7 +100,7 @@ namespace MeshPrimitives
 		return std::vector<FVector2>{ P1, P2, P3, P4, P5, P6 };
 	}
 
-	inline std::vector<FVector2> GeneratePlaneTextureCoordinate(const float Angle)
+	inline std::vector<FVector2> GeneratePlaneTextureCoordinate(const float Angle = 0.0f)
 	{
 		auto RotateCornerPoint = [](FVector2& Edge, float angle)
 		{
@@ -155,7 +155,49 @@ namespace MeshPrimitives
 		return Indices;
 	}
 
-	inline std::vector<std::uint32_t> GeneratePlaneIndices(const std::uint32_t PrimitiveSize)
+	inline std::vector<std::uint32_t> GeneratePlaneTriangleIndices(const std::uint32_t PrimitiveSize) 
+	{
+		// Assuming PrimitiveSize is divisible by 4 (for creating quads)
+		const std::uint32_t NumTriangles = PrimitiveSize / 2;
+		std::vector<std::uint32_t> Indices(NumTriangles * 3);
+
+		for (std::uint32_t i = 0; i < NumTriangles; ++i) 
+		{
+			// Triangle 1 (upper left)
+			Indices[i * 3] = 4 * i;
+			Indices[i * 3 + 1] = 4 * i + 1;
+			Indices[i * 3 + 2] = 4 * i + 2;
+
+			// Triangle 2 (lower right)
+			Indices[i * 3 + 3] = 4 * i;
+			Indices[i * 3 + 4] = 4 * i + 2;
+			Indices[i * 3 + 5] = 4 * i + 3;
+		}
+
+		return Indices;
+	}
+
+	inline std::vector<std::uint32_t> GenerateTriangleIndices(const std::uint32_t PrimitiveSize)
+	{
+		std::vector<std::uint32_t> Indices;
+		for (std::uint32_t i = 0; i < PrimitiveSize; i++)
+		{
+			Indices.push_back(2 + (2 * i));
+			Indices.push_back((i % 2) == 0 ? 1 : 4);
+			Indices.push_back(1 + (0 * i));
+
+			Indices.push_back((i % 2) == 0 ? 1 + (3 * i) : 1 + (4 * i));
+			Indices.push_back(2 + (0 * i));
+			Indices.push_back(1 + (0 * i));
+
+			Indices.push_back(3 * (1 + i));
+			Indices.push_back((i % 2) == 0 ? 3 : 1);
+			Indices.push_back(1 + (0 * i));
+		}
+		return Indices;
+	}
+
+	inline std::vector<std::uint32_t> GeneratePlaneIndices(const std::uint32_t PrimitiveSize = 1)
 	{
 		std::vector<std::uint32_t> Indices;
 		for (std::uint32_t i = 0; i < PrimitiveSize; i++)
@@ -270,7 +312,7 @@ namespace MeshPrimitives
 			MeshData.Indices.push_back(23);
 			MeshData.Indices.push_back(22);
 			MeshData.Indices.push_back(21);
-			sVertexBufferEntry VBE;
+			sVertexLayout VBE;
 			VBE.position = { static_cast<float>(-1.000000) * Scale, static_cast<float>(-1.000000) * Scale, static_cast<float>(-1.000000) * Scale };
 			VBE.texCoord = { static_cast<float>(0.000000), static_cast<float>(1.000000) };
 			MeshData.Vertices.push_back(VBE);

@@ -28,7 +28,6 @@
 #include <string>
 #include <vector>
 #include <d3d11.h>
-#include <d3d12.h>
 #include <assert.h>
 #include <wrl/client.h>
 #include "Engine/ClassBody.h"
@@ -54,10 +53,10 @@ private:
 
 protected:
 	ComPtr<ID3D11Buffer> Buffer;
-	sBufferDesc BufferDesc;
+	BufferLayout BufferDesc;
 
 protected:
-	D3D11Buffer(D3D11Device* InDevice, const sBufferDesc& InDesc, sBufferSubresource* InSubresource = NULL, ResourceTypeFlags InType = ResourceTypeFlags::eDEFAULT);
+	D3D11Buffer(D3D11Device* InDevice, const BufferLayout& InDesc, BufferSubresource* InSubresource = NULL, ResourceTypeFlags InType = ResourceTypeFlags::eDEFAULT);
 
 public:
 	using SharedPtr = std::shared_ptr<D3D11Buffer>;
@@ -77,9 +76,9 @@ public:
 	bool IsMapable() const;
 
 	FORCEINLINE ComPtr<ID3D11Buffer> GetBuffer() const { return Buffer; }
-	FORCEINLINE sBufferDesc GetBufferDesc() const { return BufferDesc; }
+	FORCEINLINE BufferLayout GetBufferDesc() const { return BufferDesc; }
 
-	virtual void ResizeBuffer(std::size_t Size, sBufferSubresource* Subresource = nullptr);
+	virtual void ResizeBuffer(std::size_t Size, BufferSubresource* Subresource = nullptr);
 };
 
 class D3D11ConstantBuffer final : public D3D11Buffer, public IConstantBuffer
@@ -90,7 +89,7 @@ private:
 	std::string Name;
 
 public:
-	D3D11ConstantBuffer(D3D11Device* InDevice, std::string InName, const sBufferDesc& InDesc, std::uint32_t InRootParameterIndex)
+	D3D11ConstantBuffer(D3D11Device* InDevice, std::string InName, const BufferLayout& InDesc, std::uint32_t InRootParameterIndex)
 		: D3D11Buffer(InDevice, InDesc, NULL, ResourceTypeFlags::eCONSTANT_BUFFER)
 		, RootParameterIndex(InRootParameterIndex)
 		, Name(InName)
@@ -114,7 +113,7 @@ private:
 	std::string Name;
 
 public:
-	D3D11VertexBuffer(D3D11Device* InDevice, std::string InName, const sBufferDesc& InDesc, sBufferSubresource* InSubresource = nullptr)
+	D3D11VertexBuffer(D3D11Device* InDevice, std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource = nullptr)
 		: D3D11Buffer(InDevice, InDesc, InSubresource, ResourceTypeFlags::eVERTEX_BUFFER)
 		, Name(InName)
 	{}
@@ -125,11 +124,11 @@ public:
 
 	virtual std::size_t GetSize() const override final { return BufferDesc.Size; }
 	virtual bool IsMapable() const override final { return D3D11Buffer::IsMapable(); }
-	virtual void UpdateSubresource(sBufferSubresource* Subresource, IGraphicsCommandContext* InCMDBuffer = nullptr) override final;
-	void UpdateSubresource(sBufferSubresource* Subresource, ID3D11DeviceContext1* Device = nullptr);
-	void ApplyBuffer(IGraphicsCommandContext* InCMDBuffer = nullptr);
+	virtual void UpdateSubresource(BufferSubresource* Subresource, IGraphicsCommandContext* InCMDBuffer = nullptr) override final;
+	void UpdateSubresource(BufferSubresource* Subresource, ID3D11DeviceContext1* Device = nullptr);
+	void ApplyBuffer(std::uint32_t Slot = 0, IGraphicsCommandContext* InCMDBuffer = nullptr);
 
-	void ResizeBuffer(std::size_t Size, sBufferSubresource* Subresource = nullptr)
+	void ResizeBuffer(std::size_t Size, BufferSubresource* Subresource = nullptr)
 	{
 		D3D11Buffer::ResizeBuffer(Size, Subresource);
 	}
@@ -142,7 +141,7 @@ private:
 	std::string Name;
 
 public:
-	D3D11IndexBuffer(D3D11Device* InDevice, std::string InName, const sBufferDesc& InDesc, sBufferSubresource* InSubresource = nullptr)
+	D3D11IndexBuffer(D3D11Device* InDevice, std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource = nullptr)
 		: D3D11Buffer(InDevice, InDesc, InSubresource, ResourceTypeFlags::eINDEX_BUFFER)
 		, Name(InName)
 	{}
@@ -153,11 +152,11 @@ public:
 
 	virtual std::size_t GetSize() const override final { return BufferDesc.Size; }
 	virtual bool IsMapable() const override final { return D3D11Buffer::IsMapable(); }
-	virtual void UpdateSubresource(sBufferSubresource* Subresource, IGraphicsCommandContext* InCMDBuffer = nullptr) override final;
-	void UpdateSubresource(sBufferSubresource* Subresource, ID3D11DeviceContext1* Device = nullptr);
+	virtual void UpdateSubresource(BufferSubresource* Subresource, IGraphicsCommandContext* InCMDBuffer = nullptr) override final;
+	void UpdateSubresource(BufferSubresource* Subresource, ID3D11DeviceContext1* Device = nullptr);
 	void ApplyBuffer(IGraphicsCommandContext* InCMDBuffer = nullptr);
 
-	void ResizeBuffer(std::size_t Size, sBufferSubresource* Subresource = nullptr)
+	void ResizeBuffer(std::size_t Size, BufferSubresource* Subresource = nullptr)
 	{
 		D3D11Buffer::ResizeBuffer(Size, Subresource);
 	}
@@ -173,7 +172,7 @@ private:
 	ID3D11ShaderResourceView* mShaderResource;
 
 public:
-	D3D11UnorderedAccessBuffer(D3D11Device* InDevice, std::string InName, const sBufferDesc& InDesc, bool bSRVAllowed = true);
+	D3D11UnorderedAccessBuffer(D3D11Device* InDevice, std::string InName, const BufferLayout& InDesc, bool bSRVAllowed = true);
 
 	virtual ~D3D11UnorderedAccessBuffer()
 	{

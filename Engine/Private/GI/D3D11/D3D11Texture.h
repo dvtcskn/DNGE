@@ -31,6 +31,13 @@
 #include "Engine/AbstractEngine.h"
 #include "GI/D3DShared/D3DShared.h"
 
+/*
+* Create
+* Base Image Texture2D
+* Base Empty Texture2D
+* Base Empty Texture3D
+*/
+
 class D3D11Texture final : public ITexture2D
 {
 	sClassBody(sClassConstructor, D3D11Texture, ITexture2D)

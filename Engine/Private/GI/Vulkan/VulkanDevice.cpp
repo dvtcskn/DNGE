@@ -172,32 +172,32 @@ ICopyCommandContext::UniquePtr VulkanDevice::CreateUniqueCopyCommandContext()
 	return ICopyCommandContext::UniquePtr();
 }
 
-IConstantBuffer::SharedPtr VulkanDevice::CreateConstantBuffer(std::string InName, const sBufferDesc& InDesc, std::uint32_t InRootParameterIndex)
+IConstantBuffer::SharedPtr VulkanDevice::CreateConstantBuffer(std::string InName, const BufferLayout& InDesc, std::uint32_t InRootParameterIndex)
 {
 	return nullptr;
 }
 
-IConstantBuffer::UniquePtr VulkanDevice::CreateUniqueConstantBuffer(std::string InName, const sBufferDesc& InDesc, std::uint32_t InRootParameterIndex)
+IConstantBuffer::UniquePtr VulkanDevice::CreateUniqueConstantBuffer(std::string InName, const BufferLayout& InDesc, std::uint32_t InRootParameterIndex)
 {
 	return nullptr;
 }
 
-IVertexBuffer::SharedPtr VulkanDevice::CreateVertexBuffer(std::string InName, const sBufferDesc& InDesc, sBufferSubresource* InSubresource)
+IVertexBuffer::SharedPtr VulkanDevice::CreateVertexBuffer(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource)
 {
 	return nullptr;
 }
 
-IVertexBuffer::UniquePtr VulkanDevice::CreateUniqueVertexBuffer(std::string InName, const sBufferDesc& InDesc, sBufferSubresource* InSubresource)
+IVertexBuffer::UniquePtr VulkanDevice::CreateUniqueVertexBuffer(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource)
 {
 	return nullptr;
 }
 
-IIndexBuffer::SharedPtr VulkanDevice::CreateIndexBuffer(std::string InName, const sBufferDesc& InDesc, sBufferSubresource* InSubresource)
+IIndexBuffer::SharedPtr VulkanDevice::CreateIndexBuffer(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource)
 {
 	return nullptr;
 }
 
-IIndexBuffer::UniquePtr VulkanDevice::CreateUniqueIndexBuffer(std::string InName, const sBufferDesc& InDesc, sBufferSubresource* InSubresource)
+IIndexBuffer::UniquePtr VulkanDevice::CreateUniqueIndexBuffer(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource)
 {
 	return nullptr;
 }

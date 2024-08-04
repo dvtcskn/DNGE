@@ -61,7 +61,7 @@ D3D12UploadBuffer::~D3D12UploadBuffer()
     Buffer = nullptr;
 }
 
-void D3D12UploadBuffer::UpdateSubresource(ID3D12Resource* InResource, D3D12_RESOURCE_STATES State, sBufferSubresource* Subresource, D3D12CommandBuffer* InCMDBuffer)
+void D3D12UploadBuffer::UpdateSubresource(ID3D12Resource* InResource, D3D12_RESOURCE_STATES State, BufferSubresource* Subresource, D3D12CommandBuffer* InCMDBuffer)
 {
     static_cast<D3D12CommandBuffer*>(InCMDBuffer)->UpdateSubresource(InResource, State, this, Subresource);
 }
@@ -92,7 +92,7 @@ void D3D12UploadBuffer::Unmap()
     }
 }
 
-D3D12ConstantBuffer::D3D12ConstantBuffer(D3D12Device* InOwner, std::string InName, const sBufferDesc& InDesc, std::uint32_t InRootParameterIndex)
+D3D12ConstantBuffer::D3D12ConstantBuffer(D3D12Device* InOwner, std::string InName, const BufferLayout& InDesc, std::uint32_t InRootParameterIndex)
     : Super()
     , Name(InName)
     , BufferDesc(InDesc)
@@ -149,7 +149,7 @@ void D3D12ConstantBuffer::Unmap()
     UploadBuffer->Unmap();
 }
 
-D3D12VertexBuffer::D3D12VertexBuffer(D3D12Device* InOwner, std::string InName, const sBufferDesc& InDesc, sBufferSubresource* Subresource)
+D3D12VertexBuffer::D3D12VertexBuffer(D3D12Device* InOwner, std::string InName, const BufferLayout& InDesc, BufferSubresource* Subresource)
     : BufferDesc(InDesc)
     , Owner(InOwner)
     , Name(InName)
@@ -193,7 +193,7 @@ D3D12VertexBuffer::~D3D12VertexBuffer()
     UploadBuffer = nullptr;
 }
 
-void D3D12VertexBuffer::ApplyBuffer(ID3D12GraphicsCommandList* CommandList)
+void D3D12VertexBuffer::ApplyBuffer(ID3D12GraphicsCommandList* CommandList, std::uint32_t Slot)
 {
     if (CurrentState != D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER)
     {
@@ -203,10 +203,10 @@ void D3D12VertexBuffer::ApplyBuffer(ID3D12GraphicsCommandList* CommandList)
         CurrentState = D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
     }
 
-    CommandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
+    CommandList->IASetVertexBuffers(Slot, 1, &m_vertexBufferView);
 }
 
-void D3D12VertexBuffer::ResizeBuffer(std::size_t Size, sBufferSubresource* InSubresource)
+void D3D12VertexBuffer::ResizeBuffer(std::size_t Size, BufferSubresource* InSubresource)
 {
     BufferDesc.Size = Size;
 
@@ -236,7 +236,7 @@ void D3D12VertexBuffer::ResizeBuffer(std::size_t Size, sBufferSubresource* InSub
     UpdateSubresource(InSubresource);
 }
 
-void D3D12VertexBuffer::UpdateSubresource(sBufferSubresource* Subresource, IGraphicsCommandContext* InCMDBuffer)
+void D3D12VertexBuffer::UpdateSubresource(BufferSubresource* Subresource, IGraphicsCommandContext* InCMDBuffer)
 {
     if (!Subresource)
         return;
@@ -254,7 +254,7 @@ void D3D12VertexBuffer::UpdateSubresource(sBufferSubresource* Subresource, IGrap
     }
 }
 
-D3D12IndexBuffer::D3D12IndexBuffer(D3D12Device* InOwner, std::string InName, const sBufferDesc& InDesc, sBufferSubresource* Subresource)
+D3D12IndexBuffer::D3D12IndexBuffer(D3D12Device* InOwner, std::string InName, const BufferLayout& InDesc, BufferSubresource* Subresource)
     : BufferDesc(InDesc)
     , Owner(InOwner)
     , Name(InName)
@@ -312,7 +312,7 @@ void D3D12IndexBuffer::ApplyBuffer(ID3D12GraphicsCommandList* CommandList)
     CommandList->IASetIndexBuffer(&IBView);
 }
 
-void D3D12IndexBuffer::ResizeBuffer(std::size_t Size, sBufferSubresource* InSubresource)
+void D3D12IndexBuffer::ResizeBuffer(std::size_t Size, BufferSubresource* InSubresource)
 {
     BufferDesc.Size = Size;
 
@@ -343,7 +343,7 @@ void D3D12IndexBuffer::ResizeBuffer(std::size_t Size, sBufferSubresource* InSubr
     UpdateSubresource(InSubresource);
 }
 
-void D3D12IndexBuffer::UpdateSubresource(sBufferSubresource* Subresource, IGraphicsCommandContext* InCMDBuffer)
+void D3D12IndexBuffer::UpdateSubresource(BufferSubresource* Subresource, IGraphicsCommandContext* InCMDBuffer)
 {
     if (InCMDBuffer)
     {
@@ -358,7 +358,7 @@ void D3D12IndexBuffer::UpdateSubresource(sBufferSubresource* Subresource, IGraph
     }
 }
 
-D3D12UnorderedAccessBuffer::D3D12UnorderedAccessBuffer(D3D12Device* InDevice, std::string InName, const sBufferDesc& InDesc, bool bSRVAllowed)
+D3D12UnorderedAccessBuffer::D3D12UnorderedAccessBuffer(D3D12Device* InDevice, std::string InName, const BufferLayout& InDesc, bool bSRVAllowed)
     : Super()
 {
 }

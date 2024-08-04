@@ -183,13 +183,13 @@ namespace GameMaterials
 
 			std::vector<sVertexAttributeDesc> VertexLayout =
 			{
-				{ "POSITION",	EFormat::RGB32_FLOAT,   0, offsetof(sVertexBufferEntry, position),    false },
-				{ "NORMAL",		EFormat::RGB32_FLOAT,   0, offsetof(sVertexBufferEntry, normal),      false },
-				{ "TEXCOORD",	EFormat::RG32_FLOAT,    0, offsetof(sVertexBufferEntry, texCoord),    false },
-				{ "COLOR",		EFormat::RGBA32_FLOAT,  0, offsetof(sVertexBufferEntry, Color),       false },
-				{ "TANGENT",	EFormat::RGB32_FLOAT,   0, offsetof(sVertexBufferEntry, tangent),     false },
-				{ "BINORMAL",	EFormat::RGB32_FLOAT,   0, offsetof(sVertexBufferEntry, binormal),    false },
-				{ "ARRAYINDEX",	EFormat::R32_UINT,	    0, offsetof(sVertexBufferEntry, ArrayIndex),  false },
+				{ "POSITION",	EFormat::RGB32_FLOAT,   0, offsetof(sVertexLayout, position),    false },
+				{ "NORMAL",		EFormat::RGB32_FLOAT,   0, offsetof(sVertexLayout, normal),      false },
+				{ "TEXCOORD",	EFormat::RG32_FLOAT,    0, offsetof(sVertexLayout, texCoord),    false },
+				{ "COLOR",		EFormat::RGBA32_FLOAT,  0, offsetof(sVertexLayout, Color),       false },
+				{ "TANGENT",	EFormat::RGB32_FLOAT,   0, offsetof(sVertexLayout, tangent),     false },
+				{ "BINORMAL",	EFormat::RGB32_FLOAT,   0, offsetof(sVertexLayout, binormal),    false },
+				{ "ARRAYINDEX",	EFormat::R32_UINT,	    0, offsetof(sVertexLayout, ArrayIndex),  false },
 			};
 			pPipelineDesc.VertexLayout = VertexLayout;
 
@@ -236,13 +236,13 @@ namespace GameMaterials
 
 			std::vector<sVertexAttributeDesc> VertexLayout =
 			{
-				{ "POSITION",	EFormat::RGB32_FLOAT,   0, offsetof(sVertexBufferEntry, position),    false },
-				{ "NORMAL",		EFormat::RGB32_FLOAT,   0, offsetof(sVertexBufferEntry, normal),      false },
-				{ "TEXCOORD",	EFormat::RG32_FLOAT,    0, offsetof(sVertexBufferEntry, texCoord),    false },
-				{ "COLOR",		EFormat::RGBA32_FLOAT,  0, offsetof(sVertexBufferEntry, Color),       false },
-				{ "TANGENT",	EFormat::RGB32_FLOAT,   0, offsetof(sVertexBufferEntry, tangent),     false },
-				{ "BINORMAL",	EFormat::RGB32_FLOAT,   0, offsetof(sVertexBufferEntry, binormal),    false },
-				{ "ARRAYINDEX",	EFormat::R32_UINT,	    0, offsetof(sVertexBufferEntry, ArrayIndex),  false },
+				{ "POSITION",	EFormat::RGB32_FLOAT,   0, offsetof(sVertexLayout, position),    false },
+				{ "NORMAL",		EFormat::RGB32_FLOAT,   0, offsetof(sVertexLayout, normal),      false },
+				{ "TEXCOORD",	EFormat::RG32_FLOAT,    0, offsetof(sVertexLayout, texCoord),    false },
+				{ "COLOR",		EFormat::RGBA32_FLOAT,  0, offsetof(sVertexLayout, Color),       false },
+				{ "TANGENT",	EFormat::RGB32_FLOAT,   0, offsetof(sVertexLayout, tangent),     false },
+				{ "BINORMAL",	EFormat::RGB32_FLOAT,   0, offsetof(sVertexLayout, binormal),    false },
+				{ "ARRAYINDEX",	EFormat::R32_UINT,	    0, offsetof(sVertexLayout, ArrayIndex),  false },
 			};
 			pPipelineDesc.VertexLayout = VertexLayout;
 
@@ -275,7 +275,7 @@ namespace GameMaterials
 					Desc.Dimensions.Y = 16;
 					Desc.Format = TextureAtlasDesc.Format;
 					ITexture2D::SharedPtr Texture = ITexture2D::CreateEmpty("Terrain_" + std::to_string(w) + "x" + std::to_string(h), Desc, 2);
-					Texture->UpdateTexture(TextureAtlas.get(), 0, 0, IntVector2(0, 0), FBounds2D(FDimension2D(16.0f,16.0f), FVector2(8.0f + w,8.0f + h)));
+					Texture->UpdateTexture(TextureAtlas.get(), 0, 0, IntVector2(0, 0), FBounds2D(FDimension2D(16.0f, 16.0f), FVector2(8.0f + w, 8.0f + h)));
 					MatInstance->AddTexture(Texture);
 				}
 			}
@@ -299,13 +299,13 @@ namespace GameMaterials
 
 			std::vector<sVertexAttributeDesc> VertexLayout =
 			{
-				{ "POSITION",	EFormat::RGB32_FLOAT,   0, offsetof(sVertexBufferEntry, position),    false },
-				{ "NORMAL",		EFormat::RGB32_FLOAT,   0, offsetof(sVertexBufferEntry, normal),      false },
-				{ "TEXCOORD",	EFormat::RG32_FLOAT,    0, offsetof(sVertexBufferEntry, texCoord),    false },
-				{ "COLOR",		EFormat::RGBA32_FLOAT,  0, offsetof(sVertexBufferEntry, Color),       false },
-				{ "TANGENT",	EFormat::RGB32_FLOAT,   0, offsetof(sVertexBufferEntry, tangent),     false },
-				{ "BINORMAL",	EFormat::RGB32_FLOAT,   0, offsetof(sVertexBufferEntry, binormal),    false },
-				{ "ARRAYINDEX",	EFormat::R32_UINT,	    0, offsetof(sVertexBufferEntry, ArrayIndex),  false },
+				{ "POSITION",	EFormat::RGB32_FLOAT,   0, offsetof(sVertexLayout, position),    false },
+				{ "NORMAL",		EFormat::RGB32_FLOAT,   0, offsetof(sVertexLayout, normal),      false },
+				{ "TEXCOORD",	EFormat::RG32_FLOAT,    0, offsetof(sVertexLayout, texCoord),    false },
+				{ "COLOR",		EFormat::RGBA32_FLOAT,  0, offsetof(sVertexLayout, Color),       false },
+				{ "TANGENT",	EFormat::RGB32_FLOAT,   0, offsetof(sVertexLayout, tangent),     false },
+				{ "BINORMAL",	EFormat::RGB32_FLOAT,   0, offsetof(sVertexLayout, binormal),    false },
+				{ "ARRAYINDEX",	EFormat::R32_UINT,	    0, offsetof(sVertexLayout, ArrayIndex),  false },
 			};
 			pPipelineDesc.VertexLayout = VertexLayout;
 
@@ -599,6 +599,53 @@ namespace GameMaterials
 
 				Cherrie = nullptr;
 			}
+		}
+
+		{
+			sPipelineDesc pPipelineDesc;
+			pPipelineDesc.BlendAttribute = sBlendAttributeDesc(EBlendStateMode::eNonPremultiplied);
+			pPipelineDesc.DepthStencilAttribute = sDepthStencilAttributeDesc(true, true);
+			pPipelineDesc.DepthStencilAttribute.DepthTest = ECompareFunction::eGreaterEqual;
+			//pPipelineDesc.DepthStencilAttribute.DepthTest = ECompareFunction::eLess;
+			//pPipelineDesc.DepthStencilAttribute.DepthTest = ECompareFunction::eAlways;
+			pPipelineDesc.PrimitiveTopologyType = EPrimitiveType::eTRIANGLE_LIST;
+			pPipelineDesc.RasterizerAttribute = sRasterizerAttributeDesc();
+
+			pPipelineDesc.NumRenderTargets = 1;
+			pPipelineDesc.RTVFormats[0] = EFormat::BGRA8_UNORM;
+			pPipelineDesc.DSVFormat = GPU::GetDefaultDepthFormat();
+
+			std::vector<sVertexAttributeDesc> VertexLayout =
+			{
+				{ "POSITION",		 EFormat::RGB32_FLOAT,   0, offsetof(sParticleVertexLayout, position),	false },
+				{ "TEXCOORD",		 EFormat::RG32_FLOAT,    0, offsetof(sParticleVertexLayout, texCoord),	false },
+				{ "COLOR",			 EFormat::RGBA32_FLOAT,  0, offsetof(sParticleVertexLayout, Color),		false },
+				{ "INSTANCEPOS",	 EFormat::RGB32_FLOAT,	 1, offsetof(sParticleVertexLayout::sParticleInstanceLayout, position),		true },
+				{ "INSTANCECOLOR",	 EFormat::RGBA32_FLOAT,	 1, offsetof(sParticleVertexLayout::sParticleInstanceLayout, Color),		true },
+			};
+			pPipelineDesc.VertexLayout = VertexLayout;
+
+			pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Vertex, 0));
+			pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Vertex, 10));
+			pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eTexture, eShaderType::Pixel, 0));
+			pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eSampler, eShaderType::Pixel, 0));
+			pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Pixel, 0));
+			//pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eTexture, eShaderType::Pixel, 1));
+			//pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eTexture, eShaderType::Pixel, 2));
+			//pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eTexture, eShaderType::Pixel, 3));
+			//pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eTexture, eShaderType::Pixel, 4));
+
+			std::vector<sShaderAttachment> ShaderAttachments;
+			pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment(L"..//Content\\Shaders\\Particle.hlsl", "ParticleVS", eShaderType::Vertex));
+			pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment(L"..//Content\\Shaders\\Particle.hlsl", "ParticlePS", eShaderType::Pixel));
+
+			sMaterial::SharedPtr ParticleMat;
+			ParticleMat = sMaterial::Create("ParticleMat", EMaterialBlendMode::Opaque, pPipelineDesc);
+			//DefaultEngineMat->BindConstantBuffer(CameraCB);
+			auto DefaultParticle_MatInstance = ParticleMat->CreateInstance("ParticleMat_MatInstance");
+			DefaultParticle_MatInstance->AddTexture(L"..//Content\\smoke-particle.png", "ParticleMat_Texture", 2);
+			//DefaultParticle_MatInstance->AddTexture(L"..//Content\\Textures\\DefaultWhiteGrid.DDS", "DefaultEngineTexture", 2);
+			sMaterialManager::Get().StoreMaterial(ParticleMat);
 		}
 	};
 }

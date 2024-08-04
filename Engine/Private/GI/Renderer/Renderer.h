@@ -31,6 +31,7 @@
 #include "PostProcessRenderer.h"
 #include "AbstractGI/ToneMapping.h"
 #include "LineRenderer.h"
+#include "ParticleRenderer.h"
 
 class sRenderer final
 {
@@ -91,9 +92,9 @@ private:
 	sCanvasRenderer::SharedPtr CanvasRenderer;
 	sPostProcessRenderer::UniquePtr PostProcessRenderer;
 	sToneMapping::UniquePtr ToneMapping;
-
 	sLineRenderer::SharedPtr LineRenderer;
 	EGBufferClear GBufferClearMode;
+	ParticleRenderer::SharedPtr pParticleRenderer;
 
 	bool bIsTonmapperEnabled;
 

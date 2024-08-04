@@ -41,7 +41,7 @@ D3D11VertexAttribute::D3D11VertexAttribute(D3D11Device* InDevice, std::vector<sV
 		elementDesc[i].SemanticName = VertexAttributeDescData[i].name.c_str();
 		elementDesc[i].SemanticIndex = 0;
 		elementDesc[i].Format = ConvertFormat_Format_To_DXGI(VertexAttributeDescData[i].format);
-		elementDesc[i].InputSlot = 0;// VertexAttributeDescData[i].bufferIndex;
+		elementDesc[i].InputSlot = VertexAttributeDescData[i].InputSlot;
 		elementDesc[i].AlignedByteOffset = VertexAttributeDescData[i].offset;
 		elementDesc[i].InputSlotClass = VertexAttributeDescData[i].isInstanced ? D3D11_INPUT_PER_INSTANCE_DATA : D3D11_INPUT_PER_VERTEX_DATA;
 		elementDesc[i].InstanceDataStepRate = VertexAttributeDescData[i].isInstanced ? 1 : 0;

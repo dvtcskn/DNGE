@@ -84,20 +84,20 @@ public:
 	virtual void SetUnorderedAccessBufferAsResource(IUnorderedAccessBuffer* pUAV, std::uint32_t RootParameterIndex) override final;
 	virtual void SetUnorderedAccessBuffersAsResource(std::vector<IUnorderedAccessBuffer*> UAVs, std::uint32_t RootParameterIndex) override final;
 
-	void UpdateSubresource(ID3D12Resource* Buffer, D3D12_RESOURCE_STATES State, D3D12UploadBuffer* UploadBuffer, sBufferSubresource* Subresource);
+	void UpdateSubresource(ID3D12Resource* Buffer, D3D12_RESOURCE_STATES State, D3D12UploadBuffer* UploadBuffer, BufferSubresource* Subresource);
 
 	virtual void SetPipeline(IPipeline* Pipeline) override final;
 
-	virtual void SetVertexBuffer(IVertexBuffer* VB) override final;
+	virtual void SetVertexBuffer(IVertexBuffer* VB, std::uint32_t Slot = 0) override final;
 	virtual void SetIndexBuffer(IIndexBuffer* IB) override final;
 
 	virtual void SetConstantBuffer(IConstantBuffer* CB, std::optional<std::uint32_t> RootParameterIndex = std::nullopt) override final;
 
 	virtual void SetTexture2D(ITexture2D* Texture2D, std::optional<std::uint32_t> RootParameterIndex = std::nullopt) override final;
 
-	virtual void UpdateBufferSubresource(IVertexBuffer* Buffer, sBufferSubresource* Subresource) override final;
+	virtual void UpdateBufferSubresource(IVertexBuffer* Buffer, BufferSubresource* Subresource) override final;
 	virtual void UpdateBufferSubresource(IVertexBuffer* Buffer, std::size_t Location, std::size_t Size, const void* pSrcData) override final;
-	virtual void UpdateBufferSubresource(IIndexBuffer* Buffer, sBufferSubresource* Subresource) override final;
+	virtual void UpdateBufferSubresource(IIndexBuffer* Buffer, BufferSubresource* Subresource) override final;
 	virtual void UpdateBufferSubresource(IIndexBuffer* Buffer, std::size_t Location, std::size_t Size, const void* pSrcData) override final;
 
 	virtual void Draw(std::uint32_t VertexCount, std::uint32_t VertexStartOffset = 0) override final;
@@ -154,11 +154,11 @@ public:
 	virtual void CopyFrameBuffer(IFrameBuffer* Dest, std::size_t DestFBOIndex, IFrameBuffer* Source, std::uint32_t SourceFBOIndex) override final;
 	virtual void CopyFrameBufferDepth(IFrameBuffer* Dest, IFrameBuffer* Source) override final;
 
-	void UpdateSubresource(ID3D12Resource* Buffer, D3D12_RESOURCE_STATES State, D3D12UploadBuffer* UploadBuffer, sBufferSubresource* Subresource);
+	void UpdateSubresource(ID3D12Resource* Buffer, D3D12_RESOURCE_STATES State, D3D12UploadBuffer* UploadBuffer, BufferSubresource* Subresource);
 
-	virtual void UpdateBufferSubresource(IVertexBuffer* Buffer, sBufferSubresource* Subresource) override final;
+	virtual void UpdateBufferSubresource(IVertexBuffer* Buffer, BufferSubresource* Subresource) override final;
 	virtual void UpdateBufferSubresource(IVertexBuffer* Buffer, std::size_t Location, std::size_t Size, const void* pSrcData) override final;
-	virtual void UpdateBufferSubresource(IIndexBuffer* Buffer, sBufferSubresource* Subresource) override final;
+	virtual void UpdateBufferSubresource(IIndexBuffer* Buffer, BufferSubresource* Subresource) override final;
 	virtual void UpdateBufferSubresource(IIndexBuffer* Buffer, std::size_t Location, std::size_t Size, const void* pSrcData) override final;
 
 	virtual void ClearState() override final;

@@ -256,14 +256,14 @@ sCanvasRenderer::sCanvasRenderer(std::size_t Width, std::size_t Height)
 	}
 
 	{
-		sBufferDesc Desc;
+		BufferLayout Desc;
 		Desc.Size = sizeof(cbgui::cbVector4) * 4;
 		Desc.Stride = sizeof(cbgui::cbVector4);
 		DepthVertexBuffer = IVertexBuffer::CreateUnique("DepthVertexBuffer", Desc);
 	}
 
 	{
-		sBufferDesc BufferDesc;
+		BufferLayout BufferDesc;
 		BufferDesc.Size = sizeof(OnScreenWidgetMatrix);
 		WidgetConstantBuffer = IConstantBuffer::Create("DepthTest", BufferDesc, 0);
 

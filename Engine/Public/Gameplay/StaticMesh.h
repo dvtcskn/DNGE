@@ -31,7 +31,7 @@
 #include "AbstractGI/Material.h"
 #include "Core/Math/CoreMath.h"
 #include "Engine/IRigidBody.h"
-#include "AbstractGI/RendererResource.h"
+#include "AbstractGI/Mesh.h"
 #include "ILevel.h"
 
 class sStaticMesh : public sMesh, public std::enable_shared_from_this<sStaticMesh>

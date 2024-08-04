@@ -35,6 +35,7 @@
 #include <Gameplay/StaticMesh.h>
 #include "GPlayerCharacter.h"
 #include "GAIController.h"
+#include <Gameplay/ParticleSystem.h>
 
 struct LevelLayer
 {
@@ -42,6 +43,11 @@ struct LevelLayer
 	~LevelLayer()
 	{
 		DeferredRemove();
+		for (auto& Emitter : Emitters)
+		{
+			Emitter = nullptr;
+		}
+		Emitters.clear();
 		for (auto& Actor : Actors)
 		{
 			Actor->RemoveFromLevel(false);
@@ -55,6 +61,11 @@ struct LevelLayer
 
 	void Release()
 	{
+		for (auto& Emitter : Emitters)
+		{
+			Emitter = nullptr;
+		}
+		Emitters.clear();
 		for (auto& Actor : Actors)
 		{
 			Actor->RemoveFromLevel();
@@ -75,6 +86,10 @@ struct LevelLayer
 				continue;
 			Actor->BeginPlay();
 		}
+		for (const auto& Emitter : Emitters)
+		{
+			Emitter->BeginPlay();
+		}
 	}
 	inline void Tick(const double DeltaTime)
 	{
@@ -86,6 +101,26 @@ struct LevelLayer
 				continue;
 			Actor->Tick(DeltaTime);
 		}
+		for (const auto& Emitter : Emitters)
+		{
+			Emitter->Tick(DeltaTime);
+		}
+
+		/*std::vector<sActor::SharedPtr>::iterator it = Actors.begin();
+		while (it != Actors.end())
+		{
+			if ((*it))
+			{
+				if (std::find(RemoveActorsByDeferred.begin(), RemoveActorsByDeferred.end(), (*it)) != RemoveActorsByDeferred.end())
+					continue;
+				(*it)->Tick(DeltaTime);
+				it++;
+			}
+			else
+			{
+				it++;
+			}
+		}*/
 	}
 	inline void FixedUpdate(const double DeltaTime)
 	{
@@ -95,6 +130,22 @@ struct LevelLayer
 				continue;
 			Actor->FixedUpdate(DeltaTime);
 		}
+
+		/*std::vector<sActor::SharedPtr>::iterator it = Actors.begin();
+		while (it != Actors.end())
+		{
+			if ((*it))
+			{
+				if (std::find(RemoveActorsByDeferred.begin(), RemoveActorsByDeferred.end(), (*it)) != RemoveActorsByDeferred.end())
+					continue;
+				(*it)->FixedUpdate(DeltaTime);
+				it++;
+			}
+			else
+			{
+				it++;
+			}
+		}*/
 	}
 
 	inline void InputProcess(const GMouseInput& MouseInput, const GKeyboardChar& KeyboardChar)
@@ -207,8 +258,65 @@ struct LevelLayer
 		return Actors.at(Index).get();
 	}
 
+	inline void AddEmitter(const std::shared_ptr<sEmitter>& Object)
+	{
+		Emitters.push_back(Object);
+	}
+	inline size_t EmitterCount() const
+	{
+		return Emitters.size();
+	}
+	inline std::vector<std::shared_ptr<sEmitter>> GetAllEmitters() const
+	{
+		return Emitters;
+	}
+	inline sEmitter* GetEmitter(const std::size_t Index) const
+	{
+		return Emitters.at(Index).get();
+	}
+	inline void RemoveEmitter(const sEmitter* Emitter)
+	{
+		std::vector<sEmitter::SharedPtr>::iterator it = Emitters.begin();
+		while (it != Emitters.end())
+		{
+			if ((*it))
+			{
+				if ((*it).get() == Emitter)
+				{
+					sEmitter::SharedPtr Temp = (*it);
+					it = Emitters.erase(it);
+					Temp = nullptr;
+					break;
+				}
+				else
+				{
+					it++;
+				}
+			}
+			else
+			{
+				it++;
+			}
+		}
+		Emitters.shrink_to_fit();
+	}
+	inline void RemoveEmitter(const std::size_t Index)
+	{
+		Emitters[Index] = nullptr;
+		Emitters.erase(Emitters.begin() + Index);
+	}
+	inline void RemoveAllEmitters(const std::size_t Index)
+	{
+		for (auto& Emitter : Emitters)
+		{
+			Emitter = nullptr;
+		}
+		Emitters.clear();
+	}
+
 	std::vector<sActor::SharedPtr> Actors;
 	std::vector<sMesh::SharedPtr> Meshes;
+	std::vector<sEmitter::SharedPtr> Emitters;
 private:
 	void DeferredRemove()
 	{
@@ -252,6 +360,8 @@ public:
 	virtual void RemoveMesh(sMesh* Object, std::size_t LayerIndex = 0) override final;
 	virtual void AddActor(const std::shared_ptr<sActor>& Object, std::size_t LayerIndex = 0) override final;
 	virtual void RemoveActor(sActor* Object, std::size_t LayerIndex = 0, bool bDeferredRemove = true) override final;
+	virtual void AddEmitter(const std::shared_ptr<sEmitter>& Object, std::size_t LayerIndex = 0) override final;
+	virtual void RemoveEmitter(sEmitter* Object, std::size_t LayerIndex = 0, bool bDeferredRemove = true) override final;
 
 	virtual size_t LayerCount() const override final;
 
@@ -261,6 +371,9 @@ public:
 	virtual size_t ActorCount(std::size_t LayerIndex = 0) const override final;
 	virtual	std::vector<std::shared_ptr<sActor>> GetAllActors(std::size_t LayerIndex = 0) const override final;
 	virtual sActor* GetActor(const std::size_t Index, std::size_t LayerIndex = 0) const override final;
+	virtual size_t EmitterCount(std::size_t LayerIndex = 0) const override final;
+	virtual	std::vector<std::shared_ptr<sEmitter>> GetAllEmitters(std::size_t LayerIndex = 0) const override final;
+	virtual sEmitter* GetEmitter(const std::size_t Index, std::size_t LayerIndex = 0) const override final;
 
 	sActor* GetPlayerFocusedActor(std::size_t Index) const;
 

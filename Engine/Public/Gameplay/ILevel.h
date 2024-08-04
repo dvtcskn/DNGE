@@ -29,10 +29,10 @@
 
 class sActor;
 class sMesh;
-class sStaticMesh;
 class sMaterial;
 class sActorComponent;
 class sMeshComponent;
+class sEmitter;
 
 struct sObjectSpawnNode
 {
@@ -78,6 +78,8 @@ public:
 	virtual void RemoveMesh(sMesh* Object, std::size_t LayerIndex = 0) = 0;
 	virtual void AddActor(const std::shared_ptr<sActor>& Object, std::size_t LayerIndex = 0) = 0;
 	virtual void RemoveActor(sActor* Object, std::size_t LayerIndex = 0, bool bDeferredRemove = true) = 0;
+	virtual void AddEmitter(const std::shared_ptr<sEmitter>& Object, std::size_t LayerIndex = 0) = 0;
+	virtual void RemoveEmitter(sEmitter* Object, std::size_t LayerIndex = 0, bool bDeferredRemove = true) = 0;
 
 	virtual size_t LayerCount() const { return 1; }
 
@@ -87,6 +89,9 @@ public:
 	virtual size_t ActorCount(std::size_t LayerIndex = 0) const = 0;
 	virtual	std::vector<std::shared_ptr<sActor>> GetAllActors(std::size_t LayerIndex = 0) const = 0;
 	virtual sActor* GetActor(const std::size_t Index, std::size_t LayerIndex = 0) const = 0;
+	virtual size_t EmitterCount(std::size_t LayerIndex = 0) const = 0;
+	virtual	std::vector<std::shared_ptr<sEmitter>> GetAllEmitters(std::size_t LayerIndex = 0) const = 0;
+	virtual sEmitter* GetEmitter(const std::size_t Index, std::size_t LayerIndex = 0) const = 0;
 
 	virtual void OnResizeWindow(const std::size_t Width, const std::size_t Height) = 0;
 

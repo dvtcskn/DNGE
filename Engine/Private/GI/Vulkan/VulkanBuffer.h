@@ -27,8 +27,6 @@
 
 #include <string>
 #include <vector>
-#include <d3d11.h>
-#include <d3d12.h>
 #include <assert.h>
 #include <wrl/client.h>
 #include "Engine/ClassBody.h"
@@ -45,7 +43,7 @@ private:
 	std::string Name;
 
 public:
-	VulkanConstantBuffer(std::string InName, const sBufferDesc& InDesc, std::uint32_t InRootParameterIndex)
+	VulkanConstantBuffer(std::string InName, const BufferLayout& InDesc, std::uint32_t InRootParameterIndex)
 		: RootParameterIndex(InRootParameterIndex)
 		, Name(InName)
 	{}
@@ -67,7 +65,7 @@ private:
 	std::string Name;
 
 public:
-	VulkanVertexBuffer(std::string InName, const sBufferDesc& InDesc, sBufferSubresource* InSubresource = nullptr)
+	VulkanVertexBuffer(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource = nullptr)
 		: Name(InName)
 	{}
 
@@ -77,7 +75,7 @@ public:
 
 	virtual std::size_t GetSize() const final override { return 0; }
 	virtual bool IsMapable() const final override { return false; }
-	virtual void UpdateSubresource(sBufferSubresource* Subresource, IGraphicsCommandContext* InCMDBuffer = nullptr) final override;
+	virtual void UpdateSubresource(BufferSubresource* Subresource, IGraphicsCommandContext* InCMDBuffer = nullptr) final override;
 };
 
 class VulkanIndexBuffer final : public IIndexBuffer
@@ -87,7 +85,7 @@ private:
 	std::string Name;
 
 public:
-	VulkanIndexBuffer(std::string InName, const sBufferDesc& InDesc, sBufferSubresource* InSubresource = nullptr)
+	VulkanIndexBuffer(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource = nullptr)
 		: Name(InName)
 	{}
 
@@ -97,5 +95,5 @@ public:
 
 	virtual std::size_t GetSize() const final override { return 0; }
 	virtual bool IsMapable() const final override { return false; }
-	virtual void UpdateSubresource(sBufferSubresource* Subresource, IGraphicsCommandContext* InCMDBuffer = nullptr) final override;
+	virtual void UpdateSubresource(BufferSubresource* Subresource, IGraphicsCommandContext* InCMDBuffer = nullptr) final override;
 };

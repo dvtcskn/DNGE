@@ -30,7 +30,7 @@
 #include <vector>
 #include <memory>
 #include "Core/Math/CoreMath.h"
-#include "AbstractGI/RendererResource.h"
+#include "AbstractGI/Mesh.h"
 #include "Sprite.h"
 #include "AnimationStates.h"
 

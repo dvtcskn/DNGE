@@ -904,7 +904,7 @@ void D3D12CommandBuffer::SetUnorderedAccessBuffersAsResource(std::vector<IUnorde
 {
 }
 
-void D3D12CommandBuffer::UpdateSubresource(ID3D12Resource* Buffer, D3D12_RESOURCE_STATES State, D3D12UploadBuffer* UploadBuffer, sBufferSubresource* Subresource)
+void D3D12CommandBuffer::UpdateSubresource(ID3D12Resource* Buffer, D3D12_RESOURCE_STATES State, D3D12UploadBuffer* UploadBuffer, BufferSubresource* Subresource)
 {
 	if (!Buffer || !UploadBuffer || !Subresource)
 		return;
@@ -928,11 +928,11 @@ void D3D12CommandBuffer::SetPipeline(IPipeline* Pipeline)
 	}
 }
 
-void D3D12CommandBuffer::SetVertexBuffer(IVertexBuffer* VB)
+void D3D12CommandBuffer::SetVertexBuffer(IVertexBuffer* VB, std::uint32_t Slot)
 {
 	if (VB)
 	{
-		static_cast<D3D12VertexBuffer*>(VB)->ApplyBuffer(CommandList.Get());
+		static_cast<D3D12VertexBuffer*>(VB)->ApplyBuffer(CommandList.Get(), Slot);
 	}
 }
 
@@ -966,7 +966,7 @@ void D3D12CommandBuffer::SetTexture2D(ITexture2D* Texture2D, std::optional<std::
 	}
 }
 
-void D3D12CommandBuffer::UpdateBufferSubresource(IVertexBuffer* Buffer, sBufferSubresource* Subresource)
+void D3D12CommandBuffer::UpdateBufferSubresource(IVertexBuffer* Buffer, BufferSubresource* Subresource)
 {
 	if (!Subresource || !Buffer)
 		return;
@@ -979,7 +979,7 @@ void D3D12CommandBuffer::UpdateBufferSubresource(IVertexBuffer* Buffer, std::siz
 	if (!Buffer || !pSrcData)
 		return;
 
-	sBufferSubresource Subresource;
+	BufferSubresource Subresource;
 	Subresource.Location = Location;
 	Subresource.pSysMem = const_cast<void*>(pSrcData);
 	Subresource.Size = Size;
@@ -987,7 +987,7 @@ void D3D12CommandBuffer::UpdateBufferSubresource(IVertexBuffer* Buffer, std::siz
 	static_cast<D3D12VertexBuffer*>(Buffer)->UpdateSubresource(&Subresource, this);
 }
 
-void D3D12CommandBuffer::UpdateBufferSubresource(IIndexBuffer* Buffer, sBufferSubresource* Subresource)
+void D3D12CommandBuffer::UpdateBufferSubresource(IIndexBuffer* Buffer, BufferSubresource* Subresource)
 {
 	if (!Subresource || !Buffer)
 		return;
@@ -1000,7 +1000,7 @@ void D3D12CommandBuffer::UpdateBufferSubresource(IIndexBuffer* Buffer, std::size
 	if (!Buffer || !pSrcData)
 		return;
 
-	sBufferSubresource Subresource;
+	BufferSubresource Subresource;
 	Subresource.Location = Location;
 	Subresource.pSysMem = const_cast<void*>(pSrcData);
 	Subresource.Size = Size;
@@ -1280,7 +1280,7 @@ void D3D12CopyCommandBuffer::CopyFrameBufferDepth(IFrameBuffer* Dest, IFrameBuff
 	bWaitForCompletion = true;
 }
 
-void D3D12CopyCommandBuffer::UpdateSubresource(ID3D12Resource* Buffer, D3D12_RESOURCE_STATES State, D3D12UploadBuffer* UploadBuffer, sBufferSubresource* Subresource)
+void D3D12CopyCommandBuffer::UpdateSubresource(ID3D12Resource* Buffer, D3D12_RESOURCE_STATES State, D3D12UploadBuffer* UploadBuffer, BufferSubresource* Subresource)
 {
 	if (!Buffer || !UploadBuffer || !Subresource)
 		return;
@@ -1296,7 +1296,7 @@ void D3D12CopyCommandBuffer::UpdateSubresource(ID3D12Resource* Buffer, D3D12_RES
 	CommandList->ResourceBarrier(1, &postCopyBarriers);
 }
 
-void D3D12CopyCommandBuffer::UpdateBufferSubresource(IVertexBuffer* Buffer, sBufferSubresource* Subresource)
+void D3D12CopyCommandBuffer::UpdateBufferSubresource(IVertexBuffer* Buffer, BufferSubresource* Subresource)
 {
 	if (!Subresource || !Buffer)
 		return;
@@ -1309,7 +1309,7 @@ void D3D12CopyCommandBuffer::UpdateBufferSubresource(IVertexBuffer* Buffer, std:
 	if (!Buffer || !pSrcData)
 		return;
 
-	sBufferSubresource Subresource;
+	BufferSubresource Subresource;
 	Subresource.Location = Location;
 	Subresource.pSysMem = const_cast<void*>(pSrcData);
 	Subresource.Size = Size;
@@ -1318,7 +1318,7 @@ void D3D12CopyCommandBuffer::UpdateBufferSubresource(IVertexBuffer* Buffer, std:
 	UpdateSubresource(pd3dBuffer->GetBuffer(), D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, pd3dBuffer->GetUploadBuffer(), &Subresource);
 }
 
-void D3D12CopyCommandBuffer::UpdateBufferSubresource(IIndexBuffer* Buffer, sBufferSubresource* Subresource)
+void D3D12CopyCommandBuffer::UpdateBufferSubresource(IIndexBuffer* Buffer, BufferSubresource* Subresource)
 {
 	if (!Subresource || !Buffer)
 		return;
@@ -1331,7 +1331,7 @@ void D3D12CopyCommandBuffer::UpdateBufferSubresource(IIndexBuffer* Buffer, std::
 	if (!Buffer || !pSrcData)
 		return;
 
-	sBufferSubresource Subresource;
+	BufferSubresource Subresource;
 	Subresource.Location = Location;
 	Subresource.pSysMem = const_cast<void*>(pSrcData);
 	Subresource.Size = Size;

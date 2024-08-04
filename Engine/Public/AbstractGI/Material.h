@@ -33,13 +33,6 @@
 #include "Engine/ClassBody.h"
 #include "Engine/AbstractEngine.h"
 
-enum class EMaterialType
-{
-	Actor,
-	UI,
-	PostProcess,
-};
-
 enum class EMaterialBlendMode
 {
 	Opaque,
@@ -147,22 +140,22 @@ public:
 	};
 
 public:
-	static sMaterial::SharedPtr CreateMaterial(std::string InName, EMaterialBlendMode InBlendMode, sPipelineDesc InPipelineDesc, EMaterialType InType = EMaterialType::Actor)
+	static sMaterial::SharedPtr CreateMaterial(std::string InName, EMaterialBlendMode InBlendMode, sPipelineDesc InPipelineDesc)
 	{
-		auto Mat = Create(InName, InBlendMode, InPipelineDesc, InType);
+		auto Mat = Create(InName, InBlendMode, InPipelineDesc);
 		return Mat;
 	}
 
 	static sMaterial::SharedPtr CreateMaterial(std::string InName, EMaterialBlendMode InBlendMode, sPipelineDesc InPipelineDesc, std::vector<sDescriptorSetLayoutBinding> InDescriptorSetLayout,
-		std::vector<sShaderAttachment> InAttachments, std::vector<sVertexAttributeDesc> InVertexLayout = std::vector<sVertexAttributeDesc>(), EMaterialType InType = EMaterialType::Actor)
+		std::vector<sShaderAttachment> InAttachments, std::vector<sVertexAttributeDesc> InVertexLayout = std::vector<sVertexAttributeDesc>())
 	{
-		auto Mat = Create(InName, InBlendMode, InPipelineDesc, InDescriptorSetLayout, InAttachments, InVertexLayout, InType);
+		auto Mat = Create(InName, InBlendMode, InPipelineDesc, InDescriptorSetLayout, InAttachments, InVertexLayout);
 		return Mat;
 	}
 
-	sMaterial(std::string InName, EMaterialBlendMode InBlendMode, sPipelineDesc InPipelineDesc, EMaterialType InType = EMaterialType::Actor);
+	sMaterial(std::string InName, EMaterialBlendMode InBlendMode, sPipelineDesc InPipelineDesc);
 	sMaterial(std::string InName, EMaterialBlendMode InBlendMode, sPipelineDesc InPipelineDesc, std::vector<sDescriptorSetLayoutBinding> InDescriptorSetLayout,
-		std::vector<sShaderAttachment> InAttachments, std::vector<sVertexAttributeDesc> InVertexLayout = std::vector<sVertexAttributeDesc>(), EMaterialType InType = EMaterialType::Actor);
+		std::vector<sShaderAttachment> InAttachments, std::vector<sVertexAttributeDesc> InVertexLayout = std::vector<sVertexAttributeDesc>());
 
 	virtual ~sMaterial();
 	sMaterialInstance::SharedPtr CreateInstance(std::string InName);
@@ -215,7 +208,6 @@ public:
 
 	void ApplyMaterial(IGraphicsCommandContext* InCMDBuffer = nullptr) const;
 
-	EMaterialType MaterialType;
 	EMaterialUsage MaterialUsage;
 	EMaterialBlendMode BlendMode;
 

@@ -72,14 +72,14 @@ public:
 	virtual ICopyCommandContext::SharedPtr CreateCopyCommandContext() override final;
 	virtual ICopyCommandContext::UniquePtr CreateUniqueCopyCommandContext() override final;
 
-	virtual IConstantBuffer::SharedPtr CreateConstantBuffer(std::string InName, const sBufferDesc& InDesc, std::uint32_t InRootParameterIndex) override final;
-	virtual IConstantBuffer::UniquePtr CreateUniqueConstantBuffer(std::string InName, const sBufferDesc& InDesc, std::uint32_t InRootParameterIndex) override final;
+	virtual IConstantBuffer::SharedPtr CreateConstantBuffer(std::string InName, const BufferLayout& InDesc, std::uint32_t InRootParameterIndex) override final;
+	virtual IConstantBuffer::UniquePtr CreateUniqueConstantBuffer(std::string InName, const BufferLayout& InDesc, std::uint32_t InRootParameterIndex) override final;
 
-	virtual IVertexBuffer::SharedPtr CreateVertexBuffer(std::string InName, const sBufferDesc& InDesc, sBufferSubresource* InSubresource = nullptr) override final;
-	virtual IVertexBuffer::UniquePtr CreateUniqueVertexBuffer(std::string InName, const sBufferDesc& InDesc, sBufferSubresource* InSubresource = nullptr) override final;
+	virtual IVertexBuffer::SharedPtr CreateVertexBuffer(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource = nullptr) override final;
+	virtual IVertexBuffer::UniquePtr CreateUniqueVertexBuffer(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource = nullptr) override final;
 
-	virtual IIndexBuffer::SharedPtr CreateIndexBuffer(std::string InName, const sBufferDesc& InDesc, sBufferSubresource* InSubresource = nullptr) override final;
-	virtual IIndexBuffer::UniquePtr CreateUniqueIndexBuffer(std::string InName, const sBufferDesc& InDesc, sBufferSubresource* InSubresource = nullptr) override final;
+	virtual IIndexBuffer::SharedPtr CreateIndexBuffer(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource = nullptr) override final;
+	virtual IIndexBuffer::UniquePtr CreateUniqueIndexBuffer(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource = nullptr) override final;
 
 	virtual IFrameBuffer::SharedPtr CreateFrameBuffer(const std::string InName, const sFrameBufferAttachmentInfo& InAttachments) override final;
 	virtual IFrameBuffer::UniquePtr CreateUniqueFrameBuffer(const std::string InName, const sFrameBufferAttachmentInfo& InAttachments) override final;
@@ -140,13 +140,13 @@ private:
 		size_t presentQueueFamilyIndex;
 	};
 
-	//vk::Device device;
-	//vk::PhysicalDevice PhysicalDevice;
-	//vk::PhysicalDeviceType PhysicalDevice_Type;
-	//vk::Instance instance;
-	//vk::Queue GraphicsQueue;
-	//vk::UniqueCommandPool CMDBufferPool;
-	//vk::PhysicalDeviceMemoryProperties PhysicalDeviceMemoryProperties;
+	/*vk::Device device;
+	vk::PhysicalDevice PhysicalDevice;
+	vk::PhysicalDeviceType PhysicalDevice_Type;
+	vk::Instance instance;
+	vk::Queue GraphicsQueue;
+	vk::UniqueCommandPool CMDBufferPool;
+	vk::PhysicalDeviceMemoryProperties PhysicalDeviceMemoryProperties;*/
 	std::uint64_t uniform_buffer_alignment;
 
 	//vk::PhysicalDeviceProperties PhysicalDeviceProperties;

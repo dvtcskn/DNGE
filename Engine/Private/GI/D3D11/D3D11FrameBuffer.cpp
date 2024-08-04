@@ -28,6 +28,130 @@
 #include "D3D11FrameBuffer.h"
 #include "D3D11CommandBuffer.h"
 
+/*
+Depth Formats
+DXGI_FORMAT_R16_TYPELESS
+DXGI_FORMAT_R16_UINT
+DXGI_FORMAT_D16_UNORM
+
+DXGI_FORMAT_R32_TYPELESS
+DXGI_FORMAT_R32_UINT
+DXGI_FORMAT_D32_FLOAT
+
+// NO SRV Only
+DXGI_FORMAT_R24G8_TYPELESS
+DXGI_FORMAT_D24_UNORM_S8_UINT
+
+DXGI_FORMAT_R32G8X24_TYPELESS
+DXGI_FORMAT_D32_FLOAT_S8X24_UINT
+*/
+
+/*struct FBO_Depth
+{
+	ComPtr<ID3D11Texture2D> Texture;
+	ComPtr<ID3D11ShaderResourceView> ShaderResource;
+	ComPtr<ID3D11DepthStencilView> DepthResource;
+
+
+	FBO_Depth()
+		: Texture(nullptr)
+		, ShaderResource(nullptr)
+		, DepthResource(nullptr)
+	{}
+
+	~FBO_Depth()
+	{
+		Texture = nullptr;
+		ShaderResource = nullptr;
+		DepthResource = nullptr;
+	}
+};
+
+std::vector<FBO_Depth*> GetSupportedDepths(ID3D11Device* Device, const sFBODesc& FDesc, bool WithSRV)
+{
+	std::vector<FBO_Depth*> Depths;
+	const auto Formats = GetAllDXGIFormats();
+
+	for (const auto& Format : Formats)
+	{
+		FBO_Depth* DBuffer = new FBO_Depth;
+		ComPtr<ID3D11Texture2D> Texture;
+		D3D11_TEXTURE2D_DESC sTextureDesc;
+		ZeroMemory(&sTextureDesc, sizeof(sTextureDesc));
+		sTextureDesc.Width = FDesc.Dimensions.X;
+		sTextureDesc.Height = FDesc.Dimensions.Y;
+		sTextureDesc.MipLevels = 1;
+		sTextureDesc.ArraySize = 1;
+		sTextureDesc.Format = Format;
+		sTextureDesc.SampleDesc.Count = FDesc.MSLevel.Count;
+		sTextureDesc.SampleDesc.Quality = FDesc.MSLevel.Quality;
+		sTextureDesc.Usage = D3D11_USAGE::D3D11_USAGE_DEFAULT;
+		sTextureDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE;
+		sTextureDesc.CPUAccessFlags = NULL;
+		sTextureDesc.MiscFlags = NULL;
+
+		Device->CreateTexture2D(&sTextureDesc, NULL, Texture.GetAddressOf());
+		DBuffer->Texture = Texture;
+		//DBuffer->TextureFormat = Format;
+		if (!Texture)
+		{
+			delete DBuffer;
+			DBuffer = nullptr;
+			continue;
+		}
+
+		for (const auto& DSVFormat : Formats)
+		{
+			CD3D11_DEPTH_STENCIL_VIEW_DESC depthStencilDesc(
+				D3D11_DSV_DIMENSION_TEXTURE2D,
+				DSVFormat,
+				0,          // Mips
+				1, 1        // Array
+			);
+
+			ComPtr<ID3D11DepthStencilView> depthStencilView;
+			Device->CreateDepthStencilView(Texture.Get(), &depthStencilDesc, depthStencilView.GetAddressOf());
+			DBuffer->DepthResource = depthStencilView;
+			//DBuffer->DepthFormat = DSVFormat;
+
+			if (depthStencilView)
+				break;
+		}
+
+		if (WithSRV)
+		{
+			for (const auto& SRVFormat : Formats)
+			{
+				CD3D11_SHADER_RESOURCE_VIEW_DESC srvDesc(
+					D3D_SRV_DIMENSION_TEXTURE2D,
+					SRVFormat,
+					0, 1,  // Mips
+					0, sTextureDesc.ArraySize   // Array
+				);
+
+				ComPtr<ID3D11ShaderResourceView> ShaderResource;
+				Device->CreateShaderResourceView(Texture.Get(), &srvDesc, ShaderResource.GetAddressOf());
+				DBuffer->ShaderResource = ShaderResource;
+				//DBuffer->SRVFormat = SRVFormat;
+
+				if (ShaderResource)
+					break;
+			}
+		}
+
+		if (DBuffer->Texture && DBuffer->DepthResource && (WithSRV && DBuffer->ShaderResource))
+		{
+			Depths.push_back(DBuffer);
+		}
+		else
+		{
+			delete DBuffer;
+			DBuffer = nullptr;
+		}
+	}
+	return Depths;
+};*/
+
 D3D11RenderTarget::D3D11RenderTarget(D3D11Device* InDevice, const std::string InName, const EFormat InFormat, const sFBODesc& Desc, bool InIsSRVAllowed, bool InIsUnorderedAccessAllowed)
 	: Super()
 	, Name(InName)

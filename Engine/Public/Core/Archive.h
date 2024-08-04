@@ -128,6 +128,10 @@ public:
 	constexpr inline std::string GetDataAsString() const
 	{
 		return std::string(Data.begin(), Data.end());
+		/*std::string STR;
+		for (auto& pChar : Data)
+			STR.push_back(pChar);
+		return STR;*/
 	}
 
 	FORCEINLINE constexpr operator std::string() const
@@ -507,7 +511,7 @@ private:
 	{
 		const std::size_t dataSize = sizeof(data);
 		const std::size_t reqSize = pos + dataSize;
-		if (reqSize > Data.size())
+		if (reqSize > Data.size()) 
 		{
 			ResizeData(Data.size() + dataSize /** 2*/);
 		}

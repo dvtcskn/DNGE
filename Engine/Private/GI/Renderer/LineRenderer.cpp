@@ -33,7 +33,7 @@ sLineRenderer::sLineRenderer(std::size_t Width, std::size_t Height)
 	, ScreenDimension(sScreenDimension(Width, Height))
 {
 	{
-		sBufferDesc Desc;
+		BufferLayout Desc;
 		Desc.Size = 4000000;
 		Desc.Stride = sizeof(sLineVertexBufferEntry);
 		VertexBuffer = IVertexBuffer::Create("LineRendererVB", Desc, nullptr);
@@ -126,7 +126,7 @@ void sLineRenderer::Tick(const double DeltaTime)
 	if (bReorder)
 	{
 		auto Data = Lines.GetVertices();
-		sBufferSubresource Subresource;
+		BufferSubresource Subresource;
 		Subresource.pSysMem = Data.data();
 		Subresource.Size = ((Lines.BoundCount * 8) + (Lines.LineCount * 2)) * sizeof(sLineVertexBufferEntry);
 		Subresource.Location = 0;
@@ -152,7 +152,7 @@ void sLineRenderer::DrawLine(const FVector& Start, const FVector& End, const FCo
 	Data.Location = ((Lines.BoundCount * 8) + (Lines.LineCount * 2)) * sizeof(sLineVertexBufferEntry);
 	Data.LineType = sLines::ELineType::eLine;
 
-	sBufferSubresource Subresource;
+	BufferSubresource Subresource;
 	Subresource.pSysMem = VertexAttributes.data();
 	Subresource.Size = VertexAttributes.size() * sizeof(sLineVertexBufferEntry);
 	Subresource.Location = Data.Location;
@@ -200,7 +200,7 @@ void sLineRenderer::DrawBound(const FBoundingBox& Box, const FColor& Color, std:
 	Data.Location = ((Lines.BoundCount * 8) + (Lines.LineCount * 2)) * sizeof(sLineVertexBufferEntry);
 	Data.LineType = sLines::ELineType::eBound;
 
-	sBufferSubresource Subresource;
+	BufferSubresource Subresource;
 	Subresource.pSysMem = VertexAttributes.data();
 	Subresource.Size = VertexAttributes.size() * sizeof(sLineVertexBufferEntry);
 	Subresource.Location = Data.Location;

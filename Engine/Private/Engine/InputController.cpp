@@ -50,7 +50,8 @@ sInputController::sInputController(void* InHWND)
 	, WheelDelta(0.0f)
 	, pGamePad(std::make_unique<DirectX::GamePad>())
 	, bUpdateOnTick(true)
-{}
+{
+}
 
 sInputController::~sInputController()
 {

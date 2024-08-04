@@ -32,10 +32,10 @@ void VulkanConstantBuffer::Map(const void* Ptr, IGraphicsCommandContext* InCMDBu
 
 }
 
-void VulkanVertexBuffer::UpdateSubresource(sBufferSubresource* Subresource, IGraphicsCommandContext* InCMDBuffer)
+void VulkanVertexBuffer::UpdateSubresource(BufferSubresource* Subresource, IGraphicsCommandContext* InCMDBuffer)
 {
 }
 
-void VulkanIndexBuffer::UpdateSubresource(sBufferSubresource* Subresource, IGraphicsCommandContext* InCMDBuffer)
+void VulkanIndexBuffer::UpdateSubresource(BufferSubresource* Subresource, IGraphicsCommandContext* InCMDBuffer)
 {
 }

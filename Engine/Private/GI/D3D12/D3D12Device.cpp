@@ -724,32 +724,32 @@ ICopyCommandContext::UniquePtr D3D12Device::CreateUniqueCopyCommandContext()
 	return D3D12CopyCommandBuffer::CreateUnique(this);
 }
 
-IConstantBuffer::SharedPtr D3D12Device::CreateConstantBuffer(std::string InName, const sBufferDesc& InDesc, std::uint32_t InRootParameterIndex)
+IConstantBuffer::SharedPtr D3D12Device::CreateConstantBuffer(std::string InName, const BufferLayout& InDesc, std::uint32_t InRootParameterIndex)
 {
 	return D3D12ConstantBuffer::Create(this, InName, InDesc, InRootParameterIndex);
 }
 
-IConstantBuffer::UniquePtr D3D12Device::CreateUniqueConstantBuffer(std::string InName, const sBufferDesc& InDesc, std::uint32_t InRootParameterIndex)
+IConstantBuffer::UniquePtr D3D12Device::CreateUniqueConstantBuffer(std::string InName, const BufferLayout& InDesc, std::uint32_t InRootParameterIndex)
 {
 	return D3D12ConstantBuffer::CreateUnique(this, InName, InDesc, InRootParameterIndex);
 }
 
-IVertexBuffer::SharedPtr D3D12Device::CreateVertexBuffer(std::string InName, const sBufferDesc& InDesc, sBufferSubresource* InSubresource)
+IVertexBuffer::SharedPtr D3D12Device::CreateVertexBuffer(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource)
 {
 	return D3D12VertexBuffer::Create(this, InName, InDesc, InSubresource);
 }
 
-IVertexBuffer::UniquePtr D3D12Device::CreateUniqueVertexBuffer(std::string InName, const sBufferDesc& InDesc, sBufferSubresource* InSubresource)
+IVertexBuffer::UniquePtr D3D12Device::CreateUniqueVertexBuffer(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource)
 {
 	return D3D12VertexBuffer::CreateUnique(this, InName, InDesc, InSubresource);
 }
 
-IIndexBuffer::SharedPtr D3D12Device::CreateIndexBuffer(std::string InName, const sBufferDesc& InDesc, sBufferSubresource* InSubresource)
+IIndexBuffer::SharedPtr D3D12Device::CreateIndexBuffer(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource)
 {
 	return D3D12IndexBuffer::Create(this, InName, InDesc, InSubresource);
 }
 
-IIndexBuffer::UniquePtr D3D12Device::CreateUniqueIndexBuffer(std::string InName, const sBufferDesc& InDesc, sBufferSubresource* InSubresource)
+IIndexBuffer::UniquePtr D3D12Device::CreateUniqueIndexBuffer(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource)
 {
 	return D3D12IndexBuffer::CreateUnique(this, InName, InDesc, InSubresource);
 }

@@ -587,12 +587,12 @@ void D3D11CommandBuffer::SetTexture2D(ITexture2D* Texture2D, std::optional<std::
 	}
 }
 
-void D3D11CommandBuffer::SetVertexBuffer(IVertexBuffer* VBuffer)
+void D3D11CommandBuffer::SetVertexBuffer(IVertexBuffer* VBuffer, std::uint32_t Slot)
 {
 	if (!VBuffer)
 		return;
 
-	static_cast<D3D11VertexBuffer*>(VBuffer)->ApplyBuffer(this);
+	static_cast<D3D11VertexBuffer*>(VBuffer)->ApplyBuffer(Slot, this);
 }
 
 void D3D11CommandBuffer::SetIndexBuffer(IIndexBuffer* IBuffer)
@@ -603,7 +603,7 @@ void D3D11CommandBuffer::SetIndexBuffer(IIndexBuffer* IBuffer)
 	static_cast<D3D11IndexBuffer*>(IBuffer)->ApplyBuffer(this);
 }
 
-void D3D11CommandBuffer::UpdateBufferSubresource(IVertexBuffer* Buffer, sBufferSubresource* Subresource)
+void D3D11CommandBuffer::UpdateBufferSubresource(IVertexBuffer* Buffer, BufferSubresource* Subresource)
 {
 	if (!Subresource || !Buffer)
 		return;
@@ -616,14 +616,14 @@ void D3D11CommandBuffer::UpdateBufferSubresource(IVertexBuffer* Buffer, std::siz
 	if (!Buffer)
 		return;
 
-	sBufferSubresource Subresource;
+	BufferSubresource Subresource;
 	Subresource.Location = Location;
 	Subresource.Size = Size;
 	Subresource.pSysMem = const_cast<void*>(pSrcData);
 	static_cast<D3D11VertexBuffer*>(Buffer)->UpdateSubresource(&Subresource, this);
 }
 
-void D3D11CommandBuffer::UpdateBufferSubresource(IIndexBuffer* Buffer, sBufferSubresource* Subresource)
+void D3D11CommandBuffer::UpdateBufferSubresource(IIndexBuffer* Buffer, BufferSubresource* Subresource)
 {
 	if (!Subresource || !Buffer)
 		return;
@@ -636,7 +636,7 @@ void D3D11CommandBuffer::UpdateBufferSubresource(IIndexBuffer* Buffer, std::size
 	if (!Buffer)
 		return;
 
-	sBufferSubresource Subresource;
+	BufferSubresource Subresource;
 	Subresource.Location = Location;
 	Subresource.Size = Size;
 	Subresource.pSysMem = const_cast<void*>(pSrcData);
@@ -796,7 +796,7 @@ void D3D11CopyCommandBuffer::CopyFrameBufferDepth(IFrameBuffer* Dest, IFrameBuff
 	DeferredCTX->CopyResource(DestFB->DepthTarget->GetD3D11Texture(), SourceFB->DepthTarget->GetD3D11Texture());
 }
 
-void D3D11CopyCommandBuffer::UpdateBufferSubresource(IVertexBuffer* Buffer, sBufferSubresource* Subresource)
+void D3D11CopyCommandBuffer::UpdateBufferSubresource(IVertexBuffer* Buffer, BufferSubresource* Subresource)
 {
 	if (!Subresource || !Buffer)
 		return;
@@ -809,14 +809,14 @@ void D3D11CopyCommandBuffer::UpdateBufferSubresource(IVertexBuffer* Buffer, std:
 	if (!Buffer)
 		return;
 
-	sBufferSubresource Subresource;
+	BufferSubresource Subresource;
 	Subresource.Location = Location;
 	Subresource.Size = Size;
 	Subresource.pSysMem = const_cast<void*>(pSrcData);
 	static_cast<D3D11VertexBuffer*>(Buffer)->UpdateSubresource(&Subresource, DeferredCTX.Get());
 }
 
-void D3D11CopyCommandBuffer::UpdateBufferSubresource(IIndexBuffer* Buffer, sBufferSubresource* Subresource)
+void D3D11CopyCommandBuffer::UpdateBufferSubresource(IIndexBuffer* Buffer, BufferSubresource* Subresource)
 {
 	if (!Subresource || !Buffer)
 		return;
@@ -829,7 +829,7 @@ void D3D11CopyCommandBuffer::UpdateBufferSubresource(IIndexBuffer* Buffer, std::
 	if (!Buffer)
 		return;
 
-	sBufferSubresource Subresource;
+	BufferSubresource Subresource;
 	Subresource.Location = Location;
 	Subresource.Size = Size;
 	Subresource.pSysMem = const_cast<void*>(pSrcData);

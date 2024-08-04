@@ -36,7 +36,7 @@ sSprite::sSprite(const std::string& InName, const std::wstring& TextureAtlasPath
 	, SpriteBound(InSpriteBound)
 	, MaterialInstance(nullptr)
 {
-	//AnimationCB = IConstantBuffer::Create(Name + "_FlipConstantBuffer", sBufferDesc(sizeof(sFlipConstantBuffer), 0), 3);
+	//AnimationCB = IConstantBuffer::Create(Name + "_FlipConstantBuffer", BufferLayout(sizeof(sFlipConstantBuffer), 0), 3);
 	//{
 	//	//AnimationConstantBuffer.Index = 0;
 	//	AnimationConstantBuffer.Flip = 0;
@@ -76,12 +76,12 @@ sSprite::sSprite(const std::string& InName, const std::wstring& TextureAtlasPath
 
 		std::array<FVector2, 4> PlaneTC = { P1, P2, P3, P4 };*/
 
-		std::vector<sVertexBufferEntry> Vertices;
+		std::vector<sVertexLayout> Vertices;
 		for (std::size_t i = 0; i < Plane.size(); i++)
 		{
 			auto& Verts = Plane.at(i);
 			auto& TC = PlaneTC.at(i);
-			sVertexBufferEntry VBE;
+			sVertexLayout VBE;
 			VBE.position = FVector(Verts.X, Verts.Y, 0.0f);
 			VBE.texCoord = TC;
 			VBE.Color = FColor::Green();
@@ -91,12 +91,12 @@ sSprite::sSprite(const std::string& InName, const std::wstring& TextureAtlasPath
 		ObjectDrawParameters.IndexCountPerInstance = (uint32_t)Indices.size();
 
 		{
-			sBufferSubresource Subresource = sBufferSubresource(Vertices.data(), Vertices.size() * sizeof(sVertexBufferEntry));
-			VertexBuffer = (IVertexBuffer::Create(Name, sBufferDesc(Vertices.size() * sizeof(sVertexBufferEntry), sizeof(sVertexBufferEntry)), &Subresource));
+			BufferSubresource Subresource = BufferSubresource(Vertices.data(), Vertices.size() * sizeof(sVertexLayout));
+			VertexBuffer = (IVertexBuffer::Create(Name, BufferLayout(Vertices.size() * sizeof(sVertexLayout), sizeof(sVertexLayout)), &Subresource));
 		}
 		{
-			sBufferSubresource Subresource = sBufferSubresource(Indices.data(), Indices.size() * sizeof(std::uint32_t));
-			IndexBuffer = (IIndexBuffer::Create(Name, sBufferDesc(Indices.size() * sizeof(std::uint32_t), sizeof(std::uint32_t)), &Subresource));
+			BufferSubresource Subresource = BufferSubresource(Indices.data(), Indices.size() * sizeof(std::uint32_t));
+			IndexBuffer = (IIndexBuffer::Create(Name, BufferLayout(Indices.size() * sizeof(std::uint32_t), sizeof(std::uint32_t)), &Subresource));
 		}
 	}
 }
@@ -138,12 +138,12 @@ sSprite::sSprite(const std::string& InName, ITexture2D* TextureAtlas, const FBou
 
 		std::array<FVector2, 4> PlaneTC = { P1, P2, P3, P4 };*/
 
-		std::vector<sVertexBufferEntry> Vertices;
+		std::vector<sVertexLayout> Vertices;
 		for (std::size_t i = 0; i < Plane.size(); i++)
 		{
 			auto& Verts = Plane.at(i);
 			auto& TC = PlaneTC.at(i);
-			sVertexBufferEntry VBE;
+			sVertexLayout VBE;
 			VBE.position = FVector(Verts.X, Verts.Y, 0.0f);
 			VBE.texCoord = TC;
 			VBE.Color = FColor::Green();
@@ -153,12 +153,12 @@ sSprite::sSprite(const std::string& InName, ITexture2D* TextureAtlas, const FBou
 		ObjectDrawParameters.IndexCountPerInstance = (uint32_t)Indices.size();
 
 		{
-			sBufferSubresource Subresource = sBufferSubresource(Vertices.data(), Vertices.size() * sizeof(sVertexBufferEntry));
-			VertexBuffer = (IVertexBuffer::Create(Name, sBufferDesc(Vertices.size() * sizeof(sVertexBufferEntry), sizeof(sVertexBufferEntry)), &Subresource));
+			BufferSubresource Subresource = BufferSubresource(Vertices.data(), Vertices.size() * sizeof(sVertexLayout));
+			VertexBuffer = (IVertexBuffer::Create(Name, BufferLayout(Vertices.size() * sizeof(sVertexLayout), sizeof(sVertexLayout)), &Subresource));
 		}
 		{
-			sBufferSubresource Subresource = sBufferSubresource(Indices.data(), Indices.size() * sizeof(std::uint32_t));
-			IndexBuffer = (IIndexBuffer::Create(Name, sBufferDesc(Indices.size() * sizeof(std::uint32_t), sizeof(std::uint32_t)), &Subresource));
+			BufferSubresource Subresource = BufferSubresource(Indices.data(), Indices.size() * sizeof(std::uint32_t));
+			IndexBuffer = (IIndexBuffer::Create(Name, BufferLayout(Indices.size() * sizeof(std::uint32_t), sizeof(std::uint32_t)), &Subresource));
 		}
 	}
 }
@@ -192,12 +192,12 @@ sSprite::sSprite(const std::string& InName, const FBounds2D& InSpriteBound, sMat
 
 		std::array<FVector2, 4> PlaneTC = { P1, P2, P3, P4 };
 
-		std::vector<sVertexBufferEntry> Vertices;
+		std::vector<sVertexLayout> Vertices;
 		for (std::size_t i = 0; i < Plane.size(); i++)
 		{
 			auto& Verts = Plane.at(i);
 			auto& TC = PlaneTC.at(i);
-			sVertexBufferEntry VBE;
+			sVertexLayout VBE;
 			VBE.position = FVector(Verts.X, Verts.Y, 0.0f);
 			VBE.texCoord = TC;
 			VBE.Color = FColor::Green();
@@ -207,12 +207,12 @@ sSprite::sSprite(const std::string& InName, const FBounds2D& InSpriteBound, sMat
 		ObjectDrawParameters.IndexCountPerInstance = (uint32_t)Indices.size();
 
 		{
-			sBufferSubresource Subresource = sBufferSubresource(Vertices.data(), Vertices.size() * sizeof(sVertexBufferEntry));
-			VertexBuffer = (IVertexBuffer::Create(Name, sBufferDesc(Vertices.size() * sizeof(sVertexBufferEntry), sizeof(sVertexBufferEntry)), &Subresource));
+			BufferSubresource Subresource = BufferSubresource(Vertices.data(), Vertices.size() * sizeof(sVertexLayout));
+			VertexBuffer = (IVertexBuffer::Create(Name, BufferLayout(Vertices.size() * sizeof(sVertexLayout), sizeof(sVertexLayout)), &Subresource));
 		}
 		{
-			sBufferSubresource Subresource = sBufferSubresource(Indices.data(), Indices.size() * sizeof(std::uint32_t));
-			IndexBuffer = (IIndexBuffer::Create(Name, sBufferDesc(Indices.size() * sizeof(std::uint32_t), sizeof(std::uint32_t)), &Subresource));
+			BufferSubresource Subresource = BufferSubresource(Indices.data(), Indices.size() * sizeof(std::uint32_t));
+			IndexBuffer = (IIndexBuffer::Create(Name, BufferLayout(Indices.size() * sizeof(std::uint32_t), sizeof(std::uint32_t)), &Subresource));
 		}
 	}
 }

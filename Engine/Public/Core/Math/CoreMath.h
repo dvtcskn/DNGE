@@ -23,7 +23,6 @@
 * SOFTWARE.
 * ---------------------------------------------------------------------------------------
 */
-
 #pragma once
 
 #include <vector>
@@ -65,38 +64,6 @@ class FBounds2D;
 static constexpr float fPI			= 3.141592653f;
 static constexpr double dPI			= 3.14159265358979323;
 static constexpr double dPI_OVER_4  = 0.78539816339744830;
-
-
-template<typename Type>
-FORCEINLINE constexpr Type Clamp(Type x, Type min, Type max)
-{
-	return x > min ? x < max ? x : max : min;
-}
-
-template<typename T>
-FORCEINLINE constexpr T SmoothStep(T edge0, T edge1, T x)
-{
-	// Scale, and clamp x to 0..1 range
-	x = Clamp((x - edge0) / (edge1 - edge0), (T)0.0, (T)1.0);
-
-	return x * x * ((T)3.0 - (T)2.0 * x);
-}
-
-FORCEINLINE constexpr float RadiansToDegrees(const float& Radians)
-{
-	return Radians * (180.f / 3.1415926535897932f);
-};
-
-FORCEINLINE constexpr float DegreesToRadians(const float& Degrees)
-{
-	return Degrees * (3.1415926535897932f / 180.f);
-};
-
-template<typename T, typename M>
-FORCEINLINE constexpr T Lerp(T a, T b, M f)
-{
-	return a + f * (b - a);
-}
 
 template<typename T>
 FORCEINLINE constexpr T Square(const T A)
@@ -184,6 +151,37 @@ template <typename T> __forceinline constexpr T AlignPowerOfTwo(T value)
 	return value == 0 ? 0 : 1 << Log2(value);
 }
 
+template<typename Type>
+FORCEINLINE constexpr Type Clamp(Type x, Type min, Type max)
+{
+	return x > min ? x < max ? x : max : min;
+}
+
+template<typename T>
+FORCEINLINE constexpr T SmoothStep(T edge0, T edge1, T x)
+{
+	// Scale, and clamp x to 0..1 range
+	x = Clamp((x - edge0) / (edge1 - edge0), (T)0.0, (T)1.0);
+
+	return x * x * ((T)3.0 - (T)2.0 * x);
+}
+
+FORCEINLINE constexpr float RadiansToDegrees(const float& Radians)
+{
+	return Radians * (180.f / 3.1415926535897932f);
+};
+
+FORCEINLINE constexpr float DegreesToRadians(const float& Degrees)
+{
+	return Degrees * (3.1415926535897932f / 180.f);
+};
+
+template<typename T, typename M>
+FORCEINLINE constexpr T Lerp(T a, T b, M f)
+{
+	return a + f * (b - a);
+}
+
 template<typename T>
 class TVector2
 {
@@ -235,6 +233,31 @@ public:
 		, Y(y)
 	{}
 
+	FORCEINLINE constexpr TVector2(const T* v)
+		: X(v[0])
+		, Y(v[1])
+	{}
+
+	T& operator [] (std::uint32_t i)
+	{
+		switch (i)
+		{
+		case 0: return X;
+		case 1: return Y;
+		}
+		return Y;
+	}
+
+	const T& operator [] (std::uint32_t i) const
+	{
+		switch (i)
+		{
+		case 0: return X;
+		case 1: return Y;
+		}
+		return Y;
+	}
+
 #if Enable_DirectX_Math
 	FORCEINLINE constexpr TVector2(const DirectX::XMFLOAT2& value)
 		: X(static_cast<T>(value.x))
@@ -252,11 +275,6 @@ public:
 	{}
 #endif
 	~TVector2() = default;
-
-	FORCEINLINE constexpr TVector2<T> GetInverse() const
-	{
-		return TVector2<T>(-X, -Y);
-	}
 
 	FORCEINLINE constexpr float Length() const
 	{
@@ -631,6 +649,12 @@ public:
 		, Z(z)
 	{}
 
+	FORCEINLINE constexpr TVector3(const T* v)
+		: X(v[0])
+		, Y(v[1])
+		, Z(v[2])
+	{}
+
 #if Enable_DirectX_Math
 	FORCEINLINE constexpr TVector3(const DirectX::XMFLOAT3& value)
 		: X(static_cast<T>(value.x))
@@ -653,9 +677,46 @@ public:
 
 	~TVector3() = default;
 
+	T& operator [] (std::uint32_t i) 
+	{
+		switch (i)
+		{
+		case 0: return X;
+		case 1: return Y;
+		case 2: return Z;
+		}
+		return Z;
+	} 
+
+	const T& operator [] (std::uint32_t i) const
+	{
+		switch (i)
+		{
+		case 0: return X;
+		case 1: return Y;
+		case 2: return Z;
+		}
+		return Z;
+	} 
+
+	FORCEINLINE constexpr bool IsNearlyZero(float Tolerance) const
+	{
+		return std::abs(X) <= Tolerance
+			&& std::abs(Y) <= Tolerance
+			&& std::abs(Z) <= Tolerance;
+	}
+
+	FORCEINLINE constexpr void Inverse()
+	{
+		X = -X;
+		Y = -Y;
+		Z = -Z;
+	}
 	FORCEINLINE constexpr TVector3<T> GetInverse() const
-	{		
-		return TVector3<T>(-X, -Y, -Z);
+	{
+		TVector3<T> V(X, Y, Z);
+		V.Inverse();
+		return V;
 	}
 
 	FORCEINLINE constexpr float Length() const
@@ -695,8 +756,21 @@ public:
 
 	FORCEINLINE constexpr TVector3<T> CrossProduct(const TVector3<T>& V) const
 	{
-		return TVector3<T>(Y * V.Z - Z * V.Y, Z * V.X - X * V.Z, X * V.Y - Y * V.X );
+		return TVector3<T>
+			(
+				Y * V.Z - Z * V.Y,
+				Z * V.X - X * V.Z,
+				X * V.Y - Y * V.X
+				);
 	}
+
+	FORCEINLINE constexpr TVector3<T> Negate()
+	{
+		X = -X;
+		Y = -Y;
+		Z = -Z;
+		return *this;
+	};
 
 public:
 	FORCEINLINE constexpr std::string ToString() const
@@ -1059,6 +1133,13 @@ public:
 		, W(w)
 	{}
 
+	FORCEINLINE constexpr TVector4(const T* v)
+		: X(v[0])
+		, Y(v[1])
+		, Z(v[2])
+		, W(v[3])
+	{}
+
 #if Enable_DirectX_Math
 	FORCEINLINE constexpr TVector4(const DirectX::XMFLOAT4& value)
 		: X(value.x)
@@ -1083,11 +1164,6 @@ public:
 #endif
 
 	~TVector4() = default;
-
-	FORCEINLINE constexpr TVector4<T> GetInverse() const
-	{
-		return TVector4<T>(-X, -Y, -Z, -W);
-	}
 
 	constexpr T& operator[](const std::size_t& idx)
 	{
@@ -1137,7 +1213,12 @@ public:
 
 	FORCEINLINE constexpr TVector4 CrossProduct(const TVector4& V) const
 	{
-		return TVector4(Y * V.Z - Z * V.Y, Z * V.X - X * V.Z, X * V.Y - Y * V.X, 0.0f );
+		return TVector4(
+			Y * V.Z - Z * V.Y,
+			Z * V.X - X * V.Z,
+			X * V.Y - Y * V.X,
+			0.0f
+		);
 	};
 
 public:
@@ -1717,6 +1798,13 @@ public:
 		, W(w)
 	{}
 
+	FORCEINLINE constexpr FVector4(const float* v)
+		: X(v[0])
+		, Y(v[1])
+		, Z(v[2])
+		, W(v[3])
+	{}
+
 #if Enable_DirectX_Math
 	FORCEINLINE constexpr FVector4(const DirectX::XMFLOAT4& value)
 		: X(value.x)
@@ -1750,11 +1838,6 @@ public:
 	const constexpr float& operator[](const std::size_t& idx) const
 	{
 		return (&X)[idx];
-	}
-
-	FORCEINLINE constexpr FVector4 GetInverse() const
-	{
-		return FVector4(-X, -Y, -Z, -W);
 	}
 
 	FORCEINLINE float Length() const
@@ -1795,7 +1878,12 @@ public:
 
 	FORCEINLINE constexpr FVector4 CrossProduct(const FVector4& V) const
 	{
-		return FVector4(Y * V.Z - Z * V.Y, Z * V.X - X * V.Z, X * V.Y - Y * V.X, 0.0f );
+		return FVector4(
+			Y * V.Z - Z * V.Y,
+			Z * V.X - X * V.Z,
+			X * V.Y - Y * V.X,
+			0.0f
+		);
 	};
 
 public:
@@ -2110,9 +2198,9 @@ public:
 
 	static FColor Random()
 	{
-		std::random_device rd;
-		std::mt19937 gen(rd());
-		std::uniform_real_distribution<> dist(0.0f, 1.0f);
+		std::random_device rd; // obtain a random number from hardware
+		std::mt19937 gen(rd()); // seed the generator
+		std::uniform_real_distribution<> dist(0.0f, 1.0f); // define the range
 
 		FColor RGB;
 		RGB.R = static_cast<float>(dist(gen));
@@ -2142,12 +2230,21 @@ public:
 	*/
 	static FVector HSVtoRGB(FVector HSV)
 	{
-		auto ClampColor = [](const FVector& value1, const float min, const float max) -> FVector
+		auto Clamp = [](const FVector& value1, const float min, const float max) -> FVector
 		{
+			auto lClamp = [](float value, float min, float max) -> float
+			{
+				value = (value > max) ? max : value;
+
+				value = (value < min) ? min : value;
+
+				return value;
+			};
+
 			return FVector(
-				Clamp(value1.X, min, max),
-				Clamp(value1.Y, min, max),
-				Clamp(value1.Z, min, max)
+				lClamp(value1.X, min, max),
+				lClamp(value1.Y, min, max),
+				lClamp(value1.Z, min, max)
 			);
 		};
 
@@ -2155,7 +2252,7 @@ public:
 		float R = abs(H * 6.0f - 3.0f) - 1.0f;
 		float G = 2.0f - abs(H * 6.0f - 2.0f);
 		float B = 2.0f - abs(H * 6.0f - 4.0f);
-		FVector RGB = ClampColor(FVector(R, G, B), 0.0f, 1.0f);
+		FVector RGB = Clamp(FVector(R, G, B), 0.0f, 1.0f);
 		FVector Temp = FVector(RGB.X - 1.0f, RGB.Y - 1.0f, RGB.Z - 1.0f) * HSV.Y;
 		Temp.X += 1.0f;
 		Temp.Y += 1.0f;
@@ -2345,6 +2442,10 @@ public:
 		return std::string("{ R: " + std::to_string(R) + " G: " + std::to_string(G) + " B: " + std::to_string(B) + " Alpha: " + std::to_string(A) + " };");
 	};
 
+	FORCEINLINE FVector GetFVector() const
+	{
+		return FVector(R,G,B);
+	}
 
 #if Enable_DirectX_Math
 	FORCEINLINE constexpr operator DirectX::XMVECTORF32() const
@@ -2409,6 +2510,152 @@ FORCEINLINE constexpr FColor operator *(const FColor& value, const float& scaleF
 FORCEINLINE constexpr FColor operator *(const float& scaleFactor, const FColor& value)
 {
 	return FColor(value.R * scaleFactor, value.G * scaleFactor, value.B * scaleFactor, value.A/* * scaleFactor*/);
+};
+
+template <typename T>
+struct TMatrix3x3
+{
+	union
+	{
+		std::array<TVector3<T>, 3> r;
+		struct
+		{
+			T m00, m01, m02;
+			T m10, m11, m12;
+			T m20, m21, m22;
+		};
+		T m[3][3];
+	};
+
+	TMatrix3x3() 
+	{}
+
+	TMatrix3x3(const TMatrix3x3<T>& Other)
+		: r(Other.r)
+	{}
+
+	TMatrix3x3(const T* v)
+	{
+		for (int i = 0; i < 3; ++i)
+			for (int ii = 0; ii < 3; ++ii)
+				m[i][ii] = v[i * 3 + ii];
+	}
+
+	constexpr TMatrix3x3(T a)
+		: m00(a), m01(a), m02(a)
+		, m10(a), m11(a), m12(a)
+		, m20(a), m21(a), m22(a) 
+	{}
+
+	constexpr TMatrix3x3(T _m00, T _m01, T _m02, T _m10, T _m11, T _m12, T _m20, T _m21, T _m22)
+		: m00(_m00), m01(_m01), m02(_m02)
+		, m10(_m10), m11(_m11), m12(_m12)
+		, m20(_m20), m21(_m21), m22(_m22) 
+	{}
+
+	constexpr TMatrix3x3(const TVector3<T>& _row0, const TVector3<T>& _row1, const TVector3<T>& _row2)
+		: m00(_row0.X), m01(_row0.Y), m02(_row0.Z)
+		, m10(_row1.X), m11(_row1.Y), m12(_row1.Z)
+		, m20(_row2.X), m21(_row2.Y), m22(_row2.Z) 
+	{}
+
+	/*constexpr TMatrix3x3(const TMatrix<T, 3, 4>& m)
+		: m00(m.m00), m01(m.m01), m02(m.m02)
+		, m10(m.m10), m11(m.m11), m12(m.m12)
+		, m20(m.m20), m21(m.m21), m22(m.m22) 
+	{}
+
+	constexpr TMatrix3x3(const matrix<T, 4, 4>& m)
+		: m00(m.m00), m01(m.m01), m02(m.m02)
+		, m10(m.m10), m11(m.m11), m12(m.m12)
+		, m20(m.m20), m21(m.m21), m22(m.m22) 
+	{}*/
+
+	/*explicit constexpr TMatrix3x3(const TMatrix3x3<T>& Other)
+	{
+		for (int i = 0; i < 3; ++i)
+			for (int ii = 0; ii < 3; ++ii)
+				m[i][ii] = (T)(Other.m[i][ii]);
+	}*/
+
+	template<typename U>
+	explicit constexpr TMatrix3x3(const TMatrix3x3<U>& Other)
+	{
+		for (int i = 0; i < 3; ++i)
+			for (int ii = 0; ii < 3; ++ii)
+				m[i][ii] = (T)(Other.m[i][ii]);
+	}
+
+	constexpr static TMatrix3x3 from_cols(const TVector3<T>& col0, const TVector3<T>& col1, const TVector3<T>& col2)
+	{
+		return TMatrix3x3(
+			col0.X, col1.X, col2.X,
+			col0.Y, col1.Y, col2.Y,
+			col0.Z, col1.Z, col2.Z);
+	}
+
+	constexpr static TMatrix3x3 Diagonal(T diag)
+	{
+		return TMatrix3x3(
+			diag, T(0), T(0),
+			T(0), diag, T(0),
+			T(0), T(0), diag);
+	}
+
+	constexpr static TMatrix3x3 Diagonal(TVector3<T> v)
+	{
+		return TMatrix3x3(
+			v.X, T(0), T(0),
+			T(0), v.Y, T(0),
+			T(0), T(0), v.Z);
+	}
+
+	constexpr static TMatrix3x3 Identity()
+	{
+		return Diagonal(T(1));
+	}
+
+	constexpr static TMatrix3x3 Zero()
+	{
+		return TMatrix3x3(static_cast<T>(0));
+	}
+
+	TVector3<T> col(int j) const
+	{
+		const float m_data[9] = { m00, m01, m02, m10, m11, m12, m20, m21, m22 };
+		TVector3<T> v; 
+		for (int i = 0; i < 3; i++)
+		{
+			if (i == 0)
+				v.X = m_data[i * 3 + j];
+			else if (i == 1)
+				v.Y = m_data[i * 3 + j];
+			else if (i == 2)
+				v.Z = m_data[i * 3 + j];
+		}
+		return v;
+	}
+
+	/* Subscript operators - built-in subscripts are ambiguous without these */
+	TVector3<T>& operator [] (int i)
+	{
+		return reinterpret_cast<TVector3<T>&>(r[i * 3]);
+	}
+	const TVector3<T>& operator [] (int i) const
+	{
+		return reinterpret_cast<const TVector3<T>&>(r[i * 3]);
+	}
+
+	template <typename T>
+	TMatrix3x3<T> operator * (const TMatrix3x3<T>& b) const
+	{
+		TMatrix3x3<T> result = TMatrix3x3<T>::Zero();
+		for (int i = 0; i < 3; ++i)
+			for (int j = 0; j < 3; ++j)
+				for (int k = 0; k < 3; ++k)
+					result.m[i][j] += m[i][k] * b.m[k][j];
+		return result;
+	}
 };
 
 __declspec(align(64)) class FMatrix
@@ -3485,6 +3732,10 @@ public:
 	FORCEINLINE constexpr FQuaternion(const FVector4& vec)
 		: m_vec(vec)
 	{}
+	FORCEINLINE constexpr FQuaternion(const float* v)
+		: m_vec(FVector4(v[0], v[1], v[2], v[3]))
+	{}
+
 
 	~FQuaternion() = default;
 
@@ -3710,6 +3961,100 @@ FORCEINLINE constexpr FRotatedVector::operator FQuaternion()
 {
 	return FQuaternion(*this);
 }
+
+template<typename T>
+struct TAffine3
+{
+	TMatrix3x3<T>	m_linear;
+	TVector3<T>		m_translation;
+
+	TAffine3()
+	{}
+
+	template<typename U>
+	explicit constexpr TAffine3(const TAffine3<U>& a)
+		: m_linear(a.m_linear)
+		, m_translation(TVector3<T>((T)a.m_translation.X, (T)a.m_translation.Y, (T)a.m_translation.Z))
+	{}
+
+	constexpr TAffine3(T m00, T m01, T m02, T m10, T m11, T m12, T m20, T m21, T m22, T t0, T t1, T t2)
+		: m_linear(m00, m01, m02, m10, m11, m12, m20, m21, m22)
+		, m_translation(t0, t1, t2) 
+	{}
+
+	constexpr TAffine3(const TVector3<T>& row0, const TVector3<T>& row1, const TVector3<T>& row2, const TVector3<T>& translation)
+		: m_linear(row0, row1, row2)
+		, m_translation(translation) 
+	{}
+
+	constexpr TAffine3(const TMatrix3x3<T>& linear, const TVector3<T>& translation)
+		: m_linear(linear)
+		, m_translation(translation) 
+	{}
+
+	static constexpr TAffine3 from_cols(const TVector3<T>& col0, const TVector3<T>& col1, const TVector3<T>& col2, const TVector3<T>& translation)
+	{
+		return TAffine3(TMatrix3x3<T>::from_cols(col0, col1, col2), translation);
+	}
+
+	static constexpr TAffine3 identity()
+	{
+		return TAffine3(TMatrix3x3<T>::Identity(), TVector3<T>::Zero());
+	}
+
+	[[nodiscard]] TVector3<T> transformVector(const TVector3<T>& v) const
+	{
+		TVector3<T> result;
+		result.X = v.X * m_linear.r[0].X + v.Y * m_linear.r[1].X + v.Z * m_linear.r[2].X;
+		result.Y = v.X * m_linear.r[0].Y + v.Y * m_linear.r[1].Y + v.Z * m_linear.r[2].Y;
+		result.Z = v.X * m_linear.r[0].Z + v.Y * m_linear.r[1].Z + v.Z * m_linear.r[2].Z;
+		return result;
+	}
+
+	[[nodiscard]] TVector3<T> transformPoint(const TVector3<T>& v) const
+	{
+		TVector3<T> result;
+		result.X = v.X * m_linear.r[0].X + v.Y * m_linear.r[1].X + v.Z * m_linear.r[2].X + m_translation.X;
+		result.Y = v.X * m_linear.r[0].Y + v.Y * m_linear.r[1].Y + v.Z * m_linear.r[2].Y + m_translation.Y;
+		result.Z = v.X * m_linear.r[0].Z + v.Y * m_linear.r[1].Z + v.Z * m_linear.r[2].Z + m_translation.Z;
+		return result;
+	}
+};
+
+template <typename T>
+TVector3<T> operator * (const TMatrix3x3<T>& a, const TVector3<T>& b)
+{
+	TVector3<T> result;
+	result.X = a.r[0].X * b.X + a.r[0].Y * b.Y + a.r[0].Z * b.Z;
+	result.Y = a.r[1].X * b.X + a.r[1].Y * b.Y + a.r[1].Z * b.Z;
+	result.Z = a.r[2].X * b.X + a.r[2].Y * b.Y + a.r[2].Z * b.Z;
+	return result;
+}
+
+template <typename T>
+TVector3<T> operator * (const TVector3<T>& a, const TMatrix3x3<T>& b)
+{
+	TVector3<T> result;
+	result.X = a.X * b.r[0].X + a.Y * b.r[1].X + a.Z * b.r[2].X;
+	result.Y = a.X * b.r[0].Y + a.Y * b.r[1].Y + a.Z * b.r[2].Y;
+	result.Z = a.X * b.r[0].Z + a.Y * b.r[1].Z + a.Z * b.r[2].Z;
+	return result;
+}
+
+template <typename T>
+TAffine3<T> operator * (const TAffine3<T>& a, const TAffine3<T>& b)
+{
+	TAffine3<T> result =
+	{
+		a.m_linear * b.m_linear,
+		a.m_translation * b.m_linear + b.m_translation
+	};
+	return result;
+}
+
+typedef TAffine3<float> Affine3;
+typedef TAffine3<double> DAffine;
+typedef TAffine3<int> IAffine;
 
 class FBoundingSphere
 {
@@ -4001,10 +4346,70 @@ public:
 		return true;
 	}
 
+	FORCEINLINE constexpr bool IntersectX(const FBoundingBox& Other) const
+	{
+		if ((Min.X > Other.Max.X) || (Other.Min.X > Max.X))
+		{
+			return false;
+		}
+
+		return true;
+	}
+
+	FORCEINLINE constexpr bool IntersectY(const FBoundingBox& Other) const
+	{
+		if ((Min.Y > Other.Max.Y) || (Other.Min.Y > Max.Y))
+		{
+			return false;
+		}
+
+		return true;
+	}
+
 	FORCEINLINE constexpr std::string ToString() const
 	{
 		return std::string("{ Min: " + Min.ToString() + " Max: " + Max.ToString() + " };");
 	};
+
+	FORCEINLINE constexpr FBoundingBox operator | (const FVector& v) const
+	{
+		return FBoundingBox(std::min(Min, v), std::max(Max, v));
+	}
+
+	FORCEINLINE FBoundingBox operator |= (const FVector& v)
+	{
+		*this = *this | v;
+		return *this;
+	}
+
+	constexpr FBoundingBox operator | (const FBoundingBox& other) const
+	{
+		return FBoundingBox(std::min(Min, other.Min), std::max(Max, other.Max));
+	}
+
+	FBoundingBox operator |= (const FBoundingBox& other)
+	{
+		*this = *this | other;
+		return *this;
+	}
+
+	FBoundingBox operator * (const Affine3& transform) const
+	{
+		// fast method to apply an affine transform to an AABB
+		FBoundingBox result;
+		result.Min = transform.m_translation;
+		result.Max = transform.m_translation;
+		const FVector* row = &transform.m_linear.r[0];
+		for (int i = 0; i < 3; i++)
+		{
+			FVector e = (&Min.X)[i] * *row;
+			FVector f = (&Max.X)[i] * *row;
+			result.Min += std::min(e, f);
+			result.Max += std::max(e, f);
+			++row;
+		}
+		return result;
+	}
 
 	auto operator<=>(const FBoundingBox&) const = default;
 };
@@ -4535,9 +4940,32 @@ FORCEINLINE constexpr FVector Cross(FVector v1, FVector v2)
 	return v1.CrossProduct(v2);
 }
 
+template<typename T>
+FORCEINLINE constexpr float GetDeterminant(const TVector2<T>& v1, const TVector2<T>& v2)
+{
+	return v1.X * v2.Y - v1.Y * v2.X;
+}
+
+template<typename T>
+FORCEINLINE constexpr float GetAngleBetweenTwoVectors(const TVector2<T>& v1, const TVector2<T>& v2)
+{
+	return (std::atan2(GetDeterminant(v1, v2), Dot(v1, v2))) * 180 / 3.14159265359f; // PI
+};
+
+template<typename T>
+FORCEINLINE constexpr float GetAngleBetweenTwoVectors(const TVector3<T>& v1, const TVector3<T>& v2)
+{
+	return (std::acos(Dot(v1, v2) / sqrt(v1.Length() * v2.Length()))) * 180 / 3.14159265359f; // PI
+};
+
 FORCEINLINE FMatrix Invert(const FMatrix& mat)
 {
 	return FMatrix(DirectX::XMMatrixInverse(nullptr, mat));
+}
+
+FORCEINLINE float RecipSqrt(const float s)
+{
+	return (DirectX::XMVectorReciprocalSqrt(FVector4(s, s, s, s))).m128_f32[0];
 }
 
 template<typename T>
@@ -4662,6 +5090,58 @@ FORCEINLINE static constexpr FMatrix GetOrthographicTransform(const int width, c
 	TempWidgetMatrix.r[3][3] = 1.00000000f;
 
 	return TempWidgetMatrix;
+}
+
+FORCEINLINE std::uint32_t vector2ToSnorm8(const FVector2& v)
+{
+	float scale = 127.0f / sqrtf(v.X * v.X + v.Y * v.Y);
+	int x = int(v.X * scale);
+	int y = int(v.Y * scale);
+	return (x & 0xff) | ((y & 0xff) << 8);
+}
+
+FORCEINLINE std::uint32_t vector3ToSnorm8(const FVector& v)
+{
+	float scale = 127.0f / sqrtf(v.X * v.X + v.Y * v.Y + v.Z * v.Z);
+	int x = int(v.X * scale);
+	int y = int(v.Y * scale);
+	int z = int(v.Z * scale);
+	return (x & 0xff) | ((y & 0xff) << 8) | ((z & 0xff) << 16);
+}
+
+FORCEINLINE std::uint32_t vector4ToSnorm8(const FVector4& v)
+{
+	float scale = 127.0f / sqrtf(v.X * v.X + v.Y * v.Y + v.Z * v.Z);
+	int x = int(v.X * scale);
+	int y = int(v.Y * scale);
+	int z = int(v.Z * scale);
+	int w = int(v.W * scale);
+	return (x & 0xff) | ((y & 0xff) << 8) | ((z & 0xff) << 16) | ((w & 0xff) << 24);
+}
+
+FORCEINLINE FVector2 snorm8ToVector2(std::uint32_t v)
+{
+
+	float x = static_cast<signed char>(v & 0xff);
+	float y = static_cast<signed char>((v >> 8) & 0xff);
+	return std::max(FVector2(x, y) / 127.0f, FVector2(-1.f));
+}
+
+FORCEINLINE FVector snorm8ToVector3(std::uint32_t v)
+{
+	float x = static_cast<signed char>(v & 0xff);
+	float y = static_cast<signed char>((v >> 8) & 0xff);
+	float z = static_cast<signed char>((v >> 16) & 0xff);
+	return std::max(FVector(x, y, z) / 127.0f, FVector(-1.f));
+}
+
+FORCEINLINE FVector4 snorm8ToVector4(std::uint32_t v)
+{
+	float x = static_cast<signed char>(v & 0xff);
+	float y = static_cast<signed char>((v >> 8) & 0xff);
+	float z = static_cast<signed char>((v >> 16) & 0xff);
+	float w = static_cast<signed char>((v >> 24) & 0xff);
+	return std::max(FVector4(x, y, z, w) / 127.0f, FVector4(-1.f));
 }
 
 //}

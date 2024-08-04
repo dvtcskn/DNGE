@@ -39,7 +39,10 @@ sActor::sActor(std::string InName, sController* InController)
 	, bIsEnabled(true)
 	, LayerIndex(0)
 	, bIsReplicated(false)
-{}
+{
+	sPrimitiveComponent::SharedPtr pPrimitiveComponent = sPrimitiveComponent::Create("DefaultPrimitiveComponent");
+	SetRootComponent(pPrimitiveComponent);
+}
 
 sActor::~sActor()
 {

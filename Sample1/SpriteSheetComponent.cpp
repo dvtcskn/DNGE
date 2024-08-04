@@ -51,7 +51,7 @@ sSpriteSheetComponent::sSpriteSheetComponent(const std::string Name)
 	, fAnimationEnd(nullptr)
 	, fFrameUpdated(nullptr)
 {
-	sBufferDesc BufferDesc;
+	BufferLayout BufferDesc;
 	BufferDesc.Size = sizeof(sAnimationFlip);
 	AnimationCB = IConstantBuffer::Create("AnimationFlip", BufferDesc, 4);
 
@@ -59,7 +59,7 @@ sSpriteSheetComponent::sSpriteSheetComponent(const std::string Name)
 	pSpriteEffectComponent->AttachToComponent(this);
 	SpriteEffectComponent = pSpriteEffectComponent.get();
 
-	MeshConstantBuffer = IConstantBuffer::Create(Name, sBufferDesc(sizeof(sMeshConstantBufferAttributes), 0), 1);
+	MeshConstantBuffer = IConstantBuffer::Create(Name, BufferLayout(sizeof(sMeshConstantBufferAttributes), 0), 1);
 	{
 		ObjectConstants.modelMatrix = FMatrix::Identity();
 		ObjectConstants.PrevModelMatrix = FMatrix::Identity();
@@ -86,7 +86,7 @@ sSpriteSheetComponent::sSpriteSheetComponent(sSpriteSheet* pSpriteSheet)
 	, fAnimationEnd(nullptr)
 	, fFrameUpdated(nullptr)
 {
-	sBufferDesc BufferDesc;
+	BufferLayout BufferDesc;
 	BufferDesc.Size = sizeof(sAnimationFlip);
 	AnimationCB = IConstantBuffer::Create("AnimationFlip", BufferDesc, 4);
 
@@ -94,7 +94,7 @@ sSpriteSheetComponent::sSpriteSheetComponent(sSpriteSheet* pSpriteSheet)
 	pSpriteEffectComponent->AttachToComponent(this);
 	SpriteEffectComponent = pSpriteEffectComponent.get();
 
-	MeshConstantBuffer = IConstantBuffer::Create(GetName(), sBufferDesc(sizeof(sMeshConstantBufferAttributes), 0), 1);
+	MeshConstantBuffer = IConstantBuffer::Create(GetName(), BufferLayout(sizeof(sMeshConstantBufferAttributes), 0), 1);
 	{
 		ObjectConstants.modelMatrix = FMatrix::Identity();
 		ObjectConstants.PrevModelMatrix = FMatrix::Identity();

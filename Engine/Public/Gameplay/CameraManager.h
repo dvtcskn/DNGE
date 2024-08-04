@@ -74,6 +74,9 @@ public:
 	void EnableVelocity();
 	void DisableVelocity();
 
+	FVector2 ConvertScreenToWorld(const FVector2& ps) const;
+	FVector2 ConvertWorldToScreen(const FVector2& pw) const;
+
 	//const sCameraSceneBuffer* GetCameraSceneBuffer() const { return CameraSceneBuffer; }
 
 	bool AddCanvasToViewport(ICanvas* Canvas);
