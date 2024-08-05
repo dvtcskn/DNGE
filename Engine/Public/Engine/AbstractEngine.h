@@ -274,6 +274,23 @@ struct sDisplayMode
 
 struct sVertexLayout
 {
+	struct sVertexInstanceLayout
+	{
+		FVector position;
+		FColor Color;
+		//std::uint32_t ArrayIndex;
+
+		sVertexInstanceLayout()
+			: position(FVector::Zero())
+			, Color(FColor::White())
+			//, ArrayIndex(NULL)
+		{}
+		sVertexInstanceLayout(FVector InPosition, FColor InColor = FColor::White())
+			: position(InPosition)
+			, Color(InColor)
+			//, ArrayIndex(NULL)
+		{}
+	};
 	FVector position;
 	FVector normal;
 	FVector2 texCoord;
@@ -300,7 +317,7 @@ struct sVertexLayout
 		, binormal(FVector::Zero())
 		, ArrayIndex(NULL)
 	{}
-	sVertexLayout(FVector InPosition, FVector InNormal, FVector2 InTexCoord, FColor InColor, 
+	sVertexLayout(FVector InPosition, FVector InNormal, FVector2 InTexCoord, FColor InColor,
 		FVector InTangent, FVector InBinormal, std::uint32_t InArrayIndex)
 		: position(InPosition)
 		, normal(InNormal)
@@ -375,6 +392,7 @@ struct sMeshData
 {
 	std::vector<std::uint32_t> Indices;
 	std::vector<sVertexLayout> Vertices;
+	std::vector<sVertexLayout::sVertexInstanceLayout> InstanceData;
 	sObjectDrawParameters DrawParameters;
 };
 
@@ -1614,9 +1632,9 @@ enum class EParticleType
 enum class EPhysicsEngine
 {
 	eNone,
-	eBulletPhysics,
+	//eBulletPhysics,
 	eBox2D,
-	ePhysX,
+	//ePhysX,
 };
 
 enum class EPostProcessRenderOrder
@@ -1631,7 +1649,7 @@ enum class EGBufferClear
 {
 	Driver,
 	Disabled,
-	Sky,
+	//Sky,
 };
 
 enum class ESplitScreenType
@@ -1825,6 +1843,9 @@ namespace GPU
 
 	void SetGBufferClearMode(EGBufferClear Mode);
 	EGBufferClear GetGBufferClearMode();
+
+	std::uint32_t GetGBufferTextureEntryPoint();
+	std::uint32_t GetGBufferTextureSize();
 
 	void SetTonemapper(const int Val);
 	int GetTonemapperIndex();

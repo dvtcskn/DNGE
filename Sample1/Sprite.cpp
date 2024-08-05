@@ -50,7 +50,7 @@ sSprite::sSprite(const std::string& InName, const std::wstring& TextureAtlasPath
 	Desc.Dimensions.Y = (std::uint32_t)InSpriteBound.GetHeight();
 	Desc.MipLevels = 1;
 	Desc.Format = AtlasTexture->GetDesc().Format;
-	auto Texture = ITexture2D::CreateEmpty(InName, Desc, 2);
+	auto Texture = ITexture2D::CreateEmpty(InName, Desc, GPU::GetGBufferTextureEntryPoint());
 	Texture->UpdateTexture(AtlasTexture.get(), 0, 0, IntVector2(0, 0), InSpriteBound);
 	MaterialInstance->AddTexture(Texture);
 	//MaterialInstance->BindConstantBuffer(AnimationCB);
@@ -113,7 +113,7 @@ sSprite::sSprite(const std::string& InName, ITexture2D* TextureAtlas, const FBou
 	Desc.Dimensions.Y = (std::uint32_t)InSpriteBound.GetHeight();
 	Desc.Format = TextureAtlas->GetDesc().Format;
 	Desc.MipLevels = 1;
-	auto Texture = ITexture2D::CreateEmpty(InName, Desc, 2);
+	auto Texture = ITexture2D::CreateEmpty(InName, Desc, GPU::GetGBufferTextureEntryPoint());
 	Texture->UpdateTexture(TextureAtlas, 0, 0, IntVector2(0, 0), InSpriteBound);
 	MaterialInstance->AddTexture(Texture);
 

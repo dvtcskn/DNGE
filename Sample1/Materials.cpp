@@ -218,7 +218,7 @@ namespace GameMaterials
 			sMaterialManager::Get().StoreMaterial(DefaultActorMat);
 
 			auto DefaultActorMatInstance = DefaultActorMat->CreateInstance("BackgoundMatInstance");
-			DefaultActorMatInstance->AddTexture(ITexture2D::Create(L"..//Content\\Pixel Adventure 1\\Free\\Background\\Pink.png", "Backgound", 2));
+			DefaultActorMatInstance->AddTexture(ITexture2D::Create(L"..//Content\\Pixel Adventure 1\\Free\\Background\\Pink.png", "Backgound", GPU::GetGBufferTextureEntryPoint()));
 		}
 		{
 			sPipelineDesc pPipelineDesc;
@@ -243,6 +243,8 @@ namespace GameMaterials
 				{ "TANGENT",	EFormat::RGB32_FLOAT,   0, offsetof(sVertexLayout, tangent),     false },
 				{ "BINORMAL",	EFormat::RGB32_FLOAT,   0, offsetof(sVertexLayout, binormal),    false },
 				{ "ARRAYINDEX",	EFormat::R32_UINT,	    0, offsetof(sVertexLayout, ArrayIndex),  false },
+				{ "INSTANCEPOS",	EFormat::RGB32_FLOAT,	1, offsetof(sVertexLayout::sVertexInstanceLayout, position),	  true },
+				{ "INSTANCECOLOR",	EFormat::RGBA32_FLOAT,	1, offsetof(sVertexLayout::sVertexInstanceLayout, Color),		  true },
 			};
 			pPipelineDesc.VertexLayout = VertexLayout;
 
@@ -255,13 +257,13 @@ namespace GameMaterials
 
 			pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(sampler, eShaderType::Pixel, 0));
 
-			pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment(L"..//Content\\Shaders\\GBufferVS.hlsl", "GeometryVS", eShaderType::Vertex));
+			pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment(L"..//Content\\Shaders\\GBufferVS.hlsl", "GeometryInstanceVS", eShaderType::Vertex));
 			pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment(L"..//Content\\Shaders\\GBufferPS.hlsl", "GeometryPS", eShaderType::Pixel));
 
 			auto DefaultActorMat = sMaterial::Create("DefaultTexturedMaterial", EMaterialBlendMode::Opaque, pPipelineDesc);
 			sMaterialManager::Get().StoreMaterial(DefaultActorMat);
 
-			ITexture2D::SharedPtr TextureAtlas = ITexture2D::Create(L"..//Content\\Pixel Adventure 1\\Free\\Terrain\\Terrain (16x16).png", "TerrainAtlas", 2);
+			ITexture2D::SharedPtr TextureAtlas = ITexture2D::Create(L"..//Content\\Pixel Adventure 1\\Free\\Terrain\\Terrain (16x16).png", "TerrainAtlas", GPU::GetGBufferTextureEntryPoint());
 
 			auto TextureAtlasDesc = TextureAtlas->GetDesc();
 

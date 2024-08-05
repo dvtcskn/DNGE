@@ -137,6 +137,25 @@ sDefaultLevel::sDefaultLevel(IWorld* pWorld, std::string InName)
 		Terrain->AddToLevel(this, FVector(0.0f, 0.0f, 0.0f), 2);
 		//Terrain->SetEnabled(false);
 
+		struct TerrainInstance
+		{
+			std::string Name;
+			FVector	Location;
+			FVector	Scale;
+
+			TerrainInstance()
+				: Name("")
+				, Location(FVector::Zero())
+				, Scale(FVector::One())
+			{}
+			TerrainInstance(std::string InName, FVector InLocation, FVector	InScale)
+				: Name(InName)
+				, Location(InLocation)
+				, Scale(InScale)
+			{}
+		};
+
+		std::map<std::uint32_t, std::vector<TerrainInstance>> TerrainInstances;
 		std::size_t X = 0;
 		std::size_t Y = 0;
 		for (const auto Tile : Tiles)
@@ -152,13 +171,15 @@ sDefaultLevel::sDefaultLevel(IWorld* pWorld, std::string InName)
 				continue;
 			}
 
-			sMeshComponent::SharedPtr Mesh = sMeshComponent::Create("TerrainMesh_" + std::to_string(X) + "x" + std::to_string(Y), EBasicMeshType::ePlane);
+			TerrainInstances[Tile - 1].push_back(TerrainInstance("TerrainMesh_" + std::to_string(X) + "x" + std::to_string(Y), FVector(X + 8.0f, Y + 8.0f, 0.0f), FVector(16.0f, 16.0f, 1.0f)));
+
+			/*sMeshComponent::SharedPtr Mesh = sMeshComponent::Create("TerrainMesh_" + std::to_string(X) + "x" + std::to_string(Y), EBasicMeshType::ePlane);
 			Mesh->SetMaterial(sMaterialManager::Get().GetMaterialInstance("DefaultTexturedMaterial", Tile - 1));
 			Mesh->AttachToComponent(TerrainMeshParent.get());
 
 			Mesh->SetRelativeScale(FVector(16.0f, 16.0f, 1.0f));
-			Mesh->SetRelativeLocation(FVector(X + 8.0f, Y + 8.0f, 0.0f));
-			
+			Mesh->SetRelativeLocation(FVector(X + 8.0f, Y + 8.0f, 0.0f));*/
+
 			/* Tile Based Collision */
 			/*if (Tile != 24 && Tile != 192 && Tile != 214 && Tile != 236 && Tile != 189 && Tile != 190 && Tile != 191)
 			{
@@ -185,6 +206,37 @@ sDefaultLevel::sDefaultLevel(IWorld* pWorld, std::string InName)
 				Y += 16;
 			}
 		}
+
+		for (const auto& TerrainInstance : TerrainInstances)
+		{
+			sMeshData Data;
+			const auto Plane = MeshPrimitives::Create2DPlaneVerticesFromDimension(FDimension2D(16.0f, 16.0f));
+			const auto PlaneTC = MeshPrimitives::GeneratePlaneTextureCoordinate(0.0f);
+			for (std::size_t i = 0; i < Plane.size(); i++)
+			{
+				auto& Verts = Plane.at(i);
+				auto& TC = PlaneTC.at(i);
+				sVertexLayout VBE;
+				VBE.position = FVector(Verts.X, Verts.Y, 0.0f);
+				VBE.texCoord = TC;
+				VBE.Color = FColor::White();
+				Data.Vertices.push_back(VBE);
+			}
+			Data.Indices = MeshPrimitives::GeneratePlaneIndices(1);
+			Data.DrawParameters.IndexCountPerInstance = (uint32_t)Data.Indices.size();
+
+			for (const auto& Instance : TerrainInstance.second)
+			{
+				Data.InstanceData.push_back(sVertexLayout::sVertexInstanceLayout(Instance.Location));
+			}
+
+			Data.DrawParameters.InstanceCount = TerrainInstance.second.size();
+			sMeshComponent::SharedPtr Mesh = sMeshComponent::Create("TerrainMesh_" + std::to_string(TerrainInstance.first), "..//Content//Pixel Adventure 1.tmx", Data);
+			Mesh->SetMaterial(sMaterialManager::Get().GetMaterialInstance("DefaultTexturedMaterial", TerrainInstance.first));
+			Mesh->AttachToComponent(TerrainMeshParent.get());
+		}
+
+		TerrainInstances.clear();
 
 		/* Simple Collision Level */
 		sRigidBodyDesc Desc;

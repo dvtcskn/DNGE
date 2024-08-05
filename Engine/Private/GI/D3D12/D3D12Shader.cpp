@@ -105,10 +105,11 @@ void D3D12Shader::CompileShaderFromFile(std::wstring InSrcFile, std::vector<sSha
 
 	if (FAILED(hr))
 	{
-		std::string Error = "";
 		if (errors)
-			Error = (static_cast<char*>(errors->GetBufferPointer()));
-		std::cout << Error << std::endl;
+		{
+			std::string Error = (static_cast<char*>(errors->GetBufferPointer()));
+			Engine::WriteToConsole(Error);
+		}
 
 		throw std::runtime_error("Error compiling shader");
 	}
@@ -159,11 +160,11 @@ void D3D12Shader::CompileShader(const void* InCode, std::size_t Size, std::vecto
 
 	if (FAILED(hr))
 	{
-		std::string Error = "";
 		if (errors)
-			Error = (static_cast<char*>(errors->GetBufferPointer()));
-
-		std::cout << Error << std::endl;
+		{
+			std::string Error = (static_cast<char*>(errors->GetBufferPointer()));
+			Engine::WriteToConsole(Error);
+		}
 
 		throw std::runtime_error("Error compiling shader");
 	}

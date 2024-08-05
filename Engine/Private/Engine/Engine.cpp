@@ -104,6 +104,16 @@ namespace GPU
 		return Renderer->GetGBufferClearMode();
 	}
 
+	std::uint32_t GetGBufferTextureEntryPoint()
+	{
+		return 2;
+	}
+
+	std::uint32_t GetGBufferTextureSize()
+	{
+		return 1;
+	}
+
 	void* GetInternalDevice()
 	{
 		return Device->GetInternalDevice();

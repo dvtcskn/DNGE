@@ -169,6 +169,8 @@ public:
 
 				{
 					CMD->SetVertexBuffer(Mesh->GetVertexBuffer());
+					if (Mesh->HasInstanceBuffer())
+						CMD->SetVertexBuffer(Mesh->GetInstanceBuffer(), 1);
 					CMD->SetIndexBuffer(Mesh->GetIndexBuffer());
 
 					if (Mesh->IsUpdateRequired())

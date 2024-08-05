@@ -53,6 +53,8 @@ public:
 
 	virtual IConstantBuffer* GetMeshConstantBuffer() const = 0;
 	virtual IVertexBuffer* GetVertexBuffer() const = 0;
+	virtual bool HasInstanceBuffer() const = 0;
+	virtual IVertexBuffer* GetInstanceBuffer() const = 0;
 	virtual IIndexBuffer* GetIndexBuffer() const = 0;
 
 	virtual std::size_t GetSecondaryConstantBufferCount() const { return 0; }
@@ -84,7 +86,7 @@ public:
 public:
 	virtual ~sMesh();
 
-	FORCEINLINE void SetName(std::string InName)  { Name = InName; };
+	FORCEINLINE void SetName(std::string InName) { Name = InName; };
 	FORCEINLINE virtual std::string GetName() const override final { return Name; };
 	FORCEINLINE std::string GetPath() const { return Path; };
 
@@ -93,31 +95,39 @@ public:
 
 	virtual IConstantBuffer* GetMeshConstantBuffer() const override final { return MeshConstantBuffer.get(); };
 	virtual IVertexBuffer* GetVertexBuffer() const override final { return VertexBuffer.get(); };
+	virtual bool HasInstanceBuffer() const override final { return InstanceBuffer != nullptr; };
+	virtual IVertexBuffer* GetInstanceBuffer() const override final { return InstanceBuffer.get(); };
 	virtual IIndexBuffer* GetIndexBuffer() const override final { return IndexBuffer.get(); };
 
 	std::vector<std::uint32_t> GetIndices() const { return Data.Indices; };
 	std::size_t GetIndicesSize() const { return Data.Indices.size(); };
 	std::vector<sVertexLayout> GetVertices() const { return Data.Vertices; };
 	std::size_t GetVerticesSize() const { return Data.Vertices.size(); };
+	std::vector<sVertexLayout::sVertexInstanceLayout> GetInstances() const { return Data.InstanceData; };
+	std::size_t GetInstanceSize() const { return Data.InstanceData.size(); };
 	virtual sObjectDrawParameters GetDrawParameters() const override final { return Data.DrawParameters; };
 
 	virtual EMeshRenderPriority GeMeshRenderPriority() const override final { return RenderPriority; }
 	void SeMeshRenderPriority(const EMeshRenderPriority Priority) { RenderPriority = Priority; }
 
 	void UpdateVertexSubresource(BufferSubresource* Subresource, IGraphicsCommandContext* Context = nullptr);
+	void UpdateInstanceubresource(BufferSubresource* Subresource, IGraphicsCommandContext* Context = nullptr);
 	void UpdateIndexSubresource(BufferSubresource* Subresource, IGraphicsCommandContext* Context = nullptr);
 
 	virtual bool IsUpdateRequired() const { return PendingVertexBufferSubresource.has_value() || PendingIndexBufferSubresource.has_value(); }
-	virtual void UpdateMesh(IGraphicsCommandContext* Context) 
+	virtual void UpdateMesh(IGraphicsCommandContext* Context)
 	{
 		UpdateVertexBufferWithPendingSubresource(Context);
+		UpdateInstanceBufferWithPendingSubresource(Context);
 		UpdateIndexBufferWithPendingSubresource(Context);
 	}
 
 	void UpdateVertexBufferWithPendingSubresource(IGraphicsCommandContext* Context);
+	void UpdateInstanceBufferWithPendingSubresource(IGraphicsCommandContext* Context);
 	void UpdateIndexBufferWithPendingSubresource(IGraphicsCommandContext* Context);
 
 	std::optional<BufferSubresource> PendingVertexBufferSubresource;
+	std::optional<BufferSubresource> PendingInstanceBufferSubresource;
 	std::optional<BufferSubresource> PendingIndexBufferSubresource;
 
 	void SetIndexOffset(std::size_t Offset) { Data.DrawParameters.StartIndexLocation = (std::uint32_t)Offset; };
@@ -143,6 +153,7 @@ private:
 
 	sMeshData Data;
 	IVertexBuffer::SharedPtr VertexBuffer;
+	IVertexBuffer::SharedPtr InstanceBuffer;
 	IIndexBuffer::SharedPtr IndexBuffer;
 
 	IConstantBuffer::SharedPtr MeshConstantBuffer;

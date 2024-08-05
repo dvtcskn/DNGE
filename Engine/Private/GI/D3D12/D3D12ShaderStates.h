@@ -508,8 +508,11 @@ public:
         ComPtr<ID3DBlob> error;
         std::string Error;
         HRESULT Serialize_HR = D3DX12SerializeVersionedRootSignature(&rootSignatureDesc, featureData.HighestVersion, &signature, &error);
-        if (error)
-            Error = (static_cast<char*>(error->GetBufferPointer()));
+		if (error)
+		{
+			Error = (static_cast<char*>(error->GetBufferPointer()));
+			Engine::WriteToConsole(Error);
+		}
         HRESULT RootSignature_HR = Device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&RootSignature));
         ThrowIfFailed(RootSignature_HR);
 

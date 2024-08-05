@@ -64,6 +64,9 @@ private:
 		virtual IVertexBuffer* GetVertexBuffer() const override final { return Owner->CurrentKeyFrame->Sprite->GetVertexBuffer(); }
 		virtual IIndexBuffer* GetIndexBuffer() const override final { return Owner->CurrentKeyFrame->Sprite->GetIndexBuffer(); };
 
+		virtual bool HasInstanceBuffer() const override final { return false; };
+		virtual IVertexBuffer* GetInstanceBuffer() const override final { return nullptr; };
+
 		virtual sObjectDrawParameters GetDrawParameters() const override final { return Owner->CurrentKeyFrame->Sprite->GetDrawParameters(); }
 
 		virtual std::vector<sMaterial::sMaterialInstance*> GetMaterialInstances() const override final { return std::vector<sMaterial::sMaterialInstance*>{Owner->CurrentKeyFrame->Sprite->GetMaterialInstance()}; }
