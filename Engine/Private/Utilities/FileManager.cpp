@@ -41,6 +41,8 @@ using namespace std::filesystem;
 
 namespace FileManager
 {
+	std::string ContentDirectory = "..//Content//";
+
 	static int enumerateNativeFiles(const char* pattern, bool directories)
 	{
 		WIN32_FIND_DATAA findData;
@@ -73,34 +75,89 @@ namespace FileManager
 		return numEntries;
 	}
 
-	std::wstring GetContentDirectory()
+	void SetContentDirectory(const std::string Path)
 	{
-		return L"..//Content//";
+		ContentDirectory = Path;
 	}
 
-	std::wstring GetAssetDirectory()
+	std::string GetContentDirectory()
 	{
-		return GetContentDirectory() + L"Assets//";
+		return ContentDirectory; // "..//Content//";
 	}
 
-	std::wstring GetMeshAssetDirectory()
+	std::string GetAssetDirectory()
 	{
-		return GetAssetDirectory() + L"Meshes//";
+		return GetContentDirectory() + "Assets//";
 	}
 
-	std::wstring GetMaterialAssetDirectory()
+	std::string GetMeshAssetDirectory()
 	{
-		return GetAssetDirectory() + L"Materials//";
+		return GetAssetDirectory() + "Meshes//";
 	}
 
-	std::wstring GetMapAssetDirectory()
+	std::string GetMaterialAssetDirectory()
 	{
-		return GetAssetDirectory() + L"Levels//";
+		return GetAssetDirectory() + "Materials//";
 	}
 
-	std::wstring GetLogsFolder()
+	std::string GetMapAssetDirectory()
 	{
-		return GetContentDirectory() + L"Logs//";
+		return GetAssetDirectory() + "Levels//";
+	}
+
+	std::string GetLogsFolder()
+	{
+		return GetContentDirectory() + "Logs//";
+	}
+
+	std::string GetShaderFolder()
+	{
+		return GetContentDirectory() + "Shaders//";
+	}
+
+	std::string GetTextureFolder()
+	{
+		return GetContentDirectory() + "Textures//";
+	}
+
+	std::wstring GetContentDirectoryW()
+	{
+		return StringToWstring(GetContentDirectory());
+	}
+
+	std::wstring GetAssetDirectoryW()
+	{
+		return StringToWstring(GetAssetDirectory());
+	}
+
+	std::wstring GetMeshAssetDirectoryW()
+	{
+		return StringToWstring(GetMeshAssetDirectory());
+	}
+
+	std::wstring GetMaterialAssetDirectoryW()
+	{
+		return StringToWstring(GetMaterialAssetDirectory());
+	}
+
+	std::wstring GetMapAssetDirectoryW()
+	{
+		return StringToWstring(GetMapAssetDirectory());
+	}
+
+	std::wstring GetLogsFolderW()
+	{
+		return StringToWstring(GetLogsFolder());
+	}
+
+	std::wstring GetShaderFolderW()
+	{
+		return StringToWstring(GetShaderFolder());
+	}
+
+	std::wstring GetTextureFolderW()
+	{
+		return StringToWstring(GetTextureFolder());
 	}
 
 	std::string Normalize(const std::string& filePath)
@@ -181,9 +238,10 @@ namespace FileManager
 	{
 		std::ofstream myfile;
 		myfile.open(InPath + InName);
+		bool Var = myfile.is_open();
 		myfile.close();
 
-		return true;
+		return Var;
 	}
 
 	bool CreateDirectory_(const std::string& path)

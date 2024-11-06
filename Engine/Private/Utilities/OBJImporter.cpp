@@ -41,6 +41,7 @@ bool OBJImporter::Import(const std::string& path)
 {
 	std::vector<std::string> Lines;
 
+	bool NameOrPartFound = false;
 	std::uint32_t PartSize = 0;
 	if (!path.empty())
 	{
@@ -54,14 +55,30 @@ bool OBJImporter::Import(const std::string& path)
 				Lines.push_back(line);
 				if (line.find("o ") != -1)
 				{
+					NameOrPartFound = true;
+					PartSize++;
+				}
+				else if (line.find("# object ") != -1)
+				{
+					NameOrPartFound = true;
 					PartSize++;
 				}
 			}
 		}
+		else
+		{
+			return false;
+		}
 	}
 
 	if (PartSize == 0)
-		return false;
+	{
+		//return false;
+		if (!NameOrPartFound)
+		{
+			PartSize = 1;
+		}
+	}
 
 	std::string MtLib;
 	for (const auto& Line : Lines)
@@ -90,12 +107,20 @@ bool OBJImporter::Import(const std::string& path)
 			continue;
 
 		std::size_t VarOffset = Line.find(" ");
+		if (VarOffset == std::string::npos)
+			continue;
 		std::string Var = std::string(Line.begin(), Line.begin() + VarOffset);
 
 		if (Var == "o")
 		{
 			PartCounter++;
 			std::istringstream sin(Line.substr(Line.find(" ") + 1));
+			sin >> obj.Parts[PartCounter].PartName;
+		}
+		else if (Line.find("# object ") != std::string::npos)
+		{
+			PartCounter++;
+			std::istringstream sin(Line.substr(9));
 			sin >> obj.Parts[PartCounter].PartName;
 		}
 		else if (Var == "v")
@@ -215,6 +240,7 @@ bool OBJImporter::Import(const std::string& path)
 
 				if (idx == 2)
 				{
+					face.MeshIndex = PartCounter;
 					Faces.push_back(face);
 					idx = 0;
 
@@ -227,16 +253,6 @@ bool OBJImporter::Import(const std::string& path)
 				}
 				idx++;
 			}
-
-			//for (const auto& String : Indexes)
-			//{
-			//	std::uint32_t Index = 0;
-			//	std::istringstream sin(String);
-			//	sin >> Index;
-			//	//obj.Faces.push_back(Index - 1);
-			//	//obj.Parts[PartCounter].Faces.push_back(Index - 1);
-			//	//obj.Parts[PartCounter].FacesByMaterial[CurrentMaterialName].push_back(Index - 1);
-			//}
 		}
 	}
 
@@ -282,6 +298,8 @@ bool OBJImporter::Import(const std::string& path)
 					continue;
 
 				std::size_t VarOffset = Line.find(" ");
+				if (VarOffset == std::string::npos)
+					continue;
 				std::string Var = std::string(Line.begin(), Line.begin() + VarOffset);
 
 				if (Var == "newmtl")
@@ -413,22 +431,23 @@ bool OBJImporter::Import(const std::string& path)
 		obj.Mesh.Positions.push_back(obj.Verts[Face.Position]);
 		obj.Mesh.TextureCoords.push_back(obj.TextureCoords[Face.TextureCoord]);
 		obj.Mesh.Normals.push_back(obj.Normals[Face.Normals]);
-	}
 
-	for (auto& Part : obj.Parts)
-	{
-		for (const auto& Face : Part.Faces)
-		{
-			Part.Mesh.Positions.push_back(Part.Verts[Face.Position]);
-			Part.Mesh.TextureCoords.push_back(Part.TextureCoords[Face.TextureCoord]);
-			Part.Mesh.Normals.push_back(Part.Normals[Face.Normals]);
-		}
+		obj.Parts[Face.MeshIndex].Mesh.Positions.push_back(obj.Verts[Face.Position]);
+		obj.Parts[Face.MeshIndex].Mesh.TextureCoords.push_back(obj.TextureCoords[Face.TextureCoord]);
+		obj.Parts[Face.MeshIndex].Mesh.Normals.push_back(obj.Normals[Face.Normals]);
 	}
 
 	for (int i = 0; i < obj.Mesh.Positions.size(); i++)
 	{
-		//obj.Mesh.Indices.push_back(obj.Faces[i].Position);
 		obj.Mesh.Indices.push_back(i);
+	}
+
+	for (auto& Part : obj.Parts)
+	{
+		for (int i = 0; i < Part.Mesh.Positions.size(); i++)
+		{
+			Part.Mesh.Indices.push_back(i);
+		}
 	}
 
 	return true;

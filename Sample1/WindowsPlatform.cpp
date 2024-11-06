@@ -220,16 +220,32 @@ WindowsPlatform::WindowsPlatform()
 	, WindowFullscreen(false)
 	, Engine(nullptr)
 {
-	ConfigManager::Get().ReadGameConfig();
-
-	WindowWidth = (std::uint32_t)ConfigManager::Get().GetGameConfig().Dimensions.Width;
-	WindowHeight = (std::uint32_t)ConfigManager::Get().GetGameConfig().Dimensions.Height;
-	WindowFullscreen = ConfigManager::Get().GetGameConfig().Fullscreen;
+	if (!ConfigManager::Get().IsGameConfigCreated())
+	{
+		if (ConfigManager::Get().CreateGameConfig())
+		{
+			if (ConfigManager::Get().ReadGameConfig())
+			{
+				WindowWidth = (std::uint32_t)ConfigManager::Get().GetGameConfig().Dimensions.Width;
+				WindowHeight = (std::uint32_t)ConfigManager::Get().GetGameConfig().Dimensions.Height;
+				WindowFullscreen = ConfigManager::Get().GetGameConfig().Fullscreen;
+			}
+		}
+	}
+	else
+	{
+		if (ConfigManager::Get().ReadGameConfig())
+		{
+			WindowWidth = (std::uint32_t)ConfigManager::Get().GetGameConfig().Dimensions.Width;
+			WindowHeight = (std::uint32_t)ConfigManager::Get().GetGameConfig().Dimensions.Height;
+			WindowFullscreen = ConfigManager::Get().GetGameConfig().Fullscreen;
+		}
+	}
 
 	RECT rect = ArrangeWindow(RECT({ 0, 0, static_cast<LONG>(WindowWidth), static_cast<LONG>(WindowHeight) }));
 	CreateViewport(L"GameTest", rect, WindowFullscreen);
 
-	Engine = sEngine::CreateUnique(EGITypes::eD3D11,
+	Engine = sEngine::CreateUnique(EGITypes::eD3D12,
 #if BulletPhysics
 		BulletWorld::Create()
 #elif PhysXEngine
@@ -237,7 +253,7 @@ WindowsPlatform::WindowsPlatform()
 #else
 		sWorld2D::Create()
 #endif
-		//, -1
+		, -1
 	);
 
 	Engine->InitWindow(GetHWND(), WindowWidth, WindowHeight, WindowFullscreen);
@@ -483,6 +499,12 @@ LRESULT WindowsPlatform::MsgProc(HWND hWnd, std::uint32_t uMsg, WPARAM wParam, L
 				MouseInput.MouseLocation = GetMouseLocation();
 				break;
 			}
+			//case WM_LBUTTONDBLCLK:
+			//{
+			//	//MouseInput.Buttons["Left"] = EMouseButtonState::ePressed;
+			//	//MouseInput.MouseLocation = GetMouseLocation();
+			//	break;
+			//}
 			case WM_RBUTTONDOWN:
 			{
 				MouseInput.Buttons["Right"] = EMouseButtonState::ePressed;
@@ -495,6 +517,12 @@ LRESULT WindowsPlatform::MsgProc(HWND hWnd, std::uint32_t uMsg, WPARAM wParam, L
 				MouseInput.MouseLocation = GetMouseLocation();
 				break;
 			}
+			//case WM_RBUTTONDBLCLK:
+			//{
+			//	//MouseInput.Buttons["Right"] = EMouseButtonState::ePressed;
+			//	//MouseInput.MouseLocation = GetMouseLocation();
+			//	break;
+			//}
 			case WM_MBUTTONDOWN:
 			{
 				MouseInput.Buttons["Middle"] = EMouseButtonState::ePressed;
@@ -507,6 +535,12 @@ LRESULT WindowsPlatform::MsgProc(HWND hWnd, std::uint32_t uMsg, WPARAM wParam, L
 				MouseInput.MouseLocation = GetMouseLocation();
 				break;
 			}
+			//case WM_MBUTTONDBLCLK:
+			//{
+			//	//MouseInput.Buttons["Middle"] = EMouseButtonState::ePressed;
+			//	//MouseInput.MouseLocation = GetMouseLocation();
+			//	break;
+			//}
 			case WM_XBUTTONDOWN:
 				switch (GET_XBUTTON_WPARAM(wParam))
 				{
@@ -536,6 +570,20 @@ LRESULT WindowsPlatform::MsgProc(HWND hWnd, std::uint32_t uMsg, WPARAM wParam, L
 					break;
 				}
 				break;
+			/*case WM_XBUTTONDBLCLK:
+				switch (GET_XBUTTON_WPARAM(wParam))
+				{
+				case XBUTTON1:
+					MouseInput.Buttons["XB1"] = EMouseButtonState::ePressed;
+					MouseInput.MouseLocation = GetMouseLocation();
+					break;
+
+				case XBUTTON2:
+					MouseInput.Buttons["XB2"] = EMouseButtonState::ePressed;
+					MouseInput.MouseLocation = GetMouseLocation();
+					break;
+				}
+				break;*/
 			case WM_SYSKEYUP:
 				break;
 			case WM_SYSKEYDOWN:

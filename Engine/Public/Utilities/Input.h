@@ -41,6 +41,7 @@ enum class EMouseButtonState
 	eIdle,
 	eReleased,
 	ePressed,
+	eDBLCLK,
 	eDisabled,
 };
 

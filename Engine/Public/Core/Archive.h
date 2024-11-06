@@ -511,7 +511,7 @@ private:
 	{
 		const std::size_t dataSize = sizeof(data);
 		const std::size_t reqSize = pos + dataSize;
-		if (reqSize > Data.size())
+		if (reqSize > Data.size()) 
 		{
 			ResizeData(Data.size() + dataSize /** 2*/);
 		}

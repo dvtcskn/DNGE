@@ -43,9 +43,9 @@ std::wstring Log::CreateLogFile() const
 	oss << std::put_time(&buf, "%d-%m-%Y_%H-%M-%S");
 	auto str = oss.str();
 
-	std::wstring wsTmp(str.begin(), str.end());
+	std::string wsTmp(str.begin(), str.end());
 
-	return FileManager::GetLogsFolder() + L"Log_" + wsTmp + L".txt";
+	return FileManager::StringToWstring(FileManager::GetLogsFolder() + "Log_" + wsTmp + ".txt");
 }
 
 bool Log::Open() const

@@ -317,7 +317,7 @@ struct sVertexLayout
 		, binormal(FVector::Zero())
 		, ArrayIndex(NULL)
 	{}
-	sVertexLayout(FVector InPosition, FVector InNormal, FVector2 InTexCoord, FColor InColor,
+	sVertexLayout(FVector InPosition, FVector InNormal, FVector2 InTexCoord, FColor InColor, 
 		FVector InTangent, FVector InBinormal, std::uint32_t InArrayIndex)
 		: position(InPosition)
 		, normal(InNormal)

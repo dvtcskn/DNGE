@@ -65,7 +65,7 @@ void sArchive::OpenFile(std::string FilePath)
 			file.seekg(0, std::ios::beg);
 
 			std::string line;
-			while (std::getline(file, line))
+			while (std::getline(file, line)) 
 			{
 				Data.insert(Data.end(), line.begin(), line.end());
 			}

@@ -26,6 +26,7 @@
 
 #include "pch.h"
 #include "LineRenderer.h"
+#include "Utilities/FileManager.h"
 
 sLineRenderer::sLineRenderer(std::size_t Width, std::size_t Height)
 	: Super()
@@ -62,8 +63,8 @@ sLineRenderer::sLineRenderer(std::size_t Width, std::size_t Height)
 	pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Vertex, 0));
 	//pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Vertex, 10));
 
-	pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment(L"..//Content\\Shaders\\GBufferVS.hlsl", "GeometryVSLine", eShaderType::Vertex));
-	pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment(L"..//Content\\Shaders\\GBufferPS.hlsl", "LineGeometryFlatPS", eShaderType::Pixel));
+	pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment(FileManager::GetShaderFolderW() + L"GBufferVS.hlsl", "GeometryVSLine", eShaderType::Vertex));
+	pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment(FileManager::GetShaderFolderW() + L"GBufferPS.hlsl", "LineGeometryFlatPS", eShaderType::Pixel));
 
 	DefaultEngineMat = sMaterial::Create("Line", EMaterialBlendMode::Opaque, pPipelineDesc);
 

@@ -53,7 +53,7 @@ sSpriteSheetComponent::sSpriteSheetComponent(const std::string Name)
 {
 	BufferLayout BufferDesc;
 	BufferDesc.Size = sizeof(sAnimationFlip);
-	AnimationCB = IConstantBuffer::Create("AnimationFlip", BufferDesc, 4);
+	AnimationCB = IConstantBuffer::Create("AnimationFlip", BufferDesc, GPU::GetGBufferTextureEntryPoint() + GPU::GetGBufferTextureSize() + 1);
 
 	sSpriteEffectComponent::SharedPtr pSpriteEffectComponent = sSpriteEffectComponent::Create("SpriteEffectComponent");
 	pSpriteEffectComponent->AttachToComponent(this);
@@ -88,7 +88,7 @@ sSpriteSheetComponent::sSpriteSheetComponent(sSpriteSheet* pSpriteSheet)
 {
 	BufferLayout BufferDesc;
 	BufferDesc.Size = sizeof(sAnimationFlip);
-	AnimationCB = IConstantBuffer::Create("AnimationFlip", BufferDesc, 4);
+	AnimationCB = IConstantBuffer::Create("AnimationFlip", BufferDesc, GPU::GetGBufferTextureEntryPoint() + GPU::GetGBufferTextureSize() + 1);
 
 	sSpriteEffectComponent::SharedPtr pSpriteEffectComponent = sSpriteEffectComponent::Create("SpriteEffectComponent");
 	pSpriteEffectComponent->AttachToComponent(this);

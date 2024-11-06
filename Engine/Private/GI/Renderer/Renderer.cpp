@@ -30,6 +30,7 @@
 #include "Gameplay/GameInstance.h"
 #include "Gameplay/StaticMesh.h"
 #include "Gameplay/MeshComponent.h"
+#include "Utilities/FileManager.h"
 
 class sRenderer::sGBuffer
 {
@@ -43,7 +44,7 @@ public:
 	{
 		BufferLayout BufferDesc;
 		BufferDesc.Size = sizeof(sTimeBuffer);
-		TimeCB = IConstantBuffer::Create("TimeCB", BufferDesc, 3);
+		TimeCB = IConstantBuffer::Create("TimeCB", BufferDesc, GPU::GetGBufferTextureEntryPoint() + GPU::GetGBufferTextureSize());
 
 		{
 			sFrameBufferAttachmentInfo AttachmentInfo;
@@ -62,7 +63,7 @@ public:
 			pPipelineDesc.PrimitiveTopologyType = EPrimitiveType::eTRIANGLE_LIST;
 			pPipelineDesc.RasterizerAttribute = sRasterizerAttributeDesc();
 
-			pPipelineDesc.NumRenderTargets = 7;
+			pPipelineDesc.NumRenderTargets = 1;
 			pPipelineDesc.RTVFormats[0] = EFormat::BGRA8_UNORM;
 			pPipelineDesc.DSVFormat = GPU::GetDefaultDepthFormat();
 
@@ -82,16 +83,21 @@ public:
 			pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Vertex, 10));
 			pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eTexture, eShaderType::Pixel, 0));
 			pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eSampler, eShaderType::Pixel, 0));
-			pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Pixel, 0));
+			pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Pixel, 11));
 
-			pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment(L"..//Content\\Shaders\\GBufferVS.hlsl", "GeometryVS", eShaderType::Vertex));
-			pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment(L"..//Content\\Shaders\\GBufferPS.hlsl", "GeometryPS", eShaderType::Pixel));
+			pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment(FileManager::GetShaderFolderW() + L"GBufferVS.hlsl", "GeometryVS", eShaderType::Vertex));
+			pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment(FileManager::GetShaderFolderW() + L"GBufferPS.hlsl", "GeometryPS", eShaderType::Pixel));
 
 			DefaultEngineMat = sMaterial::Create("DefaultEngineMat", EMaterialBlendMode::Opaque, pPipelineDesc);
+			//DefaultEngineMat->BindConstantBuffer(CameraCB);
 		}
-
 		DefaultMatInstance = DefaultEngineMat->CreateInstance("DefaultEngineMatInstance");
-		//DefaultMatInstance->AddTexture(L"..//Content\\Textures\\DefaultWhiteGrid.DDS", "DefaultEngineTexture", 2);
+
+		if (FileManager::fileExists(FileManager::GetTextureFolderW() + L"DefaultWhiteGrid.DDS"))
+		{
+			DefaultMatInstance->AddTexture(FileManager::GetTextureFolderW() + L"DefaultWhiteGrid.DDS", "DefaultEngineTexture", 2);
+			//MatInstance->AddTexture(L"..//Content\\Textures\\bfn.DDS", 3);
+		}
 	}
 	~sGBuffer()
 	{
@@ -476,7 +482,7 @@ void sRenderer::Render()
 	if (!World)
 		return;
 
-	if (GBufferClearMode == EGBufferClear::Driver)
+	if (GBufferClearMode == EGBufferClear::Driver/* || GBufferClearMode == EGBufferClear::Sky*/)
 	{
 		GBuffer->ClearGBuffer();
 	}

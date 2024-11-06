@@ -48,6 +48,7 @@ public:
 
 		struct Face
 		{
+			std::uint32_t MeshIndex;
 			std::uint32_t Position;
 			std::uint32_t TextureCoord;
 			std::uint32_t Normals;
@@ -96,6 +97,7 @@ public:
 	OBJImporter();
 	~OBJImporter();
 
+	// OBJ has to be fully triangulated.
 	bool Import(const std::string& path);
 
 	OBJ obj;

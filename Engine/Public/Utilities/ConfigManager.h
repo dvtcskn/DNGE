@@ -58,11 +58,12 @@ class ConfigManager
 	sBaseClassBody(sClassNoDefaults, ConfigManager)
 private:
 	ConfigManager()
+		: ConfigPath("..//Config//")
 	{
-		if (!FileManager::FileExists("..//Config//GameConfig.ini"))
+		/*if (!FileManager::FileExists("..//Config//GameConfig.ini"))
 		{
 			CreateGameConfig();
-		}
+		}*/
 		ReadGameConfig();
 	};
 
@@ -88,74 +89,80 @@ public:
 public:
 	GameConfig GetGameConfig() const { return gameCFG; };
 
-	void ReadGameConfig()
-	{
-		/*
-		bütün satýrlarý std::vector<std::string> containerýna koy
-		sonra her satýrý for loop ile araþtýr
-		[] -> her zaman baþlýk
-		baþlýk bulununca baþlýk tipini çöz
-		sonra alt satýra in 
-		alt satýrý for loop ile harf harf çözümle
-		hangi deðiþken olduðunu bul sonra "=" bul ve gameCFG.deðiþken set et
-		*/
+	std::string ConfigPath;
 
-		std::ifstream fin("..//Config//" + gameCFG.Name);
-		std::string line;
-		while (getline(fin, line)) 
+	bool IsGameConfigCreated()
+	{
+		return FileManager::FileExists(ConfigPath + "GameConfig.ini");
+	}
+
+	bool ReadGameConfig()
+	{
+		std::ifstream fin(ConfigPath + gameCFG.Name);
+		if (fin.is_open())
 		{
-			std::istringstream sin(line.substr(line.find("=") + 1));
-			if (line.find("WindowWidth") != -1)
-				sin >> gameCFG.Dimensions.Width;
-			if (line.find("WindowHeight") != -1)
-				sin >> gameCFG.Dimensions.Height;
-			if (line.find("Fullscreen") != -1)
-				sin >> gameCFG.Fullscreen;
-			if (line.find("Role") != -1)
-				sin >> gameCFG.NetworkRole;
-			if (line.find("IP") != -1)
-				sin >> gameCFG.IP;
-			if (line.find("Port") != -1)
-				sin >> gameCFG.Port;
+			std::string line;
+			while (getline(fin, line))
+			{
+				std::istringstream sin(line.substr(line.find("=") + 1));
+				if (line.find("WindowWidth") != -1)
+					sin >> gameCFG.Dimensions.Width;
+				if (line.find("WindowHeight") != -1)
+					sin >> gameCFG.Dimensions.Height;
+				if (line.find("Fullscreen") != -1)
+					sin >> gameCFG.Fullscreen;
+				if (line.find("Role") != -1)
+					sin >> gameCFG.NetworkRole;
+				if (line.find("IP") != -1)
+					sin >> gameCFG.IP;
+				if (line.find("Port") != -1)
+					sin >> gameCFG.Port;
+			}
+			return true;
 		}
+		return false;
+	}
+
+	bool CreateGameConfig()
+	{
+		if (FileManager::fsCreateFile(ConfigPath, "GameConfig.ini"))
+		{
+			std::wofstream ConfigFile;
+
+			ConfigFile.open(ConfigPath + "GameConfig.ini", std::ofstream::out | std::ofstream::app);
+
+			ConfigFile << "\n";
+			ConfigFile << "[Renderer]";
+			ConfigFile << "\n";
+			ConfigFile << "WindowWidth = 1366";
+			ConfigFile << "\n";
+			ConfigFile << "WindowHeight = 768";
+			ConfigFile << "\n";
+			ConfigFile << "Fullscreen = 0";
+			ConfigFile << "\n";
+			ConfigFile << "\n";
+			ConfigFile << "[Network]";
+			ConfigFile << "\n";
+			ConfigFile << "# None, Host or Client";
+			ConfigFile << "\n";
+			ConfigFile << "Role = None";
+			ConfigFile << "\n";
+			ConfigFile << "# default IP 127.0.0.1 (Local)";
+			ConfigFile << "\n";
+			ConfigFile << "IP = 127.0.0.1";
+			ConfigFile << "\n";
+			ConfigFile << "# default Port 27020";
+			ConfigFile << "\n";
+			ConfigFile << "Port = 27020";
+			ConfigFile << "\n";
+
+			ConfigFile.close();
+
+			return true;
+		}
+		return false;
 	}
 
 private:
 	GameConfig gameCFG;
-
-	void CreateGameConfig()
-	{
-		FileManager::fsCreateFile("..//Config//", "GameConfig.ini");
-
-		std::wofstream ConfigFile;
-
-		ConfigFile.open("..//Config//GameConfig.ini", std::ofstream::out | std::ofstream::app);
-
-		ConfigFile << "\n";
-		ConfigFile << "[Renderer]";
-		ConfigFile << "\n";
-		ConfigFile << "WindowWidth = 1366";
-		ConfigFile << "\n";
-		ConfigFile << "WindowHeight = 768";
-		ConfigFile << "\n";
-		ConfigFile << "Fullscreen = 0";
-		ConfigFile << "\n";
-		ConfigFile << "\n";
-		ConfigFile << "[Network]";
-		ConfigFile << "\n";
-		ConfigFile << "# None, Host or Client";
-		ConfigFile << "\n";
-		ConfigFile << "Role = Host";
-		ConfigFile << "\n";
-		ConfigFile << "# default IP 127.0.0.1 (Local)";
-		ConfigFile << "\n";
-		ConfigFile << "IP = 127.0.0.1";
-		ConfigFile << "\n";
-		ConfigFile << "# default Port 27020";
-		ConfigFile << "\n";
-		ConfigFile << "Port = 27020";
-		ConfigFile << "\n";
-
-		ConfigFile.close();
-	}
 };

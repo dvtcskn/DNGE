@@ -26,6 +26,7 @@
 
 #include "pch.h"
 #include "AbstractGI/ToneMapping.h"
+#include "Utilities/FileManager.h"
 
 sToneMapping::sToneMapping(std::size_t Width, std::size_t Height)
     : TonemapperIndex(4)
@@ -40,7 +41,7 @@ sToneMapping::sToneMapping(std::size_t Width, std::size_t Height)
         PostProcessFB = IRenderTarget::Create("sToneMapping", GPU::GetBackBufferFormat(), sFBODesc(sFBODesc::sFBODimension((std::uint32_t)Width, (std::uint32_t)Height)));
     }
 
-    const sShaderAttachment PostProcessShader = sShaderAttachment(L"..//Content\\Shaders\\Tonemapping.hlsl", "mainPS", eShaderType::Pixel);
+    const sShaderAttachment PostProcessShader = sShaderAttachment(FileManager::GetShaderFolderW() + L"Tonemapping.hlsl", "mainPS", eShaderType::Pixel);
     std::vector<sDescriptorSetLayoutBinding> DescriptorSetLayout;
     {
         DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Pixel, 0));

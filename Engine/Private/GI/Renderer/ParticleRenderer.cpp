@@ -30,6 +30,8 @@
 #include "Gameplay/StaticMesh.h"
 #include "Gameplay/MeshComponent.h"
 
+#include "Utilities/FileManager.h"
+
 ParticleRenderer::ParticleRenderer(std::size_t Width, std::size_t Height, IGraphicsCommandContext::SharedPtr CMD)
 	: GraphicsCommandContext(CMD ? CMD : IGraphicsCommandContext::Create())
 	, ScreenDimension(sScreenDimension(Width, Height))
@@ -77,9 +79,8 @@ ParticleRenderer::ParticleRenderer(std::size_t Width, std::size_t Height, IGraph
 		//pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eTexture, eShaderType::Pixel, 3));
 		//pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eTexture, eShaderType::Pixel, 4));
 
-		std::vector<sShaderAttachment> ShaderAttachments;
-		pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment(L"..//Content\\Shaders\\Particle.hlsl", "ParticleVS", eShaderType::Vertex));
-		pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment(L"..//Content\\Shaders\\Particle.hlsl", "ParticleFlatPS", eShaderType::Pixel));
+		pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment(FileManager::GetShaderFolderW() + L"Particle.hlsl", "ParticleVS", eShaderType::Vertex));
+		pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment(FileManager::GetShaderFolderW() + L"Particle.hlsl", "ParticleFlatPS", eShaderType::Pixel));
 
 		DefaultParticle_EngineMat = sMaterial::Create("DefaultEngineMat", EMaterialBlendMode::Opaque, pPipelineDesc);
 		//DefaultEngineMat->BindConstantBuffer(CameraCB);

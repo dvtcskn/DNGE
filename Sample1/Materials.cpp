@@ -196,7 +196,6 @@ namespace GameMaterials
 			pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Vertex, 0));
 			pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Vertex, 10));
 			pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eTexture, eShaderType::Pixel, 0));
-			pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Pixel, 0));
 
 			sSamplerAttributeDesc sampler(ESamplerStateMode::ePointBorder);
 			sampler.Filter = ESamplerFilter::ePoint;
@@ -210,6 +209,7 @@ namespace GameMaterials
 			sampler.BorderColor = FColor::Transparent();
 
 			pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(sampler, eShaderType::Pixel, 0));
+			pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Pixel, 0));
 
 			pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment(L"..//Content\\Shaders\\GBufferVS.hlsl", "GeometryVS", eShaderType::Vertex));
 			pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment(L"..//Content\\Shaders\\GBufferPS.hlsl", "GeometryBackgroundPS", eShaderType::Pixel));
@@ -251,7 +251,7 @@ namespace GameMaterials
 			pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Vertex, 0));
 			pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Vertex, 10));
 			pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eTexture, eShaderType::Pixel, 0));
-			pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Pixel, 0));
+			pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Pixel, 11));
 
 			sSamplerAttributeDesc sampler(ESamplerStateMode::ePointWrap);
 
@@ -277,7 +277,7 @@ namespace GameMaterials
 					Desc.Dimensions.Y = 16;
 					Desc.Format = TextureAtlasDesc.Format;
 					ITexture2D::SharedPtr Texture = ITexture2D::CreateEmpty("Terrain_" + std::to_string(w) + "x" + std::to_string(h), Desc, 2);
-					Texture->UpdateTexture(TextureAtlas.get(), 0, 0, IntVector2(0, 0), FBounds2D(FDimension2D(16.0f, 16.0f), FVector2(8.0f + w, 8.0f + h)));
+					Texture->UpdateTexture(TextureAtlas.get(), 0, 0, IntVector2(0, 0), FBounds2D(FDimension2D(16.0f,16.0f), FVector2(8.0f + w,8.0f + h)));
 					MatInstance->AddTexture(Texture);
 				}
 			}
@@ -314,8 +314,6 @@ namespace GameMaterials
 			pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Vertex, 0));
 			pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Vertex, 10));
 			pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eTexture, eShaderType::Pixel, 0));
-			pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Pixel, 0));
-			pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Pixel, 1));
 
 			sSamplerAttributeDesc sampler(ESamplerStateMode::ePointBorder);
 			sampler.Filter = ESamplerFilter::ePoint;
@@ -329,6 +327,8 @@ namespace GameMaterials
 			sampler.BorderColor = FColor::Transparent();
 
 			pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(sampler, eShaderType::Pixel, 0));
+			pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Pixel, 0));
+			pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Pixel, 1));
 
 			pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment(L"..//Content\\Shaders\\GBufferVS.hlsl", "GeometryVS", eShaderType::Vertex));
 			pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment(L"..//Content\\Shaders\\GBufferPS.hlsl", "GeometryAtlasTexturedPS", eShaderType::Pixel));

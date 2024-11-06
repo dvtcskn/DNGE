@@ -4,6 +4,12 @@
     <Filter Include="GI">
       <UniqueIdentifier>{fa1fe418-e205-4138-82c3-821f0245b447}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Private">
+      <UniqueIdentifier>{56be4261-e211-49b3-8ebd-d2f744818829}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Public">
+      <UniqueIdentifier>{c454585a-b39b-4b9d-a6c8-4846b1398c3f}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Core">
       <UniqueIdentifier>{73f01329-c39b-41be-98a3-da92692b2b2e}</UniqueIdentifier>
     </Filter>
@@ -12,6 +18,15 @@
     </Filter>
     <Filter Include="Core\Private">
       <UniqueIdentifier>{034bdd3f-6813-431d-8b51-007bceb60aab}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Platform">
+      <UniqueIdentifier>{973f0db8-c3df-4643-a8cc-bf5832039977}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Platform\Public">
+      <UniqueIdentifier>{b0725133-22df-4414-bcc9-accebc07e937}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Platform\Private">
+      <UniqueIdentifier>{d50b0b51-f5f8-442f-91ed-17c5d4dc8a47}</UniqueIdentifier>
     </Filter>
     <Filter Include="Gameplay">
       <UniqueIdentifier>{d7326fda-33d5-4ce9-b505-971ef557b182}</UniqueIdentifier>
@@ -30,6 +45,10 @@
     </Filter>
     <Filter Include="Utilities\Private">
       <UniqueIdentifier>{a0c50525-a435-435e-92f1-91d2b4e3e841}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Private\PCH">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
     <Filter Include="Engine">
       <UniqueIdentifier>{d1ac98d7-f6c9-4f6b-a2ff-4924c35e6dab}</UniqueIdentifier>
@@ -79,11 +98,11 @@
     <Filter Include="GI\Private\D3DShared">
       <UniqueIdentifier>{14967a23-668e-48c7-aa46-e54902efadf2}</UniqueIdentifier>
     </Filter>
-    <Filter Include="PCH">
-      <UniqueIdentifier>{56be4261-e211-49b3-8ebd-d2f744818829}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Engine\Private\Network">
-      <UniqueIdentifier>{eb268265-68ec-4eaa-aac6-c91ba4fc82c5}</UniqueIdentifier>
+      <UniqueIdentifier>{d211f890-17e9-433f-91d1-469cc068c81e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Public\Network">
+      <UniqueIdentifier>{33b56ff8-8bc5-49b3-920f-642cca856beb}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -95,6 +114,12 @@
     </ClInclude>
     <ClInclude Include="Public\Utilities\Input.h">
       <Filter>Utilities\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\framework.h">
+      <Filter>Private\PCH</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\pch.h">
+      <Filter>Private\PCH</Filter>
     </ClInclude>
     <ClInclude Include="Public\Engine\CPU.h">
       <Filter>Engine\Public</Filter>
@@ -312,6 +337,9 @@
     <ClInclude Include="Public\Gameplay\StaticMesh.h">
       <Filter>Gameplay\Public</Filter>
     </ClInclude>
+    <ClInclude Include="Public\AbstractGI\Mesh.h">
+      <Filter>GI\Public\AbstractGI\Renderer</Filter>
+    </ClInclude>
     <ClInclude Include="Private\GI\D3D11\ScreenGrab11.h">
       <Filter>GI\Private\D3D11</Filter>
     </ClInclude>
@@ -332,18 +360,6 @@
     </ClInclude>
     <ClInclude Include="Public\Gameplay\CircleCollision2DComponent.h">
       <Filter>Gameplay\Public\Components</Filter>
-    </ClInclude>
-    <ClInclude Include="Public\Engine\BulletRigidBody.h">
-      <Filter>Engine\Public</Filter>
-    </ClInclude>
-    <ClInclude Include="Public\Engine\BulletWorld.h">
-      <Filter>Engine\Public</Filter>
-    </ClInclude>
-    <ClInclude Include="Public\Engine\PhysXRigidBody.h">
-      <Filter>Engine\Public</Filter>
-    </ClInclude>
-    <ClInclude Include="Public\Engine\PhysXWorld.h">
-      <Filter>Engine\Public</Filter>
     </ClInclude>
     <ClInclude Include="Public\Gameplay\IWorld.h">
       <Filter>Gameplay\Public</Filter>
@@ -408,17 +424,11 @@
     <ClInclude Include="Private\Engine\Audio.h">
       <Filter>Engine\Private</Filter>
     </ClInclude>
-    <ClInclude Include="Private\framework.h">
-      <Filter>PCH</Filter>
-    </ClInclude>
-    <ClInclude Include="Private\pch.h">
-      <Filter>PCH</Filter>
+    <ClInclude Include="Private\Engine\Network.h">
+      <Filter>Engine\Private\Network</Filter>
     </ClInclude>
     <ClInclude Include="Public\Engine\AbstractEngineUtilities.h">
       <Filter>Engine\Public</Filter>
-    </ClInclude>
-    <ClInclude Include="Private\Engine\Network.h">
-      <Filter>Engine\Private\Network</Filter>
     </ClInclude>
     <ClInclude Include="Private\Engine\RemoteProcedureCall.h">
       <Filter>Engine\Private\Network</Filter>
@@ -429,8 +439,8 @@
     <ClInclude Include="Private\GI\D3D12\dx12.h">
       <Filter>GI\Private\D3D12</Filter>
     </ClInclude>
-    <ClInclude Include="Public\AbstractGI\Mesh.h">
-      <Filter>GI\Public\AbstractGI\Renderer</Filter>
+    <ClInclude Include="Public\Gameplay\ParticleSystem.h">
+      <Filter>Gameplay\Public</Filter>
     </ClInclude>
     <ClInclude Include="Private\GI\Renderer\ParticleRenderer.h">
       <Filter>GI\Private\Renderer</Filter>
@@ -438,13 +448,19 @@
     <ClInclude Include="Public\Gameplay\ParticleComponent.h">
       <Filter>Gameplay\Public\Components</Filter>
     </ClInclude>
-    <ClInclude Include="Public\Gameplay\ParticleSystem.h">
+    <ClInclude Include="Public\Gameplay\GameState.h">
       <Filter>Gameplay\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Public\Utilities\ModelImporter.h">
+      <Filter>Utilities\Public</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Private\Engine\Engine.cpp">
       <Filter>Engine\Private</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\pch.cpp">
+      <Filter>Private\PCH</Filter>
     </ClCompile>
     <ClCompile Include="Private\Engine\MemoryManager.cpp">
       <Filter>Engine\Private</Filter>
@@ -602,6 +618,9 @@
     <ClCompile Include="Private\Gameplay\StaticMesh.cpp">
       <Filter>Gameplay\Private</Filter>
     </ClCompile>
+    <ClCompile Include="Private\GI\AbstractGI\Mesh.cpp">
+      <Filter>GI\Private\AbstractGI</Filter>
+    </ClCompile>
     <ClCompile Include="Private\GI\D3D11\ScreenGrab11.cpp">
       <Filter>GI\Private\D3D11</Filter>
     </ClCompile>
@@ -671,9 +690,6 @@
     <ClCompile Include="Private\Engine\InputController.cpp">
       <Filter>Engine\Private</Filter>
     </ClCompile>
-    <ClCompile Include="Private\pch.cpp">
-      <Filter>PCH</Filter>
-    </ClCompile>
     <ClCompile Include="Private\Engine\Network.cpp">
       <Filter>Engine\Private\Network</Filter>
     </ClCompile>
@@ -683,19 +699,22 @@
     <ClCompile Include="Private\Gameplay\PlayerProxy.cpp">
       <Filter>Gameplay\Private</Filter>
     </ClCompile>
-    <ClCompile Include="Private\GI\AbstractGI\Mesh.cpp">
-      <Filter>GI\Private\AbstractGI</Filter>
+    <ClCompile Include="Private\Gameplay\ParticleSystem.cpp">
+      <Filter>Gameplay\Private</Filter>
     </ClCompile>
     <ClCompile Include="Private\GI\Renderer\ParticleRenderer.cpp">
       <Filter>GI\Private\Renderer</Filter>
     </ClCompile>
-    <ClCompile Include="Private\Gameplay\ParticleSystem.cpp">
-      <Filter>Gameplay\Private</Filter>
-    </ClCompile>
     <ClCompile Include="Private\Gameplay\ParticleComponent.cpp">
       <Filter>Gameplay\Private\Components</Filter>
     </ClCompile>
+    <ClCompile Include="Private\Gameplay\GameState.cpp">
+      <Filter>Gameplay\Private</Filter>
+    </ClCompile>
     <ClCompile Include="Private\Utilities\OBJImporter.cpp">
+      <Filter>Utilities\Private</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\Utilities\ModelImporter.cpp">
       <Filter>Utilities\Private</Filter>
     </ClCompile>
   </ItemGroup>

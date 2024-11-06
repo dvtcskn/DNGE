@@ -86,7 +86,7 @@ public:
 public:
 	virtual ~sMesh();
 
-	FORCEINLINE void SetName(std::string InName) { Name = InName; };
+	FORCEINLINE void SetName(std::string InName)  { Name = InName; };
 	FORCEINLINE virtual std::string GetName() const override final { return Name; };
 	FORCEINLINE std::string GetPath() const { return Path; };
 
@@ -115,7 +115,7 @@ public:
 	void UpdateIndexSubresource(BufferSubresource* Subresource, IGraphicsCommandContext* Context = nullptr);
 
 	virtual bool IsUpdateRequired() const { return PendingVertexBufferSubresource.has_value() || PendingIndexBufferSubresource.has_value(); }
-	virtual void UpdateMesh(IGraphicsCommandContext* Context)
+	virtual void UpdateMesh(IGraphicsCommandContext* Context) 
 	{
 		UpdateVertexBufferWithPendingSubresource(Context);
 		UpdateInstanceBufferWithPendingSubresource(Context);

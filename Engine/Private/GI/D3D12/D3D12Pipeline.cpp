@@ -137,7 +137,7 @@ D3D12Pipeline::D3D12Pipeline(D3D12Device* InOwner, const std::string& InName, co
 
     PSODesc.NodeMask = 0; auto BlendState = D3D12BlendState(InDesc.BlendAttribute);
     PSODesc.BlendState = BlendState.Get();
-    auto RasterState = D3D12Rasterizer(InDesc.RasterizerAttribute);
+    auto RasterState = D3D12Rasterizer(InDesc.RasterizerAttribute/*, !Owner->IsSoftwareDevice() && PrimitiveTopologyType == D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST*/);
     PSODesc.RasterizerState = RasterState.Get();
     PSODesc.SampleMask = 0xFFFFFFFFu;
     PSODesc.SampleDesc.Count = 1;

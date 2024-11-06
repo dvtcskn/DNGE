@@ -42,12 +42,24 @@ struct UntypedData;
 
 namespace FileManager
 {
-	std::wstring GetContentDirectory();
-	std::wstring GetAssetDirectory();
-	std::wstring GetMeshAssetDirectory();
-	std::wstring GetMaterialAssetDirectory();
-	std::wstring GetMapAssetDirectory();
-	std::wstring GetLogsFolder();
+	void SetContentDirectory(const std::string Path);
+	std::string GetContentDirectory();
+	std::string GetAssetDirectory();
+	std::string GetMeshAssetDirectory();
+	std::string GetMaterialAssetDirectory();
+	std::string GetMapAssetDirectory();
+	std::string GetLogsFolder();
+	std::string GetShaderFolder();
+	std::string GetTextureFolder();
+
+	std::wstring GetContentDirectoryW();
+	std::wstring GetAssetDirectoryW();
+	std::wstring GetMeshAssetDirectoryW();
+	std::wstring GetMaterialAssetDirectoryW();
+	std::wstring GetMapAssetDirectoryW();
+	std::wstring GetLogsFolderW();
+	std::wstring GetShaderFolderW();
+	std::wstring GetTextureFolderW();
 
 	bool FileExists(const std::wstring& file);
 	bool FileIsNewer(const std::wstring& file1, const std::wstring& file2); // ?
@@ -110,7 +122,7 @@ namespace FileManager
 
 	bool folderExists(const std::filesystem::path& name);
 	bool fileExists(const std::filesystem::path& name);
-	std::shared_ptr<UntypedData> readFile(const std::filesystem::path& name);
+	std::shared_ptr<UntypedData> readFile(const std::filesystem::path& path);
 	bool writeFile(const std::filesystem::path& name, const void* data, size_t size);
 	int enumerateFiles(const std::filesystem::path& path, const std::vector<std::string>& extensions);
 	int enumerateDirectories(const std::filesystem::path& path);

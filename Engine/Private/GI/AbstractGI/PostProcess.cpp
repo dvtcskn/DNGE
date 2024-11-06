@@ -64,7 +64,6 @@ sPostProcess::sPostProcess(const sShaderAttachment& PostProcessShader, const std
 
 	pPipelineDesc.DescriptorSetLayout = DescriptorSetLayout;
 
-	std::vector<sShaderAttachment> ShaderAttachments;
 	pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment((void*)vertexShader.data(), vertexShader.length(), "mainVS", eShaderType::Vertex));
 	//pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment(L"..//Content\\Shaders\\PostProcess.hlsl", "FullScreenTriangleVS", eShaderType::Vertex));
 	pPipelineDesc.ShaderAttachments.push_back(PostProcessShader);
@@ -95,7 +94,6 @@ void sPostProcess::SetPipeline(const sShaderAttachment& PostProcessShader, const
 
 	pPipelineDesc.DescriptorSetLayout = DescriptorSetLayout;
 
-	std::vector<sShaderAttachment> ShaderAttachments;
 	pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment((void*)vertexShader.data(), vertexShader.length(), "mainVS", eShaderType::Vertex));
 	//pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment(L"..//Content\\Shaders\\PostProcess.hlsl", "FullScreenTriangleVS", eShaderType::Vertex));
 	pPipelineDesc.ShaderAttachments.push_back(PostProcessShader);
