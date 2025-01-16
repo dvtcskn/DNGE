@@ -118,7 +118,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_LIB;%(PreprocessorDefinitions);BT_THREADSAFE=1;BT_USE_DOUBLE_PRECISION;B3_USE_CLEW;USING_DIRECTX_HEADERS;USING_DIRECTX_HEADERS</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_LIB;%(PreprocessorDefinitions);BT_THREADSAFE=1;BT_USE_DOUBLE_PRECISION;B3_USE_CLEW;USING_DIRECTX_HEADERS;USING_DIRECTX_HEADERS;VK_USE_PLATFORM_WIN32_KHR</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
@@ -137,7 +137,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_LIB;%(PreprocessorDefinitions);BT_THREADSAFE=1;BT_USE_DOUBLE_PRECISION;B3_USE_CLEW;USING_DIRECTX_HEADERS</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_LIB;%(PreprocessorDefinitions);BT_THREADSAFE=1;BT_USE_DOUBLE_PRECISION;B3_USE_CLEW;USING_DIRECTX_HEADERS;VK_USE_PLATFORM_WIN32_KHR</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
@@ -359,7 +359,6 @@
     <ClCompile Include="Private\GI\Vulkan\VulkanPipeline.cpp" />
     <ClCompile Include="Private\GI\Vulkan\VulkanRenderPass.cpp" />
     <ClCompile Include="Private\GI\Vulkan\VulkanShader.cpp" />
-    <ClCompile Include="Private\GI\Vulkan\VulkanShaderStates.cpp" />
     <ClCompile Include="Private\GI\Vulkan\VulkanTexture.cpp" />
     <ClCompile Include="Private\GI\Vulkan\VulkanViewport.cpp" />
     <ClCompile Include="Private\pch.cpp">

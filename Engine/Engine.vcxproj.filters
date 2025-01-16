@@ -615,9 +615,6 @@
     <ClCompile Include="Private\GI\Vulkan\VulkanShader.cpp">
       <Filter>GI\Private\Vulkan</Filter>
     </ClCompile>
-    <ClCompile Include="Private\GI\Vulkan\VulkanShaderStates.cpp">
-      <Filter>GI\Private\Vulkan</Filter>
-    </ClCompile>
     <ClCompile Include="Private\GI\Vulkan\VulkanTexture.cpp">
       <Filter>GI\Private\Vulkan</Filter>
     </ClCompile>
