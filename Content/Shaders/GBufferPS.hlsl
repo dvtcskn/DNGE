@@ -22,12 +22,12 @@ struct Output
     float4 finalColor : SV_Target0;
 };
 
-cbuffer sTimeBuffer : register(b0)
+cbuffer sTimeBuffer : register(b11)
 {
     double Time;
 };
 
-cbuffer sAnimationConstantBuffer : register(b1)
+cbuffer sAnimationConstantBuffer : register(b10)
 {
     //uint LayerIndex;
     uint Flip;
@@ -43,7 +43,7 @@ float4 DefaultTexturedGUIPS(GUIGeometryVSOut Input, in uint bIsFrontFace : SV_Is
     return gTexture.Sample(gSampler, Input.texCoord);
 }
 
-Output GeometryBackgroundPS(GeometryVSOut Input, in uint bIsFrontFace : SV_IsFrontFace) : SV_TARGET
+Output GeometryBackgroundPS(GeometryVSOut Input, in uint bIsFrontFace : SV_IsFrontFace)
 {
     Output output;
     
@@ -52,7 +52,7 @@ Output GeometryBackgroundPS(GeometryVSOut Input, in uint bIsFrontFace : SV_IsFro
     return output;
 }
 
-Output GeometryPS(GeometryVSOut Input, in uint bIsFrontFace : SV_IsFrontFace) : SV_TARGET
+Output GeometryPS(GeometryVSOut Input, in uint bIsFrontFace : SV_IsFrontFace)
 {
     Output output;
     
@@ -61,7 +61,7 @@ Output GeometryPS(GeometryVSOut Input, in uint bIsFrontFace : SV_IsFrontFace) : 
     return output;
 }
 
-Output GeometryFlatPS(GeometryVSOut Input, in uint bIsFrontFace : SV_IsFrontFace) : SV_TARGET
+Output GeometryFlatPS(GeometryVSOut Input, in uint bIsFrontFace : SV_IsFrontFace)
 {
     Output output;
     output.finalColor = Input.color;
@@ -79,7 +79,7 @@ float4 LineGeometryFlatPS(LineGeometryVSOut Input, in uint bIsFrontFace : SV_IsF
     return Input.color;
 }
 
-Output GeometryAtlasTexturedPS(GeometryVSOut Input, in uint bIsFrontFace : SV_IsFrontFace) : SV_TARGET
+Output GeometryAtlasTexturedPS(GeometryVSOut Input, in uint bIsFrontFace : SV_IsFrontFace)
 {
     Output output;
 

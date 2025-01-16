@@ -1,13 +1,13 @@
 
 #define WithModelMatrix 1
 
-cbuffer PerFrameConstants : register(b0)
+cbuffer PerFrameConstants : register(b13)
 {
     matrix mCameraWorldViewProj;
     matrix PrevCameraViewProj;
 };
 
-cbuffer ObjectCBuffer : register(b10)
+cbuffer ObjectCBuffer : register(b12)
 {
     matrix modelMatrix;
     matrix PrevModelMatrix;
@@ -67,8 +67,8 @@ GeometryVSOut GeometryVS(GeometryVSIn input)
     output.color = input.color;
     
     output.normal = normalize(mul(float4(input.normal, 0), modelMatrix).xyz);
-    output.tangent = float4(input.tangent, 0.0f);
-    output.binormal = float4(input.binormal, 0.0f);
+    output.tangent = input.tangent;
+    output.binormal = input.binormal;
 	
     output.texCoord = input.texCoord;
     output.ArrayIndex = input.ArrayIndex;
@@ -98,8 +98,8 @@ GeometryVSOut GeometryInstanceVS(GeometryInstanceVSIn input)
     output.color = color;
     
     output.normal = normalize(mul(float4(input.normal, 0), modelMatrix).xyz);
-    output.tangent = float4(input.tangent, 0.0f);
-    output.binormal = float4(input.binormal, 0.0f);
+    output.tangent = input.tangent;
+    output.binormal = input.binormal;
 	
     output.texCoord = input.texCoord;
     output.ArrayIndex = input.ArrayIndex;
