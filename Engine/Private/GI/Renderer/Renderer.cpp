@@ -490,7 +490,7 @@ void sRenderer::Render()
 	if (!World)
 		return;
 
-	if (GBufferClearMode == EGBufferClear::Driver || GBufferClearMode == EGBufferClear::Sky)
+	if (GBufferClearMode == EGBufferClear::Driver/* || GBufferClearMode == EGBufferClear::Sky*/)
 	{
 		GBuffer->ClearGBuffer();
 	}
