@@ -61,6 +61,7 @@ namespace
 	{
 		switch (Format)
 		{
+		case VK_FORMAT_B8G8R8A8_SRGB:
 		case VK_FORMAT_B8G8R8A8_UNORM:
 		case VK_FORMAT_B10G11R11_UFLOAT_PACK32:
 		case VK_FORMAT_X8_D24_UNORM_PACK32:

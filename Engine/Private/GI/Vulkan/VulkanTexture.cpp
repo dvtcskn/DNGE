@@ -31,7 +31,7 @@
 #include "Utilities/FileManager.h"
 #include "Utilities/stb_image.h"
 #include "DDSTextureLoader_Vulkan.h"
-#include "VulkanCommandBuffer.h"
+#include "WICTextureLoader_Vulkan.h"
 #include "VulkanCommandBuffer.h"
 #include <fstream>
 #include <span>
@@ -77,10 +77,10 @@ VulkanTexture::VulkanTexture(VulkanDevice* Device, const std::wstring FilePath, 
 		if (HR != S_OK)
 			throw std::runtime_error("DDS Texture load failed!");
 
-		VkDeviceSize Size = Desc.Dimensions.X * Desc.Dimensions.Y * 4;
+		VkDeviceSize Size = Desc.Dimensions.X * Desc.Dimensions.Y * vkBytesPerPixel(ConvertFormat_Format_To_VkFormat(Desc.Format));
 
-		VkBuffer stagingBuffer;
-		VkDeviceMemory stagingBufferMemory;
+		VkBuffer stagingBuffer = nullptr;
+		VkDeviceMemory stagingBufferMemory = nullptr;
 
 		{
 			VkBufferCreateInfo bufferInfo = {};
@@ -108,7 +108,7 @@ VulkanTexture::VulkanTexture(VulkanDevice* Device, const std::wstring FilePath, 
 			VK_CHECK(vkBindBufferMemory(Owner->Get(), stagingBuffer, stagingBufferMemory, 0));
 		}
 
-		void* data;
+		void* data = nullptr;
 		VK_CHECK(vkMapMemory(Owner->Get(), stagingBufferMemory, 0, Size, 0, &data));
 		memcpy(data, subresources[0].pData, static_cast<size_t>(Size));
 		vkUnmapMemory(Owner->Get(), stagingBufferMemory);
@@ -155,21 +155,28 @@ VulkanTexture::VulkanTexture(VulkanDevice* Device, const std::wstring FilePath, 
 	{
 		std::string PathSTR = FileManager::WideStringToString(FilePath);
 
-		int texWidth = 0, texHeight = 0, texChannels = 0;
-		stbi_uc* pixels = stbi_load(PathSTR.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
-		VkDeviceSize imageSize = texWidth * texHeight * 4;
+		//int texWidth = 0, texHeight = 0, texChannels = 0;
+		//stbi_uc* pixels = stbi_load(PathSTR.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+		//VkDeviceSize imageSize = texWidth * texHeight * 4;
 
-		Desc.MipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(texWidth, texHeight)))) + 1;
-		Desc.Dimensions.X = texWidth;
-		Desc.Dimensions.Y = texHeight;
-		Desc.Format = EFormat::RGBA8_UNORM; // ?
+		//Desc.MipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(texWidth, texHeight)))) + 1;
+		//Desc.Dimensions.X = texWidth;
+		//Desc.Dimensions.Y = texHeight;
+		//Desc.Format = EFormat::RGBA8_UNORM; // ?
 
-		if (!pixels) {
-			throw std::runtime_error("failed to load texture image!");
-		}
+		//if (!pixels) {
+		//	throw std::runtime_error("failed to load texture image!");
+		//}
 
-		VkBuffer stagingBuffer;
-		VkDeviceMemory stagingBufferMemory;
+		std::unique_ptr<uint8_t[]> decodedData;
+		TextureSubresource subresource;
+
+		HRESULT HR = Vulkan::LoadWICTextureFromFile(Device, FilePath.c_str(), &Image, Memory, Desc, decodedData, subresource);
+
+		VkDeviceSize imageSize = Desc.Dimensions.X * Desc.Dimensions.Y * vkBytesPerPixel(ConvertFormat_Format_To_VkFormat(Desc.Format));
+
+		VkBuffer stagingBuffer = nullptr;
+		VkDeviceMemory stagingBufferMemory = nullptr;
 
 		{
 			VkBufferCreateInfo bufferInfo = {};
@@ -197,12 +204,12 @@ VulkanTexture::VulkanTexture(VulkanDevice* Device, const std::wstring FilePath, 
 			VK_CHECK(vkBindBufferMemory(Owner->Get(), stagingBuffer, stagingBufferMemory, 0));
 		}
 
-		void* data;
+		void* data = nullptr;
 		VK_CHECK(vkMapMemory(Owner->Get(), stagingBufferMemory, 0, imageSize, 0, &data));
-		memcpy(data, pixels, static_cast<size_t>(imageSize));
+		memcpy(data, subresource.pData, static_cast<size_t>(imageSize));
 		vkUnmapMemory(Owner->Get(), stagingBufferMemory);
 
-		stbi_image_free(pixels);
+		//stbi_image_free(pixels);
 
 		CreateImage(Desc.Dimensions.X, Desc.Dimensions.Y, Desc.MipLevels, ConvertFormat_Format_To_VkFormat(Desc.Format), VkImageTiling::VK_IMAGE_TILING_OPTIMAL,
 			VkImageUsageFlagBits::VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VkImageUsageFlagBits::VK_IMAGE_USAGE_TRANSFER_DST_BIT | VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT, VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, Image, Memory);
@@ -270,10 +277,10 @@ VulkanTexture::VulkanTexture(VulkanDevice* Device, const std::string InName, voi
 {
 	Desc.MipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(InDesc.Dimensions.X, InDesc.Dimensions.Y)))) + 1;
 
-	VkDeviceSize InSize = InDesc.Dimensions.X * InDesc.Dimensions.Y * 4;
+	VkDeviceSize InSize = InDesc.Dimensions.X * InDesc.Dimensions.Y * vkBytesPerPixel(ConvertFormat_Format_To_VkFormat(Desc.Format));
 
-	VkBuffer stagingBuffer;
-	VkDeviceMemory stagingBufferMemory;
+	VkBuffer stagingBuffer = nullptr;
+	VkDeviceMemory stagingBufferMemory = nullptr;
 
 	{
 		VkBufferCreateInfo bufferInfo = {};
@@ -301,7 +308,7 @@ VulkanTexture::VulkanTexture(VulkanDevice* Device, const std::string InName, voi
 		VK_CHECK(vkBindBufferMemory(Owner->Get(), stagingBuffer, stagingBufferMemory, 0));
 	}
 
-	void* data;
+	void* data = nullptr;
 	VK_CHECK(vkMapMemory(Owner->Get(), stagingBufferMemory, 0, InDesc.Dimensions.X * InDesc.Dimensions.Y, 0, &data));
 	memcpy(data, InBuffer, static_cast<size_t>(InDesc.Dimensions.X * InDesc.Dimensions.Y/* Vulkan_BitsPerPixel(ConvertFormat_Format_To_VkFormat(InDesc.Format))*/));
 	vkUnmapMemory(Owner->Get(), stagingBufferMemory);

@@ -473,8 +473,8 @@ void VulkanCommandBuffer::SetPipeline(IPipeline* pipeline)
 	{
 		// Set clear color values.
 		std::vector<VkClearValue> clear_value;
-		//for (std::size_t i = 0; i < Pipeline->RenderPass->Info.GetAttachmentCount(); i++)
-		//	clear_value.push_back({ {0.0f, 1.0f, 0.0f, 1.0f} });
+		for (std::size_t i = 0; i < Pipeline->RenderPass->Info.GetAttachmentCount(); i++)
+			clear_value.push_back({ {0.0f, 0.0f, 0.0f, 0.0f} });
 
 		VkRenderPassBeginInfo renderPassInfo{};
 		renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;

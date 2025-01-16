@@ -18,6 +18,7 @@
 #include "DDSTextureLoader_Vulkan.h"
 #include "VulkanFormat.h"
 #include "VulkanException.h"
+#include "GI/D3DShared/D3DShared.h"
 
 #include <algorithm>
 #include <cassert>
@@ -165,57 +166,6 @@ enum VK_RESOURCE_DIMENSION : std::uint32_t
     RESOURCE_DIMENSION_TEXTURE1D = 2,
     RESOURCE_DIMENSION_TEXTURE2D = 3,
     RESOURCE_DIMENSION_TEXTURE3D = 4
-};
-
-inline EFormat VK_ConvertFormat_DXGI_To_Format(const DXGI_FORMAT InFormat)
-{
-    switch (InFormat)
-    {
-    case DXGI_FORMAT_R8G8B8A8_UINT:	return EFormat::RGBA8_UINT;
-        //case DXGI_FORMAT_B8G8R8A8_TYPELESS:	return EFormat::BGRA8_TYPELESS;
-    case DXGI_FORMAT_B8G8R8A8_UNORM: return EFormat::BGRA8_UNORM;
-    case DXGI_FORMAT_B8G8R8A8_UNORM_SRGB: return EFormat::BGRA8_UNORM_SRGB;
-        //case DXGI_FORMAT_BC1_UNORM: return EFormat::BC1_UNORM;
-        //case DXGI_FORMAT_BC1_UNORM_SRGB: return EFormat::BC1_UNORM_SRGB;
-        //case DXGI_FORMAT_BC2_UNORM:	return EFormat::BC2_UNORM;
-        //case DXGI_FORMAT_BC2_UNORM_SRGB: return EFormat::BC2_UNORM_SRGB;
-        //case DXGI_FORMAT_BC3_UNORM:	return EFormat::BC3_UNORM;
-        //case DXGI_FORMAT_BC3_UNORM_SRGB: return EFormat::BC3_UNORM_SRGB;
-    case DXGI_FORMAT_R8_UINT: return EFormat::R8_UINT;
-    case DXGI_FORMAT_R8_UNORM: return EFormat::R8_UNORM;
-    case DXGI_FORMAT_R8_SNORM: return EFormat::R8_SNORM;
-    case DXGI_FORMAT_R8G8_UINT:	return EFormat::RG8_UINT;
-    case DXGI_FORMAT_R8G8_UNORM: return EFormat::RG8_UNORM;
-    case DXGI_FORMAT_R16_UINT: return EFormat::R16_UINT;
-    case DXGI_FORMAT_R16_UNORM: return EFormat::R16_UNORM;
-    case DXGI_FORMAT_R16_FLOAT:	return EFormat::R16_FLOAT;
-        //case DXGI_FORMAT_R16_TYPELESS: return EFormat::R16_Typeless;
-    case DXGI_FORMAT_R8G8B8A8_UNORM: return EFormat::RGBA8_UNORM;
-    case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB: return EFormat::SRGBA8_UNORM;
-    case DXGI_FORMAT_R10G10B10A2_UNORM: return EFormat::R10G10B10A2_UNORM;
-    case DXGI_FORMAT_R11G11B10_FLOAT: return EFormat::R11G11B10_FLOAT;
-    case DXGI_FORMAT_R16G16_UINT: return EFormat::RG16_UINT;
-    case DXGI_FORMAT_R16G16_FLOAT: return EFormat::RG16_FLOAT;
-    case DXGI_FORMAT_R32_UINT: return EFormat::R32_UINT;
-    case DXGI_FORMAT_R32_FLOAT: return EFormat::R32_FLOAT;
-    case DXGI_FORMAT_R16G16B16A16_FLOAT: return EFormat::RGBA16_FLOAT;
-    case DXGI_FORMAT_R16G16B16A16_UNORM: return EFormat::RGBA16_UNORM;
-    case DXGI_FORMAT_R16G16B16A16_SNORM: return EFormat::RGBA16_SNORM;
-    case DXGI_FORMAT_R32G32_UINT: return EFormat::RG32_UINT;
-    case DXGI_FORMAT_R32G32_FLOAT: return EFormat::RG32_FLOAT;
-    case DXGI_FORMAT_R32G32B32_UINT: return EFormat::RGB32_UINT;
-    case DXGI_FORMAT_R32G32B32_FLOAT: return EFormat::RGB32_FLOAT;
-    case DXGI_FORMAT_R32G32B32A32_UINT:	return EFormat::RGBA32_UINT;
-    case DXGI_FORMAT_R32G32B32A32_FLOAT: return EFormat::RGBA32_FLOAT;
-        //case DXGI_FORMAT_R32_TYPELESS: return EFormat::R32_Typeless;			
-        //case DXGI_FORMAT_R24G8_TYPELESS: return EFormat::R24G8_Typeless;			
-        //case DXGI_FORMAT_R32G8X24_TYPELESS: return EFormat::R32G8X24_Typeless;
-    case DXGI_FORMAT_D16_UNORM: return EFormat::D16_UNORM;
-    case DXGI_FORMAT_D32_FLOAT: return EFormat::D32_FLOAT;
-    case DXGI_FORMAT_D24_UNORM_S8_UINT: return EFormat::D24_UNORM_S8_UINT;
-    case DXGI_FORMAT_D32_FLOAT_S8X24_UINT: return EFormat::D32_FLOAT_S8X24_UINT;
-    }
-    return EFormat::UNKNOWN;
 };
 
 #pragma pack(pop)
@@ -1303,7 +1253,7 @@ namespace
 
     //--------------------------------------------------------------------------------------
     HRESULT CreateTextureResource(
-        _In_ VulkanDevice* d3dDevice,
+        _In_ VulkanDevice* Device,
         VK_RESOURCE_DIMENSION resDim,
         size_t width,
         size_t height,
@@ -1316,7 +1266,7 @@ namespace
         _Outptr_ VkDeviceMemory& Memory,
         _Outptr_ sTextureDesc& TextureDesc) noexcept
     {
-        if (!d3dDevice)
+        if (!Device)
             return E_POINTER;
 
         HRESULT hr = E_FAIL;
@@ -1351,12 +1301,12 @@ namespace
             break;
         }
 
-        VkFormat VulkanFormat = ConvertFormat_Format_To_VkFormat(VK_ConvertFormat_DXGI_To_Format(format));
+        VkFormat VulkanFormat = ConvertFormat_Format_To_VkFormat(ConvertFormat_DXGI_To_Format(format));
 
         TextureDesc.ArraySize = arraySize;
         TextureDesc.Dimensions.X = width;
         TextureDesc.Dimensions.Y = height;
-        TextureDesc.Format = VK_ConvertFormat_DXGI_To_Format(format);
+        TextureDesc.Format = ConvertFormat_DXGI_To_Format(format);
         TextureDesc.MipLevels = mipCount;
 
         VkImageCreateInfo imageInfo = {};
@@ -1374,27 +1324,27 @@ namespace
         imageInfo.samples = VkSampleCountFlagBits::VK_SAMPLE_COUNT_1_BIT;
         imageInfo.sharingMode = VkSharingMode::VK_SHARING_MODE_EXCLUSIVE;
 
-        vkCreateImage(d3dDevice->Get(), &imageInfo, nullptr, texture);
+        vkCreateImage(Device->Get(), &imageInfo, nullptr, texture);
 
         VkMemoryRequirements memRequirements;
-        vkGetImageMemoryRequirements(d3dDevice->Get(), *texture, &memRequirements);
+        vkGetImageMemoryRequirements(Device->Get(), *texture, &memRequirements);
 
         // Allocate memory for the buffer
         VkMemoryAllocateInfo alloc_info{
             .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
             .allocationSize = memRequirements.size,
-            .memoryTypeIndex = d3dDevice->GetMemoryType(memRequirements.memoryTypeBits,	VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) };
+            .memoryTypeIndex = Device->GetMemoryType(memRequirements.memoryTypeBits,	VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) };
 
-        VK_CHECK(vkAllocateMemory(d3dDevice->Get(), &alloc_info, nullptr, &Memory));
+        VK_CHECK(vkAllocateMemory(Device->Get(), &alloc_info, nullptr, &Memory));
 
-        vkBindImageMemory(d3dDevice->Get(), *texture, Memory, 0);
+        vkBindImageMemory(Device->Get(), *texture, Memory, 0);
 
         hr = S_OK;
         return hr;
     }
 
     //--------------------------------------------------------------------------------------
-    HRESULT CreateTextureFromDDS(_In_ VulkanDevice* d3dDevice,
+    HRESULT CreateTextureFromDDS(_In_ VulkanDevice* Device,
         _In_ const VK_DDS_HEADER* header,
         _In_reads_bytes_(bitSize) const uint8_t* bitData,
         size_t bitSize,
@@ -1654,7 +1604,7 @@ namespace
                     CountMips(width, height));
             }
 
-            hr = CreateTextureResource(d3dDevice, resDim, twidth, theight, tdepth, reservedMips - skipMip, arraySize,
+            hr = CreateTextureResource(Device, resDim, twidth, theight, tdepth, reservedMips - skipMip, arraySize,
                 format, /*resFlags,*/ loadFlags, texture, Memory, TextureDesc);
 
             if (FAILED(hr) && !maxsize && (mipCount > 1))
@@ -1672,7 +1622,7 @@ namespace
                     twidth, theight, tdepth, skipMip, subresources);
                 if (SUCCEEDED(hr))
                 {
-                    hr = CreateTextureResource(d3dDevice, resDim, twidth, theight, tdepth, mipCount - skipMip, arraySize,
+                    hr = CreateTextureResource(Device, resDim, twidth, theight, tdepth, mipCount - skipMip, arraySize,
                         format, /*resFlags,*/ loadFlags, texture, Memory, TextureDesc);
                 }
             }

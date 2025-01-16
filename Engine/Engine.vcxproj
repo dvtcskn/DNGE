@@ -211,6 +211,7 @@
     <ClInclude Include="Private\GI\Vulkan\VulkanShaderStates.h" />
     <ClInclude Include="Private\GI\Vulkan\VulkanTexture.h" />
     <ClInclude Include="Private\GI\Vulkan\VulkanViewport.h" />
+    <ClInclude Include="Private\GI\Vulkan\WICTextureLoader_Vulkan.h" />
     <ClInclude Include="Private\pch.h" />
     <ClInclude Include="Public\AbstractGI\Material.h" />
     <ClInclude Include="Public\AbstractGI\MaterialManager.h" />
@@ -361,6 +362,7 @@
     <ClCompile Include="Private\GI\Vulkan\VulkanShader.cpp" />
     <ClCompile Include="Private\GI\Vulkan\VulkanTexture.cpp" />
     <ClCompile Include="Private\GI\Vulkan\VulkanViewport.cpp" />
+    <ClCompile Include="Private\GI\Vulkan\WICTextureLoader_Vulkan.cpp" />
     <ClCompile Include="Private\pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>

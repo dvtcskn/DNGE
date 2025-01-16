@@ -475,6 +475,9 @@
     <ClInclude Include="Private\GI\D3D12\D3D12ShaderCompiler.h">
       <Filter>GI\Private\D3D12</Filter>
     </ClInclude>
+    <ClInclude Include="Private\GI\Vulkan\WICTextureLoader_Vulkan.h">
+      <Filter>GI\Private\Vulkan</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Private\Engine\Engine.cpp">
@@ -749,6 +752,9 @@
     </ClCompile>
     <ClCompile Include="Private\GI\D3D12\D3D12ShaderCompiler.cpp">
       <Filter>GI\Private\D3D12</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\Vulkan\WICTextureLoader_Vulkan.cpp">
+      <Filter>GI\Private\Vulkan</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

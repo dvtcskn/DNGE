@@ -1,5 +1,5 @@
 
-cbuffer PerFrameConstants : register(b0)
+cbuffer PerFrameConstants : register(b13)
 {
     matrix mCameraWorldViewProj;
     matrix PrevCameraViewProj;
@@ -49,7 +49,7 @@ struct Output
 Texture2D gTexture : register(t0);
 SamplerState gSampler : register(s0);
 
-Output ParticlePS(ParticleVSOut Input, in uint bIsFrontFace : SV_IsFrontFace) : SV_TARGET
+Output ParticlePS(ParticleVSOut Input, in uint bIsFrontFace : SV_IsFrontFace)
 {
     Output Out;
     float4 diffuseColor = gTexture.Sample(gSampler, Input.texCoord);
@@ -57,7 +57,7 @@ Output ParticlePS(ParticleVSOut Input, in uint bIsFrontFace : SV_IsFrontFace) : 
     return Out;
 }
 
-Output ParticleFlatPS(ParticleVSOut Input, in uint bIsFrontFace : SV_IsFrontFace) : SV_TARGET
+Output ParticleFlatPS(ParticleVSOut Input, in uint bIsFrontFace : SV_IsFrontFace)
 {
     Output Out;
     Out.finalColor = Input.color;
