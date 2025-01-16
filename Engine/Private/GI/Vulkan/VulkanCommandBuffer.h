@@ -26,18 +26,36 @@
 #pragma once
 
 #include "Engine/AbstractEngine.h"
+#include "VulkanDevice.h"
+#include "VulkanFrameBuffer.h"
+#include "VulkanPipeline.h"
+#include <map>
 
 class VulkanCommandBuffer final : public IGraphicsCommandContext
 {
 	sClassBody(sClassConstructor, VulkanCommandBuffer, IGraphicsCommandContext)
 public:
-	VulkanCommandBuffer();
+	VulkanCommandBuffer(VulkanDevice* Device);
 	virtual ~VulkanCommandBuffer();
 
 	virtual void BeginRecordCommandList(const ERenderPass RenderPass = ERenderPass::eNONE) override final;
 	virtual void FinishRecordCommandList() override final;
 	virtual void ExecuteCommandList() override final;
 	virtual void ClearState() override final;
+
+	void ExecuteWithWait();
+
+	const VkCommandBuffer& Get() const { return CommandBuffer; }
+#ifdef VK_HPP
+	vk::CommandBuffer Get_hpp() const { return CommandBuffer; }
+#endif
+
+	void Open();
+	void Close();
+	bool IsClosed() const { return bIsClosed; }
+
+	void TransitionTo(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, VkAccessFlags2 srcAccessMask, VkAccessFlags2 dstAccessMask, VkPipelineStageFlags2 srcStage, VkPipelineStageFlags2 dstStage);
+	void CopyResource(VkImage pDstResource, VkImageLayout DestState, VkImage pSrcResource, VkImageLayout SrcState, sDimension2D Dimension);
 
 	virtual void* GetInternalCommandContext() override final { return nullptr; }
 
@@ -89,6 +107,57 @@ public:
 	void ClearCMDStates();
 
 private:
+	void BindDescriptorSets();
+
+private:
+	VulkanDevice* Owner;
+	vk::CommandBuffer CommandBuffer;
 	bool bIsSingleThreaded;
 	std::uint32_t StencilRef;
+
+	VulkanPipeline* Pipeline;
+
+	PFN_vkCmdPushDescriptorSetKHR vkCmdPushDescriptorSetKHR;
+
+	struct DescCopy
+	{
+		bool IsBuffer = false;
+		VkDescriptorBufferInfo DescriptorBufferInfo;
+		VkDescriptorImageInfo DescriptorImageInfo;
+		std::uint32_t Location;
+	};
+
+	std::vector<DescCopy> Sets;
+
+	bool bIsClosed;
+	bool bIsRenderPassActive;
+	bool bWaitForCompletion;
+};
+
+class VulkanCopyCommandBuffer : public ICopyCommandContext
+{
+	sClassBody(sClassConstructor, VulkanCopyCommandBuffer, ICopyCommandContext)
+public:
+	VulkanCopyCommandBuffer(VulkanDevice* InDevice);
+	virtual ~VulkanCopyCommandBuffer();
+
+	virtual void* GetInternalCommandContext() override final { return nullptr; }
+
+	virtual void BeginRecordCommandList() override final;
+	virtual void FinishRecordCommandList() override final;
+	virtual void ExecuteCommandList() override final;
+
+	virtual void CopyFrameBuffer(IFrameBuffer* Dest, std::size_t DestFBOIndex, IFrameBuffer* Source, std::uint32_t SourceFBOIndex) override final;
+	virtual void CopyFrameBufferDepth(IFrameBuffer* Dest, IFrameBuffer* Source) override final;
+
+	virtual void UpdateBufferSubresource(IVertexBuffer* Buffer, BufferSubresource* Subresource) override final;
+	virtual void UpdateBufferSubresource(IVertexBuffer* Buffer, std::size_t Location, std::size_t Size, const void* pSrcData) override final;
+	virtual void UpdateBufferSubresource(IIndexBuffer* Buffer, BufferSubresource* Subresource) override final;
+	virtual void UpdateBufferSubresource(IIndexBuffer* Buffer, std::size_t Location, std::size_t Size, const void* pSrcData) override final;
+
+	virtual void ClearState() override final;
+
+private:
+	bool bIsClosed;
+	bool bWaitForCompletion;
 };

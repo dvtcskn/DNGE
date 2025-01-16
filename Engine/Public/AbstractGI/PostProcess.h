@@ -54,7 +54,13 @@ public:
 
 	virtual void SetPostProcessResources(IGraphicsCommandContext* Context);
 
-	IPipeline* GetPipeline() const { return Pipeline.get(); }
+	inline bool IsCompiled() const { return Pipeline->IsCompiled(); }
+	inline bool Compile(IFrameBuffer* FrameBuffer = nullptr) { return Pipeline->Compile(FrameBuffer); }
+	inline bool Compile(IRenderTarget* RT, IDepthTarget* Depth = nullptr) { return Pipeline->Compile(RT, Depth); }
+	inline bool Compile(std::vector<IRenderTarget*> RTs, IDepthTarget* Depth = nullptr) { return Pipeline->Compile(RTs, Depth); }
+	inline bool Recompile() { return Pipeline->Recompile(); }
+
+	inline IPipeline* GetPipeline() const { return Pipeline.get(); }
 
 private:
 	IPipeline::UniquePtr Pipeline;

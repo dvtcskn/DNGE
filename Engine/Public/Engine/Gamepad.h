@@ -56,7 +56,6 @@
 #pragma clang diagnostic ignored "-Wunknown-pragmas"
 #endif
 
-
 namespace DirectX
 {
     class GamePad

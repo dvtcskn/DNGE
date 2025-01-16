@@ -36,22 +36,24 @@
 #include "D3D11ShaderStates.h"
 #include "D3D11CommandBuffer.h"
 #include "D3D11ComputeCommandContext.h"
+#include "D3D11Shader.h"
+#include "AbstractGI/ShaderManager.h"
 #include "Engine/AbstractEngine.h"
 
 #define DEBUG_D3DDEVICE 1
 
-D3D11Device::D3D11Device(std::optional<short> InGPUIndex)
+D3D11Device::D3D11Device(const GPUDeviceCreateInfo& DeviceCreateInfo)
 	: VendorId(0)
-	, GPUIndex(InGPUIndex)
+	, GPUIndex(DeviceCreateInfo.GPUIndex)
 {
 	auto WideStringToString = [](const std::wstring& utf16) -> std::string
-	{
-		const int utf16Length = (int)utf16.length() + 1;
-		const int len = WideCharToMultiByte(0, 0, utf16.data(), utf16Length, 0, 0, 0, 0);
-		std::string STR(len, '\0');
-		WideCharToMultiByte(0, 0, utf16.data(), utf16Length, STR.data(), len, 0, 0);
-		return STR;
-	};
+		{
+			const int utf16Length = (int)utf16.length() + 1;
+			const int len = WideCharToMultiByte(0, 0, utf16.data(), utf16Length, 0, 0, 0, 0);
+			std::string STR(len, '\0');
+			WideCharToMultiByte(0, 0, utf16.data(), utf16Length, STR.data(), len, 0, 0);
+			return STR;
+		};
 
 	std::uint32_t m_dxgiFactoryFlags = 0;
 #if _DEBUG && DEBUG_D3DDEVICE
@@ -115,9 +117,9 @@ D3D11Device::D3D11Device(std::optional<short> InGPUIndex)
 
 	bool bWarp = false;
 
-	if (InGPUIndex.has_value())
+	if (GPUIndex.has_value())
 	{
-		if (InGPUIndex <= -1)
+		if (GPUIndex <= -1)
 		{
 			bWarp = true;
 		}
@@ -127,8 +129,8 @@ D3D11Device::D3D11Device(std::optional<short> InGPUIndex)
 	{
 		if (SUCCEEDED(D3D11CreateDevice(
 			bWarp ? NULL : pAdapter ? pAdapter : NULL,											// pAdapter
-			bWarp ? D3D_DRIVER_TYPE_WARP 
-				  : (pAdapter) ? D3D_DRIVER_TYPE_UNKNOWN : D3D_DRIVER_TYPE_HARDWARE,			// DriverType
+			bWarp ? D3D_DRIVER_TYPE_WARP
+			: (pAdapter) ? D3D_DRIVER_TYPE_UNKNOWN : D3D_DRIVER_TYPE_HARDWARE,			// DriverType
 			NULL,																				// Software
 			bWarp ? NULL : createFlags,																		// Flags
 			&ReqFeatureLevel,																	// pFeatureLevels
@@ -153,8 +155,10 @@ D3D11Device::D3D11Device(std::optional<short> InGPUIndex)
 		}
 	}
 
-	lDirect3DDevice->QueryInterface(__uuidof (ID3D11Device1), (void**)& Direct3DDevice);
-	lDirect3DDeviceIMContext->QueryInterface(__uuidof (ID3D11DeviceContext1), (void**)& Direct3DDeviceIMContext);
+	lDirect3DDevice->QueryInterface(__uuidof (ID3D11Device1), (void**)&Direct3DDevice);
+	lDirect3DDeviceIMContext->QueryInterface(__uuidof (ID3D11DeviceContext1), (void**)&Direct3DDeviceIMContext);
+
+	ShaderCompiler = D3D11ShaderCompiler::CreateUnique(this);
 
 	{
 		if (GPUIndex.has_value())
@@ -209,6 +213,8 @@ D3D11Device::D3D11Device(std::optional<short> InGPUIndex)
 
 	if (pAdapter)
 		pAdapter->Release();
+
+	InitWindow(DeviceCreateInfo.pHWND, DeviceCreateInfo.Width, DeviceCreateInfo.Height, DeviceCreateInfo.Fullscreen);
 }
 
 D3D11Device::~D3D11Device()
@@ -246,6 +252,11 @@ void D3D11Device::InitWindow(void* InHWND, std::uint32_t InWidth, std::uint32_t 
 {
 	if (!Viewport)
 		Viewport = std::make_unique<D3D11Viewport>(this, DXGIFactory, InWidth, InHeight, bFullscreen, (HWND)InHWND);
+}
+
+void D3D11Device::BeginFrame()
+{
+	Viewport->BeginFrame();
 }
 
 void D3D11Device::Present(IRenderTarget* pRT)
@@ -397,6 +408,36 @@ bool D3D11Device::GetDeviceIdentification(std::wstring& InVendorID, std::wstring
 	// get device ID
 	InDeviceID = id.substr(17, 4);
 	return true;
+}
+
+IShader* D3D11Device::CompileShader(const sShaderAttachment& Attachment, bool Spirv)
+{
+	if (sShaderManager::Get().IsShaderExist(Attachment.GetLocation(), Attachment.FunctionName))
+		return sShaderManager::Get().GetShader(Attachment.GetLocation(), Attachment.FunctionName);
+
+	IShader::SharedPtr pShader = ShaderCompiler->Compile(Attachment);
+	sShaderManager::Get().StoreShader(pShader);
+	return pShader.get();
+}
+
+IShader* D3D11Device::CompileShader(std::wstring InSrcFile, std::string InFunctionName, eShaderType InProfile, bool Spirv, std::vector<sShaderDefines> InDefines)
+{
+	if (sShaderManager::Get().IsShaderExist(InSrcFile, InFunctionName))
+		return sShaderManager::Get().GetShader(InSrcFile, InFunctionName);
+
+	IShader::SharedPtr pShader = ShaderCompiler->Compile(InSrcFile, InFunctionName, InProfile, InDefines);
+	sShaderManager::Get().StoreShader(pShader);
+	return pShader.get();
+}
+
+IShader* D3D11Device::CompileShader(const void* InCode, std::size_t Size, std::string InFunctionName, eShaderType InProfile, bool Spirv, std::vector<sShaderDefines> InDefines)
+{
+	if (sShaderManager::Get().IsShaderExist(L"", InFunctionName))
+		return sShaderManager::Get().GetShader(L"", InFunctionName);
+
+	IShader::SharedPtr pShader = ShaderCompiler->Compile(InCode, Size, InFunctionName, InProfile, InDefines);
+	sShaderManager::Get().StoreShader(pShader);
+	return pShader.get();
 }
 
 IGraphicsCommandContext::SharedPtr D3D11Device::CreateGraphicsCommandContext()

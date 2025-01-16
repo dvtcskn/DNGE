@@ -37,6 +37,8 @@ public:
 	virtual void* GetInternalDevice() = 0;
 	virtual void Present(IRenderTarget* pRT) = 0;
 
+	virtual void BeginFrame() = 0;
+
 	virtual void ResizeWindow(std::size_t Width, std::size_t Height) = 0;
 	virtual void FullScreen(const bool value) = 0;
 	virtual bool IsFullScreen() const = 0;
@@ -51,6 +53,10 @@ public:
 	virtual sScreenDimension GetBackBufferDimension() const = 0;
 	virtual EFormat GetBackBufferFormat() const = 0;
 	virtual sViewport GetViewport() const = 0;
+
+	virtual IShader* CompileShader(const sShaderAttachment& Attachment, bool Spirv = false) = 0;
+	virtual IShader* CompileShader(std::wstring InSrcFile, std::string InFunctionName, eShaderType InProfile, bool Spirv = false, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>()) = 0;
+	virtual IShader* CompileShader(const void* InCode, std::size_t Size, std::string InFunctionName, eShaderType InProfile, bool Spirv = false, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>()) = 0;
 
 	virtual std::vector<sDisplayMode> GetAllSupportedResolutions() const = 0;
 

@@ -28,22 +28,25 @@
 #include <string>
 #include "Engine/ClassBody.h"
 #include "Engine/AbstractEngine.h"
+#include "VulkanShaderStates.h"
+#include "VulkanDevice.h"
 
 class VulkanTexture final : public ITexture2D
 {
 	sClassBody(sClassConstructor, VulkanTexture, ITexture2D)
 public:
-	VulkanTexture(const std::wstring FilePath, const std::string InName = std::string(), std::uint32_t RootParameterIndex = 0);
-	VulkanTexture(const std::string InName, void* InBuffer, const std::size_t InSize, const sTextureDesc& InDesc, std::uint32_t RootParameterIndex = 0);
+	VulkanTexture(VulkanDevice* Device, const std::wstring FilePath, const std::string InName = std::string(), std::uint32_t RootParameterIndex = 0);
+	VulkanTexture(VulkanDevice* Device, const std::string InName, void* InBuffer, const std::size_t InSize, const sTextureDesc& InDesc, std::uint32_t RootParameterIndex = 0);
+	VulkanTexture(VulkanDevice* Device, const std::string InName, const sTextureDesc& InDesc, std::uint32_t RootParameterIndex = 0);
 
 	virtual ~VulkanTexture()
 	{
 	}
 
-	virtual std::string GetName() const override final { return ""; }
-	virtual std::wstring GetPath() const override final { return L""; }
+	virtual std::string GetName() const override final { return Name; }
+	virtual std::wstring GetPath() const override final { return Path; }
 
-	virtual sTextureDesc GetDesc() const override final { return sTextureDesc(); }
+	virtual sTextureDesc GetDesc() const override final { return Desc; }
 
 	virtual void SetDefaultRootParameterIndex(std::uint32_t inRootParameterIndex) override final { }
 	virtual std::uint32_t GetDefaultRootParameterIndex() const override final { return 0; }
@@ -56,5 +59,24 @@ public:
 
 	virtual void SaveToFile(std::wstring InPath) const override final;
 
+	VkImageLayout CurrentLayout;
+	std::uint32_t RootParameterIndex;
+	VkDescriptorImageInfo DescriptorImageInfo;
+
 private:
+	void GenerateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32_t mipLevels);
+	void TransitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels);
+	void CopyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height, std::int32_t OffsetX = 0, std::int32_t OffsetY = 0);
+
+	void CreateImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory);
+
+private:
+	VulkanDevice* Owner;
+	std::string Name;
+	std::wstring Path;
+	sTextureDesc Desc;
+
+	VkImage Image;
+	VkImageView View;
+	VkDeviceMemory Memory;
 };

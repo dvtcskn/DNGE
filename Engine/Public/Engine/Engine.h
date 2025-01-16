@@ -37,10 +37,11 @@ class sEngine final
 {
 	sBaseClassBody(sClassConstructor, sEngine);
 public:
-	sEngine(const EGITypes GIType, const IPhysicalWorld::SharedPtr& PhysicalWorld, std::optional<short> GPUIndex = std::nullopt);
+	sEngine(const GPUDeviceCreateInfo& CreateInfo, const IPhysicalWorld::SharedPtr& PhysicalWorld);
+	//sEngine(const EGITypes GIType, const IPhysicalWorld::SharedPtr& PhysicalWorld, std::optional<short> GPUIndex = std::nullopt, void* InHWND = nullptr);
 	~sEngine();
 
-	void InitWindow(void* Handle, std::uint32_t InWidth, std::uint32_t InHeight, bool bFullscreen);
+	//bool InitWindow(void* HWND, std::uint32_t InWidth, std::uint32_t InHeight, bool bFullscreen);
 
 	void EngineInternalTick();
 
@@ -50,9 +51,9 @@ public:
 	/*
 	* With Renderer Tick
 	*/
+	void BeginFrame();
 	void Tick(const double DeltaTime);
 	void Render();
-
 	void Present();
 
 	bool SetMetaWorld(const std::shared_ptr<IMetaWorld>& MetaWorld);
@@ -94,6 +95,7 @@ public:
 	void InputProcess(const GMouseInput& MouseInput, const GKeyboardChar& KeyboardChar);
 
 private:
+	bool bWindowInitialized;
 	StepTimer mStepTimer;
 	StepTimer FixedStepTimer;
 	sScreenDimension ScreenDimension;

@@ -52,6 +52,7 @@ public:
 	D3D12Viewport(class D3D12Device* InOwner, ComPtr<IDXGIFactory4> InFactory, std::uint32_t InSizeX, std::uint32_t InSizeY, bool IsFullscreen, HWND InHandle);
 	~D3D12Viewport();
 
+	void BeginFrame();
 	void Present(IRenderTarget* pRT);
 
 	void ResizeSwapChain(std::size_t Width, std::size_t Height);

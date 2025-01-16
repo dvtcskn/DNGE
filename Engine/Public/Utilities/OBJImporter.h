@@ -37,6 +37,21 @@ class OBJImporter
 public:
 	struct OBJ
 	{
+		struct MTL
+		{
+			std::string Name;
+			float Ns;
+			FVector Ka;
+			FVector Kd = FVector::One();
+			FVector Ks;
+			FVector Ke;
+			float Ni;
+			float D;
+			int illum;
+
+			std::map<std::string, std::string> Maps;
+		};
+
 		struct ObjMesh
 		{
 			std::vector<FVector> Positions;
@@ -67,21 +82,6 @@ public:
 			int s; // ???
 		};
 
-		struct MTL
-		{
-			std::string Name;
-			float Ns;
-			FVector Ka;
-			FVector Kd = FVector::One();
-			FVector Ks;
-			FVector Ke;
-			float Ni;
-			float D;
-			int illum;
-
-			std::map<std::string, std::string> Maps;
-		};
-
 		std::string Name;
 		ObjMesh Mesh;
 		std::string MTLibName;
@@ -97,8 +97,7 @@ public:
 	OBJImporter();
 	~OBJImporter();
 
-	// OBJ has to be fully triangulated.
-	bool Import(const std::string& path);
+	bool Import(const std::string& path, bool bFlipTextCoordY = false);
 
 	OBJ obj;
 

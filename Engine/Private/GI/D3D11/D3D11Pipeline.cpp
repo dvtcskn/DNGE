@@ -29,6 +29,7 @@
 #include "D3D11Buffer.h"
 #include "D3D11Viewport.h"
 #include "D3D11CommandBuffer.h"
+#include "D3D11Shader.h"
 #include <stdexcept>
 
 D3D11Pipeline::D3D11Pipeline(D3D11Device* InDevice, const std::string& InName, const sPipelineDesc& InDesc)
@@ -72,16 +73,16 @@ D3D11Pipeline::D3D11Pipeline(D3D11Device* InDevice, const std::string& InName, c
 
 	for (const auto& Attachment : ShaderAttachments)
 	{
-		D3D11Shader Shader(Owner, Attachment);
+		auto Shader = Cast<D3D11CompiledShader>(Owner->CompileShader(Attachment));
 
 		if (InDesc.VertexLayout.size() > 0 && Attachment.Type == eShaderType::Vertex && !VertexAttribute)
 		{
-			VertexAttribute = std::make_unique<D3D11VertexAttribute>(Owner, InDesc.VertexLayout, Shader.GetByteCode().Get());
+			VertexAttribute = D3D11VertexAttribute::CreateUnique(Owner, InDesc.VertexLayout, Shader->GetD3DByteCode());
 			InputLayout = VertexAttribute->Get();
 		}
 
-		Shader.CreateShader();
-		Shaders.insert({ Attachment.Type, Shader.GetShaderResources() });
+		Shader->CreateD3D11Shader();
+		Shaders.insert({ Attachment.Type, Shader->GetShader() });
 	}
 
 	PrimitiveTopologyType = PrimType(InDesc.PrimitiveTopologyType);
@@ -249,7 +250,7 @@ std::optional<sDescriptorSetLayoutBinding> D3D11Pipeline::GetDescriptorSetTextur
 	return std::nullopt;
 }
 
-void D3D11Pipeline::Recompile()
+bool D3D11Pipeline::Recompile()
 {
 	for (auto& Shader : Shaders)
 	{
@@ -259,7 +260,7 @@ void D3D11Pipeline::Recompile()
 
 	for (auto& Attachment : ShaderAttachments)
 	{
-		D3D11Shader Shader(Owner, Attachment);
+		auto Shader = Cast<D3D11CompiledShader>(Owner->CompileShader(Attachment));
 
 		/*if (InVertexLayout.size() > 0 && Attachment.Type == EShaderType::Vertex && !VertexAttribute)
 		{
@@ -267,9 +268,11 @@ void D3D11Pipeline::Recompile()
 			InputLayout = VertexAttribute->Get();
 		}*/
 
-		Shader.CreateShader();
-		Shaders.insert({ Attachment.Type, Shader.GetShaderResources() });
+		Shader->CreateD3D11Shader();
+		Shaders.insert({ Attachment.Type, Shader->GetShader() });
 	}
+
+	return true;
 }
 
 D3D11ComputePipeline::D3D11ComputePipeline(D3D11Device* InDevice, const std::string& InName, const sComputePipelineDesc& InDesc)
@@ -288,17 +291,19 @@ D3D11ComputePipeline::D3D11ComputePipeline(D3D11Device* InDevice, const std::str
 		}
 	}
 
-	if (ShaderAttachment.GetShaderAttachmentType() == EShaderAttachmentType::eFile)
+	if (!ShaderAttachment.IsCodeValid())
 	{
-		D3D11Shader pShader(Owner, ShaderAttachment.GetLocation(), ShaderAttachment.FunctionName, eShaderType::Compute, ShaderAttachment.ShaderDefines);
-		pShader.CreateShader();
-		Shader = pShader.GetShaderResources();
+		auto pShader = Cast<D3D11CompiledShader>(Owner->CompileShader(ShaderAttachment.GetLocation(), ShaderAttachment.FunctionName, eShaderType::Compute, false, ShaderAttachment.ShaderDefines));
+		if (!pShader->IsCompiled())
+			pShader->CreateD3D11Shader();
+		Shader = pShader->GetShader();
 	}
 	else
 	{
-		D3D11Shader pShader(Owner, ShaderAttachment.GetByteCode(), ShaderAttachment.GetByteCodeSize(), ShaderAttachment.FunctionName, eShaderType::Compute, ShaderAttachment.ShaderDefines);
-		pShader.CreateShader();
-		Shader = pShader.GetShaderResources();
+		auto pShader = Cast<D3D11CompiledShader>(Owner->CompileShader(ShaderAttachment.GetByteCode(), ShaderAttachment.GetByteCodeSize(), ShaderAttachment.FunctionName, eShaderType::Compute, false, ShaderAttachment.ShaderDefines));
+		if (!pShader->IsCompiled())
+			pShader->CreateD3D11Shader();
+		Shader = pShader->GetShader();
 	}
 }
 
@@ -310,7 +315,7 @@ void D3D11ComputePipeline::ApplyPipeline(ID3D11DeviceContext1* Context) const
 		Context->CSSetSamplers(Sampler.first, 1, Sampler.second.GetAddressOf());
 }
 
-void D3D11ComputePipeline::Recompile()
+bool D3D11ComputePipeline::Recompile()
 {
 	for (const auto& Binding : Desc.DescriptorSetLayout)
 	{
@@ -322,16 +327,20 @@ void D3D11ComputePipeline::Recompile()
 		}
 	}
 
-	if (ShaderAttachment.GetShaderAttachmentType() == EShaderAttachmentType::eFile)
+	if (!ShaderAttachment.IsCodeValid())
 	{
-		D3D11Shader pShader(Owner, ShaderAttachment.GetLocation(), ShaderAttachment.FunctionName, eShaderType::Compute, ShaderAttachment.ShaderDefines);
-		pShader.CreateShader();
-		Shader = pShader.GetShaderResources();
+		auto pShader = Cast<D3D11CompiledShader>(Owner->CompileShader(ShaderAttachment.GetLocation(), ShaderAttachment.FunctionName, eShaderType::Compute, false, ShaderAttachment.ShaderDefines));
+		if (!pShader->IsCompiled())
+			pShader->CreateD3D11Shader();
+		Shader = pShader->GetShader();
 	}
 	else
 	{
-		D3D11Shader pShader(Owner, ShaderAttachment.GetByteCode(), ShaderAttachment.GetByteCodeSize(), ShaderAttachment.FunctionName, eShaderType::Compute, ShaderAttachment.ShaderDefines);
-		pShader.CreateShader();
-		Shader = pShader.GetShaderResources();
+		auto pShader = Cast<D3D11CompiledShader>(Owner->CompileShader(ShaderAttachment.GetByteCode(), ShaderAttachment.GetByteCodeSize(), ShaderAttachment.FunctionName, eShaderType::Compute, false, ShaderAttachment.ShaderDefines));
+		if (!pShader->IsCompiled())
+			pShader->CreateD3D11Shader();
+		Shader = pShader->GetShader();
 	}
+
+	return true;
 }

@@ -502,7 +502,7 @@ namespace cbgui
 			{
 				BufferLayout BufferDesc;
 				BufferDesc.Size = sizeof(CBGradientIdx);
-				GradientConstantBuffer = IConstantBuffer::Create("GradientConstantBuffer", BufferDesc, 1);
+				GradientConstantBuffer = IConstantBuffer::Create("GradientConstantBuffer", BufferDesc, 13); // 1
 
 				CBGradientIdx GradientIdx;
 				GradientIdx.GradientIdx = GradientIndex;

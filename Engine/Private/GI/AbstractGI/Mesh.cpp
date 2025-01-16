@@ -71,7 +71,7 @@ sMesh::sMesh(const std::string InName, EBasicMeshType MeshType, std::optional<FB
 		IndexBuffer = (IIndexBuffer::Create(Name + "_IndexBuffer", BufferLayout(Indices.size() * sizeof(std::uint32_t), sizeof(std::uint32_t)), &Subresource));
 	}
 	{
-		MeshConstantBuffer = IConstantBuffer::Create(Name + "_MeshConstantBuffer", BufferLayout(sizeof(sMeshConstantBufferAttributes), 0), 1);
+		MeshConstantBuffer = IConstantBuffer::Create(Name + "_MeshConstantBuffer", BufferLayout(sizeof(sMeshConstantBufferAttributes), 0), 1);  // 1
 		{
 			sMeshConstantBufferAttributes ObjectConstants;
 			ObjectConstants.modelMatrix = FMatrix::Identity();
@@ -92,7 +92,7 @@ sMesh::sMesh(const std::string InName, const std::string InPath)
 	, RenderPriority(EMeshRenderPriority::eDefault)
 {
 	{
-		MeshConstantBuffer = IConstantBuffer::Create(Name + "_MeshConstantBuffer", BufferLayout(sizeof(sMeshConstantBufferAttributes), 0), 1);
+		MeshConstantBuffer = IConstantBuffer::Create(Name + "_MeshConstantBuffer", BufferLayout(sizeof(sMeshConstantBufferAttributes), 0), 1); // 1
 		{
 			sMeshConstantBufferAttributes ObjectConstants;
 			ObjectConstants.modelMatrix = FMatrix::Identity();
@@ -127,7 +127,7 @@ sMesh::sMesh(const std::string InName, const std::string InPath, const sMeshData
 		IndexBuffer = (IIndexBuffer::Create(Name + "_IndexBuffer", BufferLayout(Indices.size() * sizeof(std::uint32_t), sizeof(std::uint32_t)), &Subresource));
 	}
 	{
-		MeshConstantBuffer = IConstantBuffer::Create(Name + "_MeshConstantBuffer", BufferLayout(sizeof(sMeshConstantBufferAttributes), 0), 1);
+		MeshConstantBuffer = IConstantBuffer::Create(Name + "_MeshConstantBuffer", BufferLayout(sizeof(sMeshConstantBufferAttributes), 0), 1); // 1
 		{
 			sMeshConstantBufferAttributes ObjectConstants;
 			ObjectConstants.modelMatrix = FMatrix::Identity();

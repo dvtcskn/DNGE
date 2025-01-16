@@ -34,6 +34,8 @@
 
 class D3D12Device;
 
+// To Do : make onlie/offline Descriptors
+
 struct D3D12DescriptorHandle
 {
 public:

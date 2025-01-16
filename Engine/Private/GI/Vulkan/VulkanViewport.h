@@ -28,29 +28,90 @@
 #include <map>
 #include <vector>
 #include "Engine/AbstractEngine.h"
+#include "VulkanDevice.h"
 
 class VulkanViewport final
 {
 	sBaseClassBody(sClassConstructor, VulkanViewport)
 public:
-	VulkanViewport();
+	VulkanViewport(VulkanDevice* Device, HWND* Handle);
 	~VulkanViewport();
 
-	void Present(IFrameBuffer* pFB);
-	void ResizeSwapChain(std::size_t Width, std::size_t Height);
+	void InitWindow(HWND* Handle, std::uint32_t InWidth, std::uint32_t InHeight, bool bFullscreen);
+
+	void BeginFrame();
+	void Present(IRenderTarget* pRT);
+	bool ResizeSwapChain(std::size_t Width, std::size_t Height);
 
 	void FullScreen(const bool value);
 	void Vsync(const bool value);
 	void VsyncInterval(const std::size_t value);
 
-	bool IsFullScreen() const { return false; }
-	bool IsVsyncEnabled() const { return false; }
-	std::size_t GetVsyncInterval() const { return 0; }
+	bool IsFullScreen() const { return bIsFullScreen; }
+	bool IsVsyncEnabled() const { return bVSYNC; }
+	std::size_t GetVsyncInterval() const { return Vsync_Interval; }
 
-	std::vector<sDisplayMode> GetAllSupportedResolutions() const;
+	FORCEINLINE std::uint32_t GetBackBufferCount() const { return (std::uint32_t)SwapchainImages.size(); }
 
-	FORCEINLINE std::uint32_t GetBackBufferCount() const { return 0; }
+	FORCEINLINE const sViewport& GetViewport() { return Viewport; }
+	FORCEINLINE std::uint32_t GetViewportWidth() const { return SizeX; }
+	FORCEINLINE std::uint32_t GetViewportHeight() const { return SizeY; }
+	FORCEINLINE sScreenDimension GetScreenDimension() const { return sScreenDimension(SizeX, SizeY); }
 
-	FORCEINLINE std::uint32_t GetViewportWidth() const { return 0; }
-	FORCEINLINE std::uint32_t GetViewportHeight() const { return 0; }
+	const VkSurfaceKHR& GetSurface() const { return Surface; }
+
+	EFormat GetFormat() const { return Format; }
+
+private:
+	VkResult AcquireNextImageIndex(uint32_t* image);
+	void CopyToBackBuffer(IRenderTarget* pRT);
+
+private:
+	VulkanDevice* Device;
+	VkSurfaceKHR Surface;
+	VkSwapchainKHR Swapchain;
+
+	struct SwapchainImage
+	{
+		VkImage Image;
+		VkImageView View;
+		VkImageLayout CurrentImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		VkFence Fence;
+
+		SwapchainImage(VkImage image = VK_NULL_HANDLE, VkImageView view = VK_NULL_HANDLE, VkFence fence = VK_NULL_HANDLE, VkImageLayout currentImageLayout = VK_IMAGE_LAYOUT_UNDEFINED)
+			: Image(image)
+			, View(view)
+			, CurrentImageLayout(currentImageLayout)
+			, Fence(fence)
+		{}
+
+		void Destroy(VkDevice Device)
+		{
+			vkDestroyImageView(Device, View, nullptr);
+			View = VK_NULL_HANDLE;
+			vkDestroyImage(Device, Image, nullptr);
+			Image = VK_NULL_HANDLE;
+			vkDestroyFence(Device, Fence, nullptr);
+			Fence = VK_NULL_HANDLE;
+		}
+	};
+
+	std::vector<SwapchainImage> SwapchainImages;
+
+private:
+	HWND* Handle;
+	bool bRecreateSurface;
+
+	bool bIsFullScreen;
+	bool bVSYNC;
+	std::int32_t Vsync_Interval;
+	VkSurfaceFullScreenExclusiveInfoEXT      surface_full_screen_exclusive_info_EXT;
+	VkSurfaceFullScreenExclusiveWin32InfoEXT surface_full_screen_exclusive_Win32_info_EXT;
+
+	std::uint32_t FrameIndex;
+
+	EFormat Format;
+	std::uint32_t SizeX;
+	std::uint32_t SizeY;
+	sViewport Viewport;
 };

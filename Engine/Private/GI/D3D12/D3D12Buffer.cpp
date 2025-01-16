@@ -100,7 +100,6 @@ D3D12ConstantBuffer::D3D12ConstantBuffer(D3D12Device* InOwner, std::string InNam
     , ViewHeap(D3D12DescriptorHandle(D3D12_DESCRIPTOR_HEAP_TYPE::D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV))
     , RootParameterIndex(InRootParameterIndex)
 {
-
     ID3D12Device* m_device = Owner->GetDevice();
 
     Owner->AllocateDescriptor(&ViewHeap);
@@ -131,12 +130,14 @@ std::size_t D3D12ConstantBuffer::GetSize() const
 
 void D3D12ConstantBuffer::ApplyConstantBuffer(ID3D12GraphicsCommandList* CommandList)
 {
-    CommandList->SetGraphicsRootDescriptorTable(RootParameterIndex, ViewHeap.GetGPU());
+    //CommandList->SetGraphicsRootDescriptorTable(RootParameterIndex, ViewHeap.GetGPU());
+    CommandList->SetGraphicsRootConstantBufferView(RootParameterIndex, UploadBuffer->GetGPU());
 }
 
 void D3D12ConstantBuffer::ApplyConstantBuffer(ID3D12GraphicsCommandList* CommandList, std::uint32_t InRootParameterIndex)
 {
-    CommandList->SetGraphicsRootDescriptorTable(InRootParameterIndex, ViewHeap.GetGPU());
+    //CommandList->SetGraphicsRootDescriptorTable(InRootParameterIndex, ViewHeap.GetGPU());
+    CommandList->SetGraphicsRootConstantBufferView(RootParameterIndex, UploadBuffer->GetGPU());
 }
 
 void D3D12ConstantBuffer::Map(const void* Data, IGraphicsCommandContext* InCMDBuffer)

@@ -41,17 +41,142 @@
 #include "D3D12Pipeline.h"
 #include "GI/D3DShared/D3DShared.h"
 #include "D3D12Fence.h"
+//#include "D3D12ShaderCompiler.h"
+#include "GI/Shared/ShaderCompiler.h"
 
 #include "dx12.h"
 
 #define DEBUG_D3DDEVICE 1
+
+class D3D12Device::D3D12CommandAllocatorPool 
+{
+	sBaseClassBody(sClassConstructor, D3D12Device::D3D12CommandAllocatorPool)
+public:
+	D3D12CommandAllocatorPool(D3D12Device* device)
+		: Device(device)
+		, FenceValue(0) 
+	{
+		// Create a fence
+		HRESULT hr = Device->Get()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&Fence));
+		if (FAILED(hr))
+			throw std::runtime_error("Failed to create fence");
+		FenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+		if (!FenceEvent)
+			throw std::runtime_error("Failed to create fence event");
+	}
+
+	~D3D12CommandAllocatorPool()
+	{
+		Clear();
+	}
+
+	ID3D12CommandAllocator* RequestAllocator(UINT64 completedFenceValue, D3D12_COMMAND_LIST_TYPE type)
+	{
+		std::lock_guard<std::mutex> lock(Mutex);
+
+		if (!ReadyAllocators.empty()) 
+		{
+			auto& allocatorEntry = ReadyAllocators.front();
+
+			if (allocatorEntry.fenceValue <= completedFenceValue) 
+			{
+				ID3D12CommandAllocator* allocator = allocatorEntry.allocator;
+				allocator->Reset();
+				ReadyAllocators.pop();
+				return allocator;
+			}
+		}
+
+		ID3D12CommandAllocator* allocator;
+		HRESULT hr = Device->Get()->CreateCommandAllocator(type, IID_PPV_ARGS(&allocator));
+		if (FAILED(hr))
+			throw std::runtime_error("Failed to create command allocator");
+
+		AllocatorPool.push_back(allocator);
+		return allocator;
+	}
+
+	void ReturnAllocator(ID3D12CommandAllocator* allocator, UINT64 currentFenceValue) 
+	{
+		std::lock_guard<std::mutex> lock(Mutex);
+		ReadyAllocators.push({ allocator, currentFenceValue });
+	}
+
+	void WaitForFence(bool bINFINITE = false)
+	{
+		if (Fence->GetCompletedValue() < FenceValue)
+		{
+			HRESULT hr = Fence->SetEventOnCompletion(FenceValue, FenceEvent);
+			if (FAILED(hr))
+				throw std::runtime_error("Failed to set fence event on completion");
+			WaitForSingleObject(FenceEvent, bINFINITE ? INFINITE : 33 * 1000 * 1000LL);
+		}
+	}
+
+	void WaitForFence(UINT64 fenceValue, bool bINFINITE = false)
+	{
+		if (Fence->GetCompletedValue() < fenceValue)
+		{
+			HRESULT hr = Fence->SetEventOnCompletion(fenceValue, FenceEvent);
+			if (FAILED(hr))
+				throw std::runtime_error("Failed to set fence event on completion");
+			WaitForSingleObject(FenceEvent, bINFINITE ? INFINITE : 33 * 1000 * 1000LL);
+		}
+	}
+
+	void Signal(ID3D12CommandQueue* commandQueue)
+	{
+		FenceValue++;
+		HRESULT hr = commandQueue->Signal(Fence.Get(), FenceValue);
+		if (FAILED(hr))
+			throw std::runtime_error("Failed to signal fence");
+	}
+
+	void Signal(ID3D12CommandQueue* commandQueue, UINT64& fenceValue) 
+	{
+		fenceValue++;
+		HRESULT hr = commandQueue->Signal(Fence.Get(), fenceValue);
+		if (FAILED(hr)) {
+			throw std::runtime_error("Failed to signal fence");
+		}
+	}
+
+	UINT64 GetCurrentFenceValue() const { return FenceValue; }
+
+	void Clear() 
+	{
+		std::lock_guard<std::mutex> lock(Mutex);
+		for (auto& allocator : AllocatorPool)
+			allocator->Release();
+
+		if (FenceEvent)
+			CloseHandle(FenceEvent);
+	}
+
+private:
+	struct AllocatorEntry 
+	{
+		ID3D12CommandAllocator* allocator;
+		UINT64 fenceValue;
+	};
+
+	D3D12Device* Device;
+	ComPtr<ID3D12Fence> Fence;
+	UINT64 FenceValue;
+	HANDLE FenceEvent;
+
+	std::vector<ID3D12CommandAllocator*> AllocatorPool;
+	std::queue<AllocatorEntry> ReadyAllocators;
+	std::mutex Mutex;
+};
+
 #define CheckD3DFeature(FeatureLevel, var) Direct3DDevice->CheckFeatureSupport(FeatureLevel, &var, sizeof(var))
 
-D3D12Device::D3D12Device(std::optional<short> InGPUIndex)
+D3D12Device::D3D12Device(const GPUDeviceCreateInfo& DeviceCreateInfo)
 	: bTypedUAVLoadSupport_R11G11B10_FLOAT(false)
 	, bTypedUAVLoadSupport_R16G16B16A16_FLOAT(false)
 	, useGPUBasedValidation(false)
-	, GPUIndex(InGPUIndex)
+	, GPUIndex(DeviceCreateInfo.GPUIndex)
 	, VendorId(0)
 {
 	HRESULT HR = E_FAIL;
@@ -140,6 +265,8 @@ D3D12Device::D3D12Device(std::optional<short> InGPUIndex)
 	Direct3DDevice->SetName(L"Direct3DDevice");
 #endif
 
+	Direct3DDevice->QueryInterface(IID_PPV_ARGS(&Direct3DDevice14));
+
 	{
 		D3D12_COMMAND_QUEUE_DESC queueDesc = {};
 		queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
@@ -169,6 +296,11 @@ D3D12Device::D3D12Device(std::optional<short> InGPUIndex)
 #if _DEBUG
 		ComputeQueue->SetName(L"ComputeQueue");
 #endif
+	}
+
+	{
+		ShaderCompiler = DXCShaderCompiler::CreateUnique();
+		//pD3D12ShaderCompiler = D3D12ShaderCompiler::CreateUnique();
 	}
 
 	{
@@ -206,18 +338,97 @@ D3D12Device::D3D12Device(std::optional<short> InGPUIndex)
 		}
 	}
 
-	D3D12_FEATURE_DATA_D3D12_OPTIONS12 Feature12;
-	CheckD3DFeature(D3D12_FEATURE_D3D12_OPTIONS12, Feature12);
-	bEnhancedBarriersSupport = Feature12.EnhancedBarriersSupported;
-
+	D3D12_FEATURE_DATA_D3D12_OPTIONS Feature;
+	CheckD3DFeature(D3D12_FEATURE_D3D12_OPTIONS, Feature);
+	D3D12_FEATURE_DATA_D3D12_OPTIONS1 Feature1;
+	CheckD3DFeature(D3D12_FEATURE_D3D12_OPTIONS1, Feature1);
+	D3D12_FEATURE_DATA_D3D12_OPTIONS2 Feature2;
+	CheckD3DFeature(D3D12_FEATURE_D3D12_OPTIONS2, Feature2);
+	D3D12_FEATURE_DATA_D3D12_OPTIONS3 Feature3;
+	CheckD3DFeature(D3D12_FEATURE_D3D12_OPTIONS3, Feature3);
+	D3D12_FEATURE_DATA_D3D12_OPTIONS4 Feature4;
+	CheckD3DFeature(D3D12_FEATURE_D3D12_OPTIONS4, Feature4);
 	D3D12_FEATURE_DATA_D3D12_OPTIONS5 Feature5;
 	CheckD3DFeature(D3D12_FEATURE_D3D12_OPTIONS5, Feature5);
-	RenderPassTier = Feature5.RenderPassesTier;
-
+	D3D12_FEATURE_DATA_D3D12_OPTIONS6 Feature6;
+	CheckD3DFeature(D3D12_FEATURE_D3D12_OPTIONS6, Feature6);
 	D3D12_FEATURE_DATA_D3D12_OPTIONS7 Feature7;
 	CheckD3DFeature(D3D12_FEATURE_D3D12_OPTIONS7, Feature7);
-	auto MeshShaderTier = Feature7.MeshShaderTier;
-	auto SamplerFeedbackTier = Feature7.SamplerFeedbackTier;
+	D3D12_FEATURE_DATA_D3D12_OPTIONS8 Feature8;
+	CheckD3DFeature(D3D12_FEATURE_D3D12_OPTIONS8, Feature8);
+	D3D12_FEATURE_DATA_D3D12_OPTIONS9 Feature9;
+	CheckD3DFeature(D3D12_FEATURE_D3D12_OPTIONS9, Feature9);
+	D3D12_FEATURE_DATA_D3D12_OPTIONS10 Feature10;
+	CheckD3DFeature(D3D12_FEATURE_D3D12_OPTIONS10, Feature10);
+	D3D12_FEATURE_DATA_D3D12_OPTIONS11 Feature11;
+	CheckD3DFeature(D3D12_FEATURE_D3D12_OPTIONS11, Feature11);
+	D3D12_FEATURE_DATA_D3D12_OPTIONS12 Feature12;
+	CheckD3DFeature(D3D12_FEATURE_D3D12_OPTIONS12, Feature12);
+	D3D12_FEATURE_DATA_D3D12_OPTIONS13 Feature13;
+	CheckD3DFeature(D3D12_FEATURE_D3D12_OPTIONS13, Feature13);
+	D3D12_FEATURE_DATA_D3D12_OPTIONS14 Feature14;
+	CheckD3DFeature(D3D12_FEATURE_D3D12_OPTIONS14, Feature14);
+	D3D12_FEATURE_DATA_D3D12_OPTIONS15 Feature15;
+	CheckD3DFeature(D3D12_FEATURE_D3D12_OPTIONS15, Feature15);
+	D3D12_FEATURE_DATA_D3D12_OPTIONS16 Feature16;
+	CheckD3DFeature(D3D12_FEATURE_D3D12_OPTIONS16, Feature16);
+	D3D12_FEATURE_DATA_D3D12_OPTIONS17 Feature17;
+	CheckD3DFeature(D3D12_FEATURE_D3D12_OPTIONS17, Feature17);
+	D3D12_FEATURE_DATA_D3D12_OPTIONS18 Feature18;
+	CheckD3DFeature(D3D12_FEATURE_D3D12_OPTIONS18, Feature18);
+	D3D12_FEATURE_DATA_D3D12_OPTIONS19 Feature19;
+	CheckD3DFeature(D3D12_FEATURE_D3D12_OPTIONS19, Feature19);
+	D3D12_FEATURE_DATA_D3D12_OPTIONS20 Feature20;
+	CheckD3DFeature(D3D12_FEATURE_D3D12_OPTIONS20, Feature20);
+	D3D12_FEATURE_DATA_D3D12_OPTIONS20 Feature21;
+	CheckD3DFeature(D3D12_FEATURE_D3D12_OPTIONS21, Feature21);
+
+	/*D3D12_FEATURE_DATA_FEATURE_LEVELS Feature_FEATURE_LEVELS;
+	CheckD3DFeature(D3D12_FEATURE_FEATURE_LEVELS, Feature_FEATURE_LEVELS);
+	D3D12_FEATURE_DATA_PREDICATION Feature_PREDICATION;
+	CheckD3DFeature(D3D12_FEATURE_PREDICATION, Feature_PREDICATION);
+	D3D12_FEATURE_DATA_PLACED_RESOURCE_SUPPORT_INFO Feature_PLACED_RESOURCE_SUPPORT_INFO;
+	CheckD3DFeature(D3D12_FEATURE_PLACED_RESOURCE_SUPPORT_INFO, Feature_PLACED_RESOURCE_SUPPORT_INFO);
+	D3D12_FEATURE_DATA_HARDWARE_COPY Feature_HARDWARE_COPY;
+	CheckD3DFeature(D3D12_FEATURE_HARDWARE_COPY, Feature_HARDWARE_COPY);
+	D3D12_FEATURE_DATA_PROTECTED_RESOURCE_SESSION_TYPES Feature_PROTECTED_RESOURCE_SESSION_TYPES;
+	CheckD3DFeature(D3D12_FEATURE_PROTECTED_RESOURCE_SESSION_TYPES, Feature_PROTECTED_RESOURCE_SESSION_TYPES);
+	D3D12_FEATURE_DATA_PROTECTED_RESOURCE_SESSION_TYPE_COUNT Feature_PROTECTED_RESOURCE_SESSION_TYPE_COUNT;
+	CheckD3DFeature(D3D12_FEATURE_PROTECTED_RESOURCE_SESSION_TYPE_COUNT, Feature_PROTECTED_RESOURCE_SESSION_TYPE_COUNT);
+	D3D12_FEATURE_DATA_QUERY_META_COMMAND Feature_QUERY_META_COMMAND;
+	CheckD3DFeature(D3D12_FEATURE_QUERY_META_COMMAND, Feature_QUERY_META_COMMAND);
+	D3D12_FEATURE_DATA_DISPLAYABLE Feature_DISPLAYABLE;
+	CheckD3DFeature(D3D12_FEATURE_DISPLAYABLE, Feature_DISPLAYABLE);
+	D3D12_FEATURE_DATA_CROSS_NODE Feature_CROSS_NODE;
+	CheckD3DFeature(D3D12_FEATURE_CROSS_NODE, Feature_CROSS_NODE);
+	D3D12_FEATURE_DATA_SERIALIZATION Feature_SERIALIZATION;
+	CheckD3DFeature(D3D12_FEATURE_SERIALIZATION, Feature_SERIALIZATION);
+	D3D12_FEATURE_DATA_EXISTING_HEAPS Feature_EXISTING_HEAPS;
+	CheckD3DFeature(D3D12_FEATURE_EXISTING_HEAPS, Feature_EXISTING_HEAPS);
+	D3D12_FEATURE_DATA_COMMAND_QUEUE_PRIORITY Feature_COMMAND_QUEUE_PRIORITY;
+	CheckD3DFeature(D3D12_FEATURE_COMMAND_QUEUE_PRIORITY, Feature_COMMAND_QUEUE_PRIORITY);
+	D3D12_FEATURE_DATA_SHADER_CACHE Feature_SHADER_CACHE;
+	CheckD3DFeature(D3D12_FEATURE_SHADER_CACHE, Feature_SHADER_CACHE);
+	D3D12_FEATURE_DATA_ROOT_SIGNATURE Feature_ROOT_SIGNATURE;
+	CheckD3DFeature(D3D12_FEATURE_ROOT_SIGNATURE, Feature_ROOT_SIGNATURE);
+	D3D12_FEATURE_DATA_PROTECTED_RESOURCE_SESSION_SUPPORT Feature_PROTECTED_RESOURCE_SESSION_SUPPORT;
+	CheckD3DFeature(D3D12_FEATURE_PROTECTED_RESOURCE_SESSION_SUPPORT, Feature_PROTECTED_RESOURCE_SESSION_SUPPORT);
+	D3D12_FEATURE_DATA_SHADER_MODEL Feature_SHADER_MODEL;
+	CheckD3DFeature(D3D12_FEATURE_SHADER_MODEL, Feature_SHADER_MODEL);
+	D3D12_FEATURE_DATA_GPU_VIRTUAL_ADDRESS_SUPPORT Feature_GPU_VIRTUAL_ADDRESS_SUPPORT;
+	CheckD3DFeature(D3D12_FEATURE_GPU_VIRTUAL_ADDRESS_SUPPORT, Feature_GPU_VIRTUAL_ADDRESS_SUPPORT);
+	D3D12_FEATURE_DATA_FORMAT_INFO Feature_FORMAT_INFO;
+	CheckD3DFeature(D3D12_FEATURE_FORMAT_INFO, Feature_FORMAT_INFO);
+	D3D12_FEATURE_DATA_MULTISAMPLE_QUALITY_LEVELS Feature_MULTISAMPLE_QUALITY_LEVELS;
+	CheckD3DFeature(D3D12_FEATURE_MULTISAMPLE_QUALITY_LEVELS, Feature_MULTISAMPLE_QUALITY_LEVELS);
+	D3D12_FEATURE_DATA_FORMAT_SUPPORT Feature_FORMAT_SUPPORT;
+	CheckD3DFeature(D3D12_FEATURE_FORMAT_SUPPORT, Feature_FORMAT_SUPPORT);
+	D3D12_FEATURE_DATA_ARCHITECTURE Feature_ARCHITECTURE;
+	CheckD3DFeature(D3D12_FEATURE_ARCHITECTURE, Feature_ARCHITECTURE);
+	D3D12_FEATURE_DATA_ARCHITECTURE1 Feature_FEATURE_ARCHITECTURE1;
+	CheckD3DFeature(D3D12_FEATURE_ARCHITECTURE1, Feature_FEATURE_ARCHITECTURE1);
+	D3D12_FEATURE_DATA_D3D12_OPTIONS Feature_D3D12_OPTIONS;
+	CheckD3DFeature(D3D12_FEATURE_D3D12_OPTIONS, Feature_D3D12_OPTIONS);*/
 
 	{
 		if (GPUIndex.has_value())
@@ -265,7 +476,21 @@ D3D12Device::D3D12Device(std::optional<short> InGPUIndex)
 	}
 #endif
 
-	PostInit();
+	CommandAllocatorPool = D3D12CommandAllocatorPool::CreateUnique(this);
+
+	IMCommandList = std::make_unique<D3D12CommandBuffer>(this);
+#if _DEBUG
+	IMCommandList->Get()->SetName(L"IMCommandList");
+#endif
+
+	IMCopyCommandList = D3D12CopyCommandBuffer::CreateUnique(this);
+#if _DEBUG
+	IMCopyCommandList->Get()->SetName(L"IMCopyCommandList");
+#endif
+
+	DescriptorHeapManager = std::make_unique<D3D12DescriptorHeapManager>(this);
+
+	InitWindow(DeviceCreateInfo.pHWND, DeviceCreateInfo.Width, DeviceCreateInfo.Height, DeviceCreateInfo.Fullscreen);
 }
 
 D3D12Device::~D3D12Device()
@@ -276,6 +501,9 @@ D3D12Device::~D3D12Device()
 	ID3D12DebugDevice* DebugDevice = nullptr;
 	Direct3DDevice->QueryInterface(__uuidof(ID3D12DebugDevice), (void**)(&DebugDevice));
 #endif
+
+	ShaderCompiler = nullptr;
+	//pD3D12ShaderCompiler = nullptr;
 
 	Viewport = nullptr;
 
@@ -297,6 +525,8 @@ D3D12Device::~D3D12Device()
 	ComputeQueue = nullptr;
 	CopyQueue = nullptr;
 
+	CommandAllocatorPool = nullptr;
+
 #if _DEBUG && DEBUG_D3DDEVICE
 	if (DebugDevice)
 		DebugDevice->ReportLiveDeviceObjects(D3D12_RLDO_DETAIL);
@@ -305,23 +535,10 @@ D3D12Device::~D3D12Device()
 	if (debugDev)
 		debugDev->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_ALL);
 #endif
+	Direct3DDevice14 = nullptr;
+
 	//Direct3DDevice->Release();
 	Direct3DDevice = nullptr;
-}
-
-void D3D12Device::PostInit()
-{
-	IMCommandList = std::make_unique<D3D12CommandBuffer>(this);
-#if _DEBUG
-	IMCommandList->Get()->SetName(L"IMCommandList");
-#endif
-
-	IMCopyCommandList = D3D12CopyCommandBuffer::CreateUnique(this);
-#if _DEBUG
-	IMCopyCommandList->Get()->SetName(L"IMCopyCommandList");
-#endif
-
-	DescriptorHeapManager = std::make_unique<D3D12DescriptorHeapManager>(this);
 }
 
 D3D12Viewport* D3D12Device::GetViewportContext() const
@@ -333,6 +550,11 @@ void D3D12Device::InitWindow(void* InHWND, std::uint32_t InWidth, std::uint32_t 
 {
 	if (!Viewport)
 		Viewport = std::make_unique<D3D12Viewport>(this, DxgiFactory, InWidth, InHeight, bFullscreen, (HWND)InHWND);
+}
+
+void D3D12Device::BeginFrame()
+{
+	Viewport->BeginFrame();
 }
 
 void D3D12Device::Present(IRenderTarget* pRT)
@@ -401,10 +623,44 @@ sViewport D3D12Device::GetViewport() const
 	return Viewport->GetViewport();
 }
 
+IShader* D3D12Device::CompileShader(const sShaderAttachment& Attachment, bool Spirv)
+{
+	if (sShaderManager::Get().IsShaderExist(Attachment.GetLocation(), Attachment.FunctionName))
+		return sShaderManager::Get().GetShader(Attachment.GetLocation(), Attachment.FunctionName);
+
+	IShader::SharedPtr pShader = ShaderCompiler->Compile(Attachment, Spirv);
+	//IShader::SharedPtr pShader = pD3D12ShaderCompiler->Compile(Attachment);
+	sShaderManager::Get().StoreShader(pShader);
+	return pShader.get();
+}
+
+IShader* D3D12Device::CompileShader(std::wstring InSrcFile, std::string InFunctionName, eShaderType InProfile, bool Spirv, std::vector<sShaderDefines> InDefines)
+{
+	if (sShaderManager::Get().IsShaderExist(InSrcFile, InFunctionName))
+		return sShaderManager::Get().GetShader(InSrcFile, InFunctionName);
+
+	IShader::SharedPtr pShader = ShaderCompiler->Compile(InSrcFile, InFunctionName, InProfile, Spirv, InDefines);
+	//IShader::SharedPtr pShader = pD3D12ShaderCompiler->Compile(InSrcFile, InFunctionName, InProfile, InDefines);
+	sShaderManager::Get().StoreShader(pShader);
+	return pShader.get();
+}
+
+IShader* D3D12Device::CompileShader(const void* InCode, std::size_t Size, std::string InFunctionName, eShaderType InProfile, bool Spirv, std::vector<sShaderDefines> InDefines)
+{
+	if (sShaderManager::Get().IsShaderExist(L"", InFunctionName))
+		return sShaderManager::Get().GetShader(L"", InFunctionName);
+
+	IShader::SharedPtr pShader = ShaderCompiler->Compile(InCode, Size, InFunctionName, InProfile, Spirv, InDefines);
+	//IShader::SharedPtr pShader = pD3D12ShaderCompiler->Compile(InCode, Size, InFunctionName, InProfile, InDefines);
+	sShaderManager::Get().StoreShader(pShader);
+	return pShader.get();
+}
+
 void D3D12Device::ExecuteDirectCommandLists(ID3D12CommandList* pCommandList, bool WaitForCompletion)
 {
 	GraphicsQueue->ExecuteCommandLists(1, &pCommandList);
 	GPUSignal(D3D12_COMMAND_LIST_TYPE_DIRECT);
+	//CommandAllocatorPool->Signal(GraphicsQueue.Get());
 	if (WaitForCompletion)
 		CPUWait(D3D12_COMMAND_LIST_TYPE_DIRECT);
 }
@@ -462,6 +718,8 @@ void D3D12Device::CPUWait(D3D12_COMMAND_LIST_TYPE Type)
 
 ID3D12CommandAllocator* D3D12Device::RequestCommandAllocator(D3D12_COMMAND_LIST_TYPE cmdType, std::optional<std::uint64_t> CompletedFenceValue)
 {
+	//return CommandAllocatorPool->RequestAllocator(CompletedFenceValue.has_value() ? CompletedFenceValue.value() : CommandAllocatorPool->GetCurrentFenceValue(), cmdType);
+
 	std::lock_guard<std::mutex> LockGuard(CMDAllocatorPool[cmdType == D3D12_COMMAND_LIST_TYPE_BUNDLE ? D3D12_COMMAND_LIST_TYPE_DIRECT : cmdType].m_AllocatorMutex);
 
 	ID3D12CommandAllocator* pAllocator = nullptr;
@@ -495,6 +753,8 @@ ID3D12CommandAllocator* D3D12Device::RequestCommandAllocator(D3D12_COMMAND_LIST_
 
 void D3D12Device::DiscardCommandAllocator(D3D12_COMMAND_LIST_TYPE cmdType, ID3D12CommandAllocator* Allocator, std::optional<std::uint64_t> FenceValue)
 {
+	//CommandAllocatorPool->ReturnAllocator(Allocator, FenceValue.has_value() ? FenceValue.value() : CommandAllocatorPool->GetCurrentFenceValue());
+
 	std::lock_guard<std::mutex> LockGuard(CMDAllocatorPool[cmdType == D3D12_COMMAND_LIST_TYPE_BUNDLE ? D3D12_COMMAND_LIST_TYPE_DIRECT : cmdType].m_AllocatorMutex);
 
 	const D3D12_COMMAND_LIST_TYPE Type = cmdType == D3D12_COMMAND_LIST_TYPE_BUNDLE ? D3D12_COMMAND_LIST_TYPE_DIRECT : cmdType;

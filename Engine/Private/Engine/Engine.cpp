@@ -45,6 +45,11 @@
 #include "RemoteProcedureCall.h"
 #include "Utilities/ConfigManager.h"
 
+#define Renderdoc_Enabled 0
+#if Renderdoc_Enabled && _DEBUG
+#include <renderdoc_app.h>
+#endif
+
 namespace
 {
 	static std::unique_ptr<IAbstractGIDevice> Device = nullptr;
@@ -60,6 +65,30 @@ namespace
 	static bool bPauseInput = false;
 	static bool bPausePhysics = false;
 	static bool bPauseTick = false;
+
+#if Renderdoc_Enabled && _DEBUG
+	RENDERDOC_API_1_6_0* rdoc_api = nullptr;
+
+	void InitializeRenderDoc()
+	{
+		// At init, on windows
+		if (HMODULE mod = LoadLibraryA("renderdoc.dll"))
+		{
+			pRENDERDOC_GetAPI RENDERDOC_GetAPI =
+				(pRENDERDOC_GetAPI)GetProcAddress(mod, "RENDERDOC_GetAPI");
+			int ret = RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_6_0, (void**)&rdoc_api);
+			assert(ret == 1);
+		}
+		else
+		{
+			auto Error = GetLastError();
+			if (Error == 126)
+				Engine::WriteToConsole("RENDERDOC : The specified module could not be found.");
+			else
+				Engine::WriteToConsole(std::to_string(Error));
+		}
+	}
+#endif
 }
 
 namespace GPU
@@ -91,7 +120,7 @@ namespace GPU
 
 	EFormat GetDefaultDepthFormat()
 	{
-		return EFormat::R32G8X24_Typeless; //EFormat::R32G8X24_Typeless; // EFormat::R32_Typeless
+		return EFormat::D32_FLOAT_S8X24_UINT; // EFormat::R32G8X24_Typeless; //EFormat::R32G8X24_Typeless; // EFormat::R32_Typeless
 	}
 
 	void SetGBufferClearMode(EGBufferClear Mode)
@@ -106,12 +135,12 @@ namespace GPU
 
 	std::uint32_t GetGBufferTextureEntryPoint()
 	{
-		return 2;
+		return 3;
 	}
 
 	std::uint32_t GetGBufferTextureSize()
 	{
-		return 1;
+		return 5;
 	}
 
 	void* GetInternalDevice()
@@ -187,6 +216,10 @@ namespace GPU
 	void GPU::SetViewportInstancePriority(sViewportInstance* ViewportInstance, std::size_t Priority)
 	{
 		Renderer->SetViewportInstancePriority(ViewportInstance, Priority);
+	}
+	bool IsBindlessRendererEnabled()
+	{
+		return false;
 	}
 }
 
@@ -961,10 +994,15 @@ IRigidBody::SharedPtr IRigidBody::CreateTriangleMesh(sPhysicalComponent* Owner, 
 	return PhysicalWorld ? PhysicalWorld->CreateTriangleMesh(Owner, Desc, Origin, points, numPoints, indices, numIndices) : nullptr;
 }
 
-sEngine::sEngine(const EGITypes GIType, const IPhysicalWorld::SharedPtr& InPhysicalWorld, std::optional<short> GPUIndex)
+sEngine::sEngine(const GPUDeviceCreateInfo& CreateInfo, const IPhysicalWorld::SharedPtr& InPhysicalWorld)
 	: MetaWorld(nullptr)
 	, ScreenDimension(sScreenDimension())
+	, bWindowInitialized(false)
 {
+#if Renderdoc_Enabled && _DEBUG
+	InitializeRenderDoc();
+#endif
+
 	AppStartTime = Engine::GetUTCTimeNow();
 
 	mThreadPool.Start();
@@ -973,25 +1011,67 @@ sEngine::sEngine(const EGITypes GIType, const IPhysicalWorld::SharedPtr& InPhysi
 	FixedStepTimer.SetFixedTimeStep(true);
 	FixedStepTimer.SetTargetElapsedSeconds(1.0 / 60.0);
 
-	switch (GIType)
+	switch (CreateInfo.Type)
 	{
 	case EGITypes::eD3D11:
-		Device = D3D11Device::CreateUnique(GPUIndex);
+		Device = D3D11Device::CreateUnique(CreateInfo);
 		break;
 	case EGITypes::eD3D12:
-		Device = D3D12Device::CreateUnique(GPUIndex);
+		Device = D3D12Device::CreateUnique(CreateInfo);
 		break;
 	case EGITypes::eVulkan:
-		Device = VulkanDevice::CreateUnique(GPUIndex);
+		Device = VulkanDevice::CreateUnique(CreateInfo);
 		break;
 		//case EGITypes::eOpenGL46:
 		//	break;
 	default:
+		Device = D3D11Device::CreateUnique(CreateInfo);
 		break;
 	}
 
 	PhysicalWorld = InPhysicalWorld;
+
+	bWindowInitialized = true;
+
+	ScreenDimension.Width = (std::size_t)CreateInfo.Width;
+	ScreenDimension.Height = (std::size_t)CreateInfo.Height;
+
+	InputController = sInputController::CreateUnique((HWND)CreateInfo.pHWND);
+	Renderer = sRenderer::CreateUnique(ScreenDimension.Width, ScreenDimension.Height);
 }
+
+//sEngine::sEngine(const EGITypes GIType, const IPhysicalWorld::SharedPtr& InPhysicalWorld, std::optional<short> GPUIndex, void* InHWND)
+//	: MetaWorld(nullptr)
+//	, ScreenDimension(sScreenDimension())
+//	, bWindowInitialized(false)
+//{
+//	AppStartTime = Engine::GetUTCTimeNow();
+//
+//	mThreadPool.Start();
+//	pAudio = std::make_unique<XAudio>();
+//
+//	FixedStepTimer.SetFixedTimeStep(true);
+//	FixedStepTimer.SetTargetElapsedSeconds(1.0 / 60.0);
+//
+//	switch (GIType)
+//	{
+//	case EGITypes::eD3D11:
+//		Device = D3D11Device::CreateUnique(GPUIndex, InHWND);
+//		break;
+//	case EGITypes::eD3D12:
+//		Device = D3D12Device::CreateUnique(GPUIndex, InHWND);
+//		break;
+//	case EGITypes::eVulkan:
+//		Device = VulkanDevice::CreateUnique(GPUIndex, InHWND);
+//		break;
+//		//case EGITypes::eOpenGL46:
+//		//	break;
+//	default:
+//		break;
+//	}
+//
+//	PhysicalWorld = InPhysicalWorld;
+//}
 
 sEngine::~sEngine()
 {
@@ -1013,15 +1093,22 @@ sEngine::~sEngine()
 	Device = nullptr;
 }
 
-void sEngine::InitWindow(void* Handle, std::uint32_t InWidth, std::uint32_t InHeight, bool Fullscreen)
-{
-	ScreenDimension.Width = (std::size_t)InWidth;
-	ScreenDimension.Height = (std::size_t)InHeight;
-
-	InputController = sInputController::CreateUnique((HWND)Handle);
-	Device->InitWindow(Handle, (std::uint32_t)ScreenDimension.Width, (std::uint32_t)ScreenDimension.Height, Fullscreen);
-	Renderer = sRenderer::CreateUnique(ScreenDimension.Width, ScreenDimension.Height);
-}
+//bool sEngine::InitWindow(void* InHWND, std::uint32_t InWidth, std::uint32_t InHeight, bool Fullscreen)
+//{
+//	if (bWindowInitialized)
+//		return false;
+//
+//	bWindowInitialized = true;
+//
+//	ScreenDimension.Width = (std::size_t)InWidth;
+//	ScreenDimension.Height = (std::size_t)InHeight;
+//
+//	InputController = sInputController::CreateUnique((HWND)InHWND);
+//	Device->InitWindow(InHWND, (std::uint32_t)ScreenDimension.Width, (std::uint32_t)ScreenDimension.Height, Fullscreen);
+//	Renderer = sRenderer::CreateUnique(ScreenDimension.Width, ScreenDimension.Height);
+//
+//	return true;
+//}
 
 void sEngine::SetEngineFixedTargetElapsedSeconds(bool Enable, double DeltaTime)
 {
@@ -1036,6 +1123,8 @@ void sEngine::SetFixedTargetElapsedSeconds(double DeltaTime)
 
 void sEngine::EngineInternalTick()
 {
+	BeginFrame();
+
 	FixedStepTimer.Tick([&]()
 		{
 			PhysicsTick(FixedStepTimer.GetElapsedSeconds());
@@ -1100,6 +1189,18 @@ void sEngine::Tick(const double DeltaTime)
 	Renderer->Tick(DeltaTime);
 }
 
+void sEngine::BeginFrame()
+{
+#if Renderdoc_Enabled && _DEBUG
+	if (rdoc_api) {
+		rdoc_api->StartFrameCapture(nullptr, nullptr);
+	}
+#endif
+
+	Device->BeginFrame();
+	Renderer->BeginFrame();
+}
+
 void sEngine::Render()
 {
 	Renderer->Render();
@@ -1108,6 +1209,12 @@ void sEngine::Render()
 void sEngine::Present()
 {
 	Device->Present(Renderer->GetFinalRenderTarget());
+
+#if Renderdoc_Enabled && _DEBUG
+	if (rdoc_api) {
+		rdoc_api->EndFrameCapture(nullptr, nullptr);
+	}
+#endif
 }
 
 bool sEngine::SetMetaWorld(const std::shared_ptr<IMetaWorld>& pMetaWorld)
@@ -1214,6 +1321,13 @@ void sEngine::InputProcess(const GMouseInput& MouseInput, const GKeyboardChar& K
 {
 	if (bPauseInput)
 		return;
+
+	if (KeyboardChar.bIsPressed)
+	{
+		//std::cout << "sEngine::InputProcess::CloseServer (Any Key)" << std::endl;
+		//Server->DestroySession();
+		//Client->Disconnect();
+	}
 
 	if (MetaWorld)
 		MetaWorld->InputProcess(MouseInput, KeyboardChar);

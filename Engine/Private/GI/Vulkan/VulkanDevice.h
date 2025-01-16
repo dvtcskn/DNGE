@@ -27,23 +27,96 @@
 
 #include <memory>
 #include <string>
-#include "VulkanViewport.h"
 #include "GI/AbstractGI/AbstractGIDevice.h"
 
-//#include <vulkan/vulkan.hpp>
-//#pragma comment(lib, "vulkan-1.lib")
+#ifndef WIN32
+#define WIN32
+#endif // !WIN32
+
+#ifndef VK_HPP
+#define VK_HPP 1
+#endif // !VK_HPP
+
+#ifndef VK_RAII_HPP
+#define VK_RAII_HPP 0
+#endif // !VK_RAII_HPP
+
+#if VK_HPP && !VK_RAII_HPP
+	#include <vulkan/vulkan.hpp>
+#elif VK_RAII_HPP
+	#include <vulkan/vulkan_raii.hpp>
+#else
+	#include <vulkan/vulkan.h>
+#endif // !VK_HPP
+
+class VulkanViewport;
+class VulkanShaderCompiler;
+class DXCShaderCompiler;
+class VulkanMemoryManager;
+class VulkanCommandBuffer;
+class VulkanBindlessDescriptorPool;
+class VulkanDescriptorSet;
+class VulkanPushDescriptorPool;
 
 class VulkanDevice final : public IAbstractGIDevice
 {
 	sClassBody(sClassConstructor, VulkanDevice, IAbstractGIDevice)
+private:
+	struct QueueFamilyProperties
+	{
+		std::int32_t graphicsQueueFamilyIndex = -1;
+		std::int32_t presentQueueFamilyIndex = -1;
+		std::int32_t computeQueueFamilyIndex = -1;
+		std::int32_t copyQueueFamilyIndex = -1;
+	};
+
 public:
-	VulkanDevice(std::optional<short> GPUIndex = std::nullopt);
+	VulkanDevice(const GPUDeviceCreateInfo& DeviceCreateInfo);
 	virtual ~VulkanDevice();
 	virtual void InitWindow(void* HWND, std::uint32_t Width, std::uint32_t Height, bool Fullscreen) override final;
+	virtual void BeginFrame() override final;
 	virtual void Present(IRenderTarget* pRT) override final;
 	bool GetDeviceIdentification(std::wstring& InVendorID, std::wstring& InDeviceID);
 
+	void ExecuteGraphicsCommandBuffer(VkCommandBuffer pCommandList, bool WaitForCompletion = false);
+#ifdef VK_HPP
+	void ExecuteGraphicsCommandBuffer(vk::CommandBuffer* pCommandList, bool WaitForCompletion = false);
+#endif
+	void ExecuteComputeCommandBuffer(VkCommandBuffer pCommandList, bool WaitForCompletion = false);
+	void ExecuteCopyCommandBuffer(VkCommandBuffer pCommandList, bool WaitForCompletion = false);
+
+	void ResetCommandBuffer(VkCommandBuffer CommandBuffer);
+
+	VkDescriptorSetLayout GetPushDescriptorSetLayout() const;
+	VkDescriptorSetLayout GetBindlessDescriptorSetLayout() const;
+	VkDescriptorSet GetBindlessDescriptorSet() const;
+	void UpdateBindlessImageDescriptor(uint32_t binding, uint32_t arrayIndex, VkDescriptorImageInfo* imageInfo);
+	void UpdateBindlessBufferDescriptor(uint32_t binding, uint32_t arrayIndex, VkDescriptorBufferInfo* bufferInfo);
+
+	VkSemaphore AcquireSignalledSemaphore();
+	VkSemaphore AcquireSemaphore();
+	VkFence AcquireFence();
+	void RecycleFence(VkFence Fence);
+
+	VkCommandBuffer RequestCommandBuffer();
+	void ReturnCommandBuffer(VkCommandBuffer commandBuffer);
+	bool IsCommandBufferAvailable(VkCommandBuffer commandBuffer) const;
+
+	bool GetAdapter(std::optional<short> Index, VkPhysicalDevice& GPU, QueueFamilyProperties& FamilyProperties, VkPhysicalDeviceProperties& properties) const;
+
 	virtual void* GetInternalDevice() override final { return nullptr; }
+
+	const VkInstance& GetInstance() const { return instance; }
+
+	const VkDevice& Get() const { return Device; }
+#ifdef VK_HPP
+	const vk::Device& Get_Hpp() const { return Device; }
+#endif
+	const VkQueue& GetQueue() const { return GraphicsQueue; }
+	const VkPhysicalDevice& GetPhysicalDevice() const { return PhysicalDevice; }
+	std::int32_t GraphicsQueueIndex() const { return FamilyProperties.graphicsQueueFamilyIndex; }
+
+	uint32_t GetMemoryType(uint32_t type_filter, VkMemoryPropertyFlags properties);
 
 	virtual void ResizeWindow(std::size_t Width, std::size_t Height) override final;
 	virtual void FullScreen(const bool value) override final;
@@ -62,6 +135,19 @@ public:
 	virtual sScreenDimension GetBackBufferDimension() const override final;
 	virtual EFormat GetBackBufferFormat() const override final;
 	virtual sViewport GetViewport() const override final;
+
+	void SetPerfMarkerBegin(VkCommandBuffer cmd_buf, const char* name);
+	void SetPerfMarkerEnd(VkCommandBuffer cmd_buf);
+
+	void SetResourceName(VkObjectType objectType, uint64_t handle, const char* name);
+
+	VkDeviceMemory AllocateMemory(/*std::string ClassID,*/ VkDeviceSize size, uint32_t memoryTypeIndex);
+	VkDeviceMemory AllocateMemory(/*std::string ClassID,*/ VkDeviceSize size, uint32_t type_filter, VkMemoryPropertyFlags properties);
+	void FreeMemory(VkDeviceMemory memory);
+
+	virtual IShader* CompileShader(const sShaderAttachment& Attachment, bool Spirv = false) override final;
+	virtual IShader* CompileShader(std::wstring InSrcFile, std::string InFunctionName, eShaderType InProfile, bool Spirv = false, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>()) override final;
+	virtual IShader* CompileShader(const void* InCode, std::size_t Size, std::string InFunctionName, eShaderType InProfile, bool Spirv = false, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>()) override final;
 
 	virtual IGraphicsCommandContext::SharedPtr CreateGraphicsCommandContext() override final;
 	virtual IGraphicsCommandContext::UniquePtr CreateUniqueGraphicsCommandContext() override final;
@@ -111,50 +197,62 @@ public:
 public:
 	FORCEINLINE bool IsNvDeviceID() const
 	{
-		return VendorId == 0x10DE;
+		return DeviceProperties.vendorID == 0x10DE;
 	}
 
 	FORCEINLINE bool IsAMDDeviceID() const
 	{
-		return VendorId == 0x1002;
+		return DeviceProperties.vendorID == 0x1002;
 	}
 
 	FORCEINLINE bool IsIntelDeviceID() const
 	{
-		return VendorId == 0x8086;
+		return DeviceProperties.vendorID == 0x8086;
 	}
 
 	FORCEINLINE bool IsSoftwareDevice() const
 	{
-		return VendorId == 0x1414;
+		return DeviceProperties.vendorID == 0x1414;
+	}
+
+	FORCEINLINE VulkanCommandBuffer* GetIMCommandBuffer() const
+	{
+		return IMCommandBuffer.get();
 	}
 
 private:
-	void SetupProperties();
-	void SetupQueueGraphicsFamily();
+	VkInstance instance = VK_NULL_HANDLE;
+	VkDevice Device;
+	VkPhysicalDevice PhysicalDevice;
+	VkPhysicalDeviceProperties DeviceProperties;
+	VkPhysicalDeviceType PhysicalDevice_Type;
+	VkPhysicalDeviceMemoryProperties PhysicalDeviceMemoryProperties;
+	VkPhysicalDeviceLimits deviceLimits;
+	VkDebugUtilsMessengerEXT debug_callback = VK_NULL_HANDLE;
+
+	std::unique_ptr<VulkanCommandBuffer> IMCommandBuffer;
+
+	VkQueue GraphicsQueue;
+	VkQueue ComputeQueue;
 
 private:
-	struct QueueFamilyProperties
-	{
-		size_t graphicsQueueFamilyIndex;
-		size_t presentQueueFamilyIndex;
-	};
-
-	/*vk::Device device;
-	vk::PhysicalDevice PhysicalDevice;
-	vk::PhysicalDeviceType PhysicalDevice_Type;
-	vk::Instance instance;
-	vk::Queue GraphicsQueue;
-	vk::UniqueCommandPool CMDBufferPool;
-	vk::PhysicalDeviceMemoryProperties PhysicalDeviceMemoryProperties;*/
+	QueueFamilyProperties FamilyProperties;
+	std::unique_ptr<VulkanViewport> Viewport;
 	std::uint64_t uniform_buffer_alignment;
 
-	//vk::PhysicalDeviceProperties PhysicalDeviceProperties;
-	//vk::PhysicalDeviceLimits deviceLimits;
+	std::unique_ptr<DXCShaderCompiler> ShaderCompiler;
+	//std::unique_ptr<VulkanShaderCompiler> pShaderCompiler;
 
-	QueueFamilyProperties FamilyProperties;
+	std::unique_ptr<VulkanMemoryManager> MemoryManager;
+	
+	class VkCommandPoolManager;
+	std::unique_ptr<VkCommandPoolManager> CommandPoolManager;
+	class VkCommandBufferManager;
+	std::unique_ptr<VkCommandBufferManager> CommandBufferManager;
 
-	std::unique_ptr<VulkanViewport> Viewport;
+	class VulkanSyncManager;
+	std::unique_ptr<VulkanSyncManager> SyncManager;
 
-	std::uint32_t VendorId;
+	std::unique_ptr<VulkanBindlessDescriptorPool> BindlessDescriptorPool;
+	std::unique_ptr<VulkanPushDescriptorPool> PushDescriptorPool;
 };

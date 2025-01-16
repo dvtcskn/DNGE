@@ -28,12 +28,36 @@
 #include <string>
 #include <vector>
 #include <assert.h>
-#include <wrl/client.h>
 #include "Engine/ClassBody.h"
 #include "Engine/AbstractEngine.h"
-#include "D3D11Shader.h"
+#include "VulkanShaderStates.h"
+#include "VulkanDevice.h"
 
-using namespace Microsoft::WRL;
+class VulkanUploadBuffer final
+{
+	sBaseClassBody(sClassConstructor, VulkanUploadBuffer)
+private:
+	std::string Name;
+	VulkanDevice* Owner;
+	VkBuffer Buffer;
+	VkDeviceMemory Memory;
+	void* pData;
+	std::uint32_t Size;
+	bool bIsMapped;
+
+public:
+	VulkanUploadBuffer(VulkanDevice* Device, std::string InName, const std::uint32_t Size);
+
+	virtual ~VulkanUploadBuffer();
+
+	FORCEINLINE std::string GetName() const { return Name; };
+
+	std::size_t GetSize() const { return Size; }
+	void* GetData() const { return pData; }
+	VkBuffer GetBuffer() const { return Buffer; }
+	void Map(const void* Ptr = nullptr, IGraphicsCommandContext* InCMDBuffer = nullptr);
+	void Unmap();
+};
 
 class VulkanConstantBuffer final : public IConstantBuffer
 {
@@ -41,21 +65,30 @@ class VulkanConstantBuffer final : public IConstantBuffer
 private:
 	std::uint32_t RootParameterIndex;
 	std::string Name;
+	VulkanDevice* Owner;
+	VkBuffer Buffer;
+	VkDeviceMemory Memory;
+	BufferLayout Desc;
+	void* pData;
+	bool bIsMapped;
 
 public:
-	VulkanConstantBuffer(std::string InName, const BufferLayout& InDesc, std::uint32_t InRootParameterIndex)
-		: RootParameterIndex(InRootParameterIndex)
-		, Name(InName)
-	{}
+	VulkanConstantBuffer(VulkanDevice* Device, std::string InName, const BufferLayout& InDesc, std::uint32_t InRootParameterIndex);
 
-	virtual ~VulkanConstantBuffer() = default;
+	virtual ~VulkanConstantBuffer();
 
-	FORCEINLINE virtual std::string GetName() const final override { return Name; };
+	FORCEINLINE virtual std::string GetName() const override final { return Name; };
 
+	VkBuffer GetBuffer() const { return Buffer; }
+	void* GetData() const { return pData; }
 	virtual void SetDefaultRootParameterIndex(std::uint32_t inRootParameterIndex) override final { RootParameterIndex = inRootParameterIndex; }
 	virtual std::uint32_t GetDefaultRootParameterIndex() const override final { return RootParameterIndex; }
 
-	virtual void Map(const void* Ptr, IGraphicsCommandContext* InCMDBuffer = nullptr) final override;
+	virtual void Map(const void* Ptr, IGraphicsCommandContext* InCMDBuffer = nullptr) override final;
+	void Unmap();
+
+	VkDescriptorBufferInfo DescriptorInfo;
+	std::uint32_t GetSize() const;
 };
 
 class VulkanVertexBuffer final : public IVertexBuffer
@@ -63,19 +96,29 @@ class VulkanVertexBuffer final : public IVertexBuffer
 	sClassBody(sClassConstructor, VulkanVertexBuffer, IVertexBuffer)
 private:
 	std::string Name;
+	VulkanDevice* Owner;
+	VkBuffer Buffer;
+	VkDeviceMemory Memory;
+	BufferLayout Desc;
+	VulkanUploadBuffer::UniquePtr UploadBuffer;
 
 public:
-	VulkanVertexBuffer(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource = nullptr)
-		: Name(InName)
-	{}
+	VulkanVertexBuffer(VulkanDevice* Device, std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource = nullptr);
 
-	virtual ~VulkanVertexBuffer() = default;
+	virtual ~VulkanVertexBuffer();
 
 	FORCEINLINE virtual std::string GetName() const final override { return Name; };
 
-	virtual std::size_t GetSize() const final override { return 0; }
-	virtual bool IsMapable() const final override { return false; }
-	virtual void UpdateSubresource(BufferSubresource* Subresource, IGraphicsCommandContext* InCMDBuffer = nullptr) final override;
+	VkBuffer GetBuffer() const { return Buffer; }
+	virtual std::size_t GetSize() const override final { return Desc.Size; }
+	std::size_t Stride() const { return Desc.Stride; }
+	virtual bool IsMapable() const override final { return false; }
+	virtual void UpdateSubresource(BufferSubresource* Subresource, IGraphicsCommandContext* InCMDBuffer = nullptr) override final;
+
+	bool bIsMapped;
+	void* pData;
+	void Map(const void* Ptr = nullptr, IGraphicsCommandContext* InCMDBuffer = nullptr);
+	void Unmap();
 };
 
 class VulkanIndexBuffer final : public IIndexBuffer
@@ -83,17 +126,50 @@ class VulkanIndexBuffer final : public IIndexBuffer
 	sClassBody(sClassConstructor, VulkanIndexBuffer, IIndexBuffer)
 private:
 	std::string Name;
+	VulkanDevice* Owner;
+	VkBuffer Buffer;
+	VkDeviceMemory Memory;
+	BufferLayout Desc;
+	VulkanUploadBuffer::UniquePtr UploadBuffer;
 
 public:
-	VulkanIndexBuffer(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource = nullptr)
-		: Name(InName)
-	{}
+	VulkanIndexBuffer(VulkanDevice* Device, std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource = nullptr);
 
-	virtual ~VulkanIndexBuffer() = default;
+	virtual ~VulkanIndexBuffer();
 
-	FORCEINLINE virtual std::string GetName() const final override { return Name; };
+	FORCEINLINE virtual std::string GetName() const override final { return Name; };
 
-	virtual std::size_t GetSize() const final override { return 0; }
-	virtual bool IsMapable() const final override { return false; }
-	virtual void UpdateSubresource(BufferSubresource* Subresource, IGraphicsCommandContext* InCMDBuffer = nullptr) final override;
+	VkBuffer GetBuffer() const { return Buffer; }
+	virtual std::size_t GetSize() const override final { return Desc.Size; }
+	virtual bool IsMapable() const override final { return false; }
+	virtual void UpdateSubresource(BufferSubresource* Subresource, IGraphicsCommandContext* InCMDBuffer = nullptr) override final;
+
+	bool bIsMapped;
+	void* pData;
+	void Map(const void* Ptr = nullptr, IGraphicsCommandContext* InCMDBuffer = nullptr);
+	void Unmap();
+};
+
+class VulkanUnorderedAccessBuffer final : public IUnorderedAccessBuffer
+{
+	sClassBody(sClassConstructor, VulkanUnorderedAccessBuffer, IUnorderedAccessBuffer)
+private:
+	std::string Name;
+
+public:
+	VulkanUnorderedAccessBuffer(VulkanDevice* InDevice, std::string InName, const BufferLayout& InDesc, bool bSRVAllowed = true);
+
+	virtual ~VulkanUnorderedAccessBuffer()
+	{
+
+	}
+
+	FORCEINLINE virtual std::string GetName() const override final { return Name; };
+
+	virtual bool IsSRV_Allowed() const { return false; }
+
+	VkBuffer GetBuffer() const { return VK_NULL_HANDLE; }
+	virtual std::size_t GetSize() const override final { return 0; }
+	virtual bool IsMapable() const override final { return false; }
+	virtual void Map(const void* Ptr, IGraphicsCommandContext* InCMDBuffer = nullptr) override final;
 };

@@ -46,15 +46,28 @@ public:
     void ApplyPipeline(ID3D12GraphicsCommandList* CommandList) const;
     virtual sPipelineDesc GetPipelineDesc() const  override final { return Desc; }
 
-    virtual void Recompile() override final;
+    virtual bool IsCompiled() const override final
+    {
+        return Compiled;
+    }
+
+    virtual bool Compile(IFrameBuffer* FrameBuffer = nullptr) override final;
+    virtual bool Compile(IRenderTarget* RT, IDepthTarget* Depth = nullptr) override final;
+    virtual bool Compile(std::vector<IRenderTarget*> RTs, IDepthTarget* Depth = nullptr) override final;
+
+    virtual bool Recompile() override final;
 
     ID3D12PipelineState* GetPSO() const { return PSO.Get(); };
+
+private:
+    void CompilePipeline();
 
 private:
     D3D12Device* Owner;
 
     std::string Name;
     sPipelineDesc Desc;
+    bool Compiled;
 
     D3D12_PRIMITIVE_TOPOLOGY PrimitiveTopologyType;
 
@@ -75,7 +88,7 @@ public:
 
     virtual sComputePipelineDesc GetPipelineDesc() const override final { return Desc; }
 
-    virtual void Recompile() override final;
+    virtual bool Recompile() override final;
 
     void ApplyPipeline(ID3D12GraphicsCommandList* CommandList) const;
 

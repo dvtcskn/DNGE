@@ -145,9 +145,24 @@ sMaterial::~sMaterial()
 	Pipeline = nullptr;
 }
 
-void sMaterial::RecompileProgram()
+bool sMaterial::Compile(IFrameBuffer* FrameBuffer)
 {
-	Pipeline->Recompile();
+	return Pipeline->Compile(FrameBuffer);
+}
+
+bool sMaterial::Compile(IRenderTarget* RT, IDepthTarget* Depth)
+{
+	return Pipeline->Compile(RT, Depth);
+}
+
+bool sMaterial::Compile(std::vector<IRenderTarget*> RTs, IDepthTarget* Depth)
+{
+	return Pipeline->Compile(RTs, Depth);
+}
+
+bool sMaterial::Recompile()
+{
+	return Pipeline->Recompile();
 }
 
 void sMaterial::ApplyMaterial(IGraphicsCommandContext* InCMDBuffer) const

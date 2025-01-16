@@ -44,7 +44,7 @@ sToneMapping::sToneMapping(std::size_t Width, std::size_t Height)
     const sShaderAttachment PostProcessShader = sShaderAttachment(FileManager::GetShaderFolderW() + L"Tonemapping.hlsl", "mainPS", eShaderType::Pixel);
     std::vector<sDescriptorSetLayoutBinding> DescriptorSetLayout;
     {
-        DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Pixel, 0));
+        DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Pixel, 13));
         DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eTexture, eShaderType::Pixel, 0));
         sSamplerAttributeDesc SamplerDesc;
         SamplerDesc.Filter = ESamplerFilter::ePoint;
@@ -67,7 +67,7 @@ sToneMapping::sToneMapping(std::size_t Width, std::size_t Height)
     {
         BufferLayout BufferDesc;
         BufferDesc.Size = sizeof(sToneMapping::sToneMappingConstants);
-        ToneMappingCB = IConstantBuffer::Create("ToneMappingCB", BufferDesc, 0);
+        ToneMappingCB = IConstantBuffer::Create("ToneMappingCB", BufferDesc, 0); // 13
 
         sToneMappingConstants ToneMappingConstants;
         ToneMappingConstants.exposure = 1.0f;

@@ -45,15 +45,15 @@ public:
 	}
 
 private:
-	//std::vector<ITexture2D::SharedPtr> Textures;
+	std::vector<IShader::SharedPtr> Shaders;
 
-	inline bool IsShaderExist(ITexture2D* Texture)
+	inline bool IsShaderExist(IShader* Shader)
 	{
-		/*for (const auto& pTexture : Textures)
+		for (const auto& pShader : Shaders)
 		{
-			if (Texture == pTexture.get())
+			if (Shader == pShader.get())
 				return true;
-		}*/
+		}
 		return false;
 	}
 
@@ -65,55 +65,147 @@ public:
 
 	inline void Destroy()
 	{
-		//for (auto& Texture : Textures)
-		//	Texture = nullptr;
-		//Textures.clear();
+		for (auto& Shader : Shaders)
+			Shader = nullptr;
+		Shaders.clear();
 	}
 
 	inline void DestroyShader(std::wstring Path, std::string Name)
 	{
-
+		std::vector<IShader::SharedPtr>::iterator it = Shaders.begin();
+		while (it != Shaders.end())
+		{
+			if ((*it))
+			{
+				if ((*it)->GetPath() == Path)
+				{
+					if ((*it)->GetName() == Name)
+					{
+						it = Shaders.erase(it);
+					}
+					else
+					{
+						it++;
+					}
+				}
+				else
+				{
+					it++;
+				}
+			}
+			else
+			{
+				it = Shaders.erase(it);
+			}
+		}
 	}
 	inline void DestroyShader(std::string Name)
 	{
-
+		std::vector<IShader::SharedPtr>::iterator it = Shaders.begin();
+		while (it != Shaders.end())
+		{
+			if ((*it))
+			{
+				if ((*it)->GetName() == Name)
+				{
+					it = Shaders.erase(it);
+				}
+				else
+				{
+					it++;
+				}
+			}
+			else
+			{
+				it = Shaders.erase(it);
+			}
+		}
 	}
 
 	inline bool IsShaderExist(std::wstring Path, std::string Name)
 	{
-
+		for (const auto& Shader : Shaders)
+		{
+			if (Shader->GetPath() == Path)
+			{
+				if (Shader->GetName() == Name)
+				{
+					return true;
+				}
+			}
+		}
 		return false;
 	}
 
 	inline bool IsShaderExist(std::string Name)
 	{
-
+		for (const auto& Shader : Shaders)
+		{
+			if (Shader->GetName() == Name)
+			{
+				return true;
+			}
+		}
 		return false;
 	}
 
-	inline bool StoreShader(const ITexture2D::SharedPtr& Texture)
+	inline bool StoreShader(const IShader::SharedPtr& Texture)
 	{
-
+		if (!IsShaderExist(Texture.get()))
+		{
+			Shaders.push_back(Texture);
+			return true;
+		}
 		return false;
 	}
-	inline ITexture2D* GetShader(std::wstring Path, std::string Name) const
+	inline IShader* GetShader(std::wstring Path, std::string Name) const
 	{
-
+		for (const auto& Shader : Shaders)
+		{
+			if (Shader->GetPath() == Path)
+			{
+				if (Shader->GetName() == Name)
+				{
+					return Shader.get();
+				}
+			}
+		}
 		return nullptr;
 	}
-	inline ITexture2D* GetShader(std::string Name) const
+	inline IShader* GetShader(std::string Name) const
 	{
-
+		for (const auto& Shader : Shaders)
+		{
+			if (Shader->GetName() == Name)
+			{
+				return Shader.get();
+			}
+		}
 		return nullptr;
 	}
-	inline ITexture2D::SharedPtr GetShaderAsShared(std::wstring Path, std::string Name) const
+	inline IShader::SharedPtr GetShaderAsShared(std::wstring Path, std::string Name) const
 	{
-
+		for (const auto& Shader : Shaders)
+		{
+			if (Shader->GetPath() == Path)
+			{
+				if (Shader->GetName() == Name)
+				{
+					return Shader;
+				}
+			}
+		}
 		return nullptr;
 	}
-	inline ITexture2D::SharedPtr GetShaderAsShared(std::string Name) const
+	inline IShader::SharedPtr GetShaderAsShared(std::string Name) const
 	{
-
+		for (const auto& Shader : Shaders)
+		{
+			if (Shader->GetName() == Name)
+			{
+				return Shader;
+			}
+		}
 		return nullptr;
 	}
 };

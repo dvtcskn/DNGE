@@ -38,21 +38,15 @@ __declspec(align(256)) struct OnScreenWidgetMatrix
 };
 static_assert((sizeof(OnScreenWidgetMatrix) % 256) == 0, "Constant Buffer size must be 256-byte aligned");
 
-sCanvasRenderer::sCanvasRenderer(std::size_t Width, std::size_t Height)
-	: Super()
-	, LastMaterial(nullptr)
-	, CMD(IGraphicsCommandContext::Create())
-	, bShowLines(false)
-	, bEnableStencilClipping(true)
-	, ScreenDimension(sScreenDimension(Width, Height))
+namespace
 {
-	std::string DepthTestVSShader = "														\
-							cbuffer UICBuffer : register(b0)						\
+	std::string DepthTestVSShader = "												\
+							cbuffer UICBuffer : register(b13)					\
 							{														\
 								matrix WidgetMatrix;								\
 							}														\
 																					\
-							float4 mainVS(float4 pos : POSITION) : SV_POSITION		\
+							float4 DepthTestVS(float4 pos : POSITION) : SV_POSITION		\
 							{														\
 								float4 position = float4(pos.xyz, 1.0f);			\
 								position = mul(position, WidgetMatrix);				\
@@ -68,8 +62,8 @@ sCanvasRenderer::sCanvasRenderer(std::size_t Width, std::size_t Height)
 								return float4(1.0f, 1.0f, 1.0f, 0.0f);				\
 							}";
 
-	std::string WidgetBaseVS = "															\
-							cbuffer UICBuffer : register(b0)						\
+	std::string WidgetMainVS = "															\
+							cbuffer UICBuffer : register(b13)						\
 							{														\
 								matrix WidgetMatrix;								\
 							};														\
@@ -88,7 +82,7 @@ sCanvasRenderer::sCanvasRenderer(std::size_t Width, std::size_t Height)
 								float4 Color : COLOR;								\
 							};														\
 																					\
-							GeometryVSOut GeometryVS(GeometryVSIn input)			\
+							GeometryVSOut WidgetMainVS(GeometryVSIn input)			\
 							{														\
 								GeometryVSOut output;								\
 																					\
@@ -131,6 +125,16 @@ sCanvasRenderer::sCanvasRenderer(std::size_t Width, std::size_t Height)
 							{															\
 								return float4(0.0f, 0.0f, 0.0f, 1.0f);					\
 							}";
+}
+
+sCanvasRenderer::sCanvasRenderer(std::size_t Width, std::size_t Height)
+	: Super()
+	, LastMaterial(nullptr)
+	, CMD(IGraphicsCommandContext::Create())
+	, bShowLines(false)
+	, bEnableStencilClipping(true)
+	, ScreenDimension(sScreenDimension(Width, Height))
+{
 	{
 		sPipelineDesc pPipelineDesc;
 		pPipelineDesc.BlendAttribute = sBlendAttributeDesc();
@@ -141,22 +145,18 @@ sCanvasRenderer::sCanvasRenderer(std::size_t Width, std::size_t Height)
 		pPipelineDesc.RasterizerAttribute.bEnableLineAA = true;
 		pPipelineDesc.RasterizerAttribute.CullMode = ERasterizerCullMode::eNone;
 
-		pPipelineDesc.NumRenderTargets = 1;
-		pPipelineDesc.RTVFormats[0] = EFormat::BGRA8_UNORM;
-		pPipelineDesc.DSVFormat = GPU::GetDefaultDepthFormat();
-
 		std::vector<sVertexAttributeDesc> VertexLayout =
 		{
-			{ "POSITION",	EFormat::RGBA32_FLOAT, 0,	offsetof(cbgui::cbGeometryVertexData, position),   false },
-			{ "TEXCOORD",	EFormat::RG32_FLOAT,   0,	offsetof(cbgui::cbGeometryVertexData, texCoord),   false },
-			{ "COLOR",		EFormat::RGBA32_FLOAT, 0,	offsetof(cbgui::cbGeometryVertexData, Color),	   false },
+			{ "POSITION",	EFormat::RGBA32_FLOAT, 0,	offsetof(cbgui::cbGeometryVertexData, position),   false, sizeof(cbgui::cbGeometryVertexData) },
+			{ "TEXCOORD",	EFormat::RG32_FLOAT,   0,	offsetof(cbgui::cbGeometryVertexData, texCoord),   false, sizeof(cbgui::cbGeometryVertexData) },
+			{ "COLOR",		EFormat::RGBA32_FLOAT, 0,	offsetof(cbgui::cbGeometryVertexData, Color),	   false, sizeof(cbgui::cbGeometryVertexData) },
 		};
 		pPipelineDesc.VertexLayout = VertexLayout;
 
-		pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Vertex, 0));
+		pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Vertex, 13));	// Model CB
 
 		std::vector<sShaderAttachment> ShaderAttachments;
-		pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment((void*)WidgetBaseVS.data(), WidgetBaseVS.length(), "GeometryVS", eShaderType::Vertex));
+		pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment((void*)WidgetMainVS.data(), WidgetMainVS.length(), "WidgetMainVS", eShaderType::Vertex));
 		pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment((void*)WidgetBasePS_FlatBlack.data(), WidgetBasePS_FlatBlack.length(), "WidgetFlatColorPS", eShaderType::Pixel));
 
 		DefaultUILineMaterial = sMaterial::Create("Line", EMaterialBlendMode::Opaque, pPipelineDesc);
@@ -203,16 +203,13 @@ sCanvasRenderer::sCanvasRenderer(std::size_t Width, std::size_t Height)
 
 		std::vector<sVertexAttributeDesc> VertexLayout =
 		{
-			{ "POSITION", EFormat::RGBA32_FLOAT, 0, 0, false },
+			{ "POSITION", EFormat::RGBA32_FLOAT, 0, 0, false, sizeof(cbgui::cbVector4) },
 		};
 		pPipelineDesc.VertexLayout = VertexLayout;
 
-		pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Vertex, 0));
+		pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Vertex, 13));	// Model CB
 
-		pPipelineDesc.NumRenderTargets = 0;
-		pPipelineDesc.DSVFormat = GPU::GetDefaultDepthFormat();
-
-		pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment((void*)DepthTestVSShader.data(), DepthTestVSShader.length(), "mainVS", eShaderType::Vertex));
+		pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment((void*)DepthTestVSShader.data(), DepthTestVSShader.length(), "DepthTestVS", eShaderType::Vertex));
 
 		DepthMainPipeline = IPipeline::CreateUnique("DepthMainPipeline", pPipelineDesc);
 	}
@@ -241,16 +238,13 @@ sCanvasRenderer::sCanvasRenderer(std::size_t Width, std::size_t Height)
 
 		std::vector<sVertexAttributeDesc> VertexLayout =
 		{
-			{ "POSITION", EFormat::RGBA32_FLOAT, 0, 0, false },
+			{ "POSITION", EFormat::RGBA32_FLOAT, 0, 0, false, sizeof(cbgui::cbVector4) },
 		};
 		pPipelineDesc.VertexLayout = VertexLayout;
 
-		pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Vertex, 0));
+		pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Vertex, 13)); // Model CB
 
-		pPipelineDesc.NumRenderTargets = 0;
-		pPipelineDesc.DSVFormat = GPU::GetDefaultDepthFormat();
-
-		pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment((void*)DepthTestVSShader.data(), DepthTestVSShader.length(), "mainVS", eShaderType::Vertex));
+		pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment((void*)DepthTestVSShader.data(), DepthTestVSShader.length(), "DepthTestVS", eShaderType::Vertex));
 
 		DepthPipeline = IPipeline::CreateUnique("DepthPipeline", pPipelineDesc);
 	}
@@ -265,7 +259,7 @@ sCanvasRenderer::sCanvasRenderer(std::size_t Width, std::size_t Height)
 	{
 		BufferLayout BufferDesc;
 		BufferDesc.Size = sizeof(OnScreenWidgetMatrix);
-		WidgetConstantBuffer = IConstantBuffer::Create("DepthTest", BufferDesc, 0);
+		WidgetConstantBuffer = IConstantBuffer::Create("DepthTest", BufferDesc, 0); // 0
 
 		OnScreenWidgetMatrix WidgetMatrix;
 		WidgetMatrix.Matrix = (FMatrix&)cbgui::GetViewportTransform((int)ScreenDimension.Width, (int)ScreenDimension.Height);
@@ -304,15 +298,15 @@ void sCanvasRenderer::Render(ICanvas* Canvas, IRenderTarget* pFB, std::optional<
 	std::vector<ICanvas::WidgetHierarchy*> DrawLatest;
 	std::vector<ICanvas::WidgetHierarchy*> LastInTheHierarchy;
 
-	std::function<void(IVertexBuffer*, IIndexBuffer*, ICanvas::WidgetHierarchy*, std::optional<cbgui::cbIntBounds>, const sViewport&, const eZOrderMode&)> fDraw;
-	fDraw = [&](IVertexBuffer* VertexBuffer, IIndexBuffer* IndexBuffer, ICanvas::WidgetHierarchy* Node, std::optional<cbgui::cbIntBounds> ScissorsRect, const sViewport& VP, const eZOrderMode& Mode) -> void
+	std::function<void(IRenderTarget* pFB, IVertexBuffer*, IIndexBuffer*, ICanvas::WidgetHierarchy*, std::optional<cbgui::cbIntBounds>, const sViewport&, const eZOrderMode&)> fDraw;
+	fDraw = [&](IRenderTarget* pFB, IVertexBuffer* VertexBuffer, IIndexBuffer* IndexBuffer, ICanvas::WidgetHierarchy* Node, std::optional<cbgui::cbIntBounds> ScissorsRect, const sViewport& VP, const eZOrderMode& Mode) -> void
 		{
 			if (!Node->Widget->IsVisible())
 				return;
 
 			//const cbgui::cbIntBounds& Bounds(ScissorsRect.has_value() ? *ScissorsRect : Node->Widget->GetBounds());
 
-			Draw(VertexBuffer, IndexBuffer, Node, Node->Widget->GetCulledBounds()/*Bounds,*/, VP);
+			Draw(pFB, VertexBuffer, IndexBuffer, Node, Node->Widget->GetCulledBounds()/*Bounds,*/, VP);
 
 			for (const auto& pChild : Node->Nodes)
 			{
@@ -330,7 +324,7 @@ void sCanvasRenderer::Render(ICanvas* Canvas, IRenderTarget* pFB, std::optional<
 					LastInTheHierarchy.push_back(pChild);
 					continue;
 				}
-				fDraw(VertexBuffer, IndexBuffer, pChild, std::nullopt,/*cbIntBounds(pChild->Widget->GetBounds()).Crop(Bounds),*/ VP, Mode);
+				fDraw(pFB, VertexBuffer, IndexBuffer, pChild, std::nullopt,/*cbIntBounds(pChild->Widget->GetBounds()).Crop(Bounds),*/ VP, Mode);
 			}
 		};
 
@@ -343,6 +337,12 @@ void sCanvasRenderer::Render(ICanvas* Canvas, IRenderTarget* pFB, std::optional<
 
 		CMD->ClearDepthTarget(Depth.get());
 		CMD->SetRenderTarget(pFB, Depth.get());
+
+		if (!DepthMainPipeline->IsCompiled())
+			DepthMainPipeline->Compile(pFB, Depth.get());
+
+		if (!DepthPipeline->IsCompiled())
+			DepthPipeline->Compile(pFB, Depth.get());
 
 		{
 			IVertexBuffer* VertexBuffer = Canvas->GetVertexBuffer();
@@ -365,13 +365,13 @@ void sCanvasRenderer::Render(ICanvas* Canvas, IRenderTarget* pFB, std::optional<
 						DrawLatest.push_back(Widget);
 						continue;
 					}
-					fDraw(VertexBuffer, IndexBuffer, Widget, std::nullopt, CanvasViewport, eZOrderMode::InOrder);
+					fDraw(pFB, VertexBuffer, IndexBuffer, Widget, std::nullopt, CanvasViewport, eZOrderMode::InOrder);
 
 					if (LastInTheHierarchy.size() > 0)
 					{
 						for (auto& pWidget : LastInTheHierarchy)
 						{
-							fDraw(VertexBuffer, IndexBuffer, pWidget, std::nullopt /*pWidget->Widget->GetCulledBounds()*/, CanvasViewport, eZOrderMode::LastInTheHierarchy);
+							fDraw(pFB, VertexBuffer, IndexBuffer, pWidget, std::nullopt /*pWidget->Widget->GetCulledBounds()*/, CanvasViewport, eZOrderMode::LastInTheHierarchy);
 						}
 						LastInTheHierarchy.clear();
 					}
@@ -390,7 +390,7 @@ void sCanvasRenderer::Render(ICanvas* Canvas, IRenderTarget* pFB, std::optional<
 			{
 				for (auto& Widget : DrawLatest)
 				{
-					fDraw(VertexBuffer, IndexBuffer, Widget, std::nullopt /*pWidget->Widget->GetCulledBounds()*/, CanvasViewport, eZOrderMode::Latest);
+					fDraw(pFB, VertexBuffer, IndexBuffer, Widget, std::nullopt /*pWidget->Widget->GetCulledBounds()*/, CanvasViewport, eZOrderMode::Latest);
 				}
 				DrawLatest.clear();
 			}
@@ -409,35 +409,35 @@ void sCanvasRenderer::Render(const std::vector<ICanvas*>& Canvases, IRenderTarge
 	std::vector<ICanvas::WidgetHierarchy*> DrawLatest;
 	std::vector<ICanvas::WidgetHierarchy*> LastInTheHierarchy;
 
-	std::function<void(IVertexBuffer*, IIndexBuffer*, ICanvas::WidgetHierarchy*, std::optional<cbgui::cbIntBounds>, const sViewport&, const eZOrderMode&)> fDraw;
-	fDraw = [&](IVertexBuffer* VertexBuffer, IIndexBuffer* IndexBuffer, ICanvas::WidgetHierarchy* Node, std::optional<cbgui::cbIntBounds> ScissorsRect, const sViewport& VP, const eZOrderMode& Mode) -> void
-	{
-		if (!Node->Widget->IsVisible())
-			return;
-
-		//const cbgui::cbIntBounds& Bounds(ScissorsRect.has_value() ? *ScissorsRect : Node->Widget->GetBounds());
-
-		Draw(VertexBuffer, IndexBuffer, Node, Node->Widget->GetCulledBounds()/*Bounds,*/, VP);
-
-		for (const auto& pChild : Node->Nodes)
+	std::function<void(IRenderTarget* pFB, IVertexBuffer*, IIndexBuffer*, ICanvas::WidgetHierarchy*, std::optional<cbgui::cbIntBounds>, const sViewport&, const eZOrderMode&)> fDraw;
+	fDraw = [&](IRenderTarget* pFB, IVertexBuffer* VertexBuffer, IIndexBuffer* IndexBuffer, ICanvas::WidgetHierarchy* Node, std::optional<cbgui::cbIntBounds> ScissorsRect, const sViewport& VP, const eZOrderMode& Mode) -> void
 		{
-			if (!pChild->Widget->IsVisible())
+			if (!Node->Widget->IsVisible())
+				return;
+
+			//const cbgui::cbIntBounds& Bounds(ScissorsRect.has_value() ? *ScissorsRect : Node->Widget->GetBounds());
+
+			Draw(pFB, VertexBuffer, IndexBuffer, Node, Node->Widget->GetCulledBounds()/*Bounds,*/, VP);
+
+			for (const auto& pChild : Node->Nodes)
 			{
-				continue;
+				if (!pChild->Widget->IsVisible())
+				{
+					continue;
+				}
+				if (Mode == eZOrderMode::InOrder && pChild->Widget->GetZOrderMode() == eZOrderMode::Latest)
+				{
+					DrawLatest.push_back(pChild);
+					continue;
+				}
+				else if (Mode == eZOrderMode::InOrder && pChild->Widget->GetZOrderMode() == eZOrderMode::LastInTheHierarchy)
+				{
+					LastInTheHierarchy.push_back(pChild);
+					continue;
+				}
+				fDraw(pFB, VertexBuffer, IndexBuffer, pChild, std::nullopt,/*cbIntBounds(pChild->Widget->GetBounds()).Crop(Bounds),*/ VP, Mode);
 			}
-			if (Mode == eZOrderMode::InOrder && pChild->Widget->GetZOrderMode() == eZOrderMode::Latest)
-			{
-				DrawLatest.push_back(pChild);
-				continue;
-			}
-			else if (Mode == eZOrderMode::InOrder && pChild->Widget->GetZOrderMode() == eZOrderMode::LastInTheHierarchy)
-			{
-				LastInTheHierarchy.push_back(pChild);
-				continue;
-			}
-			fDraw(VertexBuffer, IndexBuffer, pChild, std::nullopt,/*cbIntBounds(pChild->Widget->GetBounds()).Crop(Bounds),*/ VP, Mode);
-		}
-	};
+		};
 
 	{
 		CMD->BeginRecordCommandList(ERenderPass::eUI);
@@ -448,6 +448,12 @@ void sCanvasRenderer::Render(const std::vector<ICanvas*>& Canvases, IRenderTarge
 
 		CMD->ClearDepthTarget(Depth.get());
 		CMD->SetRenderTarget(pFB, Depth.get());
+
+		if (!DepthMainPipeline->IsCompiled())
+			DepthMainPipeline->Compile(pFB, Depth.get());
+
+		if (!DepthPipeline->IsCompiled())
+			DepthPipeline->Compile(pFB, Depth.get());
 
 		for (const auto& Canvas : Canvases)
 		{
@@ -471,13 +477,13 @@ void sCanvasRenderer::Render(const std::vector<ICanvas*>& Canvases, IRenderTarge
 						DrawLatest.push_back(Widget);
 						continue;
 					}
-					fDraw(VertexBuffer, IndexBuffer, Widget, std::nullopt, CanvasViewport, eZOrderMode::InOrder);
+					fDraw(pFB, VertexBuffer, IndexBuffer, Widget, std::nullopt, CanvasViewport, eZOrderMode::InOrder);
 
 					if (LastInTheHierarchy.size() > 0)
 					{
 						for (auto& pWidget : LastInTheHierarchy)
 						{
-							fDraw(VertexBuffer, IndexBuffer, pWidget, std::nullopt /*pWidget->Widget->GetCulledBounds()*/, CanvasViewport, eZOrderMode::LastInTheHierarchy);
+							fDraw(pFB, VertexBuffer, IndexBuffer, pWidget, std::nullopt /*pWidget->Widget->GetCulledBounds()*/, CanvasViewport, eZOrderMode::LastInTheHierarchy);
 						}
 						LastInTheHierarchy.clear();
 					}
@@ -496,7 +502,7 @@ void sCanvasRenderer::Render(const std::vector<ICanvas*>& Canvases, IRenderTarge
 			{
 				for (auto& Widget : DrawLatest)
 				{
-					fDraw(VertexBuffer, IndexBuffer, Widget, std::nullopt /*pWidget->Widget->GetCulledBounds()*/, CanvasViewport, eZOrderMode::Latest);
+					fDraw(pFB, VertexBuffer, IndexBuffer, Widget, std::nullopt /*pWidget->Widget->GetCulledBounds()*/, CanvasViewport, eZOrderMode::Latest);
 				}
 				DrawLatest.clear();
 			}
@@ -508,7 +514,7 @@ void sCanvasRenderer::Render(const std::vector<ICanvas*>& Canvases, IRenderTarge
 	LastMaterial = nullptr;
 }
 
-void sCanvasRenderer::Draw(IVertexBuffer* VertexBuffer, IIndexBuffer* IndexBuffer, ICanvas::WidgetHierarchy* Node, const cbgui::cbIntBounds& ScissorsRect, const sViewport& VP)
+void sCanvasRenderer::Draw(IRenderTarget* pFB, IVertexBuffer* VertexBuffer, IIndexBuffer* IndexBuffer, ICanvas::WidgetHierarchy* Node, const cbgui::cbIntBounds& ScissorsRect, const sViewport& VP)
 {
 	if (Node->Widget->HasGeometry())
 	{
@@ -520,9 +526,9 @@ void sCanvasRenderer::Draw(IVertexBuffer* VertexBuffer, IIndexBuffer* IndexBuffe
 			std::uint32_t X = (std::uint32_t)ScreenDimension.Width / VP.Width;
 			std::uint32_t Y = (std::uint32_t)ScreenDimension.Height / VP.Height;
 			CMD->SetScissorRect((std::uint32_t)VP.TopLeftY + (std::uint32_t)ScissorsRect.GetTop() / Y,
-								(std::uint32_t)VP.TopLeftX + (std::uint32_t)ScissorsRect.GetLeft() / X,
-								(std::uint32_t)VP.TopLeftY + (std::uint32_t)ScissorsRect.GetBottom() / Y, 
-								(std::uint32_t)VP.TopLeftX + (std::uint32_t)ScissorsRect.GetRight() / X);
+				(std::uint32_t)VP.TopLeftX + (std::uint32_t)ScissorsRect.GetLeft() / X,
+				(std::uint32_t)VP.TopLeftY + (std::uint32_t)ScissorsRect.GetBottom() / Y,
+				(std::uint32_t)VP.TopLeftX + (std::uint32_t)ScissorsRect.GetRight() / X);
 		}
 		else
 		{
@@ -534,6 +540,9 @@ void sCanvasRenderer::Draw(IVertexBuffer* VertexBuffer, IIndexBuffer* IndexBuffe
 		const auto& GeometryDrawData = Node->Widget->GetGeometryDrawData();
 		const auto& pMat = Node->MaterialStyle;
 		const auto& pMaterialInstace = pMat->GetMaterial(GeometryDrawData.StyleState)->Material;
+		if (!pMaterialInstace->IsCompiled())
+			pMaterialInstace->Compile(pFB, Depth.get());
+
 		sMaterial* pMaterial = pMaterialInstace->GetParent();
 		if (LastMaterial != pMaterial)
 		{
@@ -598,6 +607,9 @@ void sCanvasRenderer::Draw(IVertexBuffer* VertexBuffer, IIndexBuffer* IndexBuffe
 			return;
 
 		const auto pMaterialInstace = DefaultLineColorMatStyle->GetMaterial(GeometryDrawData.StyleState)->Material;
+		if (!pMaterialInstace->IsCompiled())
+			pMaterialInstace->Compile(pFB, Depth.get());
+
 		sMaterial* pMaterial = pMaterialInstace->GetParent();
 		if (LastMaterial != pMaterial)
 		{
@@ -649,6 +661,7 @@ bool sCanvasRenderer::DepthPass(cbgui::cbWidgetObj* Widget, const sViewport& VP)
 		CMD->SetConstantBuffer(WidgetConstantBuffer.get());
 		CMD->SetScissorRect(0, 0, (std::uint32_t)VP.Height, (std::uint32_t)VP.Width);
 		CMD->SetPipeline(DepthMainPipeline.get());
+
 		CMD->Draw(4);
 	}
 	{

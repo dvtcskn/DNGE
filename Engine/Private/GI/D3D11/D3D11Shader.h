@@ -31,49 +31,133 @@
 #include <vector>
 #include "Engine/AbstractEngine.h"
 
+#include "D3D11ShaderStates.h"
+
 #include <wrl\client.h>
 using namespace Microsoft::WRL;
 
 #include <d3dcompiler.h>
 #pragma comment( lib, "d3dcompiler.lib")
 
-class D3D11Shader final
+class D3D11CompiledShader : public IShader
 {
-	sBaseClassBody(sClassConstructor, D3D11Shader)
-private:
-	ComPtr<ID3D11DeviceChild> Shader;
-	eShaderType ShaderType;
-	ComPtr<ID3DBlob> ByteCode;
-	D3D11Device* Owner;
-	std::string FunctionName;
-
+	sClassBody(sClassConstructor, D3D11CompiledShader, IShader)
 public:
-	using SharedPtr = std::shared_ptr<D3D11Shader>;
-
-	D3D11Shader(D3D11Device* InDevice, const sShaderAttachment& Attachment);
-	D3D11Shader(D3D11Device* InDevice, std::wstring InSrcFile, std::string InFunctionName, eShaderType InProfile, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>());
-	D3D11Shader(D3D11Device* InDevice, const void* InCode, std::size_t Size, std::string InFunctionName, eShaderType InProfile, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>());
-
-	virtual ~D3D11Shader() 
+	D3D11CompiledShader(D3D11Device* InDevice, std::string InName, std::wstring InPath, eShaderType Type, ComPtr<ID3DBlob> InByteCode)
+		: Owner(InDevice)
+		, Name(InName)
+		, Path(InPath)
+		, ShaderType(Type)
+		, ByteCode(InByteCode)
+		, Shader(nullptr)
+		, bIsCompiled(false)
 	{
-		if (ByteCode)
-			ByteCode = nullptr;
-		Owner  = nullptr;
-		Shader = nullptr;
 	}
 
-	void CreateShader();
-	void CreatePixelShader();
-	void CreateVertexShader();
-	void CreateHullShader();
-	void CreateDomainShader();
-	void CreateGeometryShader();
-	void CreateComputeShader();
+	virtual ~D3D11CompiledShader()
+	{
+		Shader = nullptr;
+		ByteCode = nullptr;
+	}
 
-	FORCEINLINE ComPtr<ID3D11DeviceChild> GetShaderResources() { return Shader; }
-	FORCEINLINE ComPtr<ID3DBlob> GetByteCode() { return ByteCode; }
+	void CreateD3D11Shader()
+	{
+		if (bIsCompiled)
+			return;
+
+		switch (ShaderType)
+		{
+		case eShaderType::Vertex:
+		{
+			ID3D11VertexShader* VShader;
+			Owner->GetDevice()->CreateVertexShader(ByteCode->GetBufferPointer(), ByteCode->GetBufferSize(), NULL, &VShader);
+			Shader = VShader;
+			bIsCompiled = true;
+			break;
+		}
+		case eShaderType::HULL:
+		{
+			ID3D11HullShader* HShader;
+			Owner->GetDevice()->CreateHullShader(ByteCode->GetBufferPointer(), ByteCode->GetBufferSize(), NULL, &HShader);
+			Shader = HShader;
+			bIsCompiled = true;
+			break;
+		}
+		case eShaderType::Domain:
+		{
+			ID3D11DomainShader* DShader;
+			Owner->GetDevice()->CreateDomainShader(ByteCode->GetBufferPointer(), ByteCode->GetBufferSize(), NULL, &DShader);
+			Shader = DShader;
+			bIsCompiled = true;
+			break;
+		}
+		case eShaderType::Pixel:
+		{
+			ID3D11PixelShader* PShader;
+			Owner->GetDevice()->CreatePixelShader(ByteCode->GetBufferPointer(), ByteCode->GetBufferSize(), NULL, &PShader);
+			Shader = PShader;
+			bIsCompiled = true;
+			break;
+		}
+		case eShaderType::Geometry:
+		{
+			ID3D11GeometryShader* GShader;
+			Owner->GetDevice()->CreateGeometryShader(ByteCode->GetBufferPointer(), ByteCode->GetBufferSize(), NULL, &GShader);
+			Shader = GShader;
+			bIsCompiled = true;
+			break;
+		}
+		case eShaderType::Compute:
+		{
+			ID3D11ComputeShader* CShader;
+			Owner->GetDevice()->CreateComputeShader(ByteCode->GetBufferPointer(), ByteCode->GetBufferSize(), NULL, &CShader);
+			Shader = CShader;
+			bIsCompiled = true;
+			break;
+		}
+		}
+	}
+
+	virtual std::string GetName() const override final { return Name; }
+	virtual std::wstring GetPath() const override final { return Path; }
+	virtual eShaderType Type() const override final { return ShaderType; }
+	virtual void* GetByteCode() const override final { return ByteCode->GetBufferPointer(); }
+	virtual std::uint32_t GetByteCodeSize() const override final { return ByteCode->GetBufferSize(); }
+
+	FORCEINLINE ID3DBlob* GetD3DByteCode() { return ByteCode.Get(); }
+
+	ComPtr<ID3D11DeviceChild> GetShader() const { return Shader; }
+
+	bool IsCompiled() const { return bIsCompiled; }
 
 private:
-	void CompileShaderFromFile(std::wstring InSrcFile, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>());
-	void CompileShader(const void* InCode, std::size_t Size, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>());
+	D3D11Device* Owner;
+	std::string Name;
+	std::wstring Path;
+	eShaderType ShaderType;
+	ComPtr<ID3DBlob> ByteCode;
+	ComPtr<ID3D11DeviceChild> Shader;
+	bool bIsCompiled;
+};
+
+class D3D11ShaderCompiler final
+{
+	sBaseClassBody(sClassConstructor, D3D11ShaderCompiler)
+private:
+	D3D11Device* Owner;
+
+public:
+	D3D11ShaderCompiler(D3D11Device* InDevice);
+	IShader::SharedPtr Compile(const sShaderAttachment& Attachment);
+	IShader::SharedPtr Compile(std::wstring InSrcFile, std::string InFunctionName, eShaderType InProfile, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>());
+	IShader::SharedPtr Compile(const void* InCode, std::size_t Size, std::string InFunctionName, eShaderType InProfile, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>());
+
+	virtual ~D3D11ShaderCompiler() 
+	{
+		Owner  = nullptr;
+	}
+
+private:
+	IShader::SharedPtr CompileShaderFromFile(std::wstring InSrcFile, std::string InFunctionName, eShaderType InProfile, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>());
+	IShader::SharedPtr CompileShader(const void* InCode, std::size_t Size, std::wstring InSrcFile, std::string InFunctionName, eShaderType InProfile, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>());
 };

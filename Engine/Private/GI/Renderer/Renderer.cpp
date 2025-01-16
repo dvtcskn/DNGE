@@ -44,7 +44,7 @@ public:
 	{
 		BufferLayout BufferDesc;
 		BufferDesc.Size = sizeof(sTimeBuffer);
-		TimeCB = IConstantBuffer::Create("TimeCB", BufferDesc, GPU::GetGBufferTextureEntryPoint() + GPU::GetGBufferTextureSize());
+		TimeCB = IConstantBuffer::Create("TimeCB", BufferDesc, 2/* GPU::GetGBufferTextureEntryPoint() + GPU::GetGBufferTextureSize()*/); // 2
 
 		{
 			sFrameBufferAttachmentInfo AttachmentInfo;
@@ -63,39 +63,37 @@ public:
 			pPipelineDesc.PrimitiveTopologyType = EPrimitiveType::eTRIANGLE_LIST;
 			pPipelineDesc.RasterizerAttribute = sRasterizerAttributeDesc();
 
-			pPipelineDesc.NumRenderTargets = 1;
-			pPipelineDesc.RTVFormats[0] = EFormat::BGRA8_UNORM;
-			pPipelineDesc.DSVFormat = GPU::GetDefaultDepthFormat();
-
 			std::vector<sVertexAttributeDesc> VertexLayout =
 			{
-				{ "POSITION",	EFormat::RGB32_FLOAT,   0, offsetof(sVertexLayout, position),    false },
-				{ "NORMAL",		EFormat::RGB32_FLOAT,   0, offsetof(sVertexLayout, normal),      false },
-				{ "TEXCOORD",	EFormat::RG32_FLOAT,    0, offsetof(sVertexLayout, texCoord),    false },
-				{ "COLOR",		EFormat::RGBA32_FLOAT,  0, offsetof(sVertexLayout, Color),		  false },
-				{ "TANGENT",	EFormat::RGB32_FLOAT,   0, offsetof(sVertexLayout, tangent),     false },
-				{ "BINORMAL",	EFormat::RGB32_FLOAT,   0, offsetof(sVertexLayout, binormal),    false },
-				{ "ARRAYINDEX",	EFormat::R32_UINT,	    0, offsetof(sVertexLayout, ArrayIndex),  false },
+				{ "POSITION",	EFormat::RGB32_FLOAT,   0, offsetof(sVertexLayout, position),    false, sizeof(sVertexLayout) },
+				{ "NORMAL",		EFormat::RGB32_FLOAT,   0, offsetof(sVertexLayout, normal),      false, sizeof(sVertexLayout) },
+				{ "TEXCOORD",	EFormat::RG32_FLOAT,    0, offsetof(sVertexLayout, texCoord),    false, sizeof(sVertexLayout) },
+				{ "COLOR",		EFormat::RGBA32_FLOAT,  0, offsetof(sVertexLayout, Color),		 false, sizeof(sVertexLayout) },
+				{ "TANGENT",	EFormat::RGB32_FLOAT,   0, offsetof(sVertexLayout, tangent),     false, sizeof(sVertexLayout) },
+				{ "BINORMAL",	EFormat::RGB32_FLOAT,   0, offsetof(sVertexLayout, binormal),    false, sizeof(sVertexLayout) },
+				{ "ARRAYINDEX",	EFormat::R32_UINT,	    0, offsetof(sVertexLayout, ArrayIndex),  false, sizeof(sVertexLayout) },
 			};
 			pPipelineDesc.VertexLayout = VertexLayout;
 
-			pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Vertex, 0));
-			pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Vertex, 10));
+			pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Vertex, 13));	// Model CB 0
+			pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Vertex, 12));
+			pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Pixel, 11));	// 0
 			pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eTexture, eShaderType::Pixel, 0));
+
 			pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eSampler, eShaderType::Pixel, 0));
-			pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Pixel, 11));
 
 			pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment(FileManager::GetShaderFolderW() + L"GBufferVS.hlsl", "GeometryVS", eShaderType::Vertex));
 			pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment(FileManager::GetShaderFolderW() + L"GBufferPS.hlsl", "GeometryPS", eShaderType::Pixel));
 
 			DefaultEngineMat = sMaterial::Create("DefaultEngineMat", EMaterialBlendMode::Opaque, pPipelineDesc);
+			DefaultEngineMat->Compile(GBuffer.get());
 			//DefaultEngineMat->BindConstantBuffer(CameraCB);
 		}
-		DefaultMatInstance = DefaultEngineMat->CreateInstance("DefaultEngineMatInstance");
 
+		DefaultMatInstance = DefaultEngineMat->CreateInstance("DefaultEngineMatInstance");
 		if (FileManager::fileExists(FileManager::GetTextureFolderW() + L"DefaultWhiteGrid.DDS"))
 		{
-			DefaultMatInstance->AddTexture(FileManager::GetTextureFolderW() + L"DefaultWhiteGrid.DDS", "DefaultEngineTexture", 2);
+			//DefaultMatInstance->AddTexture(FileManager::GetTextureFolderW() + L"DefaultWhiteGrid.DDS", "DefaultEngineTexture", 3);
 			//MatInstance->AddTexture(L"..//Content\\Textures\\bfn.DDS", 3);
 		}
 	}
@@ -148,6 +146,9 @@ public:
 				const auto& pMaterialInstace = Mesh->GetMaterialInstance();
 				if (pMaterialInstace)
 				{
+					if (!pMaterialInstace->IsCompiled())
+						pMaterialInstace->Compile(GBuffer.get());
+
 					sMaterial* pMaterial = pMaterialInstace->GetParent();
 					if (BlendMode == EMaterialBlendMode::Opaque && pMaterial->BlendMode == EMaterialBlendMode::Masked)
 					{
@@ -167,6 +168,9 @@ public:
 				{
 					if (LastMaterial != DefaultEngineMat.get())
 					{
+						if (!DefaultEngineMat->IsCompiled())
+							DefaultEngineMat->Compile(GBuffer.get());
+
 						LastMaterial = DefaultEngineMat.get();
 						LastMaterial->ApplyMaterial(CMD);
 					}
@@ -184,9 +188,9 @@ public:
 
 					CMD->SetConstantBuffer(CameraCBs[index].get());
 					CMD->SetConstantBuffer(Mesh->GetMeshConstantBuffer());
+					CMD->SetConstantBuffer(TimeCB.get());
 					for (std::size_t i = 0; i < Mesh->GetSecondaryConstantBufferCount(); i++)
 						CMD->SetConstantBuffer(Mesh->GetSecondaryConstantBuffer(i));
-					CMD->SetConstantBuffer(TimeCB.get());
 
 					CMD->DrawIndexedInstanced(Mesh->GetDrawParameters());
 				}
@@ -293,7 +297,7 @@ public:
 		{
 			BufferLayout BufferDesc;
 			BufferDesc.Size = sizeof(sCameraBuffer);
-			IConstantBuffer::SharedPtr CameraCB = IConstantBuffer::Create("CameraCB_" + std::to_string(CameraCBs.size()), BufferDesc, 0);
+			IConstantBuffer::SharedPtr CameraCB = IConstantBuffer::Create("CameraCB_" + std::to_string(CameraCBs.size()), BufferDesc, 0); // 0
 			CameraCBs.push_back(CameraCB);
 		}
 	}
@@ -477,12 +481,16 @@ IMetaWorld* sRenderer::GetMetaWorld() const
 	return World;
 }
 
+void sRenderer::BeginFrame()
+{
+}
+
 void sRenderer::Render()
 {
 	if (!World)
 		return;
 
-	if (GBufferClearMode == EGBufferClear::Driver/* || GBufferClearMode == EGBufferClear::Sky*/)
+	if (GBufferClearMode == EGBufferClear::Driver || GBufferClearMode == EGBufferClear::Sky)
 	{
 		GBuffer->ClearGBuffer();
 	}
@@ -519,7 +527,8 @@ void sRenderer::Render()
 
 			FinalRenderTarget = GBuffer->Render(World->GetActiveLevel(), i, ViewportInstance->pCamera.get(), ViewportInstance->Viewport);
 			LineRenderer->Render(FinalRenderTarget, GBuffer->GetCameraConstantBuffer(i), ViewportInstance->pCamera.get(), ViewportInstance->Viewport);
-			pParticleRenderer->Render(World->GetActiveLevel(), ViewportInstance->pCamera.get(), FinalRenderTarget, ViewportInstance->Viewport);
+			if (GPU::GetGIType() != EGITypes::eVulkan)
+				pParticleRenderer->Render(World->GetActiveLevel(), ViewportInstance->pCamera.get(), FinalRenderTarget, ViewportInstance->Viewport);
 		}
 	}
 	{
@@ -542,6 +551,9 @@ void sRenderer::Render()
 		PostProcessRenderer->Render(ToneMapping.get(), FinalRenderTarget, std::nullopt);
 		FinalRenderTarget = ToneMapping->GetFrameBuffer();
 	}
+
+	if (GPU::GetGIType() == EGITypes::eVulkan)
+		return;
 
 	for (const auto& PP : PostProcess[EPostProcessRenderOrder::AfterTonemap])
 	{

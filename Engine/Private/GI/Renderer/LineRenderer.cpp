@@ -49,20 +49,17 @@ sLineRenderer::sLineRenderer(std::size_t Width, std::size_t Height)
 	pPipelineDesc.RasterizerAttribute.bEnableLineAA = true;
 	pPipelineDesc.RasterizerAttribute.CullMode = ERasterizerCullMode::eNone;
 
-	pPipelineDesc.NumRenderTargets = 1;
-	pPipelineDesc.RTVFormats[0] = EFormat::BGRA8_UNORM;
-	//pPipelineDesc.DSVFormat = EFormat::R32G8X24_Typeless;
-
 	std::vector<sVertexAttributeDesc> VertexLayout =
 	{
-		{ "POSITION",	EFormat::RGB32_FLOAT,   0, offsetof(sLineVertexBufferEntry, position),    false },
-		{ "COLOR",		EFormat::RGBA32_FLOAT,  0, offsetof(sLineVertexBufferEntry, Color),       false },
+		{ "POSITION",	EFormat::RGB32_FLOAT,   0, offsetof(sLineVertexBufferEntry, position),    false, sizeof(sLineVertexBufferEntry) },
+		{ "COLOR",		EFormat::RGBA32_FLOAT,  0, offsetof(sLineVertexBufferEntry, Color),       false, sizeof(sLineVertexBufferEntry) },
 	};
 	pPipelineDesc.VertexLayout = VertexLayout;
 
-	pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Vertex, 0));
+	pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Vertex, 13));	// Model CB
 	//pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Vertex, 10));
 
+	std::vector<sShaderAttachment> ShaderAttachments;
 	pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment(FileManager::GetShaderFolderW() + L"GBufferVS.hlsl", "GeometryVSLine", eShaderType::Vertex));
 	pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment(FileManager::GetShaderFolderW() + L"GBufferPS.hlsl", "LineGeometryFlatPS", eShaderType::Pixel));
 
@@ -229,6 +226,9 @@ void sLineRenderer::Render(IRenderTarget* BackBuffer, IConstantBuffer* CameraCB,
 
 	GraphicsCommandContext->SetScissorRect(0, 0, (std::uint32_t)ScreenDimension.Height, (std::uint32_t)ScreenDimension.Width);
 
+	if (!DefaultEngineMat->IsCompiled())
+		DefaultEngineMat->Compile();
+
 	DefaultEngineMat->ApplyMaterial(GraphicsCommandContext.get());
 	DefaultMatInstance->ApplyMaterialInstance(GraphicsCommandContext.get());
 
@@ -259,6 +259,9 @@ void sLineRenderer::Render(IGraphicsCommandContext* CMD, bool Exec, IRenderTarge
 		CMD->SetViewport(sViewport(ScreenDimension));
 
 	CMD->SetScissorRect(0, 0, (std::uint32_t)ScreenDimension.Height, (std::uint32_t)ScreenDimension.Width);
+
+	if (!DefaultEngineMat->IsCompiled())
+		DefaultEngineMat->Compile();
 
 	DefaultEngineMat->ApplyMaterial(CMD);
 	DefaultMatInstance->ApplyMaterialInstance(CMD);

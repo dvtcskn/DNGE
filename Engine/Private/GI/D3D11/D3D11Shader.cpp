@@ -29,36 +29,34 @@
 #include <iostream>
 #include "D3D11Shader.h"
 
-D3D11Shader::D3D11Shader(D3D11Device* InDevice, const sShaderAttachment& Attachment)
+D3D11ShaderCompiler::D3D11ShaderCompiler(D3D11Device* InDevice)
 	: Owner(InDevice)
-	, FunctionName(Attachment.FunctionName)
-	, ShaderType(Attachment.Type)
 {
-	if (Attachment.GetShaderAttachmentType() == EShaderAttachmentType::eFile)
-		CompileShaderFromFile(Attachment.GetLocation(), Attachment.ShaderDefines);
-	else
-		CompileShader(Attachment.GetByteCode(), Attachment.GetByteCodeSize(), Attachment.ShaderDefines);
 }
 
-D3D11Shader::D3D11Shader(D3D11Device* InDevice, std::wstring InSrcFile, std::string InFunctionName, eShaderType InProfile, std::vector<sShaderDefines> InDefines)
-	: Owner(InDevice)
-	, FunctionName(InFunctionName)
-	, ShaderType(InProfile)
+IShader::SharedPtr D3D11ShaderCompiler::Compile(const sShaderAttachment& Attachment)
 {
-	CompileShaderFromFile(InSrcFile, InDefines);
+	if (!Attachment.IsCodeValid())
+		return CompileShaderFromFile(Attachment.GetLocation(), Attachment.FunctionName, Attachment.Type, Attachment.ShaderDefines);
+	
+	return CompileShader(Attachment.GetByteCode(), Attachment.GetByteCodeSize(), L"",  Attachment.FunctionName, Attachment.Type, Attachment.ShaderDefines);
 }
 
-D3D11Shader::D3D11Shader(D3D11Device* InDevice, const void* InCode, std::size_t Size, std::string InFunctionName, eShaderType InProfile, std::vector<sShaderDefines> InDefines)
-	: Owner(InDevice)
-	, FunctionName(InFunctionName)
-	, ShaderType(InProfile)
+IShader::SharedPtr D3D11ShaderCompiler::Compile(std::wstring InSrcFile, std::string InFunctionName, eShaderType InProfile, std::vector<sShaderDefines> InDefines)
 {
-	CompileShader(InCode, Size, InDefines);
+	return CompileShaderFromFile(InSrcFile, InFunctionName, InProfile, InDefines);
 }
 
-void D3D11Shader::CompileShaderFromFile(std::wstring InSrcFile, std::vector<sShaderDefines> InDefines)
+IShader::SharedPtr D3D11ShaderCompiler::Compile(const void* InCode, std::size_t Size, std::string InFunctionName, eShaderType InProfile, std::vector<sShaderDefines> InDefines)
+{
+	return CompileShader(InCode, Size, L"", InFunctionName, InProfile, InDefines);
+}
+
+IShader::SharedPtr D3D11ShaderCompiler::CompileShaderFromFile(std::wstring InSrcFile, std::string InFunctionName, eShaderType InProfile, std::vector<sShaderDefines> InDefines)
 {
 	std::uint32_t shaderFlags = D3DCOMPILE_PACK_MATRIX_ROW_MAJOR;
+
+	ComPtr<ID3DBlob> ByteCode = nullptr;
 
 #if _DEBUG
 	shaderFlags |= D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
@@ -92,7 +90,7 @@ void D3D11Shader::CompileShaderFromFile(std::wstring InSrcFile, std::vector<sSha
 	}
 
 	ID3DBlob *errors = 0;
-	HRESULT hr = D3DCompileFromFile(InSrcFile.c_str(), MacroDefines, D3D_COMPILE_STANDARD_FILE_INCLUDE, FunctionName.c_str(), Type(ShaderType), shaderFlags, 0, &ByteCode, &errors);
+	HRESULT hr = D3DCompileFromFile(InSrcFile.c_str(), MacroDefines, D3D_COMPILE_STANDARD_FILE_INCLUDE, InFunctionName.c_str(), Type(InProfile), shaderFlags, 0, &ByteCode, &errors);
 
 	if (MacroDefines)
 		delete MacroDefines;
@@ -108,11 +106,15 @@ void D3D11Shader::CompileShaderFromFile(std::wstring InSrcFile, std::vector<sSha
 
 		throw std::runtime_error("Error compiling shader");
 	}
+
+	return D3D11CompiledShader::Create(Owner, InFunctionName, InSrcFile, InProfile, ByteCode);
 }
 
-void D3D11Shader::CompileShader(const void* InCode, std::size_t Size, std::vector<sShaderDefines> InDefines)
+IShader::SharedPtr D3D11ShaderCompiler::CompileShader(const void* InCode, std::size_t Size, std::wstring InSrcFile, std::string InFunctionName, eShaderType InProfile, std::vector<sShaderDefines> InDefines)
 {
 	std::uint32_t shaderFlags = D3DCOMPILE_PACK_MATRIX_ROW_MAJOR;
+	
+	ComPtr<ID3DBlob> ByteCode = nullptr;
 
 #if _DEBUG
 	shaderFlags |= D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
@@ -146,7 +148,7 @@ void D3D11Shader::CompileShader(const void* InCode, std::size_t Size, std::vecto
 	}
 
 	ID3DBlob *errors = 0;
-	HRESULT hr = D3DCompile(InCode, Size, NULL, MacroDefines, D3D_COMPILE_STANDARD_FILE_INCLUDE, FunctionName.c_str(), Type(ShaderType), shaderFlags, 0, &ByteCode, &errors);
+	HRESULT hr = D3DCompile(InCode, Size, NULL, MacroDefines, D3D_COMPILE_STANDARD_FILE_INCLUDE, InFunctionName.c_str(), Type(InProfile), shaderFlags, 0, &ByteCode, &errors);
 
 	if (MacroDefines)
 		delete MacroDefines;
@@ -163,83 +165,6 @@ void D3D11Shader::CompileShader(const void* InCode, std::size_t Size, std::vecto
 
 		throw std::runtime_error("Error compiling shader");
 	}
-}
 
-void D3D11Shader::CreateVertexShader()
-{
-	ID3D11VertexShader * VShader;
-	Owner->GetDevice()->CreateVertexShader(ByteCode->GetBufferPointer(), ByteCode->GetBufferSize(), NULL, &VShader);
-	ByteCode->Release();
-	ByteCode = nullptr;
-	Shader = VShader;
-}
-
-void D3D11Shader::CreatePixelShader()
-{
-	ID3D11PixelShader * PShader;
-	Owner->GetDevice()->CreatePixelShader(ByteCode->GetBufferPointer(), ByteCode->GetBufferSize(), NULL, &PShader);
-	ByteCode->Release();
-	ByteCode = nullptr;
-	Shader = PShader;
-}
-
-void D3D11Shader::CreateHullShader()
-{
-	ID3D11HullShader * HShader;
-	Owner->GetDevice()->CreateHullShader(ByteCode->GetBufferPointer(), ByteCode->GetBufferSize(), NULL, &HShader);
-	ByteCode->Release();
-	ByteCode = nullptr;
-	Shader = HShader;
-}
-
-void D3D11Shader::CreateDomainShader()
-{
-	ID3D11DomainShader * DShader;
-	Owner->GetDevice()->CreateDomainShader(ByteCode->GetBufferPointer(), ByteCode->GetBufferSize(), NULL, &DShader);
-	ByteCode->Release();
-	ByteCode = nullptr;
-	Shader = DShader;
-}
-
-void D3D11Shader::CreateGeometryShader()
-{
-	ID3D11GeometryShader* GShader;
-	Owner->GetDevice()->CreateGeometryShader(ByteCode->GetBufferPointer(), ByteCode->GetBufferSize(), NULL, &GShader);
-	ByteCode->Release();
-	ByteCode = nullptr;
-	Shader = GShader;
-}
-
-void D3D11Shader::CreateComputeShader()
-{
-	ID3D11ComputeShader* CShader;
-	Owner->GetDevice()->CreateComputeShader(ByteCode->GetBufferPointer(), ByteCode->GetBufferSize(), NULL, &CShader);
-	ByteCode->Release();
-	ByteCode = nullptr;
-	Shader = CShader;
-}
-
-void D3D11Shader::CreateShader()
-{
-	switch (ShaderType)
-	{
-	case eShaderType::Vertex:
-		CreateVertexShader();
-		break;
-	case eShaderType::HULL:
-		CreateHullShader();
-		break;
-	case eShaderType::Domain:
-		CreateDomainShader();
-		break;
-	case eShaderType::Pixel:
-		CreatePixelShader();
-		break;
-	case eShaderType::Geometry:
-		CreateGeometryShader();
-		break;
-	case eShaderType::Compute:
-		CreateComputeShader();
-		break;
-	}
+	return D3D11CompiledShader::Create(Owner, InFunctionName, InSrcFile, InProfile, ByteCode);
 }

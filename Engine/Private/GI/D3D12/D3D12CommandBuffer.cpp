@@ -83,8 +83,9 @@ void D3D12CommandBuffer::BeginRecordCommandList(const ERenderPass RenderPass)
 void D3D12CommandBuffer::Open()
 {
 	if (!CommandAllocator)
+	{
 		CommandAllocator = Owner->RequestCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT);
-
+	}
 	ThrowIfFailed(CommandList->Reset(CommandAllocator, nullptr));
 	bIsClosed = false;
 	bWaitForCompletion = false;
@@ -140,6 +141,7 @@ void D3D12CommandBuffer::ExecuteCommandList()
 	Owner->ExecuteDirectCommandLists(CommandList.Get()/*, bWaitForCompletion*/);
 
 	Owner->DiscardCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, CommandAllocator);
+
 	CommandAllocator = nullptr;
 	bWaitForCompletion = false;
 	bIsRenderPassActive = false;

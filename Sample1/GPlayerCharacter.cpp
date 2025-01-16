@@ -243,6 +243,8 @@ void GPlayerCharacter::OnBeginPlay()
 	auto Index = PC->GetPlayerIndex();
 
 	auto InputController = Engine::GetInputController();
+	if (!InputController)
+		return;
 	{
 		sKMButtonInputDesc KMButtonInputDesc;
 		//KMButtonInputDesc.bHoldable = true;

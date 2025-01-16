@@ -59,7 +59,7 @@ class D3D12ConstantBuffer : public IConstantBuffer
 {
     sClassBody(sClassConstructor, D3D12ConstantBuffer, IConstantBuffer)
 
-    ComPtr<ID3D12Resource> m_pResource;
+    //ComPtr<ID3D12Resource> m_pResource;
 
     std::string Name;
     D3D12DescriptorHandle ViewHeap;

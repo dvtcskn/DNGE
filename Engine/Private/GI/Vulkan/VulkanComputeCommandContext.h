@@ -26,12 +26,13 @@
 #pragma once
 
 #include "Engine/AbstractEngine.h"
+#include "VulkanDevice.h"
 
 class VulkanComputeCommandContext : public IComputeCommandContext
 {
 	sClassBody(sClassConstructor, VulkanComputeCommandContext, IComputeCommandContext)
 public:
-	VulkanComputeCommandContext();
+	VulkanComputeCommandContext(VulkanDevice* Device);
 	virtual ~VulkanComputeCommandContext();
 
 	virtual void BeginRecordCommandList() override final;

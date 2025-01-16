@@ -142,7 +142,13 @@ struct sGamepadButtonInputDesc
 		std::function<void(eGamepadButtons, eGamepadPlayer)> fOnUp = nullptr;
 
 		GamepadButton() = default;
-		~GamepadButton() = default;
+		~GamepadButton()
+		{
+			fOnPressed = nullptr;
+			fOnHeld = nullptr;
+			fOnReleased = nullptr;
+			fOnUp = nullptr;
+		}
 	};
 
 	struct ThumbSticks
@@ -155,7 +161,12 @@ struct sGamepadButtonInputDesc
 		std::function<void(FVector2, eGamepadButtons, eGamepadPlayer)> fOnXYAxis = nullptr;
 
 		ThumbSticks() = default;
-		~ThumbSticks() = default;
+		~ThumbSticks()
+		{
+			X = nullptr;
+			Y = nullptr;
+			fOnXYAxis = nullptr;
+		}
 	};
 
 	struct Triggers
@@ -171,11 +182,21 @@ struct sGamepadButtonInputDesc
 		std::function<void(float, eGamepadButtons, eGamepadPlayer)> fOnUp = nullptr;
 
 		Triggers() = default;
-		~Triggers() = default;
+		~Triggers()
+		{
+			fOnPressed = nullptr;
+			fOnHeld = nullptr;
+			fOnReleased = nullptr;
+			fOnUp = nullptr;
+		}
 	};
 
 	sGamepadButtonInputDesc() = default;
-	~sGamepadButtonInputDesc() = default;
+	~sGamepadButtonInputDesc()
+	{
+		OnConnected = nullptr;
+		OnDisconnected = nullptr;
+	}
 
 	bool bIsEnabled = true;
 

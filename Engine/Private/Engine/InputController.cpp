@@ -45,10 +45,10 @@ sInputController::sInputController(void* InHWND)
 	: pHWND(InHWND)
 	, bIsKeyboardEnabled(true)
 	, bIsMouseEnabled(true)
-	, bIsGamepadEnabled(true)
+	, bIsGamepadEnabled(false)
 	, MouseLocation(FVector2::Zero())
 	, WheelDelta(0.0f)
-	, pGamePad(std::make_unique<DirectX::GamePad>())
+	, pGamePad(nullptr/* std::make_unique<DirectX::GamePad>()*/)
 	, bUpdateOnTick(true)
 {
 }

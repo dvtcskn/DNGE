@@ -32,6 +32,7 @@
 #include "GI/D3DShared/D3DShared.h"
 #include "D3D12CommandBuffer.h"
 #include "D3D12Fence.h"
+#include "Utilities/FileManager.h"
 
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3d12.lib")
@@ -144,13 +145,16 @@ void D3D12Viewport::CreateRenderTargets()
 	}
 }
 
+void D3D12Viewport::BeginFrame()
+{
+	FrameIndex = SwapChain->GetCurrentBackBufferIndex();
+}
+
 void D3D12Viewport::Present(IRenderTarget* pRT)
 {
 	CopyToBackBuffer(pRT);
 
 	SwapChain->Present(!bIsVSYNCEnabled ? 0 : SyncInterval, !bIsVSYNCEnabled && !bIsFullScreen ? DXGI_PRESENT_ALLOW_TEARING : 0);
-
-	FrameIndex = SwapChain->GetCurrentBackBufferIndex();
 
 	//Owner->GPUSignal();
 	Owner->CPUWait();
@@ -218,37 +222,38 @@ void D3D12Viewport::VsyncInterval(const UINT value)
 std::vector<sDisplayMode> D3D12Viewport::GetAllSupportedResolutions() const
 {
 	std::vector<sDisplayMode> Result;
+	HRESULT HResult = S_OK;
+	IDXGIAdapter1* Adapter = Owner->GetAdapter();
+	IDXGIOutput* Output;
+	UINT iOutput = 0;
+
+	while (DXGI_ERROR_NOT_FOUND != Adapter->EnumOutputs(iOutput++, &Output))
 	{
-		HRESULT HResult = S_OK;
-		IDXGIAdapter1* Adapter = Owner->GetAdapter();
-
-		//Owner->GetAdapter(Adapter);
-
 		// get the description of the adapter
 		DXGI_ADAPTER_DESC AdapterDesc;
 		Adapter->GetDesc(&AdapterDesc);
 
-		IDXGIOutput* Output;
-		HResult = Adapter->EnumOutputs(0, &Output);
-		if (DXGI_ERROR_NOT_FOUND == HResult)
-		{
-			return std::vector<sDisplayMode>();
-		}
-		if (FAILED(HResult))
-		{
-			return std::vector<sDisplayMode>();
-		}
+		DXGI_OUTPUT_DESC desc;
+		HResult = Output->GetDesc(&desc);
+
+		MONITORINFOEXW monInfoEx;
+		monInfoEx.cbSize = sizeof(MONITORINFOEXW);
+		GetMonitorInfoW(desc.Monitor, &monInfoEx);
+
+		DISPLAY_DEVICEW dispDev;
+		dispDev.cb = sizeof(DISPLAY_DEVICEW);
+		EnumDisplayDevicesW(monInfoEx.szDevice, 0, &dispDev, 0);
 
 		DXGI_FORMAT Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 		std::uint32_t NumModes = 0;
 		HResult = Output->GetDisplayModeList(Format, 0, &NumModes, NULL);
 		if (HResult == DXGI_ERROR_NOT_FOUND)
 		{
-			return  std::vector<sDisplayMode>();
+			break;
 		}
 		else if (HResult == DXGI_ERROR_NOT_CURRENTLY_AVAILABLE)
 		{
-			return  std::vector<sDisplayMode>();
+			break;
 		}
 
 		DXGI_MODE_DESC* ModeList = new DXGI_MODE_DESC[NumModes];
@@ -257,6 +262,11 @@ std::vector<sDisplayMode> D3D12Viewport::GetAllSupportedResolutions() const
 		for (std::uint32_t m = 0; m < NumModes; m++)
 		{
 			sDisplayMode Mode;
+			std::wstring ID = dispDev.DeviceID;
+			ID.insert(0, L" (");
+			ID.append(L")");
+			std::wstring Name = dispDev.DeviceString + ID;
+			Mode.Name = FileManager::WideStringToString(Name);
 			Mode.Width = ModeList[m].Width;
 			Mode.Height = ModeList[m].Height;
 			Mode.RefreshRate.Denominator = ModeList[m].RefreshRate.Denominator;

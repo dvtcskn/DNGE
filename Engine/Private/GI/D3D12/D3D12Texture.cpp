@@ -91,7 +91,7 @@ D3D12Texture::D3D12Texture(D3D12Device* InOwner, const std::wstring FilePath, co
                 D3D12_RESOURCE_STATE_COMMON, // D3D12_RESOURCE_STATE_GENERIC_READ
                 nullptr,
                 IID_PPV_ARGS(uploadRes.GetAddressOf())));
-;
+
         IMCommandList->BeginRecordCommandList();
 
         UpdateSubresources(IMCommandList->Get(), Texture.Get(), uploadRes.Get(),

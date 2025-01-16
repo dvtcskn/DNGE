@@ -53,13 +53,13 @@ sSpriteSheetComponent::sSpriteSheetComponent(const std::string Name)
 {
 	BufferLayout BufferDesc;
 	BufferDesc.Size = sizeof(sAnimationFlip);
-	AnimationCB = IConstantBuffer::Create("AnimationFlip", BufferDesc, GPU::GetGBufferTextureEntryPoint() + GPU::GetGBufferTextureSize() + 1);
+	AnimationCB = IConstantBuffer::Create("AnimationFlip", BufferDesc, GPU::IsBindlessRendererEnabled() ? 2 : 3 /*GPU::GetGBufferTextureEntryPoint() + GPU::GetGBufferTextureSize() + 1*/); // 2 or 3
 
 	sSpriteEffectComponent::SharedPtr pSpriteEffectComponent = sSpriteEffectComponent::Create("SpriteEffectComponent");
 	pSpriteEffectComponent->AttachToComponent(this);
 	SpriteEffectComponent = pSpriteEffectComponent.get();
 
-	MeshConstantBuffer = IConstantBuffer::Create(Name, BufferLayout(sizeof(sMeshConstantBufferAttributes), 0), 1);
+	MeshConstantBuffer = IConstantBuffer::Create(Name, BufferLayout(sizeof(sMeshConstantBufferAttributes), 0), 1); // 1
 	{
 		ObjectConstants.modelMatrix = FMatrix::Identity();
 		ObjectConstants.PrevModelMatrix = FMatrix::Identity();
@@ -88,13 +88,13 @@ sSpriteSheetComponent::sSpriteSheetComponent(sSpriteSheet* pSpriteSheet)
 {
 	BufferLayout BufferDesc;
 	BufferDesc.Size = sizeof(sAnimationFlip);
-	AnimationCB = IConstantBuffer::Create("AnimationFlip", BufferDesc, GPU::GetGBufferTextureEntryPoint() + GPU::GetGBufferTextureSize() + 1);
+	AnimationCB = IConstantBuffer::Create("AnimationFlip", BufferDesc, GPU::IsBindlessRendererEnabled() ? 2 : 3 /*GPU::GetGBufferTextureEntryPoint() + GPU::GetGBufferTextureSize() + 1*/);
 
 	sSpriteEffectComponent::SharedPtr pSpriteEffectComponent = sSpriteEffectComponent::Create("SpriteEffectComponent");
 	pSpriteEffectComponent->AttachToComponent(this);
 	SpriteEffectComponent = pSpriteEffectComponent.get();
 
-	MeshConstantBuffer = IConstantBuffer::Create(GetName(), BufferLayout(sizeof(sMeshConstantBufferAttributes), 0), 1);
+	MeshConstantBuffer = IConstantBuffer::Create(GetName(), BufferLayout(sizeof(sMeshConstantBufferAttributes), 0), 1); // 1
 	{
 		ObjectConstants.modelMatrix = FMatrix::Identity();
 		ObjectConstants.PrevModelMatrix = FMatrix::Identity();

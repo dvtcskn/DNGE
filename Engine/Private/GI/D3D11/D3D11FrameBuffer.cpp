@@ -256,7 +256,7 @@ D3D11DepthTarget::D3D11DepthTarget(D3D11Device* InDevice, const std::string InNa
 	{
 		CD3D11_DEPTH_STENCIL_VIEW_DESC depthStencilDesc(
 			D3D11_DSV_DIMENSION_TEXTURE2D,
-			GetDepthViewFormat(sTextureDesc.Format),
+			GetDXGIDepthViewFormat(sTextureDesc.Format),
 			0,          // Mips
 			0, 1        // Array
 		);
@@ -268,7 +268,7 @@ D3D11DepthTarget::D3D11DepthTarget(D3D11Device* InDevice, const std::string InNa
 	{
 		CD3D11_SHADER_RESOURCE_VIEW_DESC srvDesc(
 			D3D_SRV_DIMENSION_TEXTURE2D,
-			GetDepthSRVFormat(sTextureDesc.Format),
+			GetDXGIDepthSRVFormat(sTextureDesc.Format),
 			0, 1,  // Mips
 			0, sTextureDesc.ArraySize   // Array
 		);

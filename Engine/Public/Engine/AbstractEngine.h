@@ -50,8 +50,12 @@ enum class ERenderPass
 
 enum class EGITypes
 {
+	eUndefined,
 	eD3D11,
 	eD3D12,
+	/*
+	* WIP
+	*/
 	eVulkan,
 	/* Unsuported */
 	//eOpenGL46,
@@ -68,10 +72,10 @@ enum class EFormat
 	R16_UINT,
 	R16_UNORM,
 	R16_FLOAT,
-	R16_Typeless,
+	//R16_Typeless,
 	RGBA8_UNORM,
 	BGRA8_UNORM,
-	BGRA8_TYPELESS,
+	//BGRA8_TYPELESS,
 	BGRA8_UNORM_SRGB,
 	SRGBA8_UNORM,
 	R10G10B10A2_UNORM,
@@ -79,43 +83,58 @@ enum class EFormat
 	RG16_UINT,
 	RG16_FLOAT,
 	R32_UINT,
+	R32_SINT,
 	R32_FLOAT,
-	R32_Typeless,
+	//R32_Typeless,
 	RGBA8_UINT,
 	RGBA16_FLOAT,
 	RGBA16_UINT,
 	RGBA16_UNORM,
 	RGBA16_SNORM,
 	RG32_UINT,
+	RG32_SINT,
 	RG32_FLOAT,
 	RGB32_UINT,
+	RGB32_SINT,
 	RGB32_FLOAT,
 	RGBA32_UINT,
+	RGBA32_SINT,
 	RGBA32_FLOAT,
-	R24G8_Typeless,
-	R32G8X24_Typeless, 
+	//R24G8_Typeless,
+	//R24UX8_Typeless
+	//R32G8X24_Typeless, 
 	D16_UNORM,
 	D32_FLOAT,
 	D24_UNORM_S8_UINT,
 	D32_FLOAT_S8X24_UINT,
-	BC1_UNORM,
+	/*BC1_UNORM,
 	BC1_UNORM_SRGB,
 	BC2_UNORM,
 	BC2_UNORM_SRGB,
 	BC3_UNORM,
-	BC3_UNORM_SRGB,
+	BC3_UNORM_SRGB,*/
 };
 
 namespace
 {
+	inline bool IsValidDepthOnlyFormat(const EFormat Format)
+	{
+		return Format == EFormat::D32_FLOAT || Format == EFormat::D16_UNORM;
+	};
+
+	inline bool IsValidDepthStencilFormat(const EFormat Format)
+	{
+		return Format == EFormat::D24_UNORM_S8_UINT || Format == EFormat::D32_FLOAT_S8X24_UINT;
+	};
+
 	inline bool IsValidDepthFormat(const EFormat Format)
 	{
-		return Format == EFormat::R16_Typeless || Format == EFormat::R32_Typeless || Format == EFormat::R24G8_Typeless || Format == EFormat::R32G8X24_Typeless;
+		return IsValidDepthOnlyFormat(Format) || IsValidDepthStencilFormat(Format);
 	};
 
 	inline bool IsDepthSRVSupported(const EFormat Format)
 	{
-		return Format == EFormat::R16_Typeless || Format == EFormat::R32_Typeless;
+		return Format == EFormat::R16_FLOAT || Format == EFormat::R32_FLOAT /*|| Format == EFormat::R24UX8_Typeless*/;
 	};
 }
 
@@ -130,6 +149,259 @@ enum class eShaderType : std::uint8_t
 	Mesh,
 	Amplification,
 };
+
+class RefCountedObject 
+{
+public:
+	RefCountedObject() 
+		: RefCount(1)
+	{}
+
+	virtual ~RefCountedObject() = default;
+
+	void AddRef() 
+	{
+		RefCount.fetch_add(1, std::memory_order_relaxed);
+	}
+
+	void Release() 
+	{
+		if (RefCount.fetch_sub(1, std::memory_order_acquire) == 1)
+		{
+			std::atomic_thread_fence(std::memory_order_release);
+			delete this;
+		}
+	}
+
+	int GetRefCounter() const
+	{
+		return RefCount.load(std::memory_order_relaxed);;
+	}
+
+private:
+	std::atomic<int> RefCount;
+};
+
+template <typename T>
+class RefCountPtr
+{
+public:
+	typedef T InterfaceType;
+
+protected:
+	InterfaceType* ptr_;
+	template<class U> friend class RefCountPtr;
+
+	void InternalAddRef() const throw()
+	{
+		if (ptr_ != nullptr)
+		{
+			ptr_->AddRef();
+		}
+	}
+
+	unsigned long InternalRelease() throw()
+	{
+		unsigned long ref = 0;
+		T* temp = ptr_;
+
+		if (temp != nullptr)
+		{
+			ptr_ = nullptr;
+			ref = temp->Release();
+		}
+
+		return ref;
+	}
+
+public:
+	RefCountPtr() throw() 
+		: ptr_(nullptr)
+	{}
+
+	RefCountPtr(decltype(__nullptr)) throw() 
+		: ptr_(nullptr)
+	{}
+
+	template<class U>
+	RefCountPtr(_In_opt_ U* other) throw() 
+		: ptr_(other)
+	{
+		InternalAddRef();
+	}
+
+	RefCountPtr(const RefCountPtr& other) throw() 
+		: ptr_(other.ptr_)
+	{
+		InternalAddRef();
+	}
+
+	template<class U>
+	RefCountPtr(const RefCountPtr<U>& other, typename std::enable_if<std::is_convertible<U*, T*>::value, void*>::type* = nullptr) noexcept
+		: ptr_(other.ptr_)
+	{
+		InternalAddRef();
+	}
+
+	RefCountPtr(_Inout_ RefCountPtr&& other) throw() 
+		: ptr_(nullptr)
+	{
+		if (this != reinterpret_cast<RefCountPtr*>(&reinterpret_cast<unsigned char&>(other)))
+		{
+			Swap(other);
+		}
+	}
+
+	template<class U>
+	RefCountPtr(RefCountPtr<U>&& other, typename std::enable_if<std::is_convertible<U*, T*>::value, void*>::type* = nullptr) noexcept
+		: ptr_(other.ptr_)
+	{
+		other.ptr_ = nullptr;
+	}
+
+	~RefCountPtr() throw()
+	{
+		InternalRelease();
+	}
+
+	static RefCountPtr<T> Create(T* other)
+	{
+		RefCountPtr<T> Ptr;
+		Ptr.Attach(other);
+		return Ptr;
+	}
+
+	RefCountPtr& operator=(decltype(__nullptr)) throw()
+	{
+		InternalRelease();
+		return *this;
+	}
+
+	RefCountPtr& operator=(_In_opt_ T* other) throw()
+	{
+		if (ptr_ != other)
+		{
+			RefCountPtr(other).Swap(*this);
+		}
+		return *this;
+	}
+
+	template <typename U>
+	RefCountPtr& operator=(_In_opt_ U* other) throw()
+	{
+		RefCountPtr(other).Swap(*this);
+		return *this;
+	}
+
+	RefCountPtr& operator=(const RefCountPtr& other) throw()
+	{
+		if (ptr_ != other.ptr_)
+		{
+			RefCountPtr(other).Swap(*this);
+		}
+		return *this;
+	}
+
+	template<class U>
+	RefCountPtr& operator=(const RefCountPtr<U>& other) throw()
+	{
+		RefCountPtr(other).Swap(*this);
+		return *this;
+	}
+
+	RefCountPtr& operator=(_Inout_ RefCountPtr&& other) throw()
+	{
+		RefCountPtr(static_cast<RefCountPtr&&>(other)).Swap(*this);
+		return *this;
+	}
+
+	template<class U>
+	RefCountPtr& operator=(_Inout_ RefCountPtr<U>&& other) throw()
+	{
+		RefCountPtr(static_cast<RefCountPtr<U>&&>(other)).Swap(*this);
+		return *this;
+	}
+	void Swap(_Inout_ RefCountPtr&& r) throw()
+	{
+		T* tmp = ptr_;
+		ptr_ = r.ptr_;
+		r.ptr_ = tmp;
+	}
+
+	void Swap(_Inout_ RefCountPtr& r) throw()
+	{
+		T* tmp = ptr_;
+		ptr_ = r.ptr_;
+		r.ptr_ = tmp;
+	}
+
+	T* Get() const throw()
+	{
+		return ptr_;
+	}
+
+	InterfaceType* operator->() const throw()
+	{
+		return ptr_;
+	}
+
+	T* const* GetAddressOf() const throw()
+	{
+		return &ptr_;
+	}
+
+	T** GetAddressOf() throw()
+	{
+		return &ptr_;
+	}
+
+	T** operator&()
+	{
+		return &ptr_;
+	}
+
+	operator T* () const
+	{
+		return ptr_;
+	}
+
+	T** ReleaseAndGetAddressOf() throw()
+	{
+		InternalRelease();
+		return &ptr_;
+	}
+
+	T* Detach() throw()
+	{
+		T* ptr = ptr_;
+		ptr_ = nullptr;
+		return ptr;
+	}
+
+	void Attach(_In_opt_ InterfaceType* other) throw()
+	{
+		if (ptr_ != nullptr)
+		{
+			auto ref = ptr_->Release();
+			(void)ref;
+
+			assert(ref != 0 || ptr_ != other);
+		}
+
+		ptr_ = other;
+	}
+
+	unsigned long Reset()
+	{
+		return InternalRelease();
+	}
+
+	void CopyTo(_Outptr_result_maybenull_ InterfaceType** ptr) const throw()
+	{
+		InternalAddRef();
+		*ptr = ptr_;
+	}
+};    // RefCountPtr
 
 struct IBuffer
 {
@@ -162,6 +434,11 @@ public:
 		Size = 0;
 	}
 
+	inline bool IsValid() const
+	{
+		return Data != nullptr || Size != 0;
+	}
+
 	[[nodiscard]] virtual const void* GetData() const override
 	{
 		return Data;
@@ -176,16 +453,6 @@ public:
 		return Size;
 	}
 };
-
-namespace
-{
-	inline bool IsBufferEmpty(const IBuffer* Buffer)
-	{
-		if (!Buffer)
-			return false;
-		return Buffer->GetData() == nullptr || Buffer->GetSize() == 0;
-	}
-}
 
 struct sScreenDimension
 {
@@ -213,6 +480,16 @@ FORCEINLINE bool constexpr operator !=(const sScreenDimension& value1, const sSc
 	return !((value1.Width == value2.Width) && (value1.Height == value2.Height));
 };
 #endif
+
+struct GPUDeviceCreateInfo
+{
+	EGITypes Type = EGITypes::eUndefined;
+	std::int32_t GPUIndex = -1;
+	void* pHWND = nullptr;
+	std::uint32_t Width = 0; 
+	std::uint32_t Height = 0;
+	bool Fullscreen = false;
+};
 
 struct sViewport
 {
@@ -267,6 +544,7 @@ struct sDisplayMode
 		std::uint32_t Denominator = 0;
 	};
 
+	std::string Name;
 	std::uint32_t Width = 0;
 	std::uint32_t Height = 0;
 	sRefreshRate RefreshRate;
@@ -290,6 +568,8 @@ struct sVertexLayout
 			, Color(InColor)
 			//, ArrayIndex(NULL)
 		{}
+
+		constexpr static std::size_t SizeWithoutPadding = sizeof(FVector) + sizeof(FColor);
 	};
 	FVector position;
 	FVector normal;
@@ -327,6 +607,8 @@ struct sVertexLayout
 		, binormal(InBinormal)
 		, ArrayIndex(InArrayIndex)
 	{}
+
+	constexpr static std::size_t SizeWithoutPadding = sizeof(FVector) + sizeof(FVector) + sizeof(FVector2) + sizeof(FColor) + sizeof(FVector) + sizeof(FVector) + sizeof(std::uint32_t);
 };
 
 struct sParticleVertexLayout
@@ -344,6 +626,8 @@ struct sParticleVertexLayout
 			: position(InPosition)
 			, Color(InColor)
 		{}
+
+		constexpr static std::size_t SizeWithoutPadding = sizeof(FVector) + sizeof(FColor);
 	};
 	FVector position;
 	FVector2 texCoord;
@@ -359,6 +643,8 @@ struct sParticleVertexLayout
 		, texCoord(InTexCoord)
 		, Color(InColor)
 	{}
+
+	constexpr static std::size_t SizeWithoutPadding = sizeof(FVector) + sizeof(FVector2) + sizeof(FColor);
 };
 
 struct sVertexAttributeDesc
@@ -369,6 +655,7 @@ struct sVertexAttributeDesc
 	uint32_t InputSlot;
 	uint32_t offset;
 	bool isInstanced;
+	std::size_t Stride;
 };
 
 struct sObjectDrawParameters
@@ -424,11 +711,25 @@ struct BufferSubresource
 	std::size_t Size;
 	std::size_t Location;
 
-	constexpr BufferSubresource(void* InSysMem = nullptr, std::size_t InSize = NULL, std::size_t InLocation = NULL)
-		: pSysMem(InSysMem)
+	constexpr BufferSubresource(void* InData = nullptr, std::size_t InSize = NULL, std::size_t InLocation = NULL)
+		: pSysMem(InData)
 		, Size(InSize)
 		, Location(InLocation)
 	{}
+};
+
+struct TextureSubresource
+{
+	void* pData;
+	std::size_t RowPitch;
+	std::size_t SlicePitch;
+
+	constexpr TextureSubresource(void* InData = nullptr, std::size_t InRowPitch = NULL, std::size_t InSlicePitch = NULL)
+		: pData(InData)
+		, RowPitch(InRowPitch)
+		, SlicePitch(InSlicePitch)
+	{
+	}
 };
 
 _declspec(align(256)) struct sMeshConstantBufferAttributes
@@ -592,6 +893,13 @@ struct sFrameBufferAttachmentInfo
 	{}
 
 	std::size_t GetAttachmentCount() const { return FrameBuffer.size() + (DepthFormat != EFormat::UNKNOWN ? 1 : 0); }
+	std::vector<sFrameBuffer> GetAttachments(bool WithDepth = false) const
+	{
+		std::vector<sFrameBuffer> Attachments = FrameBuffer;
+		if (WithDepth && DepthFormat != EFormat::UNKNOWN)
+			Attachments.push_back(sFrameBuffer(DepthFormat, eFrameBufferAttachmentType::eDepth));
+		return Attachments;
+	}
 	std::size_t GetRenderTargetAttachmentCount() const { return FrameBuffer.size(); }
 	void AddFrameBuffer(const EFormat Format, const eFrameBufferAttachmentType InAttachmentType = eFrameBufferAttachmentType::eRT_SRV)
 	{
@@ -754,6 +1062,7 @@ enum class ESamplerAddressMode
 	eWrap,
 	eClamp,
 	eMirror,
+	eMirrorOnce,
 	eBorder,
 };
 
@@ -857,9 +1166,7 @@ struct sSamplerAttributeDesc
 	ESamplerAddressMode AddressV;
 	ESamplerAddressMode AddressW;
 	int MipBias;
-	/** Smallest mip map level that will be used, where 0 is the highest resolution mip level. */
 	float MinMipLevel;
-	/** Largest mip map level that will be used, where 0 is the highest resolution mip level. */
 	float MaxMipLevel;
 	int MaxAnisotropy;
 	FColor BorderColor;
@@ -1073,19 +1380,18 @@ enum class EPrimitiveType : std::uint8_t
 enum class EDescriptorType : std::uint8_t
 {
 	eUniformBuffer,
+	eUAV,
+	e32BitConstant,
 	eTexture,
 	eSampler,
-	eUAV,
-	//eConstant,
 };
 
 struct sDescriptorSetLayoutBinding
 {
-private:
+public:
 	EDescriptorType DescriptorType;
 	std::optional<sSamplerAttributeDesc> SamplerDesc;
 
-public:
 	std::uint32_t Location;
 	eShaderType ShaderType;
 	std::uint32_t Size;
@@ -1124,21 +1430,13 @@ struct sShaderDefines
 	{}
 };
 
-enum class EShaderAttachmentType
-{
-	eFile,
-	eMemory,
-};
-
 struct sShaderAttachment
 {
-private:
+public:
 	std::wstring Location;
 	void* ByteCode;
 	std::size_t Size;
-	EShaderAttachmentType ShaderAttachmentType;
 
-public:
 	std::string FunctionName;
 	eShaderType Type;
 	std::vector<sShaderDefines> ShaderDefines;
@@ -1149,7 +1447,6 @@ public:
 		, Size(0)
 		, FunctionName(inEntryName)
 		, Type(InType)
-		, ShaderAttachmentType(EShaderAttachmentType::eFile)
 		, ShaderDefines(InShaderDefines)
 	{}
 	sShaderAttachment(void* pByteCode, std::size_t inSize, std::string inEntryName, eShaderType InType, const std::vector<sShaderDefines> InShaderDefines = std::vector<sShaderDefines>())
@@ -1158,7 +1455,6 @@ public:
 		, Size(inSize)
 		, FunctionName(inEntryName)
 		, Type(InType)
-		, ShaderAttachmentType(EShaderAttachmentType::eMemory)
 		, ShaderDefines(InShaderDefines)
 	{}
 
@@ -1167,8 +1463,8 @@ public:
 		ShaderDefines.clear();
 	}
 
-	EShaderAttachmentType GetShaderAttachmentType() const { return ShaderAttachmentType; }
 	std::wstring GetLocation() const { return Location; }
+	bool IsCodeValid() const { return ByteCode != nullptr; }
 	void* GetByteCode() const { return ByteCode; }
 	std::size_t GetByteCodeSize() const { return Size; }
 };
@@ -1188,6 +1484,9 @@ public:
 	static IShader::SharedPtr Create(const void* InCode, std::size_t Size, std::string InFunctionName, eShaderType InProfile, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>());
 
 public:
+	virtual std::string GetName() const = 0;
+	virtual std::wstring GetPath() const = 0;
+	virtual eShaderType Type() const = 0;
 	virtual void* GetByteCode() const = 0;
 	virtual std::uint32_t GetByteCodeSize() const = 0;
 };
@@ -1211,10 +1510,6 @@ public:
 	std::vector<sDescriptorSetLayoutBinding> DescriptorSetLayout;
 	std::vector<sShaderAttachment> ShaderAttachments;
 	std::vector<sVertexAttributeDesc> VertexLayout;
-
-	std::uint32_t NumRenderTargets;
-	std::array<EFormat, 8> RTVFormats;
-	EFormat DSVFormat;
 };
 
 class IVertexAttribute
@@ -1243,7 +1538,11 @@ public:
 
 public:
 	virtual sPipelineDesc GetPipelineDesc() const = 0;
-	virtual void Recompile() = 0;
+	virtual bool IsCompiled() const = 0;
+	virtual bool Compile(IFrameBuffer* FrameBuffer = nullptr) = 0;
+	virtual bool Compile(IRenderTarget* RT, IDepthTarget* Depth = nullptr) = 0;
+	virtual bool Compile(std::vector<IRenderTarget*> RTs, IDepthTarget* Depth = nullptr) = 0;
+	virtual bool Recompile() = 0;
 };
 
 struct sComputePipelineDesc
@@ -1271,7 +1570,7 @@ public:
 
 public:
 	virtual sComputePipelineDesc GetPipelineDesc() const = 0;
-	virtual void Recompile() = 0;
+	virtual bool Recompile() = 0;
 };
 
 struct sTextureDesc
@@ -1280,9 +1579,11 @@ struct sTextureDesc
 	{
 		std::uint32_t X;
 		std::uint32_t Y;
+		std::uint32_t Z;
 		sSize()
 			: X(NULL)
 			, Y(NULL)
+			, Z(1)
 		{}
 	};
 
@@ -1647,8 +1948,8 @@ enum class EPostProcessRenderOrder
 
 enum class EGBufferClear
 {
-	Driver,
 	Disabled,
+	Driver,
 	//Sky,
 };
 
@@ -1870,6 +2171,9 @@ namespace GPU
 	* Priority == 0 : On Top
 	*/
 	void SetViewportInstancePriority(sViewportInstance* ViewportInstance, std::size_t Priority);
+
+	// WIP
+	bool IsBindlessRendererEnabled();
 }
 
 sViewportInstance::~sViewportInstance()

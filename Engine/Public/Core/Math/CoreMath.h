@@ -4480,6 +4480,7 @@ public:
 };
 
 typedef TDimension2D<float> FDimension2D;
+typedef TDimension2D<std::uint32_t> sDimension2D;
 
 template<typename T>
 FORCEINLINE constexpr TDimension2D<T> operator +(const TDimension2D<T>& value1, const TVector2<T>& value2)

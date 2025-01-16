@@ -309,6 +309,33 @@ sDefaultLevel::sDefaultLevel(IWorld* pWorld, std::string InName)
 	}
 
 	ItemCollisionLayer.clear();
+
+	/*{
+		sEmitter::SharedPtr Emitter = sEmitter::Create("Particle System Test");
+		AddEmitter(Emitter);
+
+		Emitter->SetLocation(FVector(300, 300, 0));
+		sMeshParticleDesc Desc;
+		Desc.SetLifeTime(4.0f);
+		Desc.SpawnRate = 1;
+		Desc.MinVelocity = FVector(1.0f, -5.0f, 0.0f);
+		Desc.MaxVelocity = FVector(-1.0f, -10.0f, 0.0f);
+		Desc.StartColor = FColor(1.0f, 1.0f, 0.0f, 1.0f);
+		Desc.EndColor = FColor(1.0f, 0.0f, 0.0f, 1.0f);
+		{			
+			sParticleShape Shape;
+			auto Plane = MeshPrimitives::Create2DPlaneVerticesFromDimension(FDimension2D(8, 8));
+			const std::vector<FVector2> TC = MeshPrimitives::GeneratePlaneTextureCoordinate();
+			Shape.ShapeIndexes = MeshPrimitives::GeneratePlaneIndices();
+			for (std::size_t i = 0; i < 4; i++)
+				Shape.Shape.push_back(sParticleVertexLayout(FVector(Plane[i]), TC[i]));
+			//Desc.Shapes.push_back(Shape);
+			Desc.Shape = Shape;
+		}
+		MeshParticle::SharedPtr pMeshParticle = MeshParticle::Create(Desc);
+		pMeshParticle->MaterialInstance = sMaterialManager::Get().GetMaterialInstance("ParticleMat", "ParticleMat_MatInstance");
+		Emitter->AddParticle(pMeshParticle);
+	}*/
 }
 
 sDefaultLevel::~sDefaultLevel()

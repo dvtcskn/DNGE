@@ -51,6 +51,14 @@ void sPostProcessRenderer::Tick(const double DeltaTime)
 
 void sPostProcessRenderer::Render(sPostProcess* PostProcess, IRenderTarget* BackBuffer, std::optional<sViewport> Viewport)
 {
+	if (!PostProcess->IsCompiled())
+	{
+		if (PostProcess->HasFrameBuffer())
+			PostProcess->Compile(PostProcess->GetFrameBuffer());
+		else
+			PostProcess->Compile(BackBuffer);
+	}
+
 	GraphicsCommandContext->BeginRecordCommandList(ERenderPass::ePostProcess);
 
 	if (PostProcess->HasFrameBuffer())
@@ -93,6 +101,14 @@ void sPostProcessRenderer::CopyToFrameBuffer(sPostProcess* PostProcess, IRenderT
 
 void sPostProcessRenderer::Render(IGraphicsCommandContext* CMD, sPostProcess* PostProcess, IRenderTarget* BackBuffer, std::optional<sViewport> Viewport)
 {
+	if (!PostProcess->IsCompiled())
+	{
+		if (PostProcess->HasFrameBuffer())
+			PostProcess->Compile(PostProcess->GetFrameBuffer());
+		else
+			PostProcess->Compile(BackBuffer);
+	}
+
 	CMD->BeginRecordCommandList(ERenderPass::ePostProcess);
 
 	if (PostProcess->HasFrameBuffer())

@@ -425,10 +425,14 @@ bool GamePad::GetDevice(int player, _Outptr_ IGameInputDevice * *device) noexcep
 // Windows::Gaming::Input (Windows 10)
 //======================================================================================
 
+#ifdef _MSC_VER
 #pragma warning(push)
-#pragma warning(disable : 4471 5204 5256)
+#pragma warning(disable : 4471 5204 5256 6553)
+#endif
 #include <windows.gaming.input.h>
+#ifdef _MSC_VER
 #pragma warning(pop)
+#endif
 
 class GamePad::Impl
 {
@@ -509,6 +513,8 @@ public:
 
             mStatics.Reset();
         }
+
+        mChanged = nullptr;
 
         s_gamePad = nullptr;
     }
@@ -1287,11 +1293,6 @@ public:
         mOwner(owner),
         mConnected{},
         mLastReadTime{}
-#if (_WIN32_WINNT < _WIN32_WINNT_WIN8)
-        , mLeftMotor{}
-        , mRightMotor{}
-        , mSuspended(false)
-#endif
     {
         for (int j = 0; j < XUSER_MAX_COUNT; ++j)
         {
@@ -1320,15 +1321,6 @@ public:
 
         if (!ThrottleRetry(player, time))
         {
-#if (_WIN32_WINNT < _WIN32_WINNT_WIN8)
-            if (mSuspended)
-            {
-                memset(&state, 0, sizeof(State));
-                state.connected = mConnected[player];
-                return;
-            }
-#endif
-
             XINPUT_STATE xstate;
             const DWORD result = XInputGetState(DWORD(player), &xstate);
             if (result == ERROR_DEVICE_NOT_CONNECTED)
@@ -1415,7 +1407,6 @@ public:
                 if (xcaps.Type == XINPUT_DEVTYPE_GAMEPAD)
                 {
                     static_assert(Capabilities::GAMEPAD == XINPUT_DEVSUBTYPE_GAMEPAD, "xinput.h mismatch");
-#if (_WIN32_WINNT >= _WIN32_WINNT_WIN8)
                     static_assert(XINPUT_DEVSUBTYPE_WHEEL == Capabilities::WHEEL, "xinput.h mismatch");
                     static_assert(XINPUT_DEVSUBTYPE_ARCADE_STICK == Capabilities::ARCADE_STICK, "xinput.h mismatch");
 #ifndef __MINGW32__
@@ -1427,19 +1418,13 @@ public:
                     static_assert(XINPUT_DEVSUBTYPE_DRUM_KIT == Capabilities::DRUM_KIT, "xinput.h mismatch");
                     static_assert(XINPUT_DEVSUBTYPE_GUITAR_BASS == Capabilities::GUITAR_BASS, "xinput.h mismatch");
                     static_assert(XINPUT_DEVSUBTYPE_ARCADE_PAD == Capabilities::ARCADE_PAD, "xinput.h mismatch");
-#endif
 
                     caps.gamepadType = Capabilities::Type(xcaps.SubType);
                 }
 
                 // Hard-coded VID/PID
                 caps.vid = 0x045E;
-#if (_WIN32_WINNT >= _WIN32_WINNT_WIN8)
                 caps.pid = (xcaps.Flags & XINPUT_CAPS_WIRELESS) ? 0x0719 : 0;
-#else
-                caps.pid = 0;
-#endif
-
                 return;
             }
         }
@@ -1464,14 +1449,6 @@ public:
         UNREFERENCED_PARAMETER(leftTrigger);
         UNREFERENCED_PARAMETER(rightTrigger);
 
-#if (_WIN32_WINNT < _WIN32_WINNT_WIN8)
-        mLeftMotor[player] = leftMotor;
-        mRightMotor[player] = rightMotor;
-
-        if (mSuspended)
-            return mConnected[player];
-#endif
-
         XINPUT_VIBRATION xvibration;
         xvibration.wLeftMotorSpeed = WORD(leftMotor * 0xFFFF);
         xvibration.wRightMotorSpeed = WORD(rightMotor * 0xFFFF);
@@ -1495,24 +1472,8 @@ public:
     {
 #if (_WIN32_WINNT >= _WIN32_WINNT_WIN10)
         // XInput focus is handled automatically on Windows 10
-#elif (_WIN32_WINNT >= _WIN32_WINNT_WIN8)
-        XInputEnable(FALSE);
 #else
-        // For XInput 9.1.0, we have to emulate the behavior of XInputEnable( FALSE )
-        if (!mSuspended)
-        {
-            for (size_t j = 0; j < XUSER_MAX_COUNT; ++j)
-            {
-                if (mConnected[j])
-                {
-                    XINPUT_VIBRATION xvibration;
-                    xvibration.wLeftMotorSpeed = xvibration.wRightMotorSpeed = 0;
-                    std::ignore = XInputSetState(DWORD(j), &xvibration);
-                }
-            }
-
-            mSuspended = true;
-        }
+        XInputEnable(FALSE);
 #endif
     }
 
@@ -1520,31 +1481,8 @@ public:
     {
 #if (_WIN32_WINNT >= _WIN32_WINNT_WIN10)
         // XInput focus is handled automatically on Windows 10
-#elif (_WIN32_WINNT >= _WIN32_WINNT_WIN8)
-        XInputEnable(TRUE);
 #else
-        // For XInput 9.1.0, we have to emulate the behavior of XInputEnable( TRUE )
-        if (mSuspended)
-        {
-            const ULONGLONG time = GetTickCount64();
-
-            for (int j = 0; j < XUSER_MAX_COUNT; ++j)
-            {
-                if (mConnected[j])
-                {
-                    XINPUT_VIBRATION xvibration;
-                    xvibration.wLeftMotorSpeed = WORD(mLeftMotor[j] * 0xFFFF);
-                    xvibration.wRightMotorSpeed = WORD(mRightMotor[j] * 0xFFFF);
-                    const DWORD result = XInputSetState(DWORD(j), &xvibration);
-                    if (result == ERROR_DEVICE_NOT_CONNECTED)
-                    {
-                        ClearSlot(j, time);
-                    }
-                }
-            }
-
-            mSuspended = false;
-        }
+        XInputEnable(TRUE);
 #endif
     }
 
@@ -1555,13 +1493,6 @@ public:
 private:
     bool        mConnected[XUSER_MAX_COUNT];
     ULONGLONG   mLastReadTime[XUSER_MAX_COUNT];
-
-#if (_WIN32_WINNT < _WIN32_WINNT_WIN8)
-    // Variables for emulating XInputEnable on XInput 9.1.0
-    float       mLeftMotor[XUSER_MAX_COUNT];
-    float       mRightMotor[XUSER_MAX_COUNT];
-    bool        mSuspended;
-#endif
 
     bool ThrottleRetry(int player, ULONGLONG time)
     {
@@ -1597,9 +1528,6 @@ private:
     {
         mConnected[player] = false;
         mLastReadTime[player] = time;
-#if (_WIN32_WINNT < _WIN32_WINNT_WIN8)
-        mLeftMotor[player] = mRightMotor[player] = 0.f;
-#endif
     }
 
     int GetMostRecent()
@@ -1629,7 +1557,9 @@ GamePad::Impl* GamePad::Impl::s_gamePad = nullptr;
 #endif
 #pragma endregion
 
+#ifdef _MSC_VER
 #pragma warning( disable : 4355 )
+#endif
 
 // Public constructor.
 GamePad::GamePad() noexcept(false)

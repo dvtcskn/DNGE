@@ -124,6 +124,11 @@ public:
 		FORCEINLINE ITexture2D* GetTexture(std::uint32_t index) const { return Textures.at(index).get(); };
 		FORCEINLINE IConstantBuffer* GetConstantBuffer(std::uint32_t index) const { return ConstantBuffers.at(index).get(); };
 
+		FORCEINLINE bool IsCompiled() const { return Parent->IsCompiled(); }
+		FORCEINLINE bool Compile(IFrameBuffer* FrameBuffer = nullptr) { return Parent->Compile(FrameBuffer); }
+		FORCEINLINE bool Compile(IRenderTarget* RT, IDepthTarget* Depth = nullptr) { return Parent->Compile(RT, Depth); }
+		FORCEINLINE bool Compile(std::vector<IRenderTarget*> RTs, IDepthTarget* Depth = nullptr) { return Parent->Compile(RTs, Depth); }
+
 		void AddTexture(const ITexture2D::SharedPtr& Texture);
 		void AddTexture(std::string InName, void* InData, size_t InSize, sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex);
 		void AddTexture(std::wstring InPath, std::string InName, std::uint32_t DefaultRootParameterIndex);
@@ -160,12 +165,16 @@ public:
 	virtual ~sMaterial();
 	sMaterialInstance::SharedPtr CreateInstance(std::string InName);
 
-	void RecompileProgram();
-
 	FORCEINLINE std::string GetName() const { return Name; };
 	FORCEINLINE std::string GetPath() const { return Path; };
 	FORCEINLINE void SetPath(std::string InPath) { Path = InPath; };
 	FORCEINLINE IPipeline::SharedPtr GetPipeline() const { return Pipeline; };
+
+	FORCEINLINE bool IsCompiled() const { return Pipeline->IsCompiled(); }
+	bool Compile(IFrameBuffer* FrameBuffer = nullptr);
+	bool Compile(IRenderTarget* RT, IDepthTarget* Depth = nullptr);
+	bool Compile(std::vector<IRenderTarget*> RTs, IDepthTarget* Depth = nullptr);
+	bool Recompile();
 
 	FORCEINLINE std::vector<sDescriptorSetLayoutBinding> GetDescriptorSetLayoutBindings() const { return Pipeline->GetPipelineDesc().DescriptorSetLayout; };
 	FORCEINLINE std::vector<sMaterialInstance::SharedPtr> GetInstances() const { return Instances; };

@@ -38,7 +38,7 @@ namespace
                 float2 vTexture : TEXCOORD;\
                 float4 vPosition : SV_POSITION;\
             };\
-            VERTEX_OUT mainVS(uint vertexId : SV_VertexID)\
+            VERTEX_OUT FullScreenTriangleVS(uint vertexId : SV_VertexID)\
             {\
                 VERTEX_OUT Output;\
                 Output.vPosition = FullScreenVertsPos[vertexId];\
@@ -58,13 +58,9 @@ sPostProcess::sPostProcess(const sShaderAttachment& PostProcessShader, const std
 	pPipelineDesc.RasterizerAttribute = sRasterizerAttributeDesc();
 	pPipelineDesc.RasterizerAttribute.CullMode = ERasterizerCullMode::eNone;
 
-	pPipelineDesc.NumRenderTargets = 1;
-	pPipelineDesc.RTVFormats[0] = EFormat::BGRA8_UNORM;
-	//pPipelineDesc.DSVFormat = GPU::GetDefaultDepthFormat();
-
 	pPipelineDesc.DescriptorSetLayout = DescriptorSetLayout;
 
-	pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment((void*)vertexShader.data(), vertexShader.length(), "mainVS", eShaderType::Vertex));
+	pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment((void*)vertexShader.data(), vertexShader.length(), "FullScreenTriangleVS", eShaderType::Vertex));
 	//pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment(L"..//Content\\Shaders\\PostProcess.hlsl", "FullScreenTriangleVS", eShaderType::Vertex));
 	pPipelineDesc.ShaderAttachments.push_back(PostProcessShader);
 
@@ -88,13 +84,9 @@ void sPostProcess::SetPipeline(const sShaderAttachment& PostProcessShader, const
 	pPipelineDesc.RasterizerAttribute = sRasterizerAttributeDesc();
 	pPipelineDesc.RasterizerAttribute.CullMode = ERasterizerCullMode::eNone;
 
-	pPipelineDesc.NumRenderTargets = 1;
-	pPipelineDesc.RTVFormats[0] = EFormat::BGRA8_UNORM;
-	//pPipelineDesc.DSVFormat = GPU::GetDefaultDepthFormat();
-
 	pPipelineDesc.DescriptorSetLayout = DescriptorSetLayout;
 
-	pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment((void*)vertexShader.data(), vertexShader.length(), "mainVS", eShaderType::Vertex));
+	pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment((void*)vertexShader.data(), vertexShader.length(), "FullScreenTriangleVS", eShaderType::Vertex));
 	//pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment(L"..//Content\\Shaders\\PostProcess.hlsl", "FullScreenTriangleVS", eShaderType::Vertex));
 	pPipelineDesc.ShaderAttachments.push_back(PostProcessShader);
 

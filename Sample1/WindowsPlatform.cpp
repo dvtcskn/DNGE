@@ -32,23 +32,7 @@
 #include <Utilities/FileManager.h>
 #include "AssetManager.h"
 
-#ifndef BulletPhysics
-#define BulletPhysics 0
-#endif
-#ifndef PhysXEngine
-#define PhysXEngine 0
-#endif
-#ifndef Box2DPhysics
-	//#define Box2DPhysics 0
-#endif
-
-#if BulletPhysics
-	#include <Engine/BulletWorld.h>
-#elif PhysXEngine
-	#include <Engine/PhysXWorld.h>
-#else
-	#include <Engine/World2D.h>
-#endif
+#include <Engine/World2D.h>
 #include "Materials.h"
 
 #pragma comment(lib, "Engine.lib")
@@ -57,88 +41,9 @@
 #pragma comment(lib, "Pdh.lib")
 //#pragma comment(lib, "DirectXTK.lib")
 
-//#if _DEBUG
-//	#pragma comment(lib, "ffx_fsr2_api_x64d.lib")
-//	#pragma comment(lib, "ffx_fsr2_api_vk_x64d.lib")
-//	#pragma comment(lib, "ffx_fsr2_api_dx12_x64d.lib")
-//#else
-//	#pragma comment(lib, "ffx_fsr2_api_x64.lib")
-//	#pragma comment(lib, "ffx_fsr2_api_vk_x64.lib")
-//	#pragma comment(lib, "ffx_fsr2_api_dx12_x64.lib")
-//#endif
-
-#if BulletPhysics
-	// Bullet3
-#if _DEBUG
-	#pragma comment(lib, "BulletSoftBody_vs2010_x64_debug.lib")
-	#pragma comment(lib, "BulletInverseDynamicsUtils_vs2010_x64_debug.lib")
-	#pragma comment(lib, "BulletInverseDynamics_vs2010_x64_debug.lib")
-	#pragma comment(lib, "BulletDynamics_vs2010_x64_debug.lib")
-
-	#pragma comment(lib, "BulletCollision_vs2010_x64_debug.lib")
-	#pragma comment(lib, "LinearMath_vs2010_x64_debug.lib")
-	#pragma comment(lib, "BussIK_vs2010_x64_debug.lib")
-	#pragma comment(lib, "Bullet3Common_vs2010_x64_debug.lib")
-
-	#pragma comment(lib, "Bullet3Dynamics_vs2010_x64_debug.lib")
-	#pragma comment(lib, "Bullet3Collision_vs2010_x64_debug.lib")
-	#pragma comment(lib, "Bullet3Geometry_vs2010_x64_debug.lib")
-#else
-	#pragma comment(lib, "BulletSoftBody_vs2010_x64_release.lib")
-	#pragma comment(lib, "BulletInverseDynamicsUtils_vs2010_x64_release.lib")
-	#pragma comment(lib, "BulletInverseDynamics_vs2010_x64_release.lib")
-	#pragma comment(lib, "BulletDynamics_vs2010_x64_release.lib")
-
-	#pragma comment(lib, "BulletCollision_vs2010_x64_release.lib")
-	#pragma comment(lib, "LinearMath_vs2010_x64_release.lib")
-	#pragma comment(lib, "BussIK_vs2010_x64_release.lib")
-	#pragma comment(lib, "Bullet3Common_vs2010_x64_release.lib")
-
-	#pragma comment(lib, "Bullet3Dynamics_vs2010_x64_release.lib")
-	#pragma comment(lib, "Bullet3Collision_vs2010_x64_release.lib")
-	#pragma comment(lib, "Bullet3Geometry_vs2010_x64_release.lib")
-#endif
-#elif PhysXEngine
-	// PhysX
-#if _DEBUG
-	#pragma comment(lib, "PhysX_64.lib")
-	#pragma comment(lib, "PhysXCommon_64.lib")
-	#pragma comment(lib, "PhysXFoundation_64.lib")
-	#pragma comment(lib, "PhysXPvdSDK_static_64.lib")
-	#pragma comment(lib, "PhysXCooking_64.lib")
-	#pragma comment(lib, "PhysXExtensions_static_64.lib")
-	// 5.2
-	#pragma comment(lib, "LowLevel_static_64.lib")
-	#pragma comment(lib, "LowLevelAABB_static_64.lib")
-	#pragma comment(lib, "LowLevelDynamics_static_64.lib")
-	#pragma comment(lib, "PhysXCharacterKinematic_static_64.lib")
-	#pragma comment(lib, "PhysXTask_static_64.lib")
-	#pragma comment(lib, "PhysXVehicle_static_64.lib")
-	#pragma comment(lib, "SceneQuery_static_64.lib")
-	#pragma comment(lib, "SimulationController_static_64.lib")
-#else
-	#pragma comment(lib, "PhysX_64.lib")
-	#pragma comment(lib, "PhysXCommon_64.lib")
-	#pragma comment(lib, "PhysXFoundation_64.lib")
-	#pragma comment(lib, "PhysXPvdSDK_static_64.lib")
-	#pragma comment(lib, "PhysXCooking_64.lib")
-	#pragma comment(lib, "PhysXExtensions_static_64.lib")
-	// 5.2
-	#pragma comment(lib, "LowLevel_static_64.lib")
-	#pragma comment(lib, "LowLevelAABB_static_64.lib")
-	#pragma comment(lib, "LowLevelDynamics_static_64.lib")
-	#pragma comment(lib, "PhysXCharacterKinematic_static_64.lib")
-	#pragma comment(lib, "PhysXTask_static_64.lib")
-	#pragma comment(lib, "PhysXVehicle_static_64.lib")
-	#pragma comment(lib, "SceneQuery_static_64.lib")
-	#pragma comment(lib, "SimulationController_static_64.lib")
-#endif
-#else
-	//#pragma comment(lib, "box2d.lib")
-#endif
+#pragma comment(lib, "dxcompiler.lib")
 
 #pragma comment(lib, "box2d.lib")
-
 
 #define WINDOW_STYLE_NORMAL					(WS_VISIBLE | WS_OVERLAPPEDWINDOW | WS_CAPTION)
 #define WINDOW_STYLE_BORDERLESS				(WS_VISIBLE | WS_POPUP | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_POPUP)
@@ -243,20 +148,19 @@ WindowsPlatform::WindowsPlatform()
 	}
 
 	RECT rect = ArrangeWindow(RECT({ 0, 0, static_cast<LONG>(WindowWidth), static_cast<LONG>(WindowHeight) }));
-	CreateViewport(L"GameTest", rect, WindowFullscreen);
+	CreateViewport(L"Sample1", rect, WindowFullscreen);
 
-	Engine = sEngine::CreateUnique(EGITypes::eD3D12,
-#if BulletPhysics
-		BulletWorld::Create()
-#elif PhysXEngine
-		PhysXWorld::Create()
-#else
-		sWorld2D::Create()
-#endif
-		, -1
-	);
+	GPUDeviceCreateInfo GPUCreateInfo;
+	GPUCreateInfo.Type = EGITypes::eD3D12;
+	GPUCreateInfo.GPUIndex = -1;
+	GPUCreateInfo.Width = WindowWidth;
+	GPUCreateInfo.Height = WindowHeight;
+	GPUCreateInfo.Fullscreen = WindowFullscreen;
+	GPUCreateInfo.pHWND = GetHWND();
 
-	Engine->InitWindow(GetHWND(), WindowWidth, WindowHeight, WindowFullscreen);
+	Engine = sEngine::CreateUnique(GPUCreateInfo, sWorld2D::Create());
+
+	//Engine->InitWindow(GetHWND(), WindowWidth, WindowHeight, WindowFullscreen);
 	Engine->SetInternalBaseRenderResolution(640, 360);
 	GameMaterials::InitMaterials();
 	AssetManager::Get().InitializeResources();

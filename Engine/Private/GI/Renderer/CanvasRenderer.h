@@ -43,7 +43,7 @@ public:
 
 	void Render(ICanvas* Canvases, IRenderTarget* pFB, std::optional<sViewport> Viewport);
 	void Render(const std::vector<ICanvas*>& Canvases, IRenderTarget* pFB, std::optional<sViewport> Viewport);
-	void Draw(IVertexBuffer* VertexBuffer, IIndexBuffer* IndexBuffer, ICanvas::WidgetHierarchy* Node, const cbgui::cbIntBounds& ScissorsRect, const sViewport& VP);
+	void Draw(IRenderTarget* pFB, IVertexBuffer* VertexBuffer, IIndexBuffer* IndexBuffer, ICanvas::WidgetHierarchy* Node, const cbgui::cbIntBounds& ScissorsRect, const sViewport& VP);
 	bool DepthPass(cbgui::cbWidgetObj* Widget, const sViewport& VP);
 
 	virtual void SetRenderSize(std::size_t Width, std::size_t Height) override final;

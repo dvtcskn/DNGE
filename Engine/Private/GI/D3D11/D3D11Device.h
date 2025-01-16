@@ -37,14 +37,16 @@
 using namespace Microsoft::WRL;
 
 class D3D11Viewport;
+class D3D11ShaderCompiler;
 
 class D3D11Device final : public IAbstractGIDevice
 {
 	sClassBody(sClassConstructor, D3D11Device, IAbstractGIDevice)
 public:
-	D3D11Device(std::optional<short> InGPUIndex = std::nullopt);
+	D3D11Device(const GPUDeviceCreateInfo& DeviceCreateInfo);
 	virtual ~D3D11Device();
 	virtual void InitWindow(void* HWND, std::uint32_t Width, std::uint32_t Height, bool Fullscreen) override final;
+	virtual void BeginFrame() override final;
 	virtual void Present(IRenderTarget* pRT) override final;
 	bool GetDeviceIdentification(std::wstring& InVendorID, std::wstring& InDeviceID);
 	IDXGIAdapter1* GetAdapter(std::optional<short> Index = std::nullopt);
@@ -68,6 +70,10 @@ public:
 	virtual sScreenDimension GetBackBufferDimension() const override final;
 	virtual EFormat GetBackBufferFormat() const override final;
 	virtual sViewport GetViewport() const override final;
+
+	virtual IShader* CompileShader(const sShaderAttachment& Attachment, bool Spirv = false) override final;
+	virtual IShader* CompileShader(std::wstring InSrcFile, std::string InFunctionName, eShaderType InProfile, bool Spirv = false, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>()) override final;
+	virtual IShader* CompileShader(const void* InCode, std::size_t Size, std::string InFunctionName, eShaderType InProfile, bool Spirv = false, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>()) override final;
 
 	virtual IGraphicsCommandContext::SharedPtr CreateGraphicsCommandContext() override final;
 	virtual IGraphicsCommandContext::UniquePtr CreateUniqueGraphicsCommandContext() override final;
@@ -115,12 +121,14 @@ public:
 	//virtual ITiledTexture::UniquePtr CreateUniqueTiledTexture(const std::string InName, const std::uint32_t InTileX, const std::uint32_t InTileY, const sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex = 0) override final;
 
 private:
-	std::optional<short> GPUIndex;
+	std::optional<std::int32_t> GPUIndex;
 	ComPtr<ID3D11Device1> Direct3DDevice;
 	ComPtr<ID3D11DeviceContext1> Direct3DDeviceIMContext;
 	ComPtr<IDXGIFactory4> DXGIFactory;
 	std::unique_ptr<D3D11Viewport> Viewport;
 	std::uint32_t VendorId;
+
+	std::unique_ptr<D3D11ShaderCompiler> ShaderCompiler;
 
 public:
 	FORCEINLINE ID3D11Device1* Get() const

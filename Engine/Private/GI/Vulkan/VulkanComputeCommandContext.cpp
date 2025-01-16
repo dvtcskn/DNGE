@@ -27,7 +27,7 @@
 #include "pch.h"
 #include "VulkanComputeCommandContext.h"
 
-VulkanComputeCommandContext::VulkanComputeCommandContext()
+VulkanComputeCommandContext::VulkanComputeCommandContext(VulkanDevice* Device)
 {
 }
 

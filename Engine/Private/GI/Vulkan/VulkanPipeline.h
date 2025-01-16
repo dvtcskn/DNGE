@@ -28,25 +28,74 @@
 #include <map>
 #include "Engine/ClassBody.h"
 #include "Engine/AbstractEngine.h"
+#include "VulkanDevice.h"
+#include "VulkanRenderPass.h"
 
 class VulkanPipeline final : public IPipeline
 {
 	sClassBody(sClassConstructor, VulkanPipeline, IPipeline)
 public:
-	VulkanPipeline(std::string InName, sPipelineDesc InDesc);
+	VulkanPipeline(VulkanDevice* Device, std::string InName, sPipelineDesc InDesc);
 
 	virtual ~VulkanPipeline()
 	{
+		vkDestroyFramebuffer(Owner->Get(), FrameBuffer, nullptr);
+		vkDestroyPipeline(Owner->Get(), Pipeline, nullptr);
+		if (PipelineCache != VK_NULL_HANDLE)
+			vkDestroyPipelineCache(Owner->Get(), PipelineCache, nullptr);
+		RenderPass = nullptr;
+		Compiled = false;
+		Owner = nullptr;
 	}
+
+	VkPipeline Get() const { return	Pipeline; }
+	VkPipelineLayout GetLayout() const { return PipelineLayout; }
 
 	virtual sPipelineDesc GetPipelineDesc() const  override final { return Desc; }
 
-	virtual void Recompile() override final;
+	virtual bool IsCompiled() const override final
+	{
+		return Compiled;
+	}
+
+	virtual bool Compile(IFrameBuffer* FrameBuffer = nullptr) override final;
+	virtual bool Compile(IRenderTarget* RT, IDepthTarget* Depth = nullptr) override final;
+	virtual bool Compile(std::vector<IRenderTarget*> RTs, IDepthTarget* Depth = nullptr) override final;
+
+	virtual bool Recompile() override final;
+
+	VkFramebuffer FrameBuffer;
+	VulkanRenderpass::SharedPtr RenderPass;
+	sDimension2D FrameBufferDimension;
+
+private:
+	void CompilePipeline();
 
 protected:
+	VulkanDevice* Owner;
 	std::string Name;
 	sPipelineDesc Desc;
+	bool Compiled;
 
-	std::vector<sDescriptorSetLayoutBinding> DescriptorSetLayout;
-	std::vector<sShaderAttachment> ShaderAttachments;
+	VkPipelineLayout PipelineLayout;
+	VkGraphicsPipelineCreateInfo PipelineCreateInfo;
+
+	VkPipeline Pipeline;
+	VkPipelineCache PipelineCache;
+};
+
+class VulkanComputePipeline final : public IComputePipeline
+{
+    sClassBody(sClassConstructor, VulkanComputePipeline, IComputePipeline)
+public:
+    VulkanComputePipeline(VulkanDevice* InOwner, const std::string& InName, const sComputePipelineDesc& InDesc);
+    virtual ~VulkanComputePipeline();
+
+    virtual sComputePipelineDesc GetPipelineDesc() const override final { return Desc; }
+
+    virtual bool Recompile() override final;
+
+private:
+    std::string Name;
+    sComputePipelineDesc Desc;
 };

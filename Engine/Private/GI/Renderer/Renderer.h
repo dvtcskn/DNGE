@@ -43,6 +43,7 @@ public:
 	void BeginPlay();
 	void Tick(const double DeltaTime);
 
+	void BeginFrame();
 	void Render();
 
 	void OnResizeWindow(std::size_t Width, std::size_t Height);

@@ -65,7 +65,29 @@ public:
 	void ApplyPipeline(ID3D11DeviceContext1* Context, std::uint32_t StencilRef = 0) const;
 	virtual sPipelineDesc GetPipelineDesc() const override final { return Desc; }
 
-	virtual void Recompile() override final;
+	virtual bool IsCompiled() const override final
+	{
+		return true;
+	}
+
+	virtual bool Compile(IFrameBuffer* FrameBuffer = nullptr) override final
+	{
+		//Recompile();
+		return true;
+	}
+
+	virtual bool Compile(IRenderTarget* RT, IDepthTarget* Depth = nullptr) override final
+	{
+		//Recompile();
+		return true;
+	}
+	virtual bool Compile(std::vector<IRenderTarget*> RTs, IDepthTarget* Depth = nullptr) override final
+	{
+		//Recompile();
+		return true;
+	}
+
+	virtual bool Recompile() override final;
 
 	std::size_t GetDescriptorSetLayoutBindingSize() const { return DescriptorSetLayout.size(); }
 	std::vector<sDescriptorSetLayoutBinding> GetDescriptorSetLayoutBindings() const { return DescriptorSetLayout; }
@@ -88,7 +110,7 @@ private:
 	ComPtr<ID3D11RasterizerState1> RasterizerState;
 	std::map<std::uint32_t, ComPtr<ID3D11SamplerState>> SamplerStates;
 	ComPtr<ID3D11InputLayout> InputLayout;
-	std::unique_ptr<D3D11VertexAttribute> VertexAttribute;
+	std::shared_ptr<D3D11VertexAttribute> VertexAttribute;
 
 	std::vector<sDescriptorSetLayoutBinding> DescriptorSetLayout;
 	std::vector<sShaderAttachment> ShaderAttachments;
@@ -114,7 +136,7 @@ public:
 
 public:
 	virtual sComputePipelineDesc GetPipelineDesc() const override final { return Desc; }
-	virtual void Recompile() override final;
+	virtual bool Recompile() override final;
 
 	void ApplyPipeline(ID3D11DeviceContext1* Context) const;
 

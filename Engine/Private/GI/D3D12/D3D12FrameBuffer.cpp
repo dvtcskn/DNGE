@@ -214,9 +214,9 @@ D3D12DepthTarget::D3D12DepthTarget(D3D12Device* InOwner, const std::string InNam
 		D3D12_CLEAR_VALUE clearValue = {};
 		D3D12_RESOURCE_STATES states = D3D12_RESOURCE_STATE_COMMON;
 
-		if (IsValidDepthFormat(DXGIFormat))
+		if (IsValidDXGIDepthFormat(DXGIFormat))
 		{
-			clearValue.Format = GetDepthViewFormat(DXGIFormat);
+			clearValue.Format = GetDXGIDepthViewFormat(DXGIFormat);
 			clearValue.DepthStencil.Depth = 0.0f;
 			clearValue.DepthStencil.Stencil = 0;
 
@@ -247,7 +247,7 @@ D3D12DepthTarget::D3D12DepthTarget(D3D12Device* InOwner, const std::string InNam
 
 	{
 		D3D12_DEPTH_STENCIL_VIEW_DESC DSViewDesc = {};
-		DSViewDesc.Format = GetDepthViewFormat(DXGIFormat);
+		DSViewDesc.Format = GetDXGIDepthViewFormat(DXGIFormat);
 		if (resourceDesc.SampleDesc.Count == 1)
 		{
 			if (resourceDesc.DepthOrArraySize == 1)
@@ -273,12 +273,12 @@ D3D12DepthTarget::D3D12DepthTarget(D3D12Device* InOwner, const std::string InNam
 	}
 
 	{
-		if (IsValidDepthFormat(resourceDesc.Format))
+		if (IsValidDXGIDepthFormat(resourceDesc.Format))
 		{
-			if (IsDepthSRVSupported(resourceDesc.Format))
+			if (IsDXGIDepthSRVSupported(resourceDesc.Format))
 			{
 				D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-				srvDesc.Format = GetDepthSRVFormat(resourceDesc.Format);
+				srvDesc.Format = GetDXGIDepthSRVFormat(resourceDesc.Format);
 
 				if (resourceDesc.SampleDesc.Count == 1)
 				{

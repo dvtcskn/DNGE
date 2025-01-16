@@ -27,21 +27,77 @@
 
 #include <vector>
 #include "Engine/AbstractEngine.h"
+#include "VulkanDevice.h"
 
-class VulkanShader final
+class VulkanCompiledShader : public IShader
 {
-	sBaseClassBody(sClassConstructor, VulkanShader)
+	sClassBody(sClassConstructor, VulkanCompiledShader, IShader)
+public:
+	VulkanCompiledShader(std::string InName, std::wstring InPath, eShaderType Type)
+		: Name(InName)
+		, Path(InPath)
+		, ShaderType(Type)
+	{
+	}
+
+	virtual ~VulkanCompiledShader()
+	{
+		//vkDestroyShaderModule(Owner->Get(), shader_module, nullptr);
+	}
+
+	virtual std::string GetName() const override final { return Name; }
+	virtual std::wstring GetPath() const override final { return Path; }
+	virtual eShaderType Type() const override final { return ShaderType; }
+	virtual void* GetByteCode() const override final { return nullptr; }
+	virtual std::uint32_t GetByteCodeSize() const override final { return 0; }
+
 private:
+	std::string Name;
+	std::wstring Path;
+	eShaderType ShaderType;
+};
+
+class VulkanShaderCompiler final
+{
+	sBaseClassBody(sClassConstructor, VulkanShaderCompiler)
+private:
+	VulkanDevice* Device;
+	eShaderType ShaderType;
 	std::string FunctionName;
 
 public:
-	using SharedPtr = std::shared_ptr<VulkanShader>;
+	VulkanShaderCompiler(VulkanDevice* InDevice)
+		: Device(InDevice)
+	{}
 
-	VulkanShader(const sShaderAttachment& Attachment);
-	VulkanShader(std::wstring InSrcFile, std::string InFunctionName, eShaderType InProfile, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>());
-	VulkanShader(const void* InCode, std::size_t Size, std::string InFunctionName, eShaderType InProfile, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>());
-
-	virtual ~VulkanShader()
+	VulkanCompiledShader::SharedPtr Compile(const sShaderAttachment& Attachment) 
 	{
+		return nullptr;
+	}
+	VulkanCompiledShader::SharedPtr Compile(std::wstring InSrcFile, std::string InFunctionName, eShaderType InProfile, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>()) 
+	{
+		return nullptr;
+	}
+	VulkanCompiledShader::SharedPtr Compile(const void* InCode, std::size_t Size, std::string InFunctionName, eShaderType InProfile, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>()) 
+	{
+		return nullptr;
+	}
+
+	virtual ~VulkanShaderCompiler() 
+	{
+		Device = nullptr;
+	}
+
+	std::vector<VkShaderModule> shader_modules;
+	VkPipelineShaderStageCreateInfo shader_stage;
+
+private:
+	VulkanCompiledShader::SharedPtr CompileShaderFromFile(std::wstring InSrcFile, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>())
+	{
+		return nullptr;
+	}
+	VulkanCompiledShader::SharedPtr CompileShader(const void* InCode, std::size_t Size, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>())
+	{
+		return nullptr;
 	}
 };

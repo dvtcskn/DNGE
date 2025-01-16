@@ -63,8 +63,6 @@ public:
 		case ERasterizerCullMode::eNone:
 			desc.CullMode = D3D11_CULL_NONE;
 			break;
-		default:
-			break;
 		}
 
 		desc.FrontCounterClockwise = InDesc.FrontCounterClockwise ? TRUE : FALSE;
@@ -120,33 +118,15 @@ public:
 		{
 			switch (Mode)
 			{
-			case ECompareFunction::eLess:
-				return D3D11_COMPARISON_LESS;
-				break;
-			case ECompareFunction::eLessEqual:
-				return D3D11_COMPARISON_LESS_EQUAL;
-				break;
-			case ECompareFunction::eGreater:
-				return D3D11_COMPARISON_GREATER;
-				break;
-			case ECompareFunction::eGreaterEqual:
-				return D3D11_COMPARISON_GREATER_EQUAL;
-				break;
-			case ECompareFunction::eEqual:
-				return D3D11_COMPARISON_EQUAL;
-				break;
-			case ECompareFunction::eNotEqual:
-				return D3D11_COMPARISON_NOT_EQUAL;
-				break;
-			case ECompareFunction::eNever:
-				return D3D11_COMPARISON_NEVER;
-				break;
-			case ECompareFunction::eAlways:
-				return D3D11_COMPARISON_ALWAYS;
-				break;
-			default:
-				return D3D11_COMPARISON_LESS;
-				break;
+			case ECompareFunction::eLess: return D3D11_COMPARISON_LESS;
+			case ECompareFunction::eLessEqual: return D3D11_COMPARISON_LESS_EQUAL;
+			case ECompareFunction::eGreater: return D3D11_COMPARISON_GREATER;
+			case ECompareFunction::eGreaterEqual: return D3D11_COMPARISON_GREATER_EQUAL;
+			case ECompareFunction::eEqual: return D3D11_COMPARISON_EQUAL;;
+			case ECompareFunction::eNotEqual: return D3D11_COMPARISON_NOT_EQUAL;
+			case ECompareFunction::eNever: return D3D11_COMPARISON_NEVER;
+			case ECompareFunction::eAlways: return D3D11_COMPARISON_ALWAYS;
+			default: return D3D11_COMPARISON_FUNC();
 			}
 		};
 
@@ -179,21 +159,12 @@ public:
 		{
 			switch (Mode)
 			{
-			case ESamplerAddressMode::eWrap:
-				return D3D11_TEXTURE_ADDRESS_WRAP;
-				break;
-			case ESamplerAddressMode::eClamp:
-				return D3D11_TEXTURE_ADDRESS_CLAMP;
-				break;
-			case ESamplerAddressMode::eMirror:
-				return D3D11_TEXTURE_ADDRESS_MIRROR;
-				break;
-			case ESamplerAddressMode::eBorder:
-				return D3D11_TEXTURE_ADDRESS_BORDER;
-				break;
-			default:
-				return D3D11_TEXTURE_ADDRESS_WRAP;
-				break;
+			case ESamplerAddressMode::eWrap: return D3D11_TEXTURE_ADDRESS_WRAP;
+			case ESamplerAddressMode::eClamp: return D3D11_TEXTURE_ADDRESS_CLAMP;
+			case ESamplerAddressMode::eMirror: return D3D11_TEXTURE_ADDRESS_MIRROR;
+			case ESamplerAddressMode::eMirrorOnce: return D3D11_TEXTURE_ADDRESS_MODE::D3D11_TEXTURE_ADDRESS_MIRROR_ONCE;
+			case ESamplerAddressMode::eBorder: return D3D11_TEXTURE_ADDRESS_BORDER;
+			default: return D3D11_TEXTURE_ADDRESS_MODE();
 			}
 		};
 
@@ -249,33 +220,15 @@ public:
 		{
 			switch (Mode)
 			{
-			case ECompareFunction::eLess:
-				return D3D11_COMPARISON_LESS;
-				break;
-			case ECompareFunction::eLessEqual:
-				return D3D11_COMPARISON_LESS_EQUAL;
-				break;
-			case ECompareFunction::eGreater:
-				return D3D11_COMPARISON_GREATER;
-				break;
-			case ECompareFunction::eGreaterEqual:
-				return D3D11_COMPARISON_GREATER_EQUAL;
-				break;
-			case ECompareFunction::eEqual:
-				return D3D11_COMPARISON_EQUAL;
-				break;
-			case ECompareFunction::eNotEqual:
-				return D3D11_COMPARISON_NOT_EQUAL;
-				break;
-			case ECompareFunction::eNever:
-				return D3D11_COMPARISON_NEVER;
-				break;
-			case ECompareFunction::eAlways:
-				return D3D11_COMPARISON_ALWAYS;
-				break;
-			default:
-				return D3D11_COMPARISON_LESS;
-				break;
+			case ECompareFunction::eLess: return D3D11_COMPARISON_LESS;
+			case ECompareFunction::eLessEqual: return D3D11_COMPARISON_LESS_EQUAL;
+			case ECompareFunction::eGreater: return D3D11_COMPARISON_GREATER;
+			case ECompareFunction::eGreaterEqual: return D3D11_COMPARISON_GREATER_EQUAL;
+			case ECompareFunction::eEqual: return D3D11_COMPARISON_EQUAL;
+			case ECompareFunction::eNotEqual: return D3D11_COMPARISON_NOT_EQUAL;
+			case ECompareFunction::eNever: return D3D11_COMPARISON_NEVER;
+			case ECompareFunction::eAlways:	return D3D11_COMPARISON_ALWAYS;
+			default: return D3D11_COMPARISON_FUNC();
 			}
 		};
 
@@ -283,42 +236,26 @@ public:
 		{
 			switch (Mode)
 			{
-			case EStencilOp::eKeep:
-				return D3D11_STENCIL_OP_KEEP;
-				break;
-			case EStencilOp::eZero:
-				return D3D11_STENCIL_OP_ZERO;
-				break;
-			case EStencilOp::eReplace:
-				return D3D11_STENCIL_OP_REPLACE;
-				break;
-			case EStencilOp::eSaturatedIncrement:
-				return D3D11_STENCIL_OP_INCR_SAT;
-				break;
-			case EStencilOp::eSaturatedDecrement:
-				return D3D11_STENCIL_OP_DECR_SAT;
-				break;
-			case EStencilOp::eInvert:
-				return D3D11_STENCIL_OP_INVERT;
-				break;
-			case EStencilOp::eIncrement:
-				return D3D11_STENCIL_OP_INCR;
-				break;
-			case EStencilOp::eDecrement:
-				return D3D11_STENCIL_OP_DECR;
-				break;
-			default:
-				return D3D11_STENCIL_OP_ZERO;
-				break;
+			case EStencilOp::eKeep:	return D3D11_STENCIL_OP_KEEP;
+			case EStencilOp::eZero:	return D3D11_STENCIL_OP_ZERO;
+			case EStencilOp::eReplace: return D3D11_STENCIL_OP_REPLACE;
+			case EStencilOp::eSaturatedIncrement: return D3D11_STENCIL_OP_INCR_SAT;
+			case EStencilOp::eSaturatedDecrement: return D3D11_STENCIL_OP_DECR_SAT;
+			case EStencilOp::eInvert: return D3D11_STENCIL_OP_INVERT;
+			case EStencilOp::eIncrement: return D3D11_STENCIL_OP_INCR;
+			case EStencilOp::eDecrement: return D3D11_STENCIL_OP_DECR;
+			default: return D3D11_STENCIL_OP();
 			}
 		};
 
 		CD3D11_DEPTH_STENCIL_DESC desc(D3D11_DEFAULT);
 		desc.DepthFunc = Compare(InDesc.DepthTest);
-		desc.DepthEnable = InDesc.bEnableDepthWrite;
+		desc.DepthEnable = InDesc.DepthTest != ECompareFunction::eAlways || InDesc.bEnableDepthWrite;
 		desc.StencilEnable = InDesc.bStencilEnable;
 
 		desc.DepthWriteMask = InDesc.bDepthWriteMask ? D3D11_DEPTH_WRITE_MASK_ALL : D3D11_DEPTH_WRITE_MASK_ZERO;
+
+		desc.StencilEnable = InDesc.bEnableFrontFaceStencil || InDesc.bEnableBackFaceStencil;
 		desc.StencilReadMask = D3D11_DEFAULT_STENCIL_READ_MASK; //Initializer.StencilReadMask;
 		desc.StencilWriteMask = D3D11_DEFAULT_STENCIL_WRITE_MASK; //Initializer.StencilWriteMask;
 
@@ -532,6 +469,7 @@ private:
 
 class D3D11VertexAttribute
 {
+	sBaseClassBody(sClassConstructor, D3D11VertexAttribute)
 public:
 	D3D11VertexAttribute(D3D11Device* InDevice, std::vector<sVertexAttributeDesc> InDesc, void* InShaderCode = 0);
 

@@ -52,14 +52,17 @@ class D3D12CopyCommandBuffer;
 struct D3D12DescriptorHandle;
 class D3D12DescriptorHeapManager;
 class D3D12Fence;
+class D3D12ShaderCompiler;
+class DXCShaderCompiler;
 
 class D3D12Device final : public IAbstractGIDevice
 {
 	sClassBody(sClassConstructor, D3D12Device, IAbstractGIDevice)
 public:
-	D3D12Device(std::optional<short> InGPUIndex = std::nullopt);
+	D3D12Device(const GPUDeviceCreateInfo& DeviceCreateInfo);
 	virtual ~D3D12Device();
 	virtual void InitWindow(void* HWND, std::uint32_t Width, std::uint32_t Height, bool Fullscreen) override final;
+	virtual void BeginFrame() override final;
 	virtual void Present(IRenderTarget* pRT) override final;
 	bool GetDeviceIdentification(std::wstring& InVendorID, std::wstring& InDeviceID) const;
 	IDXGIAdapter* FindAdapter(const WCHAR* InTargetName) const;
@@ -103,6 +106,10 @@ public:
 	virtual sScreenDimension GetBackBufferDimension() const override final;
 	virtual EFormat GetBackBufferFormat() const override final;
 	virtual sViewport GetViewport() const override final;
+
+	virtual IShader* CompileShader(const sShaderAttachment& Attachment, bool Spirv = false) override final;
+	virtual IShader* CompileShader(std::wstring InSrcFile, std::string InFunctionName, eShaderType InProfile, bool Spirv = false, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>()) override final;
+	virtual IShader* CompileShader(const void* InCode, std::size_t Size, std::string InFunctionName, eShaderType InProfile, bool Spirv = false, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>()) override final;
 
 	virtual IGraphicsCommandContext::SharedPtr CreateGraphicsCommandContext() override final;
 	virtual IGraphicsCommandContext::UniquePtr CreateUniqueGraphicsCommandContext() override final;
@@ -150,15 +157,14 @@ public:
 	//virtual ITiledTexture::UniquePtr CreateUniqueTiledTexture(const std::string InName, const std::uint32_t InTileX, const std::uint32_t InTileY, const sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex = 0) override final;
 
 private:
-	void PostInit();
-
-private:
-	std::optional<short> GPUIndex;
+	std::optional<std::int32_t> GPUIndex;
 	ComPtr<ID3D12Device> Direct3DDevice;
 	ComPtr<IDXGIFactory4> DxgiFactory;
 	ComPtr<ID3D12CommandQueue> GraphicsQueue;
 	ComPtr<ID3D12CommandQueue> ComputeQueue;
 	ComPtr<ID3D12CommandQueue> CopyQueue;
+
+	ComPtr<ID3D12Device14> Direct3DDevice14;
 
 	D3D_FEATURE_LEVEL FeatureLevel;
 
@@ -197,6 +203,9 @@ private:
 	};
 
 	std::map<D3D12_COMMAND_LIST_TYPE, CommandAllocatorPool> CMDAllocatorPool;
+
+	std::unique_ptr<DXCShaderCompiler> ShaderCompiler;
+	//std::unique_ptr<D3D12ShaderCompiler> pD3D12ShaderCompiler;
 
 public:
 	FORCEINLINE ID3D12Device* Get() const
@@ -284,4 +293,8 @@ private:
 	{
 		return DescriptorHeapManager.get();
 	}
+
+private:
+	class D3D12CommandAllocatorPool;
+	std::unique_ptr<D3D12CommandAllocatorPool> CommandAllocatorPool;
 };

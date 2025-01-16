@@ -37,7 +37,7 @@ OBJImporter::~OBJImporter()
 {
 }
 
-bool OBJImporter::Import(const std::string& path)
+bool OBJImporter::Import(const std::string& path, bool bFlipTextCoordY)
 {
 	std::vector<std::string> Lines;
 
@@ -181,8 +181,8 @@ bool OBJImporter::Import(const std::string& path)
 				std::istringstream sin(Line.substr(Offset));
 				sin >> Y;
 			}
-			obj.Parts[PartCounter].TextureCoords.push_back(FVector2(X, Y));
-			obj.TextureCoords.push_back(FVector2(X, Y));
+			obj.Parts[PartCounter].TextureCoords.push_back(FVector2(X, bFlipTextCoordY ? 1.0f - Y : Y));
+			obj.TextureCoords.push_back(FVector2(X, bFlipTextCoordY ? 1.0f - Y : Y));
 		}
 		else if (Var == "s")
 		{
@@ -253,6 +253,16 @@ bool OBJImporter::Import(const std::string& path)
 				}
 				idx++;
 			}
+
+			//for (const auto& String : Indexes)
+			//{
+			//	std::uint32_t Index = 0;
+			//	std::istringstream sin(String);
+			//	sin >> Index;
+			//	//obj.Faces.push_back(Index - 1);
+			//	//obj.Parts[PartCounter].Faces.push_back(Index - 1);
+			//	//obj.Parts[PartCounter].FacesByMaterial[CurrentMaterialName].push_back(Index - 1);
+			//}
 		}
 	}
 
@@ -435,10 +445,32 @@ bool OBJImporter::Import(const std::string& path)
 		obj.Parts[Face.MeshIndex].Mesh.Positions.push_back(obj.Verts[Face.Position]);
 		obj.Parts[Face.MeshIndex].Mesh.TextureCoords.push_back(obj.TextureCoords[Face.TextureCoord]);
 		obj.Parts[Face.MeshIndex].Mesh.Normals.push_back(obj.Normals[Face.Normals]);
+
+		/*for (auto& Part : obj.Parts)
+		{
+			if (std::find(Part.Verts.begin(), Part.Verts.end(), obj.Verts[Face.Position]) != Part.Verts.end())
+			{
+				Part.Mesh.Positions.push_back(obj.Verts[Face.Position]);
+				Part.Mesh.TextureCoords.push_back(obj.TextureCoords[Face.TextureCoord]);
+				Part.Mesh.Normals.push_back(obj.Normals[Face.Normals]);
+				break;
+			}
+		}*/
 	}
+
+	/*for (auto& Part : obj.Parts)
+	{
+		for (const auto& Face : Part.Faces)
+		{
+			Part.Mesh.Positions.push_back(Part.Verts[Face.Position]);
+			Part.Mesh.TextureCoords.push_back(Part.TextureCoords[Face.TextureCoord]);
+			Part.Mesh.Normals.push_back(Part.Normals[Face.Normals]);
+		}
+	}*/
 
 	for (int i = 0; i < obj.Mesh.Positions.size(); i++)
 	{
+		//obj.Mesh.Indices.push_back(obj.Faces[i].Position);
 		obj.Mesh.Indices.push_back(i);
 	}
 
