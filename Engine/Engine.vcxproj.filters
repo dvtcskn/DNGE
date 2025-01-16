@@ -104,6 +104,9 @@
     <Filter Include="Engine\Public\Network">
       <UniqueIdentifier>{33b56ff8-8bc5-49b3-920f-642cca856beb}</UniqueIdentifier>
     </Filter>
+    <Filter Include="GI\Private\Shared">
+      <UniqueIdentifier>{38a6f4ff-31b8-48af-8ef8-73e5450338ca}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Public\Engine\Engine.h">
@@ -454,6 +457,27 @@
     <ClInclude Include="Public\Utilities\ModelImporter.h">
       <Filter>Utilities\Public</Filter>
     </ClInclude>
+    <ClInclude Include="Private\GI\Vulkan\DDSTextureLoader_Vulkan.h">
+      <Filter>GI\Private\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\Vulkan\VulkanDescriptorHeapManager.h">
+      <Filter>GI\Private\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\Vulkan\VulkanException.h">
+      <Filter>GI\Private\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\Vulkan\VulkanFormat.h">
+      <Filter>GI\Private\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\Vulkan\VulkanRenderPass.h">
+      <Filter>GI\Private\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\Shared\ShaderCompiler.h">
+      <Filter>GI\Private\Shared</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\GI\D3D12\D3D12ShaderCompiler.h">
+      <Filter>GI\Private\D3D12</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Private\Engine\Engine.cpp">
@@ -716,6 +740,24 @@
     </ClCompile>
     <ClCompile Include="Private\Utilities\ModelImporter.cpp">
       <Filter>Utilities\Private</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\Vulkan\DDSTextureLoader_Vulkan.cpp">
+      <Filter>GI\Private\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\Vulkan\VulkanDescriptorHeapManager.cpp">
+      <Filter>GI\Private\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\Vulkan\VulkanException.cpp">
+      <Filter>GI\Private\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\Vulkan\VulkanRenderPass.cpp">
+      <Filter>GI\Private\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\Shared\ShaderCompiler.cpp">
+      <Filter>GI\Private\Shared</Filter>
+    </ClCompile>
+    <ClCompile Include="Private\GI\D3D12\D3D12ShaderCompiler.cpp">
+      <Filter>GI\Private\D3D12</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>
