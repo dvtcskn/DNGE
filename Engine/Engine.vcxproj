@@ -180,7 +180,6 @@
     <ClInclude Include="Private\GI\D3D12\D3D12Fence.h" />
     <ClInclude Include="Private\GI\D3D12\D3D12FrameBuffer.h" />
     <ClInclude Include="Private\GI\D3D12\D3D12Pipeline.h" />
-    <ClInclude Include="Private\GI\D3D12\D3D12Shader.h" />
     <ClInclude Include="Private\GI\D3D12\D3D12ShaderCompiler.h" />
     <ClInclude Include="Private\GI\D3D12\D3D12ShaderStates.h" />
     <ClInclude Include="Private\GI\D3D12\D3D12Texture.h" />
@@ -337,7 +336,6 @@
     <ClCompile Include="Private\GI\D3D12\D3D12Fence.cpp" />
     <ClCompile Include="Private\GI\D3D12\D3D12FrameBuffer.cpp" />
     <ClCompile Include="Private\GI\D3D12\D3D12Pipeline.cpp" />
-    <ClCompile Include="Private\GI\D3D12\D3D12Shader.cpp" />
     <ClCompile Include="Private\GI\D3D12\D3D12ShaderCompiler.cpp" />
     <ClCompile Include="Private\GI\D3D12\D3D12Texture.cpp" />
     <ClCompile Include="Private\GI\D3D12\D3D12Viewport.cpp" />

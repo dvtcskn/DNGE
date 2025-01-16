@@ -202,9 +202,6 @@
     <ClInclude Include="Private\GI\D3D12\D3D12Pipeline.h">
       <Filter>GI\Private\D3D12</Filter>
     </ClInclude>
-    <ClInclude Include="Private\GI\D3D12\D3D12Shader.h">
-      <Filter>GI\Private\D3D12</Filter>
-    </ClInclude>
     <ClInclude Include="Private\GI\D3D12\D3D12ShaderStates.h">
       <Filter>GI\Private\D3D12</Filter>
     </ClInclude>
@@ -544,9 +541,6 @@
       <Filter>GI\Private\D3D12</Filter>
     </ClCompile>
     <ClCompile Include="Private\GI\D3D12\D3D12Pipeline.cpp">
-      <Filter>GI\Private\D3D12</Filter>
-    </ClCompile>
-    <ClCompile Include="Private\GI\D3D12\D3D12Shader.cpp">
       <Filter>GI\Private\D3D12</Filter>
     </ClCompile>
     <ClCompile Include="Private\GI\D3D12\D3D12Texture.cpp">
