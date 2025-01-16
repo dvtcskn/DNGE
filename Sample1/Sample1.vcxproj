@@ -72,11 +72,11 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <IncludePath>$(SolutionDir)\ThirdParty\assimp\include;$(SolutionDir)\ThirdParty\DirectX-Headers\include;$(SolutionDir)\ThirdParty\CBGUI\include;$(SolutionDir)\Engine\Public;$(SolutionDir)\ThirdParty\box2d\include;$(IncludePath)</IncludePath>
-    <LibraryPath>$(SolutionDir)\ThirdParty\CBGUI\ThirdParty\freetype2\objs\x64\Release Static;$(SolutionDir)\x64\Release;$(SolutionDir)\ThirdParty\assimp\lib\RelWithDebInfo;$(SolutionDir)\ThirdParty\CBGUI\x64\Release;$(SolutionDir)\ThirdParty\box2d\bin\Release;$(LibraryPath)</LibraryPath>
+    <LibraryPath>C:\VulkanSDK\1.4.304.0\Lib;$(SolutionDir)\ThirdParty\CBGUI\ThirdParty\freetype2\objs\x64\Release Static;$(SolutionDir)\x64\Release;$(SolutionDir)\ThirdParty\assimp\lib\RelWithDebInfo;$(SolutionDir)\ThirdParty\CBGUI\x64\Release;$(SolutionDir)\ThirdParty\box2d\bin\Release;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <IncludePath>$(SolutionDir)\ThirdParty\assimp\include;$(SolutionDir)\ThirdParty\DirectX-Headers\include;$(SolutionDir)\ThirdParty\CBGUI\include;$(SolutionDir)\Engine\Public;$(SolutionDir)\ThirdParty\box2d\include;$(IncludePath)</IncludePath>
-    <LibraryPath>$(SolutionDir)\ThirdParty\CBGUI\ThirdParty\freetype2\objs\x64\Debug Static;$(SolutionDir)\x64\Debug;$(SolutionDir)\ThirdParty\assimp\lib\RelWithDebInfo;$(SolutionDir)\ThirdParty\CBGUI\x64\Debug;$(SolutionDir)\ThirdParty\box2d\bin\Debug;$(LibraryPath)</LibraryPath>
+    <LibraryPath>C:\VulkanSDK\1.4.304.0\Lib;$(SolutionDir)\ThirdParty\CBGUI\ThirdParty\freetype2\objs\x64\Debug Static;$(SolutionDir)\x64\Debug;$(SolutionDir)\ThirdParty\assimp\lib\RelWithDebInfo;$(SolutionDir)\ThirdParty\CBGUI\x64\Debug;$(SolutionDir)\ThirdParty\box2d\bin\Debug;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
