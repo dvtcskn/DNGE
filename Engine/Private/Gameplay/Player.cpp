@@ -28,7 +28,7 @@
 #include "Gameplay/Player.h"
 #include "Gameplay/GameInstance.h"
 
-sPlayer::sPlayer(sGameInstance* InOwner, std::size_t InPlayerIndex)
+sPlayer::sPlayer(sGameInstance* InOwner, std::uint32_t InPlayerIndex)
 	: Owner(InOwner)
 	, Controller(sPlayerController::Create(this))
 	, PlayerFocusedActor(nullptr)
@@ -41,7 +41,7 @@ sPlayer::sPlayer(sGameInstance* InOwner, std::size_t InPlayerIndex)
 	SetPlayerFocusedActor(sActor::Create("DefaultActor"));
 }
 
-sPlayer::sPlayer(sGameInstance* InOwner, std::size_t InPlayerIndex, sPlayerController::SharedPtr PlayerController, sActor::SharedPtr InPlayerFocusedActor)
+sPlayer::sPlayer(sGameInstance* InOwner, std::uint32_t InPlayerIndex, sPlayerController::SharedPtr PlayerController, sActor::SharedPtr InPlayerFocusedActor)
 	: Owner(InOwner)
 	, Controller(PlayerController)
 	, PlayerFocusedActor(nullptr)
@@ -58,7 +58,7 @@ sPlayer::sPlayer(sGameInstance* InOwner, sPlayerController::SharedPtr PlayerCont
 	: Owner(InOwner)
 	, Controller(PlayerController)
 	, PlayerFocusedActor(nullptr)
-	, PlayerIndex(InOwner->GetPlayerCount())
+	, PlayerIndex((std::uint32_t)InOwner->GetPlayerCount())
 	, DeferredRemovePlayerActor(false)
 	, Name("Player_" + std::to_string(PlayerIndex))
 	, bIsReplicated(false)
@@ -231,7 +231,7 @@ sViewportInstance* sPlayer::GetViewportInstance() const
 	return nullptr;
 }
 
-std::int32_t sPlayer::GetPlayerIndex() const
+std::uint32_t sPlayer::GetPlayerIndex() const
 {
 	return PlayerIndex;
 	//return Owner->GetPlayerIndex(const_cast<sPlayer*>(this));
@@ -318,7 +318,7 @@ void sPlayer::PlayerRemoved()
 	OnPlayerRemoved();
 }
 
-void sPlayer::SetPlayerIndex(std::size_t Index)
+void sPlayer::SetPlayerIndex(std::uint32_t Index)
 {
 	PlayerIndex = Index;
 }

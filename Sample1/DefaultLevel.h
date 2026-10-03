@@ -103,7 +103,7 @@ struct LevelLayer
 		}
 		for (const auto& Emitter : Emitters)
 		{
-			Emitter->Tick(DeltaTime);
+			Emitter->Tick((float)DeltaTime);
 		}
 
 		/*std::vector<sActor::SharedPtr>::iterator it = Actors.begin();

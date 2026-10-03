@@ -42,21 +42,32 @@ class IGraphicsCommandContext;
 
 enum class ERenderPass
 {
-	eNONE,
-	eGBuffer,
-	ePostProcess,
-	eUI,
+	NONE,
+	GBuffer,
+	Line,
+	Particle,
+	PostProcess,
+	UI,
+};
+
+enum class EGPUDeviceType
+{
+	Hardware,
+	Software
 };
 
 enum class EGITypes
 {
-	eUndefined,
-	eD3D11,
-	eD3D12,
+	Undefined,
+	Default,
+	D3D12 = Default,
 	/*
 	* WIP
+	* When "ResourceDescriptorHeap" support is added, this will be supported.
 	*/
-	eVulkan,
+	Vulkan,
+	// Deprecated
+	D3D11,
 	/* Unsuported */
 	//eOpenGL46,
 };
@@ -117,6 +128,11 @@ enum class EFormat
 
 namespace
 {
+	inline void hash_combine(std::size_t& seed, std::size_t h)
+	{
+		seed ^= h + 0x9e3779b97f4a7c15ULL + (seed << 6) + (seed >> 2);
+	}
+
 	inline bool IsValidDepthOnlyFormat(const EFormat Format)
 	{
 		return Format == EFormat::D32_FLOAT || Format == EFormat::D16_UNORM;
@@ -148,6 +164,8 @@ enum class eShaderType : std::uint8_t
 	Domain,
 	Mesh,
 	Amplification,
+
+	All,
 };
 
 class RefCountedObject 
@@ -481,10 +499,19 @@ FORCEINLINE bool constexpr operator !=(const sScreenDimension& value1, const sSc
 };
 #endif
 
-struct GPUDeviceCreateInfo
+struct GPUCreateInfo
 {
-	EGITypes Type = EGITypes::eUndefined;
-	std::int32_t GPUIndex = -1;
+	struct DeviceCreateInfo
+	{
+		EGITypes Type = EGITypes::Default;
+		std::uint32_t GPUIndex = 0;
+		EGPUDeviceType DeviceType;
+	};
+	DeviceCreateInfo PrimaryGPU;
+	/*
+	* WIP
+	*/
+	DeviceCreateInfo SecondaryGPU;
 	void* pHWND = nullptr;
 	std::uint32_t Width = 0; 
 	std::uint32_t Height = 0;
@@ -528,7 +555,7 @@ struct sViewportInstance
 	sBaseClassBody(sClassConstructor, sViewportInstance)
 
 	sViewportInstance() = default;
-	inline ~sViewportInstance();
+	~sViewportInstance();
 
 	bool bIsEnabled = true;
 	std::optional<sViewport> Viewport = std::nullopt;
@@ -548,6 +575,14 @@ struct sDisplayMode
 	std::uint32_t Width = 0;
 	std::uint32_t Height = 0;
 	sRefreshRate RefreshRate;
+};
+
+enum class EVertexLayoutType
+{
+	DefaultVertexLayout,
+	Line,
+	Particle,
+	GUI,
 };
 
 struct sVertexLayout
@@ -616,6 +651,7 @@ struct sParticleVertexLayout
 	struct sParticleInstanceLayout
 	{
 		FVector position;
+		//std::uint32_t padding = 0;
 		FColor Color;
 
 		sParticleInstanceLayout()
@@ -647,15 +683,127 @@ struct sParticleVertexLayout
 	constexpr static std::size_t SizeWithoutPadding = sizeof(FVector) + sizeof(FVector2) + sizeof(FColor);
 };
 
+struct sLineVertexBufferEntry
+{
+	struct sLineVertexBufferInstanceLayout
+	{
+		FVector position;
+		FColor Color;
+
+		sLineVertexBufferInstanceLayout()
+			: position(FVector::Zero())
+			, Color(FColor::White())
+		{}
+		sLineVertexBufferInstanceLayout(FVector InPosition, FColor InColor = FColor::White())
+			: position(InPosition)
+			, Color(InColor)
+		{}
+
+		constexpr static std::size_t SizeWithoutPadding = sizeof(FVector) + sizeof(FColor);
+	};
+	FVector position;
+	FColor Color;
+
+	sLineVertexBufferEntry()
+		: position(FVector::Zero())
+		, Color(FColor::White())
+	{}
+};
+
 struct sVertexAttributeDesc
 {
-	std::string name;
-	EFormat format;
+	std::string name = "";
+	EFormat format = EFormat::UNKNOWN;
 	//uint32_t Index;
-	uint32_t InputSlot;
-	uint32_t offset;
-	bool isInstanced;
-	std::size_t Stride;
+	uint32_t InputSlot = 0;
+	uint32_t offset = 0;
+	bool isInstanced = false;
+	std::size_t Stride = 0;
+
+	static std::vector<sVertexAttributeDesc> GetDefaultMeshVertexLayout(bool bInstanced = false)
+	{
+		std::vector<sVertexAttributeDesc> VertexLayout;
+		if (bInstanced)
+		{
+			VertexLayout =
+			{
+				{ "POSITION",		EFormat::RGB32_FLOAT,   0, offsetof(sVertexLayout, position),							false, sizeof(sVertexLayout) },
+				{ "NORMAL",			EFormat::RGB32_FLOAT,   0, offsetof(sVertexLayout, normal),								false, sizeof(sVertexLayout) },
+				{ "TEXCOORD",		EFormat::RG32_FLOAT,    0, offsetof(sVertexLayout, texCoord),							false, sizeof(sVertexLayout) },
+				{ "COLOR",			EFormat::RGBA32_FLOAT,  0, offsetof(sVertexLayout, Color),								false, sizeof(sVertexLayout) },
+				{ "TANGENT",		EFormat::RGB32_FLOAT,   0, offsetof(sVertexLayout, tangent),							false, sizeof(sVertexLayout) },
+				{ "BINORMAL",		EFormat::RGB32_FLOAT,   0, offsetof(sVertexLayout, binormal),							false, sizeof(sVertexLayout) },
+				{ "ARRAYINDEX",		EFormat::R32_UINT,	    0, offsetof(sVertexLayout, ArrayIndex),							false, sizeof(sVertexLayout) },
+				{ "INSTANCEPOS",	EFormat::RGB32_FLOAT,	1, offsetof(sVertexLayout::sVertexInstanceLayout, position),    true, sizeof(sVertexLayout::sVertexInstanceLayout) },
+				{ "INSTANCECOLOR",	EFormat::RGBA32_FLOAT,	1, offsetof(sVertexLayout::sVertexInstanceLayout, Color),		true, sizeof(sVertexLayout::sVertexInstanceLayout) },
+			};
+		}
+		else
+		{
+			VertexLayout =
+			{
+				{ "POSITION",	EFormat::RGB32_FLOAT,   0, offsetof(sVertexLayout, position),    false, sizeof(sVertexLayout) },
+				{ "NORMAL",		EFormat::RGB32_FLOAT,   0, offsetof(sVertexLayout, normal),      false, sizeof(sVertexLayout) },
+				{ "TEXCOORD",	EFormat::RG32_FLOAT,    0, offsetof(sVertexLayout, texCoord),    false, sizeof(sVertexLayout) },
+				{ "COLOR",		EFormat::RGBA32_FLOAT,  0, offsetof(sVertexLayout, Color),		 false, sizeof(sVertexLayout) },
+				{ "TANGENT",	EFormat::RGB32_FLOAT,   0, offsetof(sVertexLayout, tangent),     false, sizeof(sVertexLayout) },
+				{ "BINORMAL",	EFormat::RGB32_FLOAT,   0, offsetof(sVertexLayout, binormal),    false, sizeof(sVertexLayout) },
+				{ "ARRAYINDEX",	EFormat::R32_UINT,	    0, offsetof(sVertexLayout, ArrayIndex),  false, sizeof(sVertexLayout) },
+			};
+		}
+
+		return VertexLayout;
+	}
+
+	static std::vector<sVertexAttributeDesc> GetDefaultLineVertexLayout(bool bInstanced = false)
+	{
+		std::vector<sVertexAttributeDesc> VertexLayout;
+		if (bInstanced)
+		{
+			VertexLayout =
+			{
+				{ "POSITION",		EFormat::RGB32_FLOAT,   0, offsetof(sLineVertexBufferEntry, position),									  false, sizeof(sLineVertexBufferEntry) },
+				{ "COLOR",			EFormat::RGBA32_FLOAT,  0, offsetof(sLineVertexBufferEntry, Color),										  false, sizeof(sLineVertexBufferEntry) },
+				{ "INSTANCEPOS",	EFormat::RGB32_FLOAT,	1, offsetof(sLineVertexBufferEntry::sLineVertexBufferInstanceLayout, position),	  true, sizeof(sLineVertexBufferEntry::sLineVertexBufferInstanceLayout) },
+				{ "INSTANCECOLOR",	EFormat::RGBA32_FLOAT,	1, offsetof(sLineVertexBufferEntry::sLineVertexBufferInstanceLayout, Color),	  true, sizeof(sLineVertexBufferEntry::sLineVertexBufferInstanceLayout) },
+			};
+		}
+		else
+		{
+			VertexLayout =
+			{
+				{ "POSITION",	EFormat::RGB32_FLOAT,   0, offsetof(sLineVertexBufferEntry, position),    false, sizeof(sLineVertexBufferEntry) },
+				{ "COLOR",		EFormat::RGBA32_FLOAT,  0, offsetof(sLineVertexBufferEntry, Color),       false, sizeof(sLineVertexBufferEntry) },
+			};
+		}
+
+		return VertexLayout;
+	}
+
+	static std::vector<sVertexAttributeDesc> GetDefaultParticleVertexLayout()
+	{
+		std::vector<sVertexAttributeDesc> VertexLayout =
+		{
+			{ "POSITION",		 EFormat::RGB32_FLOAT,   0, offsetof(sParticleVertexLayout, position),	false, sizeof(sParticleVertexLayout) },
+			{ "TEXCOORD",		 EFormat::RG32_FLOAT,    0, offsetof(sParticleVertexLayout, texCoord),	false, sizeof(sParticleVertexLayout) },
+			{ "COLOR",			 EFormat::RGBA32_FLOAT,  0, offsetof(sParticleVertexLayout, Color),		false, sizeof(sParticleVertexLayout) },
+			{ "INSTANCEPOS",	 EFormat::RGB32_FLOAT,	 1, offsetof(sParticleVertexLayout::sParticleInstanceLayout, position),		true, sizeof(sParticleVertexLayout::sParticleInstanceLayout) },
+			{ "INSTANCECOLOR",	 EFormat::RGBA32_FLOAT,	 1, offsetof(sParticleVertexLayout::sParticleInstanceLayout, Color),		true, sizeof(sParticleVertexLayout::sParticleInstanceLayout) },
+		};
+		return VertexLayout;
+	}
+
+	static std::vector<sVertexAttributeDesc> GetDefaultGUIVertexLayout(bool bInstanced = false);
+};
+
+enum class EDrawTypes
+{
+	Undefined,
+	Draw,
+	DrawInstanced,
+	DrawIndexedInstanced,
+	Indirect,
+	Dispatch,
 };
 
 struct sObjectDrawParameters
@@ -745,74 +893,130 @@ _declspec(align(256)) struct sMeshConstantBufferAttributes
 
 static_assert((sizeof(sMeshConstantBufferAttributes) % 16) == 0, "CB size not padded correctly");
 
+struct ResourceSharedHandle
+{
+	EGITypes GIType = EGITypes::Undefined;
+	std::uint32_t DeviceIndex = -1;
+	void* ResourceHandle = nullptr;
+};
+
 class IConstantBuffer
 {
 	sBaseClassBody(sClassDefaultProtectedConstructor, IConstantBuffer)
 public:
-	static IConstantBuffer::SharedPtr Create(std::string InName, const BufferLayout& InDesc, std::uint32_t InRootParameterIndex);
-	static IConstantBuffer::UniquePtr CreateUnique(std::string InName, const BufferLayout& InDesc, std::uint32_t InRootParameterIndex);
+	static IConstantBuffer::SharedPtr Create(std::string InName, const BufferLayout& InDesc, std::uint32_t InRootParameterIndex, std::uint32_t GPUIndex = 0);
+	static IConstantBuffer::UniquePtr CreateUnique(std::string InName, const BufferLayout& InDesc, std::uint32_t InRootParameterIndex, std::uint32_t GPUIndex = 0);
 
 public:
 	virtual std::string GetName() const = 0;
+	virtual std::uint32_t GetBindlessIndex() const = 0;
 	virtual void SetDefaultRootParameterIndex(std::uint32_t RootParameterIndex) = 0;
 	virtual std::uint32_t GetDefaultRootParameterIndex() const = 0;
 	virtual void Map(const void* Ptr, IGraphicsCommandContext* InCMDBuffer = nullptr) = 0;
+
+	virtual ResourceSharedHandle* GetSharedHandle() const = 0;
+	virtual bool CopyFrom(IConstantBuffer* ConstantBuffer) = 0;
 };
 
 class IVertexBuffer
 {
 	sBaseClassBody(sClassDefaultProtectedConstructor, IVertexBuffer)
 public:
-	static IVertexBuffer::SharedPtr Create(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource = nullptr);
-	static IVertexBuffer::UniquePtr CreateUnique(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource = nullptr);
+	static IVertexBuffer::SharedPtr Create(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource = nullptr, std::uint32_t GPUIndex = 0);
+	static IVertexBuffer::UniquePtr CreateUnique(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource = nullptr, std::uint32_t GPUIndex = 0);
 
 public:
 	virtual std::string GetName() const = 0;
 	virtual std::size_t GetSize() const = 0;
 	virtual bool IsMapable() const = 0;
 	virtual void UpdateSubresource(BufferSubresource* Subresource, IGraphicsCommandContext* InCMDBuffer = nullptr) = 0;
+
+	virtual ResourceSharedHandle* GetSharedHandle() const = 0;
+	virtual bool CopyFrom(IVertexBuffer* VertexBuffer) = 0;
 };
 
 class IIndexBuffer
 {
 	sBaseClassBody(sClassDefaultProtectedConstructor, IIndexBuffer)
 public:
-	static IIndexBuffer::SharedPtr Create(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource = nullptr);
-	static IIndexBuffer::UniquePtr CreateUnique(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource = nullptr);
+	static IIndexBuffer::SharedPtr Create(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource = nullptr, std::uint32_t GPUIndex = 0);
+	static IIndexBuffer::UniquePtr CreateUnique(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource = nullptr, std::uint32_t GPUIndex = 0);
 
 public:
 	virtual std::string GetName() const = 0;
 	virtual std::size_t GetSize() const = 0;
 	virtual bool IsMapable() const = 0;
 	virtual void UpdateSubresource(BufferSubresource* Subresource, IGraphicsCommandContext* InCMDBuffer = nullptr) = 0;
+
+	virtual ResourceSharedHandle* GetSharedHandle() const = 0;
+	virtual bool CopyFrom(IIndexBuffer* IndexBuffer) = 0;
 };
 
-class IUnorderedAccessBuffer
+class IByteAddressBuffer
 {
-	sBaseClassBody(sClassDefaultProtectedConstructor, IUnorderedAccessBuffer)
+	sBaseClassBody(sClassDefaultProtectedConstructor, IByteAddressBuffer)
 public:
-	static IUnorderedAccessBuffer::SharedPtr Create(std::string InName, const BufferLayout& InDesc, bool bSRVAllowed = true);
-	static IUnorderedAccessBuffer::UniquePtr CreateUnique(std::string InName, const BufferLayout& InDesc, bool bSRVAllowed = true);
+	/*
+	* size should be a multiple of 4
+	*/
+	static IByteAddressBuffer::SharedPtr Create(std::string InName, std::uint64_t Size, bool bReadWriteAllowed = false, std::uint32_t GPUIndex = 0);
+	static IByteAddressBuffer::UniquePtr CreateUnique(std::string InName, std::uint64_t Size, bool bReadWriteAllowed = false, std::uint32_t GPUIndex = 0);
 
 public:
 	virtual std::string GetName() const = 0;
+	virtual std::uint32_t GetBindlessIndex() const = 0;
+
+	virtual bool IsReadWriteAllowed() const = 0;
+	virtual std::uint64_t GetSize() const = 0;
+
+	virtual bool IsMapable() const = 0;
+	virtual void Map(const void* Ptr, std::size_t Location, std::uint32_t Stride, IGraphicsCommandContext* InCMDBuffer = nullptr) = 0;
+
+	virtual ResourceSharedHandle* GetSharedHandle() const = 0;
+	virtual bool CopyFrom(IByteAddressBuffer* UnorderedAccessBuffer) = 0;
+};
+
+class IStructuredBuffer
+{
+	sBaseClassBody(sClassDefaultProtectedConstructor, IStructuredBuffer)
+public:
+	static IStructuredBuffer::SharedPtr Create(std::string InName, const BufferLayout& InDesc, bool bSRVAllowed = true, std::uint32_t GPUIndex = 0);
+	static IStructuredBuffer::UniquePtr CreateUnique(std::string InName, const BufferLayout& InDesc, bool bSRVAllowed = true, std::uint32_t GPUIndex = 0);
+
+public:
+	virtual std::string GetName() const = 0;
+	virtual std::uint32_t GetBindlessIndex() const = 0;
 
 	virtual bool IsSRV_Allowed() const = 0;
 	virtual std::size_t GetSize() const = 0;
 
 	virtual bool IsMapable() const = 0;
-	virtual void Map(const void* Ptr, IGraphicsCommandContext* InCMDBuffer = nullptr) = 0;
+	virtual void Map(const void* Ptr, std::size_t Location, IGraphicsCommandContext* InCMDBuffer = nullptr) = 0;
+
+	virtual ResourceSharedHandle* GetSharedHandle() const = 0;
+	virtual bool CopyFrom(IStructuredBuffer* UnorderedAccessBuffer) = 0;
 };
 
 class IIndirectBuffer
 {
 	sBaseClassBody(sClassDefaultProtectedConstructor, IIndirectBuffer)
 public:
-	static IIndirectBuffer::SharedPtr Create(std::string InName);
-	static IIndirectBuffer::UniquePtr CreateUnique(std::string InName);
+	static IIndirectBuffer::SharedPtr Create(std::string InName, BufferLayout Layout, std::uint32_t GPUIndex = 0);
+	static IIndirectBuffer::UniquePtr CreateUnique(std::string InName, BufferLayout Layout, std::uint32_t GPUIndex = 0);
 
 public:
+	virtual std::string GetName() const = 0;
 
+	virtual std::uint64_t GetSize() const = 0;
+	virtual std::uint64_t GetTotalCommandSize() const = 0;
+	virtual std::uint64_t GetCurrentCommandSize() const = 0;
+	virtual std::uint64_t GetStride() const = 0;
+	virtual std::uint64_t GetOffset() const = 0;
+
+	virtual void SetArgument(void* InArgument, std::size_t NewCommandSize = 1, std::uint64_t NewOffset = 0) = 0;
+
+	virtual ResourceSharedHandle* GetSharedHandle() const = 0;
+	virtual bool CopyFrom(IIndirectBuffer* IndirectBuffer) = 0;
 };
 
 struct sFBODesc
@@ -855,18 +1059,18 @@ struct sFBODesc
 	{}
 };
 
-enum class eFrameBufferAttachmentType
+enum class EFrameBufferAttachmentType
 {
-	eRT,
-	eRT_SRV,
-	eRT_UAV,
-	eRT_SRV_UAV,
-	eDepth,
-	eDepth_SRV,
-	eDepth_UAV,
-	eDepth_SRV_UAV,
-	eUAV,
-	eUAV_SRV
+	RT,
+	RT_SRV,
+	RT_UAV,
+	RT_SRV_UAV,
+	Depth,
+	Depth_SRV,
+	Depth_UAV,
+	Depth_SRV_UAV,
+	UAV,
+	UAV_SRV
 };
 
 struct sFrameBufferAttachmentInfo
@@ -874,8 +1078,8 @@ struct sFrameBufferAttachmentInfo
 	struct sFrameBuffer
 	{
 		EFormat Format;
-		eFrameBufferAttachmentType AttachmentType;
-		sFrameBuffer(const EFormat& InFormat, const eFrameBufferAttachmentType InAttachmentType = eFrameBufferAttachmentType::eRT_SRV)
+		EFrameBufferAttachmentType AttachmentType;
+		sFrameBuffer(const EFormat& InFormat, const EFrameBufferAttachmentType InAttachmentType = EFrameBufferAttachmentType::RT_SRV)
 			: Format(InFormat)
 			, AttachmentType(InAttachmentType)
 		{}
@@ -897,11 +1101,11 @@ struct sFrameBufferAttachmentInfo
 	{
 		std::vector<sFrameBuffer> Attachments = FrameBuffer;
 		if (WithDepth && DepthFormat != EFormat::UNKNOWN)
-			Attachments.push_back(sFrameBuffer(DepthFormat, eFrameBufferAttachmentType::eDepth));
+			Attachments.push_back(sFrameBuffer(DepthFormat, EFrameBufferAttachmentType::Depth));
 		return Attachments;
 	}
 	std::size_t GetRenderTargetAttachmentCount() const { return FrameBuffer.size(); }
-	void AddFrameBuffer(const EFormat Format, const eFrameBufferAttachmentType InAttachmentType = eFrameBufferAttachmentType::eRT_SRV)
+	void AddFrameBuffer(const EFormat Format, const EFrameBufferAttachmentType InAttachmentType = EFrameBufferAttachmentType::RT_SRV)
 	{
 		FrameBuffer.push_back(sFrameBuffer(Format, InAttachmentType));
 	}
@@ -912,25 +1116,30 @@ class IRenderTarget
 {
 	sBaseClassBody(sClassDefaultProtectedConstructor, IRenderTarget)
 public:
-	static IRenderTarget::SharedPtr Create(const std::string InName, const EFormat Format, const sFBODesc& Desc);
-	static IRenderTarget::UniquePtr CreateUnique(const std::string InName, const EFormat Format, const sFBODesc& Desc);
+	static IRenderTarget::SharedPtr Create(const std::string InName, const EFormat Format, const sFBODesc& Desc, std::uint32_t GPUIndex = 0);
+	static IRenderTarget::UniquePtr CreateUnique(const std::string InName, const EFormat Format, const sFBODesc& Desc, std::uint32_t GPUIndex = 0);
 
 public:
 	virtual bool IsSRV_Allowed() const = 0;
 	virtual bool IsUAV_Allowed() const = 0;
+	virtual std::uint32_t GetSRVBindlessIndex() const = 0;
+	virtual std::uint32_t GetUAVBindlessIndex() const = 0;
 
 	virtual void* GetNativeTexture() const = 0;
 
 	virtual void SetDefaultRootParameterIndex(std::uint32_t RootParameterIndex) = 0;
 	virtual std::uint32_t GetDefaultRootParameterIndex() const = 0;
+
+	virtual ResourceSharedHandle* GetSharedHandle() const = 0;
+	virtual bool CopyFrom(IRenderTarget* RenderTarget) = 0;
 };
 
 class IDepthTarget
 {
 	sBaseClassBody(sClassDefaultProtectedConstructor, IDepthTarget)
 public:
-	static IDepthTarget::SharedPtr Create(const std::string InName, const EFormat Format, const sFBODesc& Desc);
-	static IDepthTarget::UniquePtr CreateUnique(const std::string InName, const EFormat Format, const sFBODesc& Desc);
+	static IDepthTarget::SharedPtr Create(const std::string InName, const EFormat Format, const sFBODesc& Desc, std::uint32_t GPUIndex = 0);
+	static IDepthTarget::UniquePtr CreateUnique(const std::string InName, const EFormat Format, const sFBODesc& Desc, std::uint32_t GPUIndex = 0);
 
 public:
 	virtual bool IsSRV_Allowed() const = 0;
@@ -940,30 +1149,38 @@ public:
 
 	virtual void SetDefaultRootParameterIndex(std::uint32_t RootParameterIndex) = 0;
 	virtual std::uint32_t GetDefaultRootParameterIndex() const = 0;
+
+	virtual ResourceSharedHandle* GetSharedHandle() const = 0;
+	virtual bool CopyFrom(IDepthTarget* DepthTarget) = 0;
 };
 
 class IUnorderedAccessTarget
 {
 	sBaseClassBody(sClassDefaultProtectedConstructor, IUnorderedAccessTarget)
 public:
-	static IUnorderedAccessTarget::SharedPtr Create(const std::string InName, const EFormat Format, const sFBODesc& Desc, bool InEnableSRV = true);
-	static IUnorderedAccessTarget::UniquePtr CreateUnique(const std::string InName, const EFormat Format, const sFBODesc& Desc, bool InEnableSRV = true);
+	static IUnorderedAccessTarget::SharedPtr Create(const std::string InName, const EFormat Format, const sFBODesc& Desc, bool InEnableSRV = true, std::uint32_t GPUIndex = 0);
+	static IUnorderedAccessTarget::UniquePtr CreateUnique(const std::string InName, const EFormat Format, const sFBODesc& Desc, bool InEnableSRV = true, std::uint32_t GPUIndex = 0);
 
 public:
 	virtual bool IsSRV_Allowed() const = 0;
+	virtual std::uint32_t GetSRVBindlessIndex() const = 0;
+	virtual std::uint32_t GetUAVBindlessIndex() const = 0;
 
 	virtual void* GetNativeTexture() const = 0;
 
 	virtual void SetDefaultRootParameterIndex(std::uint32_t RootParameterIndex) = 0;
 	virtual std::uint32_t GetDefaultRootParameterIndex() const = 0;
+
+	virtual ResourceSharedHandle* GetSharedHandle() const = 0;
+	virtual bool CopyFrom(IUnorderedAccessTarget* UnorderedAccessTarget) = 0;
 };
 
 class IFrameBuffer
 {
 	sBaseClassBody(sClassDefaultProtectedConstructor, IFrameBuffer)
 public:
-	static IFrameBuffer::SharedPtr Create(const std::string InName, const sFrameBufferAttachmentInfo& InAttachments);
-	static IFrameBuffer::UniquePtr CreateUnique(const std::string InName, const sFrameBufferAttachmentInfo& InAttachments);
+	static IFrameBuffer::SharedPtr Create(const std::string InName, const sFrameBufferAttachmentInfo& InAttachments, std::uint32_t GPUIndex = 0);
+	static IFrameBuffer::UniquePtr CreateUnique(const std::string InName, const sFrameBufferAttachmentInfo& InAttachments, std::uint32_t GPUIndex = 0);
 
 public:
 	virtual std::string GetName() const = 0;
@@ -982,20 +1199,22 @@ public:
 
 	virtual std::size_t GetAttachmentCount() const = 0;
 	virtual std::size_t GetRenderTargetAttachmentCount() const = 0;
+
+	virtual bool CopyFrom(IFrameBuffer* FrameBuffer) = 0;
 };
 
 enum class ERasterizerCullMode
 {
-	eNone,
-	eCW,
-	eCCW,
+	None,
+	CW,
+	CCW,
 };
 
 enum class ERasterizerFillMode
 {
-	ePoint,
-	eWireframe,
-	eSolid,
+	Point,
+	Wireframe,
+	Solid,
 };
 
 struct sRasterizerAttributeDesc
@@ -1011,8 +1230,8 @@ struct sRasterizerAttributeDesc
 
 	bool FrontCounterClockwise;
 
-	sRasterizerAttributeDesc(ERasterizerCullMode InMode = ERasterizerCullMode::eCW)
-		: FillMode(ERasterizerFillMode::eSolid)
+	sRasterizerAttributeDesc(ERasterizerCullMode InMode = ERasterizerCullMode::CW)
+		: FillMode(ERasterizerFillMode::Solid)
 		, CullMode(InMode)
 		, DepthBias(0)
 		, DepthBiasClamp(0.0f)
@@ -1025,7 +1244,7 @@ struct sRasterizerAttributeDesc
 
 	sRasterizerAttributeDesc(ERasterizerFillMode InMode)
 		: FillMode(InMode)
-		, CullMode(InMode == ERasterizerFillMode::eWireframe ? ERasterizerCullMode::eNone : ERasterizerCullMode::eCW)
+		, CullMode(InMode == ERasterizerFillMode::Wireframe ? ERasterizerCullMode::None : ERasterizerCullMode::CW)
 		, DepthBias(0)
 		, DepthBiasClamp(0.0f)
 		, DepthClipEnable(true)
@@ -1038,152 +1257,210 @@ struct sRasterizerAttributeDesc
 
 enum class ECompareFunction
 {
-	eLess,
-	eLessEqual,
-	eGreater,
-	eGreaterEqual,
-	eEqual,
-	eNotEqual,
-	eNever,
-	eAlways,
+	Less,
+	LessEqual,
+	Greater,
+	GreaterEqual,
+	Equal,
+	NotEqual,
+	Never,
+	Always,
 };
 
 enum class ESamplerFilter
 {
-	ePoint,
-	eBilinear,
-	eTrilinear,
-	eAnisotropicPoint,
-	eAnisotropicLinear,
+	Point,
+	Bilinear,
+	Trilinear,
+	AnisotropicPoint,
+	AnisotropicLinear,
 };
 
 enum class ESamplerAddressMode
 {
-	eWrap,
-	eClamp,
-	eMirror,
-	eMirrorOnce,
-	eBorder,
+	Wrap,
+	Clamp,
+	Mirror,
+	MirrorOnce,
+	Border,
 };
 
 enum class ESamplerStateMode
 {
-	ePointWrap,
-	ePointClamp,
-	ePointBorder,
-	eLinearWrap,
-	eLinearClamp,
-	eAnisotropicWrap,
-	eAnisotropicClamp,
-	eAnisotropicLinear,
+	PointWrap,
+	PointClamp,
+	PointBorder,
+	LinearWrap,
+	LinearClamp,
+	AnisotropicWrap,
+	AnisotropicClamp,
+	AnisotropicLinear,
 };
 
 struct sSamplerAttributeDesc
 {
-	sSamplerAttributeDesc(ESamplerStateMode InMode = ESamplerStateMode::ePointWrap)
-		: Filter(ESamplerFilter::ePoint)
-		, AddressU(ESamplerAddressMode::eClamp)
-		, AddressV(ESamplerAddressMode::eClamp)
-		, AddressW(ESamplerAddressMode::eClamp)
+	sSamplerAttributeDesc(ESamplerStateMode InMode = ESamplerStateMode::PointWrap)
+		: Filter(ESamplerFilter::Point)
+		, AddressU(ESamplerAddressMode::Clamp)
+		, AddressV(ESamplerAddressMode::Clamp)
+		, AddressW(ESamplerAddressMode::Clamp)
 		, MipBias(0)
 		, MinMipLevel(0)
 		, MaxMipLevel(FLT_MAX)
 		, MaxAnisotropy(1)
 		, BorderColor(FColor::White())
 		, bUINTBorderColor(false)
-		, SamplerComparisonFunction(ECompareFunction::eNever)
+		, SamplerComparisonFunction(ECompareFunction::Never)
 	{
 		switch (InMode)
 		{
-		case ESamplerStateMode::ePointWrap:
-			Filter = ESamplerFilter::ePoint;
-			AddressU = ESamplerAddressMode::eWrap;
-			AddressV = ESamplerAddressMode::eWrap;
-			AddressW = ESamplerAddressMode::eWrap;
+		case ESamplerStateMode::PointWrap:
+			Filter = ESamplerFilter::Point;
+			AddressU = ESamplerAddressMode::Wrap;
+			AddressV = ESamplerAddressMode::Wrap;
+			AddressW = ESamplerAddressMode::Wrap;
 			break;
-		case ESamplerStateMode::ePointClamp:
-			Filter = ESamplerFilter::ePoint;
-			AddressU = ESamplerAddressMode::eClamp;
-			AddressV = ESamplerAddressMode::eClamp;
-			AddressW = ESamplerAddressMode::eClamp;
+		case ESamplerStateMode::PointClamp:
+			Filter = ESamplerFilter::Point;
+			AddressU = ESamplerAddressMode::Clamp;
+			AddressV = ESamplerAddressMode::Clamp;
+			AddressW = ESamplerAddressMode::Clamp;
 			break;
-		case ESamplerStateMode::ePointBorder:
-			Filter = ESamplerFilter::ePoint;
-			AddressU = ESamplerAddressMode::eBorder;
-			AddressV = ESamplerAddressMode::eBorder;
-			AddressW = ESamplerAddressMode::eBorder;
+		case ESamplerStateMode::PointBorder:
+			Filter = ESamplerFilter::Point;
+			AddressU = ESamplerAddressMode::Border;
+			AddressV = ESamplerAddressMode::Border;
+			AddressW = ESamplerAddressMode::Border;
 			break;
-		case ESamplerStateMode::eLinearWrap:
-			Filter = ESamplerFilter::eBilinear;
-			AddressU = ESamplerAddressMode::eWrap;
-			AddressV = ESamplerAddressMode::eWrap;
-			AddressW = ESamplerAddressMode::eWrap;
+		case ESamplerStateMode::LinearWrap:
+			Filter = ESamplerFilter::Bilinear;
+			AddressU = ESamplerAddressMode::Wrap;
+			AddressV = ESamplerAddressMode::Wrap;
+			AddressW = ESamplerAddressMode::Wrap;
 			break;
-		case ESamplerStateMode::eLinearClamp:
-			Filter = ESamplerFilter::eBilinear;
-			AddressU = ESamplerAddressMode::eClamp;
-			AddressV = ESamplerAddressMode::eClamp;
-			AddressW = ESamplerAddressMode::eClamp;
+		case ESamplerStateMode::LinearClamp:
+			Filter = ESamplerFilter::Bilinear;
+			AddressU = ESamplerAddressMode::Clamp;
+			AddressV = ESamplerAddressMode::Clamp;
+			AddressW = ESamplerAddressMode::Clamp;
 			break;
-		case ESamplerStateMode::eAnisotropicWrap:
-			Filter = ESamplerFilter::eAnisotropicPoint;
-			AddressU = ESamplerAddressMode::eWrap;
-			AddressV = ESamplerAddressMode::eWrap;
-			AddressW = ESamplerAddressMode::eWrap;
+		case ESamplerStateMode::AnisotropicWrap:
+			Filter = ESamplerFilter::AnisotropicPoint;
+			AddressU = ESamplerAddressMode::Wrap;
+			AddressV = ESamplerAddressMode::Wrap;
+			AddressW = ESamplerAddressMode::Wrap;
 			break;
-		case ESamplerStateMode::eAnisotropicClamp:
-			Filter = ESamplerFilter::eAnisotropicPoint;
-			AddressU = ESamplerAddressMode::eClamp;
-			AddressV = ESamplerAddressMode::eClamp;
-			AddressW = ESamplerAddressMode::eClamp;
+		case ESamplerStateMode::AnisotropicClamp:
+			Filter = ESamplerFilter::AnisotropicPoint;
+			AddressU = ESamplerAddressMode::Clamp;
+			AddressV = ESamplerAddressMode::Clamp;
+			AddressW = ESamplerAddressMode::Clamp;
 			break;
-		case ESamplerStateMode::eAnisotropicLinear:
-			Filter = ESamplerFilter::eAnisotropicLinear;
-			AddressU = ESamplerAddressMode::eWrap;
-			AddressV = ESamplerAddressMode::eWrap;
-			AddressW = ESamplerAddressMode::eWrap;
-			SamplerComparisonFunction = ECompareFunction::eLess;
+		case ESamplerStateMode::AnisotropicLinear:
+			Filter = ESamplerFilter::AnisotropicLinear;
+			AddressU = ESamplerAddressMode::Wrap;
+			AddressV = ESamplerAddressMode::Wrap;
+			AddressW = ESamplerAddressMode::Wrap;
+			SamplerComparisonFunction = ECompareFunction::Less;
 			break;
 		}
 	}
 
 	void SetToAddressToWrap()
 	{
-		AddressU = ESamplerAddressMode::eWrap;
-		AddressV = ESamplerAddressMode::eWrap;
-		AddressW = ESamplerAddressMode::eWrap;
+		AddressU = ESamplerAddressMode::Wrap;
+		AddressV = ESamplerAddressMode::Wrap;
+		AddressW = ESamplerAddressMode::Wrap;
 	}
 
 	void SetToAddressToClamp()
 	{
-		AddressU = ESamplerAddressMode::eClamp;
-		AddressV = ESamplerAddressMode::eClamp;
-		AddressW = ESamplerAddressMode::eClamp;
+		AddressU = ESamplerAddressMode::Clamp;
+		AddressV = ESamplerAddressMode::Clamp;
+		AddressW = ESamplerAddressMode::Clamp;
 	}
 
 	ESamplerFilter Filter;
 	ESamplerAddressMode AddressU;
 	ESamplerAddressMode AddressV;
 	ESamplerAddressMode AddressW;
-	int MipBias;
+	std::uint32_t MipBias;
 	float MinMipLevel;
 	float MaxMipLevel;
-	int MaxAnisotropy;
+	std::uint32_t MaxAnisotropy;
 	FColor BorderColor;
 	bool bUINTBorderColor;
 	ECompareFunction SamplerComparisonFunction;
+
+#if _MSVC_LANG >= 202002L
+	constexpr auto operator<=>(const sSamplerAttributeDesc&) const = default;
+#endif
+};
+
+#if _MSVC_LANG < 202002L
+FORCEINLINE bool constexpr operator ==(const sSamplerAttributeDesc& value1, const sSamplerAttributeDesc& value2)
+{
+	return value1.Filter == value2.Filter && value1.AddressU == value2.AddressU && value1.AddressV == value2.AddressV &&
+		   value1.AddressW == value2.AddressW && value1.MipBias == value2.MipBias && value1.MinMipLevel == value2.MinMipLevel &&
+		   value1.MinMipLevel == value2.MinMipLevel && value1.MaxAnisotropy == value2.MaxAnisotropy && value1.BorderColor == value2.BorderColor &&
+		   value1.bUINTBorderColor == value2.bUINTBorderColor && value1.SamplerComparisonFunction == value2.SamplerComparisonFunction;
+};
+
+FORCEINLINE bool constexpr operator !=(const sSamplerAttributeDesc& value1, const sSamplerAttributeDesc& value2)
+{
+	return value1.Filter != value2.Filter && value1.AddressU != value2.AddressU && value1.AddressV != value2.AddressV &&
+		   value1.AddressW != value2.AddressW && value1.MipBias != value2.MipBias && value1.MinMipLevel != value2.MinMipLevel &&
+		   value1.MinMipLevel != value2.MinMipLevel && value1.MaxAnisotropy != value2.MaxAnisotropy && value1.BorderColor != value2.BorderColor &&
+		   value1.bUINTBorderColor != value2.bUINTBorderColor && value1.SamplerComparisonFunction != value2.SamplerComparisonFunction;
+};
+#endif
+
+struct sSamplerAttributeDescHash
+{
+	std::size_t operator()(const sSamplerAttributeDesc& s) const
+	{
+		std::size_t seed = 0;
+		hash_combine(seed, std::hash<ESamplerFilter>{}(s.Filter));
+		hash_combine(seed, std::hash<ESamplerAddressMode>{}(s.AddressU));
+		hash_combine(seed, std::hash<ESamplerAddressMode>{}(s.AddressV));
+		hash_combine(seed, std::hash<ESamplerAddressMode>{}(s.AddressW));
+		hash_combine(seed, std::hash<std::uint32_t>{}(s.MipBias));
+		hash_combine(seed, std::hash<float>{}(s.MinMipLevel));
+		hash_combine(seed, std::hash<float>{}(s.MaxMipLevel));
+		hash_combine(seed, std::hash<std::uint32_t>{}(s.MaxAnisotropy));
+		hash_combine(seed, std::hash<float>{}(s.BorderColor.R));
+		hash_combine(seed, std::hash<float>{}(s.BorderColor.G));
+		hash_combine(seed, std::hash<float>{}(s.BorderColor.B));
+		hash_combine(seed, std::hash<float>{}(s.BorderColor.A));
+		hash_combine(seed, std::hash<bool>{}(s.bUINTBorderColor));
+		hash_combine(seed, std::hash<ECompareFunction>{}(s.SamplerComparisonFunction));
+		return seed;
+	}
+};
+
+class ISamplerState
+{
+	sBaseClassBody(sClassDefaultProtectedConstructor, ISamplerState)
+public:
+	static ISamplerState::SharedPtr Create(const std::string InName, const sSamplerAttributeDesc& InDesc, std::uint32_t GPUIndex = 0);
+	static ISamplerState::UniquePtr CreateUnique(const std::string InName, const sSamplerAttributeDesc& InDesc, std::uint32_t GPUIndex = 0);
+
+public:
+	virtual std::string GetName() const = 0;
+	virtual sSamplerAttributeDesc GetSamplerDesc() const = 0;
+	virtual std::uint32_t GetBindlessIndex() const = 0;
 };
 
 enum class EStencilOp
 {
-	eKeep,
-	eZero,
-	eReplace,
-	eSaturatedIncrement,
-	eSaturatedDecrement,
-	eInvert,
-	eIncrement,
-	eDecrement,
+	Keep,
+	Zero,
+	Replace,
+	SaturatedIncrement,
+	SaturatedDecrement,
+	Invert,
+	Increment,
+	Decrement,
 };
 
 struct sDepthStencilAttributeDesc
@@ -1206,21 +1483,21 @@ struct sDepthStencilAttributeDesc
 	unsigned __int8 StencilReadMask;
 	unsigned __int8 StencilWriteMask;
 
-	sDepthStencilAttributeDesc(bool DepthWrite = true, bool StencilEnable = false)
+	sDepthStencilAttributeDesc(ECompareFunction DepthTestFunc = ECompareFunction::LessEqual, bool DepthWrite = true, bool StencilEnable = false)
 		: bEnableDepthWrite(DepthWrite)
 		, bStencilEnable(StencilEnable)
 		, bDepthWriteMask(true)
-		, DepthTest(ECompareFunction::eLessEqual)
+		, DepthTest(DepthTestFunc)
 		, bEnableFrontFaceStencil(false)
-		, FrontFaceStencilTest(ECompareFunction::eAlways)
-		, FrontFaceStencilFailStencilOp(EStencilOp::eKeep)
-		, FrontFaceDepthFailStencilOp(EStencilOp::eKeep)
-		, FrontFacePassStencilOp(EStencilOp::eKeep)
+		, FrontFaceStencilTest(ECompareFunction::Always)
+		, FrontFaceStencilFailStencilOp(EStencilOp::Keep)
+		, FrontFaceDepthFailStencilOp(EStencilOp::Keep)
+		, FrontFacePassStencilOp(EStencilOp::Keep)
 		, bEnableBackFaceStencil(false)
-		, BackFaceStencilTest(ECompareFunction::eAlways)
-		, BackFaceStencilFailStencilOp(EStencilOp::eKeep)
-		, BackFaceDepthFailStencilOp(EStencilOp::eKeep)
-		, BackFacePassStencilOp(EStencilOp::eKeep)
+		, BackFaceStencilTest(ECompareFunction::Always)
+		, BackFaceStencilFailStencilOp(EStencilOp::Keep)
+		, BackFaceDepthFailStencilOp(EStencilOp::Keep)
+		, BackFacePassStencilOp(EStencilOp::Keep)
 		, StencilReadMask(0xFF)
 		, StencilWriteMask(0xFF)
 	{}
@@ -1228,49 +1505,49 @@ struct sDepthStencilAttributeDesc
 
 enum class EBlendFactor
 {
-	eZero,
-	eOne,
-	eSourceColor,
-	eInverseSourceColor,
-	eSourceAlpha,
-	eInverseSourceAlpha,
-	eDestAlpha,
-	eInverseDestAlpha,
-	eDestColor,
-	eInverseDestColor,
-	eBlendFactor,
-	eInverseBlendFactor,
+	Zero,
+	One,
+	SourceColor,
+	InverseSourceColor,
+	SourceAlpha,
+	InverseSourceAlpha,
+	DestAlpha,
+	InverseDestAlpha,
+	DestColor,
+	InverseDestColor,
+	BlendFactor,
+	InverseBlendFactor,
 };
 
 enum class EColorWriteMask
 {
-	eNONE = 0,
-	eRED = 0x01,
-	eGREEN = 0x02,
-	eBLUE = 0x04,
-	eALPHA = 0x08,
+	NONE = 0,
+	RED = 0x01,
+	GREEN = 0x02,
+	BLUE = 0x04,
+	ALPHA = 0x08,
 
-	eRGB = eRED | eGREEN | eBLUE,
-	eRGBA = eRED | eGREEN | eBLUE | eALPHA,
-	eRG = eRED | eGREEN,
-	eBA = eBLUE | eALPHA,
+	RGB = RED | GREEN | BLUE,
+	RGBA = RED | GREEN | BLUE | ALPHA,
+	RG = RED | GREEN,
+	BA = BLUE | ALPHA,
 };
 
 enum class EBlendOperation
 {
-	eAdd,
-	eSubtract,
-	eMin,
-	eMax,
-	eReverseSubtract,
+	Add,
+	Subtract,
+	Min,
+	Max,
+	ReverseSubtract,
 };
 
 enum class EBlendStateMode
 {
-	eOpaque,
-	eAlphaBlend,
-	eAdditive,
-	eNonPremultiplied,
+	Opaque,
+	AlphaBlend,
+	Additive,
+	NonPremultiplied,
 };
 
 struct sBlendAttributeDesc
@@ -1291,13 +1568,13 @@ public:
 
 		BlendTarget(
 			bool InBlendEnable = false,
-			EBlendOperation InColorBlendOp = EBlendOperation::eAdd,
-			EBlendFactor InColorSrcBlend = EBlendFactor::eOne,
-			EBlendFactor InColorDestBlend = EBlendFactor::eZero,
-			EBlendOperation InAlphaBlendOp = EBlendOperation::eAdd,
-			EBlendFactor InAlphaSrcBlend = EBlendFactor::eOne,
-			EBlendFactor InAlphaDestBlend = EBlendFactor::eZero,
-			EColorWriteMask InColorWriteMask = EColorWriteMask::eRGBA
+			EBlendOperation InColorBlendOp = EBlendOperation::Add,
+			EBlendFactor InColorSrcBlend = EBlendFactor::One,
+			EBlendFactor InColorDestBlend = EBlendFactor::Zero,
+			EBlendOperation InAlphaBlendOp = EBlendOperation::Add,
+			EBlendFactor InAlphaSrcBlend = EBlendFactor::One,
+			EBlendFactor InAlphaDestBlend = EBlendFactor::Zero,
+			EColorWriteMask InColorWriteMask = EColorWriteMask::RGBA
 		)
 			: bBlendEnable(InBlendEnable)
 			, ColorBlendOp(InColorBlendOp)
@@ -1311,32 +1588,32 @@ public:
 
 		BlendTarget(EBlendStateMode InMode)
 			: bBlendEnable(true)
-			, ColorBlendOp(EBlendOperation::eAdd)
-			, ColorSrcBlend(EBlendFactor::eOne)
-			, ColorDestBlend(EBlendFactor::eZero)
-			, AlphaBlendOp(EBlendOperation::eAdd)
-			, AlphaSrcBlend(EBlendFactor::eOne)
-			, AlphaDestBlend(EBlendFactor::eZero)
-			, ColorWriteMask(EColorWriteMask::eRGBA)
+			, ColorBlendOp(EBlendOperation::Add)
+			, ColorSrcBlend(EBlendFactor::One)
+			, ColorDestBlend(EBlendFactor::Zero)
+			, AlphaBlendOp(EBlendOperation::Add)
+			, AlphaSrcBlend(EBlendFactor::One)
+			, AlphaDestBlend(EBlendFactor::Zero)
+			, ColorWriteMask(EColorWriteMask::RGBA)
 		{
 			switch (InMode)
 			{
-			case EBlendStateMode::eOpaque:
-				ColorSrcBlend = EBlendFactor::eOne;
-				ColorDestBlend = EBlendFactor::eZero;
+			case EBlendStateMode::Opaque:
+				ColorSrcBlend = EBlendFactor::One;
+				ColorDestBlend = EBlendFactor::Zero;
 				break;
-			case EBlendStateMode::eAlphaBlend:
-				ColorSrcBlend = EBlendFactor::eOne;
-				ColorDestBlend = EBlendFactor::eInverseSourceAlpha;
+			case EBlendStateMode::AlphaBlend:
+				ColorSrcBlend = EBlendFactor::One;
+				ColorDestBlend = EBlendFactor::InverseSourceAlpha;
 				break;
-			case EBlendStateMode::eAdditive:
-				ColorSrcBlend = EBlendFactor::eSourceAlpha;
-				ColorDestBlend = EBlendFactor::eOne;
+			case EBlendStateMode::Additive:
+				ColorSrcBlend = EBlendFactor::SourceAlpha;
+				ColorDestBlend = EBlendFactor::One;
 				break;
-			case EBlendStateMode::eNonPremultiplied:
-				ColorSrcBlend = EBlendFactor::eSourceAlpha;
-				ColorDestBlend = EBlendFactor::eInverseSourceAlpha;
-				AlphaDestBlend = EBlendFactor::eSourceAlpha;
+			case EBlendStateMode::NonPremultiplied:
+				ColorSrcBlend = EBlendFactor::SourceAlpha;
+				ColorDestBlend = EBlendFactor::InverseSourceAlpha;
+				AlphaDestBlend = EBlendFactor::SourceAlpha;
 				break;
 			}
 		}
@@ -1371,43 +1648,46 @@ public:
 
 enum class EPrimitiveType : std::uint8_t
 {
-	ePOINT_LIST = 0x0,
-	eTRIANGLE_LIST = 0x1,
-	eTRIANGLE_STRIP = 0x2,
-	eLINE_LIST = 0x4,
+	UNDEFINED,
+	POINT_LIST,
+	TRIANGLE_LIST,
+	TRIANGLE_STRIP,
+	LINE_LIST,
 };
 
 enum class EDescriptorType : std::uint8_t
 {
-	eUniformBuffer,
-	eUAV,
+	UniformBuffer,
+	UAV,
 	e32BitConstant,
-	eTexture,
-	eSampler,
+	Texture,
+	Sampler,
+	StaticSampler,
 };
 
-struct sDescriptorSetLayoutBinding
+struct sShaderBinding
 {
 public:
 	EDescriptorType DescriptorType;
-	std::optional<sSamplerAttributeDesc> SamplerDesc;
 
 	std::uint32_t Location;
 	eShaderType ShaderType;
 	std::uint32_t Size;
 	std::uint32_t RegisterSpace;
 
-	sDescriptorSetLayoutBinding(EDescriptorType InType, eShaderType InShaderType, std::uint32_t InLocation, std::uint32_t InSize = 1, std::uint32_t InRegisterSpace = 0)
+	sSamplerAttributeDesc SamplerDesc;
+
+	sShaderBinding(EDescriptorType InType, eShaderType InShaderType, std::uint32_t InLocation, std::uint32_t InSize = 1, std::uint32_t InRegisterSpace = 0)
 		: Location(InLocation)
 		, DescriptorType(InType)
 		, ShaderType(InShaderType)
 		, Size(InSize)
 		, RegisterSpace(InRegisterSpace)
-		, SamplerDesc(std::nullopt)
+		, SamplerDesc(sSamplerAttributeDesc())
 	{}
-	sDescriptorSetLayoutBinding(sSamplerAttributeDesc Sampler, eShaderType InShaderType, std::uint32_t InLocation, std::uint32_t InSize = 1, std::uint32_t InRegisterSpace = 0)
+	sShaderBinding(sSamplerAttributeDesc Sampler, eShaderType InShaderType, std::uint32_t InLocation, std::uint32_t InSize = 1, std::uint32_t InRegisterSpace = 0)
 		: Location(InLocation)
-		, DescriptorType(EDescriptorType::eSampler)
+		, DescriptorType(EDescriptorType::StaticSampler)
 		, ShaderType(InShaderType)
 		, Size(InSize)
 		, RegisterSpace(InRegisterSpace)
@@ -1415,7 +1695,41 @@ public:
 	{}
 
 	EDescriptorType GetDescriptorType() const { return DescriptorType; }
-	std::optional<sSamplerAttributeDesc> GetSamplerDesc() const { return SamplerDesc; }
+
+#if _MSVC_LANG >= 202002L
+	//constexpr auto operator<=>(const sShaderBinding&) const = default;
+#endif
+
+	bool operator==(const sShaderBinding& rhs)
+	{
+		return DescriptorType == rhs.DescriptorType && SamplerDesc == rhs.SamplerDesc
+			&& Location == rhs.Location && ShaderType == rhs.ShaderType && Size == rhs.Size && RegisterSpace == rhs.RegisterSpace;
+	}
+};
+
+struct sDescriptorSetLayoutBindingHash
+{
+	std::size_t operator()(const sShaderBinding& s) const
+	{
+		std::size_t seed = 0;
+		hash_combine(seed, std::hash<EDescriptorType>{}(s.DescriptorType));
+		hash_combine(seed, std::hash<std::uint32_t>{}(s.Location));
+		hash_combine(seed, std::hash<eShaderType>{}(s.ShaderType));
+		hash_combine(seed, std::hash<std::uint32_t>{}(s.Size));
+		hash_combine(seed, std::hash<std::uint32_t>{}(s.RegisterSpace));
+		hash_combine(seed, sSamplerAttributeDescHash{}(s.SamplerDesc));
+		return seed;
+	}
+};
+
+struct sDescriptorSetLayoutBindingVectorHash
+{
+	std::size_t operator()(const std::vector<sShaderBinding>& v) const {
+		std::size_t seed = v.size();
+		for (const auto& s : v)
+			hash_combine(seed, sDescriptorSetLayoutBindingHash{}(s));
+		return seed;
+	}
 };
 
 struct sShaderDefines
@@ -1479,37 +1793,143 @@ class IShader
 {
 	sBaseClassBody(sClassDefaultProtectedConstructor, IShader)
 public:
-	static IShader::SharedPtr Create(const sShaderAttachment& Attachment);
-	static IShader::SharedPtr Create(std::wstring InSrcFile, std::string InFunctionName, eShaderType InProfile, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>());
-	static IShader::SharedPtr Create(const void* InCode, std::size_t Size, std::string InFunctionName, eShaderType InProfile, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>());
+	static IShader::SharedPtr Create(const sShaderAttachment& Attachment, std::uint32_t GPUIndex = 0);
+	static IShader::SharedPtr Create(std::wstring InSrcFile, std::string InFunctionName, eShaderType InProfile, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>(), std::uint32_t GPUIndex = 0);
+	static IShader::SharedPtr Create(const void* InCode, std::size_t Size, std::string InFunctionName, eShaderType InProfile, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>(), std::uint32_t GPUIndex = 0);
 
 public:
 	virtual std::string GetName() const = 0;
 	virtual std::wstring GetPath() const = 0;
 	virtual eShaderType Type() const = 0;
 	virtual void* GetByteCode() const = 0;
-	virtual std::uint32_t GetByteCodeSize() const = 0;
+	virtual std::size_t GetByteCodeSize() const = 0;
+};
+
+struct sIndirectLayoutBindingDesc
+{
+	sBaseClassBody(sClassNoDefaults, sIndirectLayoutBindingDesc)
+public:
+	sIndirectLayoutBindingDesc(EDrawTypes InDrawType = EDrawTypes::Undefined, std::uint32_t InNumArguments = std::uint32_t(-1), std::uint32_t InStride = std::uint32_t(-1), std::uint32_t InDrawIndex = std::uint32_t(-1), std::vector<sShaderBinding> NewBindings = std::vector<sShaderBinding>())
+		: DrawType(InDrawType)
+		, DrawIndex(InDrawIndex)
+		, NumArguments(InNumArguments)
+		, Stride(InStride)
+		, CustomBindings(NewBindings)
+	{}
+
+	EDrawTypes DrawType = EDrawTypes::Undefined;
+	std::uint32_t DrawIndex = std::uint32_t(-1);
+	std::uint32_t NumArguments = std::uint32_t(-1);
+	std::uint32_t Stride = std::uint32_t(-1);
+
+	std::vector<sShaderBinding> CustomBindings;
 };
 
 struct sPipelineDesc
 {
 	sBaseClassBody(sClassNoDefaults, sPipelineDesc)
 public:
-	sPipelineDesc() = default;
+	sPipelineDesc(ERenderPass InRenderPass = ERenderPass::NONE)
+		: RenderPass(InRenderPass)
+		, RasterizerAttribute(sRasterizerAttributeDesc())
+		, DepthStencilAttribute(sDepthStencilAttributeDesc())
+		, BlendAttribute(sBlendAttributeDesc())
+		, PrimitiveTopologyType(EPrimitiveType::TRIANGLE_LIST)
+		, IndirectLayoutBindingDesc(sIndirectLayoutBindingDesc())
+	{}
+
+	sPipelineDesc(ERenderPass InRenderPass, EBlendStateMode BlendStateMode, ECompareFunction DepthCompareFunction, bool bStencilEnabled, EVertexLayoutType VertexLayoutType, 
+		bool bIsInstanced, sIndirectLayoutBindingDesc NewIndirectLayoutBindingDesc)
+		: RenderPass(InRenderPass)
+		, RasterizerAttribute(sRasterizerAttributeDesc())
+		, DepthStencilAttribute(sDepthStencilAttributeDesc())
+		, BlendAttribute(sBlendAttributeDesc())
+		, PrimitiveTopologyType(EPrimitiveType::TRIANGLE_LIST)
+		, IndirectLayoutBindingDesc(sIndirectLayoutBindingDesc())
+	{
+		DepthStencilAttribute = sDepthStencilAttributeDesc(DepthCompareFunction, true, bStencilEnabled);
+		BlendAttribute = sBlendAttributeDesc(BlendStateMode);
+		PrimitiveTopologyType = EPrimitiveType::TRIANGLE_LIST;
+		IndirectLayoutBindingDesc = NewIndirectLayoutBindingDesc;
+
+		switch (VertexLayoutType)
+		{
+		case EVertexLayoutType::DefaultVertexLayout:
+			VertexLayout = sVertexAttributeDesc::GetDefaultMeshVertexLayout(bIsInstanced);
+			break;
+		case EVertexLayoutType::GUI:
+			VertexLayout = sVertexAttributeDesc::GetDefaultGUIVertexLayout(bIsInstanced);
+			break;
+		case EVertexLayoutType::Particle:
+			VertexLayout = sVertexAttributeDesc::GetDefaultParticleVertexLayout();
+			break;
+		case EVertexLayoutType::Line:
+			VertexLayout = sVertexAttributeDesc::GetDefaultLineVertexLayout(bIsInstanced);
+			break;
+		}
+	}
+
 	~sPipelineDesc()
 	{
-		DescriptorSetLayout.clear();
+		Bindings.clear();
 		ShaderAttachments.clear();
 		VertexLayout.clear();
 	}
+
+	ERenderPass RenderPass;
 	sRasterizerAttributeDesc RasterizerAttribute;
 	sDepthStencilAttributeDesc DepthStencilAttribute;
 	sBlendAttributeDesc BlendAttribute;
 	EPrimitiveType PrimitiveTopologyType;
+	sIndirectLayoutBindingDesc IndirectLayoutBindingDesc;
 
-	std::vector<sDescriptorSetLayoutBinding> DescriptorSetLayout;
+	std::vector<sShaderBinding> Bindings;
 	std::vector<sShaderAttachment> ShaderAttachments;
 	std::vector<sVertexAttributeDesc> VertexLayout;
+
+	static sPipelineDesc CreateDefaultPipelineDesc(ERenderPass InRenderPass, sBlendAttributeDesc BlendState = sBlendAttributeDesc(), sRasterizerAttributeDesc RasterizerDesc = sRasterizerAttributeDesc(), sDepthStencilAttributeDesc DepthStencilDesc = sDepthStencilAttributeDesc(), std::vector<sVertexAttributeDesc> VertexLayoutDesc = sVertexAttributeDesc::GetDefaultMeshVertexLayout(false), 
+	  EPrimitiveType InPrimitiveType = EPrimitiveType::TRIANGLE_LIST, sIndirectLayoutBindingDesc IndirectLayoutBindingDesc = sIndirectLayoutBindingDesc(), 
+	  std::vector<sShaderBinding> InBindings = std::vector<sShaderBinding>(), std::vector<sShaderAttachment> InShaderAttachments = std::vector<sShaderAttachment>())
+	{
+		sPipelineDesc Desc(InRenderPass);
+		Desc.RasterizerAttribute = RasterizerDesc;
+		Desc.DepthStencilAttribute = DepthStencilDesc;
+		Desc.BlendAttribute = BlendState;
+		Desc.PrimitiveTopologyType = InPrimitiveType;
+		Desc.VertexLayout = VertexLayoutDesc;
+		Desc.IndirectLayoutBindingDesc = IndirectLayoutBindingDesc;
+		Desc.Bindings = InBindings;
+		Desc.ShaderAttachments = InShaderAttachments;
+
+		return Desc;
+	}
+
+	static sPipelineDesc CreateDefaultPipelineDesc(ERenderPass InRenderPass, EBlendStateMode BlendStateMode = EBlendStateMode::Opaque, ECompareFunction DepthCompareFunction = ECompareFunction::LessEqual, bool bStencilEnabled = true, EVertexLayoutType VertexLayoutType = EVertexLayoutType::DefaultVertexLayout, bool bIsInstanced = false, sIndirectLayoutBindingDesc IndirectLayoutBindingDesc = sIndirectLayoutBindingDesc())
+	{
+		sPipelineDesc Desc(InRenderPass);
+		Desc.DepthStencilAttribute = sDepthStencilAttributeDesc(DepthCompareFunction, true, bStencilEnabled);
+		Desc.BlendAttribute = sBlendAttributeDesc(BlendStateMode);
+		Desc.PrimitiveTopologyType = EPrimitiveType::TRIANGLE_LIST;
+		Desc.IndirectLayoutBindingDesc = IndirectLayoutBindingDesc;
+
+		switch (VertexLayoutType)
+		{
+			case EVertexLayoutType::DefaultVertexLayout:
+				Desc.VertexLayout = sVertexAttributeDesc::GetDefaultMeshVertexLayout(bIsInstanced);
+				break;
+			case EVertexLayoutType::GUI:
+				Desc.VertexLayout = sVertexAttributeDesc::GetDefaultGUIVertexLayout(bIsInstanced);
+				break;
+			case EVertexLayoutType::Particle:
+				Desc.VertexLayout = sVertexAttributeDesc::GetDefaultParticleVertexLayout();
+				break;
+			case EVertexLayoutType::Line:
+				Desc.VertexLayout = sVertexAttributeDesc::GetDefaultLineVertexLayout(bIsInstanced);
+				break;
+		}
+
+		return Desc;
+	}
 };
 
 class IVertexAttribute
@@ -1525,19 +1945,22 @@ class IRootSignature
 	sBaseClassBody(sClassDefaultProtectedConstructor, IRootSignature)
 public:
 	virtual void Release() = 0;
-
-	virtual std::vector<sDescriptorSetLayoutBinding> GetDescriptorSetLayout() const = 0;
+	virtual std::vector<sShaderBinding> GetDescriptorSetLayout() const = 0;
+	virtual bool IsIndirectCommandAvailable() const = 0;
 };
 
 class IPipeline
 {
 	sBaseClassBody(sClassDefaultProtectedConstructor, IPipeline)
 public:
-	static IPipeline::SharedPtr Create(const std::string& InName, const sPipelineDesc& InDesc);
-	static IPipeline::UniquePtr CreateUnique(const std::string& InName, const sPipelineDesc& InDesc);
+	static IPipeline::SharedPtr Create(const std::string& InName, const sPipelineDesc& InDesc, std::uint32_t GPUIndex = 0);
+	static IPipeline::UniquePtr CreateUnique(const std::string& InName, const sPipelineDesc& InDesc, std::uint32_t GPUIndex = 0);
 
 public:
 	virtual sPipelineDesc GetPipelineDesc() const = 0;
+	virtual ERenderPass GetRenderPass() const = 0;
+	virtual IRootSignature* GetRootSignature() const = 0;
+	virtual bool IsIndirectCommandAvailable() const = 0;
 	virtual bool IsCompiled() const = 0;
 	virtual bool Compile(IFrameBuffer* FrameBuffer = nullptr) = 0;
 	virtual bool Compile(IRenderTarget* RT, IDepthTarget* Depth = nullptr) = 0;
@@ -1549,15 +1972,15 @@ struct sComputePipelineDesc
 {
 	sBaseClassBody(sClassNoDefaults, sComputePipelineDesc)
 public:
-	sComputePipelineDesc(const sShaderAttachment& InShaderAttachment, const std::vector<sDescriptorSetLayoutBinding>& InDescriptorSetLayout)
+	sComputePipelineDesc(const sShaderAttachment& InShaderAttachment, const std::vector<sShaderBinding>& InBindings)
 		: ShaderAttachment(InShaderAttachment)
-		, DescriptorSetLayout(InDescriptorSetLayout)
+		, Bindings(InBindings)
 	{}
 	~sComputePipelineDesc()
 	{
-		DescriptorSetLayout.clear();
+		Bindings.clear();
 	}
-	std::vector<sDescriptorSetLayoutBinding> DescriptorSetLayout;
+	std::vector<sShaderBinding> Bindings;
 	sShaderAttachment ShaderAttachment;
 };
 
@@ -1565,8 +1988,8 @@ class IComputePipeline
 {
 	sBaseClassBody(sClassDefaultProtectedConstructor, IComputePipeline)
 public:
-	static IComputePipeline::SharedPtr Create(const std::string& InName, const sComputePipelineDesc& InDesc);
-	static IComputePipeline::UniquePtr CreateUnique(const std::string& InName, const sComputePipelineDesc& InDesc);
+	static IComputePipeline::SharedPtr Create(const std::string& InName, const sComputePipelineDesc& InDesc, std::uint32_t GPUIndex = 0);
+	static IComputePipeline::UniquePtr CreateUnique(const std::string& InName, const sComputePipelineDesc& InDesc, std::uint32_t GPUIndex = 0);
 
 public:
 	virtual sComputePipelineDesc GetPipelineDesc() const = 0;
@@ -1603,16 +2026,17 @@ class ITexture2D
 {
 	sBaseClassBody(sClassDefaultProtectedConstructor, ITexture2D)
 public:
-	static ITexture2D::SharedPtr Create(const std::wstring FilePath, const std::string InName, std::uint32_t DefaultRootParameterIndex = 0);
-	static ITexture2D::UniquePtr CreateUnique(const std::wstring FilePath, const std::string InName, std::uint32_t DefaultRootParameterIndex = 0);
-	static ITexture2D::SharedPtr Create(const std::string InName, void* InBuffer, const std::size_t InSize, const sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex = 0);
-	static ITexture2D::UniquePtr CreateUnique(const std::string InName, void* InBuffer, const std::size_t InSize, const sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex = 0);
-	static ITexture2D::SharedPtr CreateEmpty(const std::string InName, const sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex = 0);
-	static ITexture2D::UniquePtr CreateUniqueEmpty(const std::string InName, const sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex = 0);
+	static ITexture2D::SharedPtr Create(const std::wstring FilePath, const std::string InName, std::uint32_t DefaultRootParameterIndex = 0, std::uint32_t GPUIndex = 0);
+	static ITexture2D::UniquePtr CreateUnique(const std::wstring FilePath, const std::string InName, std::uint32_t DefaultRootParameterIndex = 0, std::uint32_t GPUIndex = 0);
+	static ITexture2D::SharedPtr Create(const std::string InName, void* InBuffer, const std::size_t InSize, const sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex = 0, std::uint32_t GPUIndex = 0);
+	static ITexture2D::UniquePtr CreateUnique(const std::string InName, void* InBuffer, const std::size_t InSize, const sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex = 0, std::uint32_t GPUIndex = 0);
+	static ITexture2D::SharedPtr CreateEmpty(const std::string InName, const sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex = 0, std::uint32_t GPUIndex = 0);
+	static ITexture2D::UniquePtr CreateUniqueEmpty(const std::string InName, const sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex = 0, std::uint32_t GPUIndex = 0);
 
 public:
 	virtual std::wstring GetPath() const = 0;
 	virtual std::string GetName() const = 0;
+	virtual std::uint32_t GetBindlessIndex() const = 0;
 
 	virtual sTextureDesc GetDesc() const = 0;
 
@@ -1626,24 +2050,174 @@ public:
 	virtual void UpdateTexture(const void* pSrcData, std::size_t RowPitch, std::size_t MinX, std::size_t MinY, std::size_t MaxX, std::size_t MaxY, IGraphicsCommandContext* InCommandBuffer = nullptr) = 0;
 
 	virtual void SaveToFile(std::wstring InPath) const = 0;
+	virtual ResourceSharedHandle* GetSharedHandle() const = 0;
+	virtual bool CopyFrom(ITexture2D* Texture2D) = 0;
 };
 
 typedef ITexture2D ITiledTexture;
 
-class IGraphicsCommandContext
+class sMaterial;
+struct GMouseInput;
+struct GKeyboardChar;
+
+class IRenderPass
+{
+	sBaseClassBody(sClassDefaultProtectedConstructor, IRenderPass);
+public:
+	virtual void BeginPlay() = 0;
+	virtual void Tick(const double DeltaTime) = 0;
+
+	//virtual void Render(IFrameBuffer* pFB) = 0;
+
+	virtual void SetRenderSize(std::size_t Width, std::size_t Height) = 0;
+	virtual void OnInputProcess(const GMouseInput& MouseInput, const GKeyboardChar& KeyboardChar) = 0;
+};
+
+class IRenderer
+{
+	sBaseClassBody(sClassDefaultProtectedConstructor, IRenderer)
+public:
+	virtual void RegisterMaterial(sMaterial* Material) = 0;
+	virtual void CompileMaterial(sMaterial* Material, bool bRecompile = false) = 0;
+	virtual void CompilePipeline(IPipeline* Pipeline, bool bRecompile = false) = 0;
+	virtual sIndirectLayoutBindingDesc GetRenderPassIndirectLayoutBindingDesc(ERenderPass RenderPass) const = 0;
+	virtual IFrameBuffer* GetFrameBuffer(ERenderPass RenderPass) const = 0;
+};
+
+struct IBindlessSceneDescriptor {};
+struct IBindlessSceneContainer
+{
+	virtual const IBindlessSceneDescriptor* GetDescriptor() const
+	{
+		return nullptr;
+	}
+
+	virtual std::uint32_t Size() const
+	{
+		return GetMaterialInstanceSize() + GetConstantBuffereSize() + GetUAVSize() + GetTextureSize() + GetSamplerSize() + GetVertexBuffersSize() + GetByteAddressBufferSize();
+	}
+
+	virtual std::uint32_t GetOffset() const
+	{
+		return 0;
+	}
+
+	virtual std::vector<std::uint32_t> GetAllBindlessIndices() const
+	{
+		return std::vector<std::uint32_t>();
+	}
+
+	virtual std::vector<std::uint32_t> GetAllVertexBufferBindlessIndices() const
+	{
+		return std::vector<std::uint32_t>();
+	}
+
+	virtual std::uint32_t GetVertexBuffersSize() const
+	{
+		return 0;
+	}
+
+	virtual std::vector<std::uint32_t> GetAllMaterialInstanceBindlessIndices() const
+	{
+		return std::vector<std::uint32_t>();
+	}
+
+	virtual std::uint32_t GetMaterialInstanceSize() const
+	{
+		return 0;
+	}
+
+	virtual std::vector<std::uint32_t> GetAllConstantBufferBindlessIndices() const
+	{
+		return std::vector<std::uint32_t>();
+	}
+
+	virtual std::uint32_t GetConstantBuffereSize() const
+	{
+		return 0;
+	}
+
+	virtual std::vector<std::uint32_t> GetAllTextureBindlessIndices() const
+	{
+		return std::vector<std::uint32_t>();
+	}
+
+	virtual std::uint32_t GetTextureSize() const
+	{
+		return 0;
+	}
+
+	virtual std::vector<std::uint32_t> GetAllSamplerBindlessIndices() const
+	{
+		return std::vector<std::uint32_t>();
+	}
+
+	virtual std::uint32_t GetSamplerSize() const
+	{
+		return 0;
+	}
+
+	virtual std::vector<std::uint32_t> GetAllUAVBindlessIndices() const
+	{
+		return std::vector<std::uint32_t>();
+	}
+
+	virtual std::uint32_t GetUAVSize() const
+	{
+		return 0;
+	}
+
+	virtual std::vector<std::uint32_t> GetAllByteAddressBufferBindlessIndices() const
+	{
+		return std::vector<std::uint32_t>();
+	}
+
+	virtual std::uint32_t GetByteAddressBufferSize() const
+	{
+		return 0;
+	}
+};
+
+enum class ECommandContextType
+{
+	Graphics,
+	Compute,
+	Copy,
+};
+
+enum class ECommandContextExecuteType
+{
+	Immediate,
+	Deferred,
+};
+
+class ICommandContext
+{
+	sBaseClassBody(sClassDefaultProtectedConstructor, ICommandContext)
+public:
+	virtual void* GetInternalCommandContext() = 0;
+	virtual ECommandContextType GetCommandContextType() const = 0;
+};
+
+class IGraphicsCommandContext : public ICommandContext
 {
 	sBaseClassBody(sClassDefaultProtectedConstructor, IGraphicsCommandContext)
 public:
-	static IGraphicsCommandContext::SharedPtr Create();
-	static IGraphicsCommandContext::UniquePtr CreateUnique();
+	static IGraphicsCommandContext::SharedPtr Create(std::uint32_t GPUIndex = 0);
+	static IGraphicsCommandContext::UniquePtr CreateUnique(std::uint32_t GPUIndex = 0);
 
 public:
-	virtual void BeginRecordCommandList(const ERenderPass RenderPass = ERenderPass::eNONE) = 0;
+	virtual ECommandContextType GetCommandContextType() const override final
+	{
+		return ECommandContextType::Graphics;
+	}
+
+	virtual bool BeginRecordCommandList(const ERenderPass RenderPass = ERenderPass::NONE) = 0;
 	virtual void FinishRecordCommandList() = 0;
-	virtual void ExecuteCommandList() = 0;
+	virtual void ExecuteCommandList(ECommandContextExecuteType ExecuteType = ECommandContextExecuteType::Immediate, std::uint32_t Order = std::uint32_t(-1)) = 0;
 	virtual void ClearState() = 0;
 
-	virtual void* GetInternalCommandContext() = 0;
+	virtual bool IsRecorded() const = 0;
 
 	virtual void SetViewport(const sViewport& Viewport) = 0;
 
@@ -1662,8 +2236,8 @@ public:
 	virtual void SetFrameBufferAsResource(IFrameBuffer* pFB, std::uint32_t FBOIndex, std::uint32_t RootParameterIndex) = 0;
 	virtual void SetRenderTargetAsResource(IRenderTarget* pRT, std::uint32_t RootParameterIndex) = 0;
 	virtual void SetRenderTargetsAsResource(std::vector<IRenderTarget*> RTs, std::uint32_t RootParameterIndex) = 0;
-	virtual void SetUnorderedAccessBufferAsResource(IUnorderedAccessBuffer* pUAV, std::uint32_t RootParameterIndex) = 0;
-	virtual void SetUnorderedAccessBuffersAsResource(std::vector<IUnorderedAccessBuffer*> UAVs, std::uint32_t RootParameterIndex) = 0;
+	virtual void SetUnorderedAccessBufferAsResource(IStructuredBuffer* pUAV, std::optional<std::uint32_t> RootParameterIndex = std::nullopt) = 0;
+	virtual void SetUnorderedAccessBuffersAsResource(std::vector<IStructuredBuffer*> UAVs, std::optional<std::uint32_t> RootParameterIndex = std::nullopt) = 0;
 	virtual void CopyFrameBuffer(IFrameBuffer* Dest, std::size_t DestFBOIndex, IFrameBuffer* Source, std::uint32_t SourceFBOIndex) = 0;
 	virtual void CopyFrameBufferDepth(IFrameBuffer* Dest, IFrameBuffer* Source) = 0;
 	virtual void CopyRenderTarget(IRenderTarget* Dest, IRenderTarget* Source) = 0;
@@ -1682,6 +2256,11 @@ public:
 	virtual void UpdateBufferSubresource(IIndexBuffer* Buffer, BufferSubresource* Subresource) = 0;
 	virtual void UpdateBufferSubresource(IIndexBuffer* Buffer, std::size_t Location, std::size_t Size, const void* pSrcData) = 0;
 
+	virtual void Set32BitConstant(std::uint32_t RootParameterIndex, std::uint32_t SrcData, std::uint32_t DestOffsetIn32BitValues = 0) = 0;
+	virtual void Set32BitConstants(std::uint32_t RootParameterIndex, const void* pSrcData, std::uint32_t Num32BitValuesToSet = 1, std::uint32_t DestOffsetIn32BitValues = 0) = 0;
+
+	virtual void SetBindlessDescriptor(std::uint32_t RootParameterIndex, IBindlessSceneContainer* Container) = 0;
+
 	virtual void Draw(std::uint32_t VertexCount, std::uint32_t VertexStartOffset = 0) = 0;
 	virtual void DrawInstanced(std::uint32_t VertexCountPerInstance, std::uint32_t InstanceCount, std::uint32_t StartVertexLocation, std::uint32_t StartInstanceLocation) = 0;
 	virtual void DrawIndexedInstanced(std::uint32_t IndexCountPerInstance, std::uint32_t InstanceCount, std::uint32_t StartIndexLocation, std::int32_t BaseVertexLocation, std::uint32_t StartInstanceLocation) = 0;
@@ -1690,20 +2269,23 @@ public:
 	virtual void ExecuteIndirect(IIndirectBuffer* IndirectBuffer) = 0;
 };
 
-class IComputeCommandContext
+class IComputeCommandContext : public ICommandContext
 {
 	sBaseClassBody(sClassDefaultProtectedConstructor, IComputeCommandContext)
 public:
-	static IComputeCommandContext::SharedPtr Create();
-	static IComputeCommandContext::UniquePtr CreateUnique();
+	static IComputeCommandContext::SharedPtr Create(std::uint32_t GPUIndex = 0);
+	static IComputeCommandContext::UniquePtr CreateUnique(std::uint32_t GPUIndex = 0);
 
 public:
+	virtual ECommandContextType GetCommandContextType() const override final
+	{
+		return ECommandContextType::Compute;
+	}
+
 	virtual void BeginRecordCommandList() = 0;
 	virtual void FinishRecordCommandList() = 0;
 	virtual void ExecuteCommandList() = 0;
 	virtual void ClearState() = 0;
-
-	virtual void* GetInternalCommandContext() = 0;
 
 	virtual void SetFrameBuffer(IFrameBuffer* pFB, std::optional<std::size_t> FBOIndex) = 0;
 	virtual void SetRenderTargetAsResource(IRenderTarget* pRT, std::uint32_t RootParameterIndex) = 0;
@@ -1716,10 +2298,10 @@ public:
 	virtual void SetRenderTargetsAsUAV(std::vector<IRenderTarget*> RTs, std::uint32_t RootParameterIndex) = 0;
 	virtual void SetUnorderedAccessTargetAsSRV(IUnorderedAccessTarget* pST, std::uint32_t RootParameterIndex) = 0;
 	virtual void SetUnorderedAccessTargetsAsSRV(std::vector<IUnorderedAccessTarget*> pSTs, std::uint32_t RootParameterIndex) = 0;
-	virtual void SetUnorderedAccessBuffer(IUnorderedAccessBuffer* pUAV, std::uint32_t RootParameterIndex) = 0;
-	virtual void SetUnorderedAccessBuffers(std::vector<IUnorderedAccessBuffer*> UAVs, std::uint32_t RootParameterIndex) = 0;
-	virtual void SetUnorderedAccessBufferAsResource(IUnorderedAccessBuffer* pUAV, std::uint32_t RootParameterIndex) = 0;
-	virtual void SetUnorderedAccessBuffersAsResource(std::vector<IUnorderedAccessBuffer*> UAVs, std::uint32_t RootParameterIndex) = 0;
+	virtual void SetUnorderedAccessBuffer(IStructuredBuffer* pUAV, std::uint32_t RootParameterIndex) = 0;
+	virtual void SetUnorderedAccessBuffers(std::vector<IStructuredBuffer*> UAVs, std::uint32_t RootParameterIndex) = 0;
+	virtual void SetUnorderedAccessBufferAsResource(IStructuredBuffer* pUAV, std::uint32_t RootParameterIndex) = 0;
+	virtual void SetUnorderedAccessBuffersAsResource(std::vector<IStructuredBuffer*> UAVs, std::uint32_t RootParameterIndex) = 0;
 
 	virtual void SetPipeline(IComputePipeline* Pipeline) = 0;
 	virtual void SetConstantBuffer(IConstantBuffer* CB, std::optional<std::uint32_t> RootParameterIndex = std::nullopt) = 0;
@@ -1728,20 +2310,23 @@ public:
 	virtual void ExecuteIndirect(IIndirectBuffer* IndirectBuffer) = 0;
 };
 
-class ICopyCommandContext
+class ICopyCommandContext : public ICommandContext
 {
 	sBaseClassBody(sClassDefaultProtectedConstructor, ICopyCommandContext)
 public:
-	static ICopyCommandContext::SharedPtr Create();
-	static ICopyCommandContext::UniquePtr CreateUnique();
+	static ICopyCommandContext::SharedPtr Create(std::uint32_t GPUIndex = 0);
+	static ICopyCommandContext::UniquePtr CreateUnique(std::uint32_t GPUIndex = 0);
 
 public:
+	virtual ECommandContextType GetCommandContextType() const override final
+	{
+		return ECommandContextType::Copy;
+	}
+
 	virtual void BeginRecordCommandList() = 0;
 	virtual void FinishRecordCommandList() = 0;
 	virtual void ExecuteCommandList() = 0;
 	virtual void ClearState() = 0;
-
-	virtual void* GetInternalCommandContext() = 0;
 
 	virtual void CopyFrameBuffer(IFrameBuffer* Dest, std::size_t DestFBOIndex, IFrameBuffer* Source, std::uint32_t SourceFBOIndex) = 0;
 	virtual void CopyFrameBufferDepth(IFrameBuffer* Dest, IFrameBuffer* Source) = 0;
@@ -1872,7 +2457,7 @@ struct sGPUInfo
 		, DeviceId(0)
 		, SubSysId(0)
 		, Revision(0)
-		, SupportedAPI(EGITypes::eD3D11)
+		, SupportedAPI(EGITypes::D3D11)
 		, SupportedFeatureLevel(0)
 		, SupportedFeatureLevelString("")
 		, SharedSystemMemory(0)
@@ -1910,7 +2495,7 @@ struct sGPUInfo
 
 	FORCEINLINE constexpr std::string SupportedAPIToString() const
 	{
-		return SupportedAPI == EGITypes::eD3D11 ? "D3D11" : SupportedAPI == EGITypes::eD3D12 ? "D3D12" : SupportedAPI == EGITypes::eVulkan ? "Vulkan" : "Unknown";
+		return SupportedAPI == EGITypes::D3D11 ? "D3D11" : SupportedAPI == EGITypes::D3D12 ? "D3D12" : SupportedAPI == EGITypes::Vulkan ? "Vulkan" : "Unknown";
 	}
 
 	FORCEINLINE constexpr std::string ToString() const
@@ -1926,16 +2511,16 @@ struct sGPUInfo
 
 enum class EParticleType
 {
-	eCPU,
-	eGPU,
+	CPU,
+	GPU,
 };
 
 enum class EPhysicsEngine
 {
-	eNone,
+	None,
 	//eBulletPhysics,
-	eBox2D,
-	//ePhysX,
+	Box2D,
+	//PhysX,
 };
 
 enum class EPostProcessRenderOrder
@@ -1946,7 +2531,7 @@ enum class EPostProcessRenderOrder
 	AfterUI,
 };
 
-enum class EGBufferClear
+enum class ERendererClear
 {
 	Disabled,
 	Driver,
@@ -2135,6 +2720,8 @@ class sPhysicalComponent;
 
 namespace GPU
 {
+	void* GetInternalDevice();
+
 	sGPUInfo GetGPUInfo();
 	EGITypes GetGIType();
 	sViewport GetViewport();
@@ -2142,19 +2729,26 @@ namespace GPU
 	EFormat GetBackBufferFormat();
 	EFormat GetDefaultDepthFormat();
 
-	void SetGBufferClearMode(EGBufferClear Mode);
-	EGBufferClear GetGBufferClearMode();
+	std::uint32_t GetBackBufferSize();
+	std::uint32_t GetCurrentBackBufferIndex();
 
-	std::uint32_t GetGBufferTextureEntryPoint();
-	std::uint32_t GetGBufferTextureSize();
+	bool IsBindlessRendererSupported();
+	bool IsBindlessRendererEnabled();
+
+	IRenderer* GetRenderer();
+	void RegisterMaterial(sMaterial* Material);
+	void CompileMaterial(sMaterial* Material, bool bRecompile = false);
+	void CompilePipeline(IPipeline* Pipeline, bool bRecompile = false);
+	sIndirectLayoutBindingDesc GetRenderPassIndirectLayoutBindingDesc(ERenderPass RenderPass);
+	IFrameBuffer* GetFrameBuffer(ERenderPass RenderPass);
+	void SetRendererClearMode(ERendererClear Mode);
+	ERendererClear GetRendererClearMode();
 
 	void SetTonemapper(const int Val);
 	int GetTonemapperIndex();
 
 	void AddPostProcess(const EPostProcessRenderOrder Order, const std::shared_ptr<sPostProcess>& PostProcess);
 	void RemovePostProcess(const EPostProcessRenderOrder Order, const int Val);
-
-	void* GetInternalDevice();
 
 	void DrawLine(const FVector& Start, const FVector& End, std::optional<float> Time);
 	void DrawBound(const FBoundingBox& Box, std::optional<float> Time);
@@ -2171,17 +2765,6 @@ namespace GPU
 	* Priority == 0 : On Top
 	*/
 	void SetViewportInstancePriority(sViewportInstance* ViewportInstance, std::size_t Priority);
-
-	// WIP
-	bool IsBindlessRendererEnabled();
-}
-
-sViewportInstance::~sViewportInstance()
-{
-	bIsEnabled = false;
-	GPU::RemoveViewportInstance(this);
-	pCamera = nullptr;
-	Canvases.clear();
 }
 
 namespace Physics
@@ -2322,6 +2905,6 @@ namespace Engine
 		std::mt19937 gen(rd()); // seed the generator
 		std::uniform_real_distribution<> dist(Min, Max); // define the range
 
-		return dist(gen);
+		return static_cast<T>(dist(gen));
 	}
 }

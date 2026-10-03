@@ -35,24 +35,21 @@ protected:
 	sPostProcess()
 		: Pipeline(nullptr)
 	{}
-	sPostProcess(const sShaderAttachment& PostProcessShader, const std::vector<sDescriptorSetLayoutBinding>& DescriptorSetLayout, 
-		const sDepthStencilAttributeDesc& DepthStencil = sDepthStencilAttributeDesc(false),
-		const sBlendAttributeDesc& Blend = sBlendAttributeDesc(EBlendStateMode::eOpaque));
+	sPostProcess(const sShaderAttachment& PostProcessShader, const std::vector<sShaderBinding>& DescriptorSetLayout, 
+		const sDepthStencilAttributeDesc& DepthStencil = sDepthStencilAttributeDesc(ECompareFunction::LessEqual, false),
+		const sBlendAttributeDesc& Blend = sBlendAttributeDesc(EBlendStateMode::Opaque));
 	virtual ~sPostProcess();
 
-	void SetPipeline(const sShaderAttachment& PostProcessShader, const std::vector<sDescriptorSetLayoutBinding>& DescriptorSetLayout,
-		const sDepthStencilAttributeDesc& DepthStencil = sDepthStencilAttributeDesc(false),
-		const sBlendAttributeDesc& Blend = sBlendAttributeDesc(EBlendStateMode::eOpaque));
+	void SetPipeline(const sShaderAttachment& PostProcessShader, const std::vector<sShaderBinding>& DescriptorSetLayout,
+		const sDepthStencilAttributeDesc& DepthStencil = sDepthStencilAttributeDesc(ECompareFunction::LessEqual, false),
+		const sBlendAttributeDesc& Blend = sBlendAttributeDesc(EBlendStateMode::Opaque));
 
 public:
 	virtual bool HasFrameBuffer() const { return false; }
 	virtual IRenderTarget* GetFrameBuffer() const { return nullptr; }
 	virtual void SetFrameBufferSize(const std::size_t Width, const std::size_t Height) {}
 
-	virtual bool UseBackBufferAsResource() const { return false; }
-	virtual std::size_t GetBackBufferResourceRootParameterIndex() const { return 0; }
-
-	virtual void SetPostProcessResources(IGraphicsCommandContext* Context);
+	virtual void SetPostProcessResources(IGraphicsCommandContext* Context, IRenderTarget* BackBuffer = nullptr);
 
 	inline bool IsCompiled() const { return Pipeline->IsCompiled(); }
 	inline bool Compile(IFrameBuffer* FrameBuffer = nullptr) { return Pipeline->Compile(FrameBuffer); }

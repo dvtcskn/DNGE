@@ -4440,8 +4440,8 @@ public:
 	T Height;
 
 	FORCEINLINE constexpr TDimension2D() noexcept
-		: Width(0.0f)
-		, Height(0.0f)
+		: Width(T())
+		, Height(T())
 	{}
 	FORCEINLINE constexpr TDimension2D(const T InWidth, const T InHeight) noexcept
 		: Width(InWidth)

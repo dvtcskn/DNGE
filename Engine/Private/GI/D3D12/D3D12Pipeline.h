@@ -34,7 +34,6 @@
 #include "D3D12Device.h"
 #include "D3D12Shader.h"
 #include "D3D12ShaderStates.h"
-#include "D3D12CommandBuffer.h"
 
 class D3D12Pipeline final : public IPipeline
 {
@@ -43,7 +42,6 @@ public:
 	D3D12Pipeline(D3D12Device* InOwner, const std::string& InName, const sPipelineDesc& InDesc);
 	virtual ~D3D12Pipeline();
 
-    void ApplyPipeline(ID3D12GraphicsCommandList* CommandList) const;
     virtual sPipelineDesc GetPipelineDesc() const  override final { return Desc; }
 
     virtual bool IsCompiled() const override final
@@ -57,7 +55,12 @@ public:
 
     virtual bool Recompile() override final;
 
-    ID3D12PipelineState* GetPSO() const { return PSO.Get(); };
+    virtual ERenderPass GetRenderPass() const override final { return Desc.RenderPass; }
+    virtual IRootSignature* GetRootSignature() const override final { return RootSignature.get(); }
+    virtual bool IsIndirectCommandAvailable() const override final { return RootSignature->IsIndirectCommandAvailable(); }
+    FORCEINLINE ID3D12PipelineState* GetPSO() const { return PSO.Get(); }
+    FORCEINLINE D3D12_PRIMITIVE_TOPOLOGY GetPrimitiveTopologyType() const { return PrimitiveTopologyType; }
+    FORCEINLINE D3D12RootSignature* GetD3D12RootSignature() const { return RootSignature.get(); }
 
 private:
     void CompilePipeline();
@@ -74,6 +77,8 @@ private:
     std::vector<sShaderAttachment> ShaderAttachments;
     std::shared_ptr<D3D12VertexAttribute> VertexAttribute;
     std::shared_ptr<D3D12RootSignature> RootSignature;
+
+    std::vector<std::shared_ptr<D3D12SamplerState>> Samplers;
 
     D3D12_GRAPHICS_PIPELINE_STATE_DESC PSODesc;
     ComPtr<ID3D12PipelineState> PSO;

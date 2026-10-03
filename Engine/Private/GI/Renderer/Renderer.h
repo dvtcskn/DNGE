@@ -33,15 +33,21 @@
 #include "LineRenderer.h"
 #include "ParticleRenderer.h"
 
-class sRenderer final
+class sRenderer final : public IRenderer
 {
-	sBaseClassBody(sClassConstructor, sRenderer);
+	sClassBody(sClassConstructor, sRenderer, IRenderer);
 public:
 	sRenderer(std::size_t Width, std::size_t Height);
 	~sRenderer();
 
 	void BeginPlay();
 	void Tick(const double DeltaTime);
+
+	virtual void RegisterMaterial(sMaterial* Material) override final;
+	virtual void CompileMaterial(sMaterial* Material, bool bRecompile = false) override final;
+	virtual void CompilePipeline(IPipeline* Pipeline, bool bRecompile = false) override final;
+	virtual sIndirectLayoutBindingDesc GetRenderPassIndirectLayoutBindingDesc(ERenderPass RenderPass) const override final;
+	virtual IFrameBuffer* GetFrameBuffer(ERenderPass RenderPass) const override final;
 
 	void BeginFrame();
 	void Render();
@@ -74,8 +80,8 @@ public:
 	inline sScreenDimension GetInternalBaseRenderResolution() const { return InternalBaseRenderResolution; }
 	void SetInternalBaseRenderResolution(std::size_t Width, std::size_t Height);
 
-	void SetGBufferClearMode(EGBufferClear Mode);
-	EGBufferClear GetGBufferClearMode() { return GBufferClearMode; }
+	void SetRendererClearMode(ERendererClear Mode);
+	ERendererClear GetRendererClearMode() { return GBufferClearMode; }
 
 	void OnInputProcess(const GMouseInput& MouseInput, const GKeyboardChar& KeyboardChar);
 
@@ -94,7 +100,7 @@ private:
 	sPostProcessRenderer::UniquePtr PostProcessRenderer;
 	sToneMapping::UniquePtr ToneMapping;
 	sLineRenderer::SharedPtr LineRenderer;
-	EGBufferClear GBufferClearMode;
+	ERendererClear GBufferClearMode;
 	ParticleRenderer::SharedPtr pParticleRenderer;
 
 	bool bIsTonmapperEnabled;

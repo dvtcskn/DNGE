@@ -136,7 +136,7 @@ private:
 	virtual void OnPlayerDisconnected(std::string PlayerName, std::string NetAddress) {}
 
 protected:
-	std::size_t GetNextPlayerIndex();
+	std::uint32_t GetNextPlayerIndex();
 
 private:
 	bool bIsInitialized;

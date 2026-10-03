@@ -39,7 +39,7 @@ public:
 	sSprite(const std::string& Name, const std::wstring& TextureAtlasPath, const FBounds2D& SpriteBound, const std::string& DefaultMaterialName = "DefaultActorAtlastMat");
 	sSprite(const std::string& Name, ITexture2D* TextureAtlas, const FBounds2D& SpriteBound, sMaterial* DefaultMaterialName);
 	sSprite(const std::string& Name, ITexture2D* TextureAtlas, const FBounds2D& SpriteBound, const std::string& DefaultMaterialName = "DefaultActorAtlastMat");
-	sSprite(const std::string& Name, const FBounds2D& SpriteBound, sMaterial::sMaterialInstance* AtlasMaterialInstance);
+	sSprite(const std::string& Name, const FBounds2D& SpriteBound, sMaterialInstance* AtlasMaterialInstance);
 
 public:
 	virtual ~sSprite();
@@ -51,9 +51,12 @@ public:
 
 	sObjectDrawParameters GetDrawParameters() const { return ObjectDrawParameters; };
 
-	sMaterial::sMaterialInstance* GetMaterialInstance() const { return MaterialInstance; }
+	sMaterialInstance* GetMaterialInstance() const { return MaterialInstance; }
 
 	const FBounds2D& GetBound() const { return SpriteBound; }
+
+	const MeshBindlessGeometryHandle* GetGeometryHandle() const { return &GeometryHandle; }
+	const MeshIndexBufferHandle* GetIndexHandle() const { return &IndexBufferHandle; }
 
 	//bool IsFlipped() const;
 	//void Flip(bool value);
@@ -66,7 +69,10 @@ private:
 	IVertexBuffer::SharedPtr VertexBuffer;
 	IIndexBuffer::SharedPtr IndexBuffer;
 
-	sMaterial::sMaterialInstance* MaterialInstance;
+	sMaterialInstance* MaterialInstance;
+
+	MeshBindlessGeometryHandle GeometryHandle;
+	MeshIndexBufferHandle IndexBufferHandle;
 
 	//__declspec(align(256)) struct sFlipConstantBuffer
 	//{
@@ -119,13 +125,13 @@ public:
 
 	sObjectDrawParameters GetDrawParameters(std::size_t SpriteIndex) const;
 
-	sMaterial::sMaterialInstance* GetMaterialInstance(std::size_t SpriteIndex) const;
+	sMaterialInstance* GetMaterialInstance(std::size_t SpriteIndex) const;
 
 	const FBounds2D& GetSpriteBound(std::size_t SpriteIndex) const;
 
 	sSprite* GetSprite(std::size_t index) const;
 	std::size_t GetKeyFrameSize() const { return KeyFrames.size(); }
-	sSpriteSheetKeyFrame* GetKeyFrame(std::size_t index) const;
+	sSpriteSheetKeyFrame* GetKeyFrame(std::uint32_t index) const;
 	std::size_t GetKeyFrameIndexAtTime(float Time) const;
 	std::size_t GetKeyFrameIndexAtFrame(std::size_t Frame) const;
 	sSprite* GetSpriteAtTime(float Time) const;

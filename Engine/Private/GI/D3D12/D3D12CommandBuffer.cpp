@@ -33,9 +33,15 @@
 #include "D3D12Texture.h"
 #include "GI/D3DShared/D3DShared.h"
 
+#if Pix3_Enabled && _DEBUG
+#include <pix3.h>
+#endif
+
 D3D12CommandBuffer::D3D12CommandBuffer(D3D12Device* InOwner)
 	: Owner(InOwner)
 	, StencilRef(0)
+	, CurrentPipeline(nullptr)
+	, CurrentRootSignature(nullptr)
 	, bIsClosed(false)
 	, bWaitForCompletion(false)
 	, bIsRenderPassEnabled(false)
@@ -43,7 +49,7 @@ D3D12CommandBuffer::D3D12CommandBuffer(D3D12Device* InOwner)
 {
 	auto Device = Owner->GetDevice();
 	CommandAllocator = Owner->RequestCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT);
-	ThrowIfFailed(Device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, CommandAllocator, nullptr, IID_PPV_ARGS(&CommandList)));
+	ThrowIfFailed(Device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, CommandAllocator.Get(), nullptr, IID_PPV_ARGS(&CommandList)));
 	CommandList->Close();
 	bIsClosed = true;
 #if _DEBUG
@@ -53,31 +59,41 @@ D3D12CommandBuffer::D3D12CommandBuffer(D3D12Device* InOwner)
 
 D3D12CommandBuffer::~D3D12CommandBuffer()
 {
+	WaitForGPU();
+	Owner->OnCommandBufferDestroyed(this);
 	RT_ToTransition.clear();
 	Depth_ToTransition.clear();
+
+	CurrentPipeline = nullptr;
+	CurrentRootSignature = nullptr;
 
 	CommandList = nullptr;
 	CommandAllocator = nullptr;
 	Owner = nullptr;
 }
 
-void D3D12CommandBuffer::BeginRecordCommandList(const ERenderPass RenderPass)
+bool D3D12CommandBuffer::BeginRecordCommandList(const ERenderPass RenderPass)
 {
+	if (Owner->IsCommandBufferPendingForExecute(this))
+		return false;
+
 	RT_ToTransition.clear();
 	Depth_ToTransition.clear();
 
 	Open();
 
-	if (RenderPass != ERenderPass::eNONE)
+	if (RenderPass != ERenderPass::NONE)
 	{
 		Owner->SetHeaps(CommandList.Get());
-		if (bIsRenderPassEnabled && RenderPass != ERenderPass::eUI)
+		if (bIsRenderPassEnabled && RenderPass != ERenderPass::UI)
 			bIsRenderPassActive = true;
 	}
 	else
 	{
 		//Owner->CPUWait();
 	}
+
+	return true;
 }
 
 void D3D12CommandBuffer::Open()
@@ -86,7 +102,9 @@ void D3D12CommandBuffer::Open()
 	{
 		CommandAllocator = Owner->RequestCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT);
 	}
-	ThrowIfFailed(CommandList->Reset(CommandAllocator, nullptr));
+	ThrowIfFailed(CommandList->Reset(CommandAllocator.Get(), nullptr));
+	CurrentPipeline = nullptr;
+	CurrentRootSignature = nullptr;
 	bIsClosed = false;
 	bWaitForCompletion = false;
 }
@@ -119,7 +137,7 @@ void D3D12CommandBuffer::FinishRecordCommandList()
 	}
 
 	if (Barriers.size() > 0)
-		CommandList->ResourceBarrier(Barriers.size(), Barriers.data());
+		CommandList->ResourceBarrier((UINT)Barriers.size(), Barriers.data());
 	Barriers.clear();
 	RT_ToTransition.clear();
 	Depth_ToTransition.clear();
@@ -134,13 +152,23 @@ void D3D12CommandBuffer::Close()
 {
 	CommandList->Close();
 	bIsClosed = true;
+
+	CurrentPipeline = nullptr;
+	CurrentRootSignature = nullptr;
 }
 
-void D3D12CommandBuffer::ExecuteCommandList()
+void D3D12CommandBuffer::ExecuteCommandList(ECommandContextExecuteType ExecuteType, std::uint32_t Order)
 {
-	Owner->ExecuteDirectCommandLists(CommandList.Get()/*, bWaitForCompletion*/);
+	const auto fenceValue = Owner->ExecuteDirectCommandLists(ExecuteType, Order, this /*CommandList.Get()*//*, bWaitForCompletion*/);
 
-	Owner->DiscardCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, CommandAllocator);
+	if (ExecuteType == ECommandContextExecuteType::Immediate)
+	{
+		Owner->DiscardCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, CommandAllocator, fenceValue);
+	}
+	else if (ExecuteType == ECommandContextExecuteType::Deferred)
+	{
+
+	}
 
 	CommandAllocator = nullptr;
 	bWaitForCompletion = false;
@@ -212,6 +240,9 @@ void D3D12CommandBuffer::CopyResource(ID3D12Resource* pDstResource, D3D12_RESOUR
 	//CD3DX12_BARRIER_GROUP BarrierGroup(2, Barrier);
 	//CMDList->Get()->Barrier(1, &BarrierGroup);
 
+	if (pSrcResource->GetDesc() != pDstResource->GetDesc())
+		return;
+
 	{
 		std::vector<D3D12_RESOURCE_BARRIER> preCopyBarriers;
 		preCopyBarriers.push_back(CD3DX12_RESOURCE_BARRIER::Transition(pSrcResource, SrcState, D3D12_RESOURCE_STATE_COPY_SOURCE));
@@ -231,8 +262,8 @@ void D3D12CommandBuffer::CopyResource(ID3D12Resource* pDstResource, D3D12_RESOUR
 
 void D3D12CommandBuffer::WaitForGPU()
 {
-	Owner->GPUSignal();
-	Owner->CPUWait();
+	Owner->GPUSignal(D3D12_COMMAND_LIST_TYPE_DIRECT);
+	Owner->CpuWait(D3D12_COMMAND_LIST_TYPE_DIRECT);
 }
 
 void D3D12CommandBuffer::SetViewport(const sViewport& Viewport)
@@ -659,6 +690,8 @@ void D3D12CommandBuffer::SetFrameBufferAsResource(IFrameBuffer* pFB, std::uint32
 
 void D3D12CommandBuffer::SetRenderTargetAsResource(IRenderTarget* pRT, std::uint32_t RootParameterIndex)
 {
+	if (GPU::IsBindlessRendererEnabled())
+		return;
 	if (pRT)
 	{
 		D3D12RenderTarget* FBuffer = static_cast<D3D12RenderTarget*>(pRT);
@@ -898,35 +931,70 @@ void D3D12CommandBuffer::CopyDepthBuffer(IDepthTarget* Dest, IDepthTarget* Sourc
 	bWaitForCompletion = true;
 }
 
-void D3D12CommandBuffer::SetUnorderedAccessBufferAsResource(IUnorderedAccessBuffer* pUAV, std::uint32_t RootParameterIndex)
+void D3D12CommandBuffer::SetUnorderedAccessBufferAsResource(IStructuredBuffer* pUAV, std::optional<std::uint32_t> RootParameterIndex)
 {
 }
 
-void D3D12CommandBuffer::SetUnorderedAccessBuffersAsResource(std::vector<IUnorderedAccessBuffer*> UAVs, std::uint32_t RootParameterIndex)
+void D3D12CommandBuffer::SetUnorderedAccessBuffersAsResource(std::vector<IStructuredBuffer*> UAVs, std::optional<std::uint32_t> RootParameterIndex)
 {
 }
 
-void D3D12CommandBuffer::UpdateSubresource(ID3D12Resource* Buffer, D3D12_RESOURCE_STATES State, D3D12UploadBuffer* UploadBuffer, BufferSubresource* Subresource)
+void D3D12CommandBuffer::CopyBufferRegion(ID3D12Resource* Buffer, D3D12_RESOURCE_STATES State, ID3D12Resource* UploadBuffer, void* UploadData, BufferSubresource* Subresource)
 {
 	if (!Buffer || !UploadBuffer || !Subresource)
 		return;
 
-	memcpy((BYTE*)UploadBuffer->GetData() + Subresource->Location, Subresource->pSysMem, Subresource->Size);
+	memcpy((BYTE*)UploadData + Subresource->Location, Subresource->pSysMem, Subresource->Size);
 
-	D3D12_RESOURCE_BARRIER preCopyBarriers = CD3DX12_RESOURCE_BARRIER::Transition(Buffer, State, D3D12_RESOURCE_STATE_COPY_DEST);
-	CommandList->ResourceBarrier(1, &preCopyBarriers);
+	const bool IsEnhancedBarriersSupported = Owner->IsEnhancedBarriersSupported();
+	if (IsEnhancedBarriersSupported)
+	{
 
-	CommandList->CopyBufferRegion(Buffer, (UINT64)Subresource->Location, UploadBuffer->Get(), (UINT64)Subresource->Location, (UINT64)Subresource->Size);
+	}
+	else
+	{
+		D3D12_RESOURCE_BARRIER preCopyBarriers = CD3DX12_RESOURCE_BARRIER::Transition(Buffer, State, D3D12_RESOURCE_STATE_COPY_DEST);
+		CommandList->ResourceBarrier(1, &preCopyBarriers);
+	}
 
-	D3D12_RESOURCE_BARRIER postCopyBarriers = CD3DX12_RESOURCE_BARRIER::Transition(Buffer, D3D12_RESOURCE_STATE_COPY_DEST, State);
-	CommandList->ResourceBarrier(1, &postCopyBarriers);
+	CommandList->CopyBufferRegion(Buffer, (UINT64)Subresource->Location, UploadBuffer, (UINT64)Subresource->Location, (UINT64)Subresource->Size);
+
+	if (IsEnhancedBarriersSupported)
+	{
+
+	}
+	else
+	{
+		D3D12_RESOURCE_BARRIER postCopyBarriers = CD3DX12_RESOURCE_BARRIER::Transition(Buffer, D3D12_RESOURCE_STATE_COPY_DEST, State);
+		CommandList->ResourceBarrier(1, &postCopyBarriers);
+	}
+}
+
+void D3D12CommandBuffer::UpdateBuffer(ID3D12Resource* Buffer, ID3D12Resource* UploadBuffer, BufferSubresource* Subresource)
+{
+	if (!Buffer || !UploadBuffer || !Subresource)
+		return;
+
+	D3D12_SUBRESOURCE_DATA SUBRESOURCE = {};
+	SUBRESOURCE.pData = Subresource->pSysMem;
+	SUBRESOURCE.RowPitch = Subresource->Size;
+	SUBRESOURCE.SlicePitch = Subresource->Location;
+	UpdateSubresources<1>(CommandList.Get(), Buffer, UploadBuffer, 0, 0, 1, &SUBRESOURCE);
 }
 
 void D3D12CommandBuffer::SetPipeline(IPipeline* Pipeline)
 {
-	if (Pipeline)
+	if (Pipeline && CurrentPipeline != Pipeline)
 	{
-		static_cast<D3D12Pipeline*>(Pipeline)->ApplyPipeline(CommandList.Get());
+		CurrentPipeline = static_cast<D3D12Pipeline*>(Pipeline);
+		CommandList->IASetPrimitiveTopology(CurrentPipeline->GetPrimitiveTopologyType());
+		auto RootSignature = CurrentPipeline->GetD3D12RootSignature();
+		if (RootSignature && CurrentRootSignature != RootSignature)
+		{
+			CurrentRootSignature = RootSignature;
+			CommandList->SetGraphicsRootSignature(CurrentRootSignature->Get());
+		}
+		CommandList->SetPipelineState(CurrentPipeline->GetPSO());
 	}
 }
 
@@ -948,6 +1016,8 @@ void D3D12CommandBuffer::SetIndexBuffer(IIndexBuffer* IB)
 
 void D3D12CommandBuffer::SetConstantBuffer(IConstantBuffer* CB, std::optional<std::uint32_t> RootParameterIndex)
 {
+	//if (GPU::IsBindlessRendererEnabled())
+	//	return;
 	if (CB)
 	{
 		if (RootParameterIndex.has_value())
@@ -959,6 +1029,8 @@ void D3D12CommandBuffer::SetConstantBuffer(IConstantBuffer* CB, std::optional<st
 
 void D3D12CommandBuffer::SetTexture2D(ITexture2D* Texture2D, std::optional<std::uint32_t> RootParameterIndex)
 {
+	if (GPU::IsBindlessRendererEnabled())
+		return;
 	if (Texture2D)
 	{
 		if (RootParameterIndex.has_value())
@@ -1010,40 +1082,101 @@ void D3D12CommandBuffer::UpdateBufferSubresource(IIndexBuffer* Buffer, std::size
 	static_cast<D3D12IndexBuffer*>(Buffer)->UpdateSubresource(&Subresource, this);
 }
 
+void D3D12CommandBuffer::Set32BitConstant(std::uint32_t RootParameterIndex, std::uint32_t SrcData, std::uint32_t DestOffsetIn32BitValues)
+{
+	CommandList->SetGraphicsRoot32BitConstant(RootParameterIndex, SrcData, DestOffsetIn32BitValues);
+}
+
+void D3D12CommandBuffer::Set32BitConstants(std::uint32_t RootParameterIndex, const void* pSrcData, std::uint32_t Num32BitValuesToSet, std::uint32_t DestOffsetIn32BitValues)
+{
+	CommandList->SetGraphicsRoot32BitConstants(RootParameterIndex, Num32BitValuesToSet, pSrcData, DestOffsetIn32BitValues);
+}
+
+void D3D12CommandBuffer::SetBindlessDescriptor(std::uint32_t RootParameterIndex, IBindlessSceneContainer* Container)
+{
+	if (!Container)
+		return;
+
+	CommandList->SetGraphicsRoot32BitConstants(RootParameterIndex, Container->Size(), Container->GetDescriptor(), Container->GetOffset());
+}
+
 void D3D12CommandBuffer::Draw(std::uint32_t VertexCount, std::uint32_t VertexStartOffset)
 {
+#if Pix3_Enabled && _DEBUG
+	PIXBeginEvent(CommandList.Get(), 0, L"D3D12CommandBuffer::Draw");
+#endif
 	CommandList->DrawInstanced(VertexCount, 1, VertexStartOffset, 0);
+#if Pix3_Enabled && _DEBUG
+	PIXEndEvent(CommandList.Get());
+#endif
 }
 
 void D3D12CommandBuffer::DrawInstanced(std::uint32_t VertexCountPerInstance, std::uint32_t InstanceCount, std::uint32_t StartVertexLocation, std::uint32_t StartInstanceLocation)
 {
+#if Pix3_Enabled && _DEBUG
+	PIXBeginEvent(CommandList.Get(), 0, L"D3D12CommandBuffer::DrawInstanced");
+#endif
 	CommandList->DrawInstanced(VertexCountPerInstance, InstanceCount, StartVertexLocation, StartInstanceLocation);
+#if Pix3_Enabled && _DEBUG
+	PIXEndEvent(CommandList.Get());
+#endif
 }
 
 void D3D12CommandBuffer::DrawIndexedInstanced(std::uint32_t IndexCountPerInstance, std::uint32_t InstanceCount, std::uint32_t StartIndexLocation, std::int32_t BaseVertexLocation, std::uint32_t StartInstanceLocation)
 {
+#if Pix3_Enabled && _DEBUG
+	PIXBeginEvent(CommandList.Get(), 0, L"D3D12CommandBuffer::DrawIndexedInstanced");
+#endif
 	CommandList->DrawIndexedInstanced(IndexCountPerInstance, InstanceCount, StartIndexLocation, BaseVertexLocation, StartInstanceLocation);
+#if Pix3_Enabled && _DEBUG
+	PIXEndEvent(CommandList.Get());
+#endif
 }
 
 void D3D12CommandBuffer::DrawIndexedInstanced(const sObjectDrawParameters& DrawParameters)
 {
+#if Pix3_Enabled && _DEBUG
+	PIXBeginEvent(CommandList.Get(), 0, L"D3D12CommandBuffer::DrawIndexedInstanced");
+#endif
 	DrawIndexedInstanced(
 		DrawParameters.IndexCountPerInstance,
 		DrawParameters.InstanceCount,
 		DrawParameters.StartIndexLocation,
 		DrawParameters.BaseVertexLocation,
 		DrawParameters.StartInstanceLocation);
+#if Pix3_Enabled && _DEBUG
+	PIXEndEvent(CommandList.Get());
+#endif
 }
 
-void D3D12CommandBuffer::ExecuteIndirect(IIndirectBuffer* IndirectBuffer)
+void D3D12CommandBuffer::ExecuteIndirect(IIndirectBuffer* inIndirectBuffer)
 {
+#if Pix3_Enabled && _DEBUG
+	PIXBeginEvent(CommandList.Get(), 0, L"D3D12CommandBuffer::ExecuteIndirect");
+#endif
+	if (!CurrentPipeline)
+		return;
+	D3D12IndirectBuffer* IndirectBuffer = static_cast<D3D12IndirectBuffer*>(inIndirectBuffer);
+	if (!IndirectBuffer) 
+		return;
+	ID3D12CommandSignature* CommandSignature = CurrentRootSignature->GetCommandSignature();
+	if (!CommandSignature)
+		return;
+	ID3D12Resource* ArgumentBuffer = IndirectBuffer->GetBuffer();
+	if (!ArgumentBuffer)
+		return;
+	UINT64 ArgumentOffset = IndirectBuffer->GetOffset();
+	CommandList->ExecuteIndirect(CommandSignature, (UINT)IndirectBuffer->GetCurrentCommandSize(), ArgumentBuffer, ArgumentOffset, NULL, 0);
+#if Pix3_Enabled && _DEBUG
+	PIXEndEvent(CommandList.Get());
+#endif
 }
 
 void D3D12CommandBuffer::ClearState()
 {
 	StencilRef = 0;
 	CommandList->ClearState(nullptr);
-	CommandList->Reset(CommandAllocator, nullptr);
+	CommandList->Reset(CommandAllocator.Get(), nullptr);
 	CommandList->Close();
 
 	bIsClosed = true;
@@ -1057,7 +1190,7 @@ D3D12CopyCommandBuffer::D3D12CopyCommandBuffer(D3D12Device* InDevice)
 {
 	auto Device = Owner->GetDevice();
 	CommandAllocator = Owner->RequestCommandAllocator(D3D12_COMMAND_LIST_TYPE_COPY);
-	ThrowIfFailed(Device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_COPY, CommandAllocator, nullptr, IID_PPV_ARGS(&CommandList)));
+	ThrowIfFailed(Device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_COPY, CommandAllocator.Get(), nullptr, IID_PPV_ARGS(&CommandList)));
 	CommandList->Close();
 	bIsClosed = true;
 #if _DEBUG
@@ -1074,7 +1207,7 @@ D3D12CopyCommandBuffer::~D3D12CopyCommandBuffer()
 
 void D3D12CopyCommandBuffer::BeginRecordCommandList()
 {
-	WaitForGPU();
+	//WaitForGPU();
 	Open();
 }
 
@@ -1085,9 +1218,19 @@ void D3D12CopyCommandBuffer::FinishRecordCommandList()
 
 void D3D12CopyCommandBuffer::ExecuteCommandList()
 {
-	Owner->ExecuteCopyCommandLists(CommandList.Get(), bWaitForCompletion);
+	const auto fenceValue = Owner->ExecuteCopyCommandLists(ECommandContextExecuteType::Immediate, 0, this, /*CommandList.Get(),*/ bWaitForCompletion);
 
-	Owner->DiscardCommandAllocator(D3D12_COMMAND_LIST_TYPE_COPY, CommandAllocator);
+	Owner->DiscardCommandAllocator(D3D12_COMMAND_LIST_TYPE_COPY, CommandAllocator, fenceValue);
+
+	///*if (ExecuteType == ECommandContextExecuteType::Immediate)
+	//{
+	//	Owner->DiscardCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, CommandAllocator, fenceValue);
+	//}
+	//else if (ExecuteType == ECommandContextExecuteType::Deferred)
+	//{
+	//	bIsPendingForExecute = true;
+	//}*/
+
 	CommandAllocator = nullptr;
 	bWaitForCompletion = false;
 }
@@ -1097,7 +1240,7 @@ void D3D12CopyCommandBuffer::Open()
 	if (!CommandAllocator)
 		CommandAllocator = Owner->RequestCommandAllocator(D3D12_COMMAND_LIST_TYPE_COPY);
 
-	ThrowIfFailed(CommandList->Reset(CommandAllocator, nullptr));
+	ThrowIfFailed(CommandList->Reset(CommandAllocator.Get(), nullptr));
 	bIsClosed = false;
 	bWaitForCompletion = false;
 }
@@ -1116,7 +1259,7 @@ void D3D12CopyCommandBuffer::ResourceBarrier(UINT NumBarriers, const D3D12_RESOU
 void D3D12CopyCommandBuffer::WaitForGPU()
 {
 	Owner->GPUSignal();
-	Owner->CPUWait();
+	Owner->CpuWait(D3D12_COMMAND_LIST_TYPE_COPY);
 }
 
 void D3D12CopyCommandBuffer::CopyResource(ID3D12Resource* pDstResource, D3D12_RESOURCE_STATES DestState, ID3D12Resource* pSrcResource, D3D12_RESOURCE_STATES SrcState)
@@ -1345,7 +1488,7 @@ void D3D12CopyCommandBuffer::UpdateBufferSubresource(IIndexBuffer* Buffer, std::
 void D3D12CopyCommandBuffer::ClearState()
 {
 	CommandList->ClearState(nullptr);
-	CommandList->Reset(CommandAllocator, nullptr);
+	CommandList->Reset(CommandAllocator.Get(), nullptr);
 	CommandList->Close();
 
 	bIsClosed = true;

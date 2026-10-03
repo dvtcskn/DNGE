@@ -98,12 +98,15 @@ public:
 	virtual ~D3D11ConstantBuffer() = default;
 
 	FORCEINLINE virtual std::string GetName() const override final { return Name; };
+	virtual std::uint32_t GetBindlessIndex() const override final { return std::uint32_t(-1); }
 
 	virtual void SetDefaultRootParameterIndex(std::uint32_t inRootParameterIndex) override final { RootParameterIndex = inRootParameterIndex; }
 	virtual std::uint32_t GetDefaultRootParameterIndex() const override final { return RootParameterIndex; }
 	void ApplyConstantBuffer(ID3D11DeviceContext1* CMD, std::uint32_t InSlot, eShaderType InType = eShaderType::Pixel);
 
 	virtual void Map(const void* Ptr, IGraphicsCommandContext* InCMDBuffer = nullptr) override final;
+	virtual ResourceSharedHandle* GetSharedHandle() const override final { return nullptr; }
+	virtual bool CopyFrom(IConstantBuffer* ConstantBuffer) override final { return false; }
 };
 
 class D3D11VertexBuffer final : public D3D11Buffer, public IVertexBuffer
@@ -132,6 +135,8 @@ public:
 	{
 		D3D11Buffer::ResizeBuffer(Size, Subresource);
 	}
+	virtual ResourceSharedHandle* GetSharedHandle() const override final { return nullptr; }
+	virtual bool CopyFrom(IVertexBuffer* VertexBuffer) override final { return false; }
 };
 
 class D3D11IndexBuffer final : public D3D11Buffer, public IIndexBuffer
@@ -160,11 +165,13 @@ public:
 	{
 		D3D11Buffer::ResizeBuffer(Size, Subresource);
 	}
+	virtual ResourceSharedHandle* GetSharedHandle() const override final { return nullptr; }
+	virtual bool CopyFrom(IIndexBuffer* IndexBuffer) override final { return false; }
 };
 
-class D3D11UnorderedAccessBuffer final : public D3D11Buffer, public IUnorderedAccessBuffer
+class D3D11StructuredBuffer final : public D3D11Buffer, public IStructuredBuffer
 {
-	sClassBody(sClassConstructor, D3D11UnorderedAccessBuffer, IUnorderedAccessBuffer)
+	sClassBody(sClassConstructor, D3D11StructuredBuffer, IStructuredBuffer)
 private:
 	std::string Name;
 
@@ -172,15 +179,16 @@ private:
 	ID3D11ShaderResourceView* mShaderResource;
 
 public:
-	D3D11UnorderedAccessBuffer(D3D11Device* InDevice, std::string InName, const BufferLayout& InDesc, bool bSRVAllowed = true);
+	D3D11StructuredBuffer(D3D11Device* InDevice, std::string InName, const BufferLayout& InDesc, bool bSRVAllowed = true);
 
-	virtual ~D3D11UnorderedAccessBuffer()
+	virtual ~D3D11StructuredBuffer()
 	{
 		mUnorderedAccess = nullptr;
 		mShaderResource = nullptr;
 	}
 
 	FORCEINLINE virtual std::string GetName() const override final { return Name; };
+	virtual std::uint32_t GetBindlessIndex() const override final { return std::uint32_t(-1); }
 
 	virtual bool IsSRV_Allowed() const { return mShaderResource != nullptr; }
 
@@ -189,5 +197,7 @@ public:
 
 	virtual std::size_t GetSize() const override final { return BufferDesc.Size; }
 	virtual bool IsMapable() const override final { return D3D11Buffer::IsMapable(); }
-	virtual void Map(const void* Ptr, IGraphicsCommandContext* InCMDBuffer = nullptr) override final;
+	virtual void Map(const void* Ptr, std::size_t Location, IGraphicsCommandContext* InCMDBuffer = nullptr) override final;
+	virtual ResourceSharedHandle* GetSharedHandle() const override final { return nullptr; }
+	virtual bool CopyFrom(IStructuredBuffer* UnorderedAccessBuffer) override final { return false; }
 };

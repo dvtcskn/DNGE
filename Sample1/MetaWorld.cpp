@@ -144,7 +144,7 @@ void MetaWorld::SetActiveWorld(const std::size_t index)
 
 void MetaWorld::SetActiveWorld(const std::string& Name)
 {
-	for (std::size_t i = 0; i < Worlds.size(); i++)
+	for (std::uint32_t i = 0; i < Worlds.size(); i++)
 	{
 		if (Worlds[i]->GetName() == Name)
 		{

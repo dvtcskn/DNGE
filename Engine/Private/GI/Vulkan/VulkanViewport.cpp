@@ -411,7 +411,7 @@ void VulkanViewport::Vsync(const bool value)
 	bVSYNC = value;
 }
 
-void VulkanViewport::VsyncInterval(const std::size_t value)
+void VulkanViewport::VsyncInterval(const std::uint32_t value)
 {
 	Vsync_Interval = value;
 }
@@ -435,7 +435,7 @@ bool VulkanViewport::ResizeSwapChain(std::size_t Width, std::size_t Height)
 
 	vkDeviceWaitIdle(Device->Get());
 
-	InitWindow(Handle, Width, Width, IsFullScreen());
+	InitWindow(Handle, (std::uint32_t)Width, (std::uint32_t)Width, IsFullScreen());
 
 	return true;
 }

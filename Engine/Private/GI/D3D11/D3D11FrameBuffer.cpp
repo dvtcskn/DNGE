@@ -353,43 +353,43 @@ D3D11FrameBuffer::D3D11FrameBuffer(D3D11Device* InDevice, const std::string InNa
 	{
 		const auto& FB = AttachmentInfo.FrameBuffer[i];
 
-		if (FB.AttachmentType == eFrameBufferAttachmentType::eUAV)
+		if (FB.AttachmentType == EFrameBufferAttachmentType::UAV)
 		{
 			UAVs.push_back(D3D11UnorderedAccessTarget::Create(InDevice, Name + "_UAV_" + std::to_string(UAVs.size()), FB.Format, FDesc, false));
 		}
-		else if (FB.AttachmentType == eFrameBufferAttachmentType::eUAV_SRV)
+		else if (FB.AttachmentType == EFrameBufferAttachmentType::UAV_SRV)
 		{
 			UAVs.push_back(D3D11UnorderedAccessTarget::Create(InDevice, Name + "_UAV_" + std::to_string(UAVs.size()), FB.Format, FDesc, true));
 		}
-		else if (FB.AttachmentType == eFrameBufferAttachmentType::eRT)
+		else if (FB.AttachmentType == EFrameBufferAttachmentType::RT)
 		{
 			RenderTargets.push_back(D3D11RenderTarget::Create(InDevice, Name + "_RenderTarget_" + std::to_string(RenderTargets.size()), FB.Format, FDesc, false, false));
 		}
-		else if (FB.AttachmentType == eFrameBufferAttachmentType::eRT_SRV)
+		else if (FB.AttachmentType == EFrameBufferAttachmentType::RT_SRV)
 		{
 			RenderTargets.push_back(D3D11RenderTarget::Create(InDevice, Name + "_RenderTarget_" + std::to_string(RenderTargets.size()), FB.Format, FDesc, true, false));
 		}
-		else if (FB.AttachmentType == eFrameBufferAttachmentType::eRT_UAV)
+		else if (FB.AttachmentType == EFrameBufferAttachmentType::RT_UAV)
 		{
 			RenderTargets.push_back(D3D11RenderTarget::Create(InDevice, Name + "_RenderTarget_" + std::to_string(RenderTargets.size()), FB.Format, FDesc, false, true));
 		}
-		else if (FB.AttachmentType == eFrameBufferAttachmentType::eRT_SRV_UAV)
+		else if (FB.AttachmentType == EFrameBufferAttachmentType::RT_SRV_UAV)
 		{
 			RenderTargets.push_back(D3D11RenderTarget::Create(InDevice, Name + "_RenderTarget_" + std::to_string(RenderTargets.size()), FB.Format, FDesc, true, true));
 		}
-		else if (FB.AttachmentType == eFrameBufferAttachmentType::eDepth)
+		else if (FB.AttachmentType == EFrameBufferAttachmentType::Depth)
 		{
 
 		}
-		else if (FB.AttachmentType == eFrameBufferAttachmentType::eDepth_SRV)
+		else if (FB.AttachmentType == EFrameBufferAttachmentType::Depth_SRV)
 		{
 
 		}
-		else if (FB.AttachmentType == eFrameBufferAttachmentType::eDepth_UAV)
+		else if (FB.AttachmentType == EFrameBufferAttachmentType::Depth_UAV)
 		{
 
 		}
-		else if (FB.AttachmentType == eFrameBufferAttachmentType::eDepth_SRV_UAV)
+		else if (FB.AttachmentType == EFrameBufferAttachmentType::Depth_SRV_UAV)
 		{
 
 		}
@@ -405,22 +405,22 @@ void D3D11FrameBuffer::AttachRenderTarget(const IRenderTarget::SharedPtr& Render
 {
 	if (auto RT = std::dynamic_pointer_cast<D3D11RenderTarget>(RenderTarget))
 	{
-		eFrameBufferAttachmentType AttachmentType;
+		EFrameBufferAttachmentType AttachmentType;
 		if (!RT->IsSRV_Allowed() && !RT->IsUAV_Allowed())
 		{
-			AttachmentType = eFrameBufferAttachmentType::eRT;
+			AttachmentType = EFrameBufferAttachmentType::RT;
 		}
 		else if (RT->IsSRV_Allowed() && !RT->IsUAV_Allowed())
 		{
-			AttachmentType = eFrameBufferAttachmentType::eRT_SRV;
+			AttachmentType = EFrameBufferAttachmentType::RT_SRV;
 		}
 		else if (!RT->IsSRV_Allowed() && RT->IsUAV_Allowed())
 		{
-			AttachmentType = eFrameBufferAttachmentType::eRT_UAV;
+			AttachmentType = EFrameBufferAttachmentType::RT_UAV;
 		}
 		else if (RT->IsSRV_Allowed() && RT->IsUAV_Allowed())
 		{
-			AttachmentType = eFrameBufferAttachmentType::eRT_SRV_UAV;
+			AttachmentType = EFrameBufferAttachmentType::RT_SRV_UAV;
 		}
 
 		if (Index.has_value())
@@ -439,14 +439,14 @@ void D3D11FrameBuffer::AttachUnorderedAccessTarget(const IUnorderedAccessTarget:
 {
 	if (auto ST = std::dynamic_pointer_cast<D3D11UnorderedAccessTarget>(UnorderedAccessTarget))
 	{
-		eFrameBufferAttachmentType AttachmentType;
+		EFrameBufferAttachmentType AttachmentType;
 		if (!ST->IsSRV_Allowed())
 		{
-			AttachmentType = eFrameBufferAttachmentType::eUAV;
+			AttachmentType = EFrameBufferAttachmentType::UAV;
 		}
 		else if (ST->IsSRV_Allowed())
 		{
-			AttachmentType = eFrameBufferAttachmentType::eUAV_SRV;
+			AttachmentType = EFrameBufferAttachmentType::UAV_SRV;
 		}
 
 		if (Index.has_value())
@@ -469,6 +469,11 @@ void D3D11FrameBuffer::SetDepthTarget(const IDepthTarget::SharedPtr& InDepthTarg
 		DepthTarget = DT;
 		AttachmentInfo.DepthFormat = DepthTarget->GetFormat();
 	}
+}
+
+bool D3D11FrameBuffer::CopyFrom(IFrameBuffer* FrameBuffer)
+{
+	return false;
 }
 
 void D3D11FrameBuffer::ApplyFrameBuffer(IGraphicsCommandContext* InCMDBuffer, std::optional<std::size_t> FBOIndex)

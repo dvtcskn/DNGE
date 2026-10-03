@@ -28,6 +28,62 @@
 #include "AbstractGI/Mesh.h"
 #include "Core/MeshPrimitives.h"
 
+void MeshBindlessGeometryHandle::Release()
+{
+	if (!Owner.expired())
+	{
+		if (std::shared_ptr<sMeshGeometryContainer> PTR = Owner.lock())
+			PTR->Free(Descriptor);
+	}
+
+	Owner.reset();
+
+	StructureIndex = std::uint32_t(-1);
+	Descriptor = GeometryDescriptor();
+}
+
+void MeshBindlessGeometryHandle::UpdateGeometry(void* Geometry)
+{
+	if (!Owner.expired())
+	{
+		if (std::shared_ptr<sMeshGeometryContainer> PTR = Owner.lock())
+			PTR->UpdateGeometry(Descriptor, Geometry);
+	}
+}
+
+void MeshIndexBufferHandle::Release()
+{
+	if (!Owner.expired())
+	{
+		if (std::shared_ptr<sMeshIndexContainer> PTR = Owner.lock())
+			PTR->DeallocateHandle(this);
+	}
+
+	Owner.reset();
+
+	Descriptor = std::uint32_t(-1);
+}
+
+void MeshIndexBufferHandle::UpdateIndexBuffer(void* IndexData)
+{
+	if (!Owner.expired())
+	{
+		if (std::shared_ptr<sMeshIndexContainer> PTR = Owner.lock())
+		{
+			BufferSubresource Subresource;
+			Subresource.Location = GetStartIndexLocation() * sizeof(std::uint32_t);
+			Subresource.pSysMem = IndexData;
+			Subresource.Size = GetSize() * sizeof(std::uint32_t);
+			PTR->UpdateIndexBuffer(&Subresource);
+		}
+	}
+}
+
+void sMeshIndexContainer::SetIndexBuffer(IGraphicsCommandContext* CommandContext)
+{
+	CommandContext->SetIndexBuffer(IndexBuffer.get());
+}
+
 sMesh::sMesh(const std::string InName, EBasicMeshType MeshType, std::optional<FBoxDimension> Dimension)
 	: Name(InName)
 	, Path("Generated")
@@ -59,6 +115,16 @@ sMesh::sMesh(const std::string InName, EBasicMeshType MeshType, std::optional<FB
 	{
 		Data = MeshPrimitives::CreateBox(/*Dimension*/);
 	}
+
+	GeometryHandle = MeshBindlessGeometryHandle((std::uint32_t)Data.Vertices.size(), sizeof(sVertexLayout));
+	sMeshGeometryContainerManager::Get().AllocateHandle(&GeometryHandle);
+	GeometryHandle.UpdateGeometry(Data.Vertices.data());
+
+	IndexBufferHandle = MeshIndexBufferHandle((std::uint32_t)Data.Indices.size(), sizeof(std::uint32_t));
+	sMeshGeometryContainerManager::Get().AllocateHandle(&IndexBufferHandle);
+	IndexBufferHandle.UpdateIndexBuffer(Data.Indices.data());
+
+	Data.DrawParameters.StartIndexLocation = IndexBufferHandle.GetStartIndexLocation();
 
 	{
 		auto Vertices = Data.Vertices;
@@ -109,7 +175,22 @@ sMesh::sMesh(const std::string InName, const std::string InPath, const sMeshData
 	, MaterialInstance(nullptr)
 	, InstanceBuffer(nullptr)
 	, RenderPriority(EMeshRenderPriority::eDefault)
+	, GeometryHandle(MeshBindlessGeometryHandle((std::uint32_t)pData.Vertices.size(), sizeof(sVertexLayout)))
+	, GeometryInstanceHandle(MeshBindlessGeometryHandle((std::uint32_t)pData.InstanceData.size(), sizeof(sVertexLayout::sVertexInstanceLayout)))
+	, IndexBufferHandle(MeshIndexBufferHandle((std::uint32_t)pData.Indices.size(), sizeof(std::uint32_t)))
 {
+	sMeshGeometryContainerManager::Get().AllocateHandle(&GeometryHandle);
+	GeometryHandle.UpdateGeometry(Data.Vertices.data());
+	if (pData.InstanceData.size() > 0)
+	{
+		sMeshGeometryContainerManager::Get().AllocateHandle(&GeometryInstanceHandle);
+		GeometryInstanceHandle.UpdateGeometry(Data.InstanceData.data());
+	}
+	sMeshGeometryContainerManager::Get().AllocateHandle(&IndexBufferHandle);
+	IndexBufferHandle.UpdateIndexBuffer(Data.Indices.data());
+
+	Data.DrawParameters.StartIndexLocation = IndexBufferHandle.GetStartIndexLocation();
+
 	{
 		auto Vertices = Data.Vertices;
 		BufferSubresource Subresource = BufferSubresource(Vertices.data(), Vertices.size() * sizeof(sVertexLayout));
@@ -148,12 +229,36 @@ sMesh::~sMesh()
 
 	PendingVertexBufferSubresource = std::nullopt;
 	PendingIndexBufferSubresource = std::nullopt;
+
+	sMeshGeometryContainerManager::Get().DeallocateHandle(&GeometryHandle);
+	sMeshGeometryContainerManager::Get().DeallocateHandle(&GeometryInstanceHandle);
+	sMeshGeometryContainerManager::Get().DeallocateHandle(&IndexBufferHandle);
 }
 
 void sMesh::SetMeshData(const sMeshData& pData, const std::string InPath)
 {
 	Data = pData;
 	Path = InPath;
+
+	sMeshGeometryContainerManager::Get().DeallocateHandle(&GeometryHandle);
+	sMeshGeometryContainerManager::Get().DeallocateHandle(&GeometryInstanceHandle);
+	sMeshGeometryContainerManager::Get().DeallocateHandle(&IndexBufferHandle);
+
+	GeometryHandle = MeshBindlessGeometryHandle((std::uint32_t)pData.Vertices.size(), sizeof(sVertexLayout));
+	sMeshGeometryContainerManager::Get().AllocateHandle(&GeometryHandle);
+	GeometryHandle.UpdateGeometry(Data.Vertices.data());
+
+	if (Data.InstanceData.size() > 0)
+	{
+		GeometryInstanceHandle = MeshBindlessGeometryHandle((std::uint32_t)pData.InstanceData.size(), sizeof(sVertexLayout::sVertexInstanceLayout));
+		sMeshGeometryContainerManager::Get().AllocateHandle(&GeometryInstanceHandle);
+		GeometryInstanceHandle.UpdateGeometry(Data.InstanceData.data());
+	}
+
+	IndexBufferHandle = MeshIndexBufferHandle((std::uint32_t)pData.Indices.size(), sizeof(std::uint32_t));
+	sMeshGeometryContainerManager::Get().AllocateHandle(&IndexBufferHandle);
+	IndexBufferHandle.UpdateIndexBuffer(Data.Indices.data());
+
 	{
 		auto Vertices = Data.Vertices;
 		BufferSubresource Subresource = BufferSubresource(Vertices.data(), Vertices.size() * sizeof(sVertexLayout));
@@ -172,9 +277,9 @@ void sMesh::SetMeshData(const sMeshData& pData, const std::string InPath)
 	}
 }
 
-std::vector<sMaterial::sMaterialInstance*> sMesh::GetMaterialInstances() const
+std::vector<sMaterialInstance*> sMesh::GetMaterialInstances() const
 {
-	return std::vector<sMaterial::sMaterialInstance*>{ MaterialInstance };
+	return std::vector<sMaterialInstance*>{ MaterialInstance };
 }
 
 std::int32_t sMesh::GetNumMaterials() const
@@ -182,12 +287,12 @@ std::int32_t sMesh::GetNumMaterials() const
 	return 1;
 }
 
-sMaterial::sMaterialInstance* sMesh::GetMaterialInstance(/*std::int32_t Index*/) const
+sMaterialInstance* sMesh::GetMaterialInstance(/*std::int32_t Index*/) const
 {
 	return MaterialInstance;
 }
 
-void sMesh::SetMaterial(/*std::int32_t Index, */sMaterial::sMaterialInstance* Material)
+void sMesh::SetMaterial(/*std::int32_t Index, */sMaterialInstance* Material)
 {
 	MaterialInstance = Material;
 }

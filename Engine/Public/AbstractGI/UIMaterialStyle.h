@@ -44,7 +44,7 @@ public:
 	UIMaterial()
 		: Material(nullptr)
 	{}
-	UIMaterial(sMaterial::sMaterialInstance* Mat)
+	UIMaterial(sMaterialInstance* Mat)
 		: Super()
 		, Material(Mat)
 	{}
@@ -53,7 +53,7 @@ public:
 		Material = nullptr;
 	}
 
-	sMaterial::sMaterialInstance* Material;
+	sMaterialInstance* Material;
 };
 
 class IUIMaterialStyle

@@ -30,103 +30,103 @@
 #include "Core/Math/CoreMath.h"
 #include "CanvasRenderer.h"
 #include "Renderer.h"
+#include "Utilities/FileManager.h"
 
 __declspec(align(256)) struct OnScreenWidgetMatrix
 {
 	FMatrix Matrix;
-	FMatrix Offset[3];
+	//FMatrix Offset[3];
 };
 static_assert((sizeof(OnScreenWidgetMatrix) % 256) == 0, "Constant Buffer size must be 256-byte aligned");
 
-namespace
+struct sGUIBuffer : public IBindlessSceneDescriptor
 {
-	std::string DepthTestVSShader = "												\
-							cbuffer UICBuffer : register(b13)					\
-							{														\
-								matrix WidgetMatrix;								\
-							}														\
-																					\
-							float4 DepthTestVS(float4 pos : POSITION) : SV_POSITION		\
-							{														\
-								float4 position = float4(pos.xyz, 1.0f);			\
-								position = mul(position, WidgetMatrix);				\
-																					\
-								position.z = 0.0f;									\
-								position.w = 1.0f;									\
-																					\
-								return position;									\
-							}														\
-																					\
-							float4 mainPS() : SV_TARGET								\
-							{														\
-								return float4(1.0f, 1.0f, 1.0f, 0.0f);				\
-							}";
+	std::uint32_t ObjectBuffer;
+	std::uint32_t StructureIndex;
+	std::uint32_t MaterialIndex;
+	std::uint32_t CBGradientIndex = 0;
+};
 
-	std::string WidgetMainVS = "															\
-							cbuffer UICBuffer : register(b13)						\
-							{														\
-								matrix WidgetMatrix;								\
-							};														\
-																					\
-							struct GeometryVSIn										\
-							{														\
-								float4 position : POSITION;							\
-								float2 texCoord : TEXCOORD;							\
-								float4 Color : COLOR;								\
-							};														\
-																					\
-							struct GeometryVSOut									\
-							{														\
-								float4 position : SV_Position;						\
-								float2 texCoord : TEXCOORD;							\
-								float4 Color : COLOR;								\
-							};														\
-																					\
-							GeometryVSOut WidgetMainVS(GeometryVSIn input)			\
-							{														\
-								GeometryVSOut output;								\
-																					\
-								float4 pos = float4(input.position.xyz, 1.0f);		\
-								pos = mul(pos, WidgetMatrix);						\
-																					\
-								pos.z = 0.0f;										\
-								pos.w = 1.0f;										\
-																					\
-								output.position = pos;								\
-																					\
-								output.Color = input.Color;							\
-								output.texCoord = input.texCoord;					\
-																					\
-								return output;										\
-							}";
+struct sCanvasDescriptor : public IBindlessSceneContainer
+{
+	sGUIBuffer Descriptor;
 
-	std::string WidgetBasePS_Flat = "															\
-							struct GeometryVSOut										\
-							{															\
-								float4 position : SV_Position;							\
-								float2 texCoord : TEXCOORD;								\
-								float4 Color : COLOR;									\
-							};															\
-																						\
-							float4 WidgetFlatColorPS(GeometryVSOut Input) : SV_TARGET	\
-							{															\
-								return Input.Color;										\
-							}";
+	sCanvasDescriptor(sGUIBuffer NewDescriptor)
+		: Descriptor(NewDescriptor)
+	{}
 
-	std::string WidgetBasePS_FlatBlack = "												\
-							struct GeometryVSOut										\
-							{															\
-								float4 position : SV_Position;							\
-								float2 texCoord : TEXCOORD;								\
-								float4 Color : COLOR;									\
-							};															\
-																						\
-							float4 WidgetFlatColorPS(GeometryVSOut Input) : SV_TARGET	\
-							{															\
-								return float4(0.0f, 0.0f, 0.0f, 1.0f);					\
-							}";
-}
+	virtual const IBindlessSceneDescriptor* GetDescriptor() const override final
+	{
+		return &Descriptor;
+	}
 
+	virtual std::vector<std::uint32_t> GetAllBindlessIndices() const override final
+	{
+		std::vector<std::uint32_t> BindlessIndices;
+		BindlessIndices.push_back(Descriptor.ObjectBuffer);
+		BindlessIndices.push_back(Descriptor.StructureIndex);
+		BindlessIndices.push_back(Descriptor.MaterialIndex);
+		BindlessIndices.push_back(Descriptor.CBGradientIndex);
+		return BindlessIndices;
+	}
+
+	virtual std::vector<std::uint32_t> GetAllMaterialInstanceBindlessIndices() const override final
+	{
+		std::vector<std::uint32_t> BindlessIndices;
+		BindlessIndices.push_back(Descriptor.StructureIndex);
+		BindlessIndices.push_back(Descriptor.MaterialIndex);
+		return BindlessIndices;
+	}
+
+	virtual std::uint32_t GetMaterialInstanceSize() const override final
+	{
+		return 2;
+	}
+
+	virtual std::vector<std::uint32_t> GetAllConstantBufferBindlessIndices() const override final
+	{
+		std::vector<std::uint32_t> BindlessIndices;
+		BindlessIndices.push_back(Descriptor.ObjectBuffer);
+		BindlessIndices.push_back(Descriptor.CBGradientIndex);
+		return BindlessIndices;
+	}
+
+	virtual std::uint32_t GetConstantBuffereSize() const override final
+	{
+		return 2;
+	}
+};
+
+struct sGUIDepthBuffer : public IBindlessSceneDescriptor
+{
+	std::uint32_t ObjectBuffer;
+};
+
+struct sCanvasDepthPassDescriptor : public IBindlessSceneContainer
+{
+	sGUIDepthBuffer Descriptor;
+
+	sCanvasDepthPassDescriptor(sGUIDepthBuffer NewDescriptor)
+		: Descriptor(NewDescriptor)
+	{}
+
+	virtual const IBindlessSceneDescriptor* GetDescriptor() const override final
+	{
+		return &Descriptor;
+	}
+
+	virtual std::vector<std::uint32_t> GetAllConstantBufferBindlessIndices() const override final
+	{
+		std::vector<std::uint32_t> BindlessIndices;
+		BindlessIndices.push_back(Descriptor.ObjectBuffer);
+		return BindlessIndices;
+	}
+
+	virtual std::uint32_t GetConstantBuffereSize() const override final
+	{
+		return 1;
+	}
+};
 sCanvasRenderer::sCanvasRenderer(std::size_t Width, std::size_t Height)
 	: Super()
 	, LastMaterial(nullptr)
@@ -139,11 +139,11 @@ sCanvasRenderer::sCanvasRenderer(std::size_t Width, std::size_t Height)
 		sPipelineDesc pPipelineDesc;
 		pPipelineDesc.BlendAttribute = sBlendAttributeDesc();
 		pPipelineDesc.DepthStencilAttribute = sDepthStencilAttributeDesc();
-		pPipelineDesc.DepthStencilAttribute.DepthTest = ECompareFunction::eAlways;
-		pPipelineDesc.PrimitiveTopologyType = EPrimitiveType::eLINE_LIST;
+		pPipelineDesc.DepthStencilAttribute.DepthTest = ECompareFunction::Always;
+		pPipelineDesc.PrimitiveTopologyType = EPrimitiveType::LINE_LIST;
 		pPipelineDesc.RasterizerAttribute = sRasterizerAttributeDesc();
 		pPipelineDesc.RasterizerAttribute.bEnableLineAA = true;
-		pPipelineDesc.RasterizerAttribute.CullMode = ERasterizerCullMode::eNone;
+		pPipelineDesc.RasterizerAttribute.CullMode = ERasterizerCullMode::None;
 
 		std::vector<sVertexAttributeDesc> VertexLayout =
 		{
@@ -153,16 +153,16 @@ sCanvasRenderer::sCanvasRenderer(std::size_t Width, std::size_t Height)
 		};
 		pPipelineDesc.VertexLayout = VertexLayout;
 
-		pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Vertex, 13));	// Model CB
+		pPipelineDesc.Bindings.push_back(sShaderBinding(EDescriptorType::e32BitConstant, eShaderType::All, 0, 4));	// Model CB
 
 		std::vector<sShaderAttachment> ShaderAttachments;
-		pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment((void*)WidgetMainVS.data(), WidgetMainVS.length(), "WidgetMainVS", eShaderType::Vertex));
-		pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment((void*)WidgetBasePS_FlatBlack.data(), WidgetBasePS_FlatBlack.length(), "WidgetFlatColorPS", eShaderType::Pixel));
+		pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment(FileManager::GetShaderFolderW() + L"GUI.hlsl", "GUIGeometryVS", eShaderType::Vertex));
+		pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment(FileManager::GetShaderFolderW() + L"GUI.hlsl", "WidgetFlatColorPS", eShaderType::Pixel));
 
 		DefaultUILineMaterial = sMaterial::Create("Line", EMaterialBlendMode::Opaque, pPipelineDesc);
 
 		{
-			sMaterial::sMaterialInstance::SharedPtr FlatColorInstance = DefaultUILineMaterial->CreateInstance("LineInstance");
+			sMaterialInstance::SharedPtr FlatColorInstance = DefaultUILineMaterial->CreateInstance("LineInstance");
 			DefaultLineColorMatStyle = UIMaterialStyle::Create("Image", UIMaterial::Create(FlatColorInstance.get()));
 			FlatColorInstance = nullptr;
 		}
@@ -184,22 +184,22 @@ sCanvasRenderer::sCanvasRenderer(std::size_t Width, std::size_t Height)
 		pPipelineDesc.BlendAttribute = sBlendAttributeDesc();
 
 		pPipelineDesc.DepthStencilAttribute.bEnableDepthWrite = false;
-		pPipelineDesc.DepthStencilAttribute.DepthTest = ECompareFunction::eAlways;
+		pPipelineDesc.DepthStencilAttribute.DepthTest = ECompareFunction::Always;
 		pPipelineDesc.DepthStencilAttribute.bDepthWriteMask = false;
 		pPipelineDesc.DepthStencilAttribute.bStencilEnable = true;
 
-		pPipelineDesc.DepthStencilAttribute.FrontFaceStencilFailStencilOp = EStencilOp::eKeep;
-		pPipelineDesc.DepthStencilAttribute.FrontFaceDepthFailStencilOp = EStencilOp::eKeep;
-		pPipelineDesc.DepthStencilAttribute.FrontFacePassStencilOp = EStencilOp::eReplace;
-		pPipelineDesc.DepthStencilAttribute.FrontFaceStencilTest = ECompareFunction::eAlways;
+		pPipelineDesc.DepthStencilAttribute.FrontFaceStencilFailStencilOp = EStencilOp::Keep;
+		pPipelineDesc.DepthStencilAttribute.FrontFaceDepthFailStencilOp = EStencilOp::Keep;
+		pPipelineDesc.DepthStencilAttribute.FrontFacePassStencilOp = EStencilOp::Replace;
+		pPipelineDesc.DepthStencilAttribute.FrontFaceStencilTest = ECompareFunction::Always;
 
-		pPipelineDesc.DepthStencilAttribute.BackFaceStencilFailStencilOp = EStencilOp::eKeep;
-		pPipelineDesc.DepthStencilAttribute.BackFaceDepthFailStencilOp = EStencilOp::eKeep;
-		pPipelineDesc.DepthStencilAttribute.BackFacePassStencilOp = EStencilOp::eReplace;
-		pPipelineDesc.DepthStencilAttribute.BackFaceStencilTest = ECompareFunction::eAlways;
+		pPipelineDesc.DepthStencilAttribute.BackFaceStencilFailStencilOp = EStencilOp::Keep;
+		pPipelineDesc.DepthStencilAttribute.BackFaceDepthFailStencilOp = EStencilOp::Keep;
+		pPipelineDesc.DepthStencilAttribute.BackFacePassStencilOp = EStencilOp::Replace;
+		pPipelineDesc.DepthStencilAttribute.BackFaceStencilTest = ECompareFunction::Always;
 
-		pPipelineDesc.PrimitiveTopologyType = EPrimitiveType::eTRIANGLE_STRIP;
-		pPipelineDesc.RasterizerAttribute = sRasterizerAttributeDesc(ERasterizerCullMode::eCCW);
+		pPipelineDesc.PrimitiveTopologyType = EPrimitiveType::TRIANGLE_STRIP;
+		pPipelineDesc.RasterizerAttribute = sRasterizerAttributeDesc(ERasterizerCullMode::CCW);
 
 		std::vector<sVertexAttributeDesc> VertexLayout =
 		{
@@ -207,9 +207,9 @@ sCanvasRenderer::sCanvasRenderer(std::size_t Width, std::size_t Height)
 		};
 		pPipelineDesc.VertexLayout = VertexLayout;
 
-		pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Vertex, 13));	// Model CB
+		pPipelineDesc.Bindings.push_back(sShaderBinding(EDescriptorType::e32BitConstant, eShaderType::Vertex, 0, 1));	// Model CB
 
-		pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment((void*)DepthTestVSShader.data(), DepthTestVSShader.length(), "DepthTestVS", eShaderType::Vertex));
+		pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment(FileManager::GetShaderFolderW() + L"GUI.hlsl", "DepthTestVS", eShaderType::Vertex));
 
 		DepthMainPipeline = IPipeline::CreateUnique("DepthMainPipeline", pPipelineDesc);
 	}
@@ -219,22 +219,22 @@ sCanvasRenderer::sCanvasRenderer(std::size_t Width, std::size_t Height)
 		pPipelineDesc.BlendAttribute = sBlendAttributeDesc();
 
 		pPipelineDesc.DepthStencilAttribute.bEnableDepthWrite = false;
-		pPipelineDesc.DepthStencilAttribute.DepthTest = ECompareFunction::eAlways;
+		pPipelineDesc.DepthStencilAttribute.DepthTest = ECompareFunction::Always;
 		pPipelineDesc.DepthStencilAttribute.bDepthWriteMask = false;
 		pPipelineDesc.DepthStencilAttribute.bStencilEnable = true;
 
-		pPipelineDesc.DepthStencilAttribute.FrontFaceStencilFailStencilOp = EStencilOp::eKeep;
-		pPipelineDesc.DepthStencilAttribute.FrontFaceDepthFailStencilOp = EStencilOp::eKeep;
-		pPipelineDesc.DepthStencilAttribute.FrontFacePassStencilOp = EStencilOp::eSaturatedIncrement;
-		pPipelineDesc.DepthStencilAttribute.FrontFaceStencilTest = ECompareFunction::eAlways;
+		pPipelineDesc.DepthStencilAttribute.FrontFaceStencilFailStencilOp = EStencilOp::Keep;
+		pPipelineDesc.DepthStencilAttribute.FrontFaceDepthFailStencilOp = EStencilOp::Keep;
+		pPipelineDesc.DepthStencilAttribute.FrontFacePassStencilOp = EStencilOp::SaturatedIncrement;
+		pPipelineDesc.DepthStencilAttribute.FrontFaceStencilTest = ECompareFunction::Always;
 
-		pPipelineDesc.DepthStencilAttribute.BackFaceStencilFailStencilOp = EStencilOp::eKeep;
-		pPipelineDesc.DepthStencilAttribute.BackFaceDepthFailStencilOp = EStencilOp::eKeep;
-		pPipelineDesc.DepthStencilAttribute.BackFacePassStencilOp = EStencilOp::eSaturatedIncrement;
-		pPipelineDesc.DepthStencilAttribute.BackFaceStencilTest = ECompareFunction::eAlways;
+		pPipelineDesc.DepthStencilAttribute.BackFaceStencilFailStencilOp = EStencilOp::Keep;
+		pPipelineDesc.DepthStencilAttribute.BackFaceDepthFailStencilOp = EStencilOp::Keep;
+		pPipelineDesc.DepthStencilAttribute.BackFacePassStencilOp = EStencilOp::SaturatedIncrement;
+		pPipelineDesc.DepthStencilAttribute.BackFaceStencilTest = ECompareFunction::Always;
 
-		pPipelineDesc.PrimitiveTopologyType = EPrimitiveType::eTRIANGLE_STRIP;
-		pPipelineDesc.RasterizerAttribute = sRasterizerAttributeDesc(ERasterizerCullMode::eCCW);
+		pPipelineDesc.PrimitiveTopologyType = EPrimitiveType::TRIANGLE_STRIP;
+		pPipelineDesc.RasterizerAttribute = sRasterizerAttributeDesc(ERasterizerCullMode::CCW);
 
 		std::vector<sVertexAttributeDesc> VertexLayout =
 		{
@@ -242,9 +242,9 @@ sCanvasRenderer::sCanvasRenderer(std::size_t Width, std::size_t Height)
 		};
 		pPipelineDesc.VertexLayout = VertexLayout;
 
-		pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Vertex, 13)); // Model CB
+		pPipelineDesc.Bindings.push_back(sShaderBinding(EDescriptorType::e32BitConstant, eShaderType::Vertex, 0, 1)); // Model CB
 
-		pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment((void*)DepthTestVSShader.data(), DepthTestVSShader.length(), "DepthTestVS", eShaderType::Vertex));
+		pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment(FileManager::GetShaderFolderW() + L"GUI.hlsl", "DepthTestVS", eShaderType::Vertex));
 
 		DepthPipeline = IPipeline::CreateUnique("DepthPipeline", pPipelineDesc);
 	}
@@ -329,7 +329,7 @@ void sCanvasRenderer::Render(ICanvas* Canvas, IRenderTarget* pFB, std::optional<
 		};
 
 	{
-		CMD->BeginRecordCommandList(ERenderPass::eUI);
+		CMD->BeginRecordCommandList(ERenderPass::UI);
 
 		sViewport CanvasViewport = Viewport.has_value() ? *Viewport : sViewport(ScreenDimension);
 
@@ -440,7 +440,8 @@ void sCanvasRenderer::Render(const std::vector<ICanvas*>& Canvases, IRenderTarge
 		};
 
 	{
-		CMD->BeginRecordCommandList(ERenderPass::eUI);
+		bool bDraw = false;
+		CMD->BeginRecordCommandList(ERenderPass::UI);
 
 		sViewport CanvasViewport = Viewport.has_value() ? *Viewport : sViewport(ScreenDimension);
 
@@ -478,6 +479,7 @@ void sCanvasRenderer::Render(const std::vector<ICanvas*>& Canvases, IRenderTarge
 						continue;
 					}
 					fDraw(pFB, VertexBuffer, IndexBuffer, Widget, std::nullopt, CanvasViewport, eZOrderMode::InOrder);
+					bDraw = true;
 
 					if (LastInTheHierarchy.size() > 0)
 					{
@@ -509,7 +511,8 @@ void sCanvasRenderer::Render(const std::vector<ICanvas*>& Canvases, IRenderTarge
 		};
 
 		CMD->FinishRecordCommandList();
-		CMD->ExecuteCommandList();
+		if (bDraw)
+			CMD->ExecuteCommandList(ECommandContextExecuteType::Deferred, 4);
 	}
 	LastMaterial = nullptr;
 }
@@ -540,6 +543,8 @@ void sCanvasRenderer::Draw(IRenderTarget* pFB, IVertexBuffer* VertexBuffer, IInd
 		const auto& GeometryDrawData = Node->Widget->GetGeometryDrawData();
 		const auto& pMat = Node->MaterialStyle;
 		const auto& pMaterialInstace = pMat->GetMaterial(GeometryDrawData.StyleState)->Material;
+		if (!pMaterialInstace)
+			return;
 		if (!pMaterialInstace->IsCompiled())
 			pMaterialInstace->Compile(pFB, Depth.get());
 
@@ -548,9 +553,19 @@ void sCanvasRenderer::Draw(IRenderTarget* pFB, IVertexBuffer* VertexBuffer, IInd
 		{
 			LastMaterial = pMaterial;
 			LastMaterial->ApplyMaterial(CMD.get());
-			CMD->SetConstantBuffer(WidgetConstantBuffer.get());
+			//CMD->SetConstantBuffer(WidgetConstantBuffer.get());
 		}
 		pMaterialInstace->ApplyMaterialInstance(CMD.get());
+
+		sGUIBuffer CanvasGraph;
+		CanvasGraph.ObjectBuffer = WidgetConstantBuffer->GetBindlessIndex();
+		CanvasGraph.StructureIndex = pMaterialInstace->GetStructureId();
+		CanvasGraph.MaterialIndex = pMaterialInstace->GetId();
+		if (pMaterialInstace->GetConstantBufferSize() > 0)
+			CanvasGraph.CBGradientIndex = (std::uint32_t)pMaterialInstace->GetConstantBuffeBindlessIndex(0);
+		//CMD->Set32BitConstants(1, &CanvasGraph, 2, 0);
+		sCanvasDescriptor Descriptor(CanvasGraph);
+		CMD->SetBindlessDescriptor(0, &Descriptor);
 
 		if (Node->bVertexDirty || Node->bIndexDirty)
 		{
@@ -607,6 +622,8 @@ void sCanvasRenderer::Draw(IRenderTarget* pFB, IVertexBuffer* VertexBuffer, IInd
 			return;
 
 		const auto pMaterialInstace = DefaultLineColorMatStyle->GetMaterial(GeometryDrawData.StyleState)->Material;
+		if (!pMaterialInstace)
+			return;
 		if (!pMaterialInstace->IsCompiled())
 			pMaterialInstace->Compile(pFB, Depth.get());
 
@@ -615,9 +632,19 @@ void sCanvasRenderer::Draw(IRenderTarget* pFB, IVertexBuffer* VertexBuffer, IInd
 		{
 			LastMaterial = pMaterial;
 			LastMaterial->ApplyMaterial(CMD.get());
-			CMD->SetConstantBuffer(WidgetConstantBuffer.get());
+			//CMD->SetConstantBuffer(WidgetConstantBuffer.get());
 		}
 		pMaterialInstace->ApplyMaterialInstance(CMD.get());
+
+		sGUIBuffer CanvasGraph;
+		CanvasGraph.ObjectBuffer = WidgetConstantBuffer->GetBindlessIndex();
+		CanvasGraph.StructureIndex = pMaterialInstace->GetStructureId();
+		CanvasGraph.MaterialIndex = pMaterialInstace->GetId();
+		if (pMaterialInstace->GetConstantBufferSize() > 0)
+			CanvasGraph.CBGradientIndex = (std::uint32_t)pMaterialInstace->GetConstantBuffeBindlessIndex(0);
+		//CMD->Set32BitConstants(1, &CanvasGraph, 2, 0);
+		sCanvasDescriptor Descriptor(CanvasGraph);
+		CMD->SetBindlessDescriptor(0, &Descriptor);
 
 		if (Node->bVertexDirty || Node->bIndexDirty)
 		{
@@ -658,9 +685,15 @@ bool sCanvasRenderer::DepthPass(cbgui::cbWidgetObj* Widget, const sViewport& VP)
 		Data.push_back(cbgui::cbVector4(cbgui::cbVector((float)VP.Width, (float)VP.Height), cbgui::cbVector(0.0f, 1.0f)));
 		CMD->UpdateBufferSubresource(DepthVertexBuffer.get(), 0 * sizeof(cbgui::cbVector4), Data.size() * sizeof(cbgui::cbVector4), Data.data());
 
-		CMD->SetConstantBuffer(WidgetConstantBuffer.get());
 		CMD->SetScissorRect(0, 0, (std::uint32_t)VP.Height, (std::uint32_t)VP.Width);
 		CMD->SetPipeline(DepthMainPipeline.get());
+
+		//CMD->SetConstantBuffer(WidgetConstantBuffer.get());
+		sGUIDepthBuffer CanvasGraph;
+		CanvasGraph.ObjectBuffer = WidgetConstantBuffer->GetBindlessIndex();
+		//CMD->Set32BitConstants(0, &CanvasGraph, 1, 0);
+		sCanvasDepthPassDescriptor Descriptor(CanvasGraph);
+		CMD->SetBindlessDescriptor(0, &Descriptor);
 
 		CMD->Draw(4);
 	}
@@ -678,9 +711,16 @@ bool sCanvasRenderer::DepthPass(cbgui::cbWidgetObj* Widget, const sViewport& VP)
 			pData = cbgui::RotateVectorAroundPoint(pData, Widget->GetRotatorOrigin(), Widget->GetRotation());
 		CMD->UpdateBufferSubresource(DepthVertexBuffer.get(), 0 * sizeof(cbgui::cbVector4), Data.size() * sizeof(cbgui::cbVector4), Data.data());
 
-		CMD->SetConstantBuffer(WidgetConstantBuffer.get());
 		CMD->SetScissorRect(0, 0, (std::uint32_t)VP.Height, (std::uint32_t)VP.Width);
 		CMD->SetPipeline(DepthPipeline.get());
+
+		//CMD->SetConstantBuffer(WidgetConstantBuffer.get());
+		sGUIDepthBuffer CanvasGraph;
+		CanvasGraph.ObjectBuffer = WidgetConstantBuffer->GetBindlessIndex();
+		//CMD->Set32BitConstants(0, &CanvasGraph, 1, 0);
+		sCanvasDepthPassDescriptor Descriptor(CanvasGraph);
+		CMD->SetBindlessDescriptor(0, &Descriptor);
+
 		CMD->Draw(4);
 	}
 

@@ -40,7 +40,7 @@ sSpriteSheetComponent::sSpriteSheetComponent(const std::string Name)
 	, FrameCount(0)
 	, CurrentSpriteIndex(0)
 	, bIsAnimationActive(true)
-	, bFlip(false)
+	, bFlip(true)
 	, CurrentKeyFrame(nullptr)
 	, AnimSeqFrameCount(0)
 	//, ElapsedTime(0.0f)
@@ -51,10 +51,6 @@ sSpriteSheetComponent::sSpriteSheetComponent(const std::string Name)
 	, fAnimationEnd(nullptr)
 	, fFrameUpdated(nullptr)
 {
-	BufferLayout BufferDesc;
-	BufferDesc.Size = sizeof(sAnimationFlip);
-	AnimationCB = IConstantBuffer::Create("AnimationFlip", BufferDesc, GPU::IsBindlessRendererEnabled() ? 2 : 3 /*GPU::GetGBufferTextureEntryPoint() + GPU::GetGBufferTextureSize() + 1*/); // 2 or 3
-
 	sSpriteEffectComponent::SharedPtr pSpriteEffectComponent = sSpriteEffectComponent::Create("SpriteEffectComponent");
 	pSpriteEffectComponent->AttachToComponent(this);
 	SpriteEffectComponent = pSpriteEffectComponent.get();
@@ -75,7 +71,7 @@ sSpriteSheetComponent::sSpriteSheetComponent(sSpriteSheet* pSpriteSheet)
 	, FrameCount(0)
 	, CurrentSpriteIndex(0)
 	, bIsAnimationActive(true)
-	, bFlip(false)
+	, bFlip(true)
 	, CurrentKeyFrame(nullptr)
 	, AnimSeqFrameCount(0)
 	//, ElapsedTime(0.0f)
@@ -86,10 +82,6 @@ sSpriteSheetComponent::sSpriteSheetComponent(sSpriteSheet* pSpriteSheet)
 	, fAnimationEnd(nullptr)
 	, fFrameUpdated(nullptr)
 {
-	BufferLayout BufferDesc;
-	BufferDesc.Size = sizeof(sAnimationFlip);
-	AnimationCB = IConstantBuffer::Create("AnimationFlip", BufferDesc, GPU::IsBindlessRendererEnabled() ? 2 : 3 /*GPU::GetGBufferTextureEntryPoint() + GPU::GetGBufferTextureSize() + 1*/);
-
 	sSpriteEffectComponent::SharedPtr pSpriteEffectComponent = sSpriteEffectComponent::Create("SpriteEffectComponent");
 	pSpriteEffectComponent->AttachToComponent(this);
 	SpriteEffectComponent = pSpriteEffectComponent.get();
@@ -116,8 +108,6 @@ sSpriteSheetComponent::~sSpriteSheetComponent()
 	fAnimationStarted = nullptr;
 	fAnimationEnd = nullptr;
 	fFrameUpdated = nullptr;
-
-	AnimationCB = nullptr;
 }
 
 void sSpriteSheetComponent::OnBeginPlay()
@@ -164,17 +154,11 @@ void sSpriteSheetComponent::Flip(bool value)
 
 	if (bFlip)
 	{
-		//SetRelativeRotation(FQuaternion(FAngles(180.0f, 0.0f, 0.0f)));
-
-		AnimationFlip.Flip = true;
-		AnimationCB->Map(&AnimationFlip);
+		SetRelativeRotation(FQuaternion(FAngles(180.0f, 0.0f, 0.0f)));
 	}
 	else
 	{
-		//SetRelativeRotation(FQuaternion(FAngles(0.0f, 0.0f, 0.0f)));
-
-		AnimationFlip.Flip = false;
-		AnimationCB->Map(&AnimationFlip);
+		SetRelativeRotation(FQuaternion(FAngles(0.0f, 0.0f, 0.0f)));
 	}
 
 	//if (CurrentKeyFrame)

@@ -258,7 +258,7 @@ VulkanTexture::VulkanTexture(VulkanDevice* Device, const std::wstring FilePath, 
 	{
 		DescriptorImageInfo.imageLayout = VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		DescriptorImageInfo.imageView = View;
-		VulkanSamplerState Sampler = VulkanSamplerState(sSamplerAttributeDesc(ESamplerStateMode::eAnisotropicWrap));
+		VulkanStaticSamplerState Sampler = VulkanStaticSamplerState(sSamplerAttributeDesc(ESamplerStateMode::AnisotropicWrap));
 		DescriptorImageInfo.sampler = Sampler.Get(Owner->Get());
 	}
 
@@ -359,7 +359,12 @@ VulkanTexture::VulkanTexture(VulkanDevice* Device, const std::string InName, voi
 	{
 		DescriptorImageInfo.imageLayout = VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		DescriptorImageInfo.imageView = View;
-		VulkanSamplerState Sampler = VulkanSamplerState(sSamplerAttributeDesc(ESamplerStateMode::eAnisotropicWrap));
+		sSamplerAttributeDesc SamplerDesc(ESamplerStateMode::PointWrap);
+		//SamplerDesc.AddressU = ESamplerAddressMode::Wrap;
+		//SamplerDesc.AddressV = ESamplerAddressMode::Wrap;
+		//SamplerDesc.AddressW = ESamplerAddressMode::Wrap;
+		//SamplerDesc.Filter = ESamplerFilter::AnisotropicLinear;
+		VulkanStaticSamplerState Sampler = VulkanStaticSamplerState(SamplerDesc);
 		DescriptorImageInfo.sampler = Sampler.Get(Owner->Get());
 	}
 
@@ -416,7 +421,7 @@ VulkanTexture::VulkanTexture(VulkanDevice* Device, const std::string InName, con
 	{
 		DescriptorImageInfo.imageLayout = VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		DescriptorImageInfo.imageView = View;
-		VulkanSamplerState Sampler = VulkanSamplerState(sSamplerAttributeDesc(ESamplerStateMode::eAnisotropicWrap));
+		VulkanStaticSamplerState Sampler = VulkanStaticSamplerState(sSamplerAttributeDesc(ESamplerStateMode::AnisotropicWrap));
 		DescriptorImageInfo.sampler = Sampler.Get(Owner->Get());
 	}
 
@@ -467,11 +472,11 @@ void VulkanTexture::UpdateTexture(ITexture2D* SourceTexture, std::size_t SourceA
 	Copy.dstSubresource.baseArrayLayer = 0;
 	Copy.dstSubresource.layerCount = 1;
 	Copy.dstSubresource.mipLevel = 0;
-	Copy.extent.width = TargetBounds.has_value() ? TargetBounds->GetWidth() : Texure->Desc.Dimensions.X;
-	Copy.extent.height = TargetBounds.has_value() ? TargetBounds->GetHeight() : Texure->Desc.Dimensions.Y;
+	Copy.extent.width = TargetBounds.has_value() ? (std::uint32_t)std::trunc(TargetBounds->GetWidth()) : Texure->Desc.Dimensions.X;
+	Copy.extent.height = TargetBounds.has_value() ? (std::uint32_t)std::trunc(TargetBounds->GetHeight()) : Texure->Desc.Dimensions.Y;
 	Copy.extent.depth = 1;
-	Copy.srcOffset.x = TargetBounds.has_value() ? TargetBounds.value().Min.X : 0;
-	Copy.srcOffset.y = TargetBounds.has_value() ? TargetBounds.value().Min.Y : 0;
+	Copy.srcOffset.x = TargetBounds.has_value() ? (std::int32_t)std::trunc(TargetBounds.value().Min.X) : 0;
+	Copy.srcOffset.y = TargetBounds.has_value() ? (std::int32_t)std::trunc(TargetBounds.value().Min.Y) : 0;
 	Copy.srcOffset.z = 0;
 	Copy.srcSubresource.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
 	Copy.srcSubresource.baseArrayLayer = 0;
@@ -590,7 +595,7 @@ void VulkanTexture::UpdateTexture(const void* pSrcData, std::size_t RowPitch, st
 	//	Owner->GetIMCommandBuffer()->ExecuteWithWait();
 	//}
 
-	CopyBufferToImage(stagingBuffer, Image, MaxX - MinX, MaxY - MinY, MinX, MinY);
+	CopyBufferToImage(stagingBuffer, Image, std::uint32_t(MaxX - MinX), std::uint32_t(MaxY - MinY), (std::int32_t)MinX, (std::int32_t)MinY);
 
 	//if (CurrentLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
 	//{
@@ -777,7 +782,7 @@ void VulkanTexture::TransitionImageLayout(VkImage image, VkFormat format, VkImag
 	vkDestroyFence(Owner->Get(), fence, nullptr);
 }
 
-void VulkanTexture::CopyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height, std::int32_t OffsetX, std::int32_t OffsetY)
+void VulkanTexture::CopyBufferToImage(VkBuffer buffer, VkImage image, std::uint32_t width, std::uint32_t height, std::int32_t OffsetX, std::int32_t OffsetY)
 {
 	VkCommandBuffer commandBuffer = Owner->GetIMCommandBuffer()->Get();
 

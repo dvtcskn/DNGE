@@ -89,11 +89,14 @@ public:
 
 	virtual bool Recompile() override final;
 
+	virtual ERenderPass GetRenderPass() const override final { return Desc.RenderPass; }
+	virtual IRootSignature* GetRootSignature() const override final { return nullptr; }
+	virtual bool IsIndirectCommandAvailable() const override final { return false; }
 	std::size_t GetDescriptorSetLayoutBindingSize() const { return DescriptorSetLayout.size(); }
-	std::vector<sDescriptorSetLayoutBinding> GetDescriptorSetLayoutBindings() const { return DescriptorSetLayout; }
-	sDescriptorSetLayoutBinding GetDescriptorSetLayoutBinding(std::size_t index) const { return DescriptorSetLayout.at(index); }
-	std::optional<sDescriptorSetLayoutBinding> GetDescriptorSetConstantBufferLayoutBinding(std::size_t index) const;
-	std::optional<sDescriptorSetLayoutBinding> GetDescriptorSetTextureLayoutBinding(std::size_t index) const;
+	std::vector<sShaderBinding> GetDescriptorSetLayoutBindings() const { return DescriptorSetLayout; }
+	sShaderBinding GetDescriptorSetLayoutBinding(std::size_t index) const { return DescriptorSetLayout.at(index); }
+	std::optional<sShaderBinding> GetDescriptorSetConstantBufferLayoutBinding(std::size_t index) const;
+	std::optional<sShaderBinding> GetDescriptorSetTextureLayoutBinding(std::size_t index) const;
 
 	void SetStencilRef(ID3D11DeviceContext1* Context, std::uint32_t Ref);
 
@@ -112,7 +115,7 @@ private:
 	ComPtr<ID3D11InputLayout> InputLayout;
 	std::shared_ptr<D3D11VertexAttribute> VertexAttribute;
 
-	std::vector<sDescriptorSetLayoutBinding> DescriptorSetLayout;
+	std::vector<sShaderBinding> DescriptorSetLayout;
 	std::vector<sShaderAttachment> ShaderAttachments;
 	std::map<eShaderType, ComPtr<ID3D11DeviceChild>> Shaders;
 };
@@ -140,9 +143,9 @@ public:
 
 	void ApplyPipeline(ID3D11DeviceContext1* Context) const;
 
-	std::size_t GetDescriptorSetLayoutBindingSize() const { return Desc.DescriptorSetLayout.size(); }
-	std::vector<sDescriptorSetLayoutBinding> GetDescriptorSetLayoutBindings() const { return Desc.DescriptorSetLayout; }
-	sDescriptorSetLayoutBinding GetDescriptorSetLayoutBinding(std::size_t index) const { return Desc.DescriptorSetLayout.at(index); }
+	std::size_t GetDescriptorSetLayoutBindingSize() const { return Desc.Bindings.size(); }
+	std::vector<sShaderBinding> GetDescriptorSetLayoutBindings() const { return Desc.Bindings; }
+	sShaderBinding GetDescriptorSetLayoutBinding(std::size_t index) const { return Desc.Bindings.at(index); }
 
 private:
 	D3D11Device* Owner;

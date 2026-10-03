@@ -294,7 +294,7 @@ void VulkanPipeline::CompilePipeline()
 			break;
 		}
 
-		auto pShader = Owner->CompileShader(Attachment, true);
+		auto pShader = Owner->CompileVkShader(Attachment, true);
 		//Shaders.push_back(pShader);
 
 		// Create shader module from generated SPIR-V
@@ -323,16 +323,16 @@ void VulkanPipeline::CompilePipeline()
 
 	switch (Desc.PrimitiveTopologyType)
 	{
-	case EPrimitiveType::ePOINT_LIST:
+	case EPrimitiveType::POINT_LIST:
 		input_assembly_state.topology = VkPrimitiveTopology::VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
 		break;
-	case EPrimitiveType::eTRIANGLE_LIST:
+	case EPrimitiveType::TRIANGLE_LIST:
 		input_assembly_state.topology = VkPrimitiveTopology::VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 		break;
-	case EPrimitiveType::eTRIANGLE_STRIP:
+	case EPrimitiveType::TRIANGLE_STRIP:
 		input_assembly_state.topology = VkPrimitiveTopology::VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
 		break;
-	case EPrimitiveType::eLINE_LIST:
+	case EPrimitiveType::LINE_LIST:
 		input_assembly_state.topology = VkPrimitiveTopology::VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
 		break;
 	}
@@ -340,14 +340,14 @@ void VulkanPipeline::CompilePipeline()
 
 	VkPipelineViewportStateCreateInfo viewport_state{ VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO };
 
-	auto VP = Owner->GetViewport();
+	auto VP = GPU::GetViewport();
 	VkViewport Viewport = {};
-	Viewport.width = VP.Width;
-	Viewport.height = VP.Height;
+	Viewport.width = (float)VP.Width;
+	Viewport.height = (float)VP.Height;
 	Viewport.minDepth = VP.MinDepth;
 	Viewport.maxDepth = VP.MaxDepth;
-	Viewport.x = VP.TopLeftX;
-	Viewport.y = VP.TopLeftY;
+	Viewport.x = (float)VP.TopLeftX;
+	Viewport.y = (float)VP.TopLeftY;
 
 	VkRect2D Rect = {};
 	Rect.extent.width = VP.Width;
@@ -401,32 +401,28 @@ void VulkanPipeline::CompilePipeline()
 	PipelineCreateInfo.pDepthStencilState = &DepthStencil;
 	PipelineCreateInfo.pDynamicState = &dynamic_state;
 
-	VkDescriptorSetLayout Layouts = Owner->GetPushDescriptorSetLayout();
+	VkDescriptorSetLayout Layout = Owner->GetBindlessDescriptorSetLayout();
 
-	VkPipelineLayoutCreateInfo pipeline_layout_info = { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
-	pipeline_layout_info.pSetLayouts = &Layouts;
-	pipeline_layout_info.setLayoutCount = 1;
-
-	/*std::vector<VkPushConstantRange> push_constants;
+	std::vector<VkPushConstantRange> Ranges;
+	for (const auto& Layout : Desc.Bindings)
 	{
-		VkPushConstantRange push_constant;
-		push_constant.offset = 0;
-		push_constant.size = sizeof(sMeshConstantBufferAttributes);
-		push_constant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-		push_constants.push_back(push_constant);
-	}
-	{
-		VkPushConstantRange push_constant;
-		push_constant.offset = 0;
-		push_constant.size = 256;
-		push_constant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-		push_constants.push_back(push_constant);
+		VkPushConstantRange pushConstantRange{};
+		pushConstantRange.stageFlags = VK_SHADER_STAGE_ALL;
+		pushConstantRange.offset = 0;
+		pushConstantRange.size = sizeof(std::uint32_t) * Layout.Size;
+		Ranges.push_back(pushConstantRange);
 	}
 
-	pipeline_layout_info.pPushConstantRanges = push_constants.data();
-	pipeline_layout_info.pushConstantRangeCount = push_constants.size();*/
+	VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
+	pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 
-	vkCreatePipelineLayout(Owner->Get(), &pipeline_layout_info, nullptr, &PipelineLayout);
+	pipelineLayoutInfo.pSetLayouts = &Layout;
+	pipelineLayoutInfo.setLayoutCount = 1;
+
+	pipelineLayoutInfo.pushConstantRangeCount = (std::uint32_t)Ranges.size();
+	pipelineLayoutInfo.pPushConstantRanges = Ranges.data();
+
+	vkCreatePipelineLayout(Owner->Get(), &pipelineLayoutInfo, nullptr, &PipelineLayout);
 
 	PipelineCreateInfo.layout = PipelineLayout;
 

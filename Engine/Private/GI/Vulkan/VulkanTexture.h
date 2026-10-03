@@ -45,6 +45,7 @@ public:
 
 	virtual std::string GetName() const override final { return Name; }
 	virtual std::wstring GetPath() const override final { return Path; }
+	virtual std::uint32_t GetBindlessIndex() const override final { return std::uint32_t(-1); }
 
 	virtual sTextureDesc GetDesc() const override final { return Desc; }
 
@@ -63,10 +64,13 @@ public:
 	std::uint32_t RootParameterIndex;
 	VkDescriptorImageInfo DescriptorImageInfo;
 
+	virtual ResourceSharedHandle* GetSharedHandle() const override final { return nullptr; }
+	virtual bool CopyFrom(ITexture2D* Texture2D) override final { return false; }
+
 private:
 	void GenerateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32_t mipLevels);
 	void TransitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels);
-	void CopyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height, std::int32_t OffsetX = 0, std::int32_t OffsetY = 0);
+	void CopyBufferToImage(VkBuffer buffer, VkImage image, std::uint32_t width, std::uint32_t height, std::int32_t OffsetX = 0, std::int32_t OffsetY = 0);
 
 	void CreateImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory);
 

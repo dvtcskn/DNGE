@@ -73,7 +73,7 @@ sDefaultLevel::sDefaultLevel(IWorld* pWorld, std::string InName)
 	SpawnLocations.push_back(sObjectSpawnNode("PlayerSpawn", 0, FVector(75.0f, 250.0f, 0.0f), 3));
 	SpawnLocations.push_back(sObjectSpawnNode("PlayerSpawn", 1, FVector(315.699677f, 140.0f, 0.0f), 3));
 	SpawnLocations.push_back(sObjectSpawnNode("PlayerSpawn", 2, FVector(324.700043f, 260.700012f, 0.0f), 3));
-	SpawnLocations.push_back(sObjectSpawnNode("PlayerSpawn", 3, FVector(505.697540f, 260.700043, 0.0f), 3));
+	SpawnLocations.push_back(sObjectSpawnNode("PlayerSpawn", 3, FVector(505.697540f, 260.700043f, 0.0f), 3));
 
 	{
 		sMesh::SharedPtr Mesh = sMesh::Create("BackgroundMesh", EBasicMeshType::ePlane/*, FBoxDimension(1366, 768, 1)*/);
@@ -108,14 +108,14 @@ sDefaultLevel::sDefaultLevel(IWorld* pWorld, std::string InName)
 
 	tinyxml2::XMLElement* Block_Objectgroup = doc.FirstChildElement("map")->FirstChildElement("objectgroup");
 	{
-		std::size_t ElementCounter = 0;
+		std::uint32_t ElementCounter = 0;
 		for (auto child = Block_Objectgroup->FirstChildElement("object"); child; child = child->NextSiblingElement("object"))
 			BlockCollisionLayer.push_back(child);
 	}
 
 	tinyxml2::XMLElement* Moveable_Objectgroup = Block_Objectgroup->NextSiblingElement("objectgroup");
 	{
-		std::size_t ElementCounter = 0;
+		std::uint32_t ElementCounter = 0;
 		for (auto child = Moveable_Objectgroup->FirstChildElement("object"); child; child = child->NextSiblingElement("object"))
 			MoveableCollisionLayer.push_back(child);
 
@@ -123,7 +123,7 @@ sDefaultLevel::sDefaultLevel(IWorld* pWorld, std::string InName)
 
 	tinyxml2::XMLElement* Item_Objectgroup = Moveable_Objectgroup->NextSiblingElement("objectgroup");
 	{
-		std::size_t ElementCounter = 0;
+		std::uint32_t ElementCounter = 0;
 		for (auto child = Item_Objectgroup->FirstChildElement("object"); child; child = child->NextSiblingElement("object"))
 			ItemCollisionLayer.push_back(child);
 
@@ -156,8 +156,8 @@ sDefaultLevel::sDefaultLevel(IWorld* pWorld, std::string InName)
 		};
 
 		std::map<std::uint32_t, std::vector<TerrainInstance>> TerrainInstances;
-		std::size_t X = 0;
-		std::size_t Y = 0;
+		std::uint32_t X = 0;
+		std::uint32_t Y = 0;
 		for (const auto Tile : Tiles)
 		{
 			if (Tile == 0)
@@ -207,12 +207,13 @@ sDefaultLevel::sDefaultLevel(IWorld* pWorld, std::string InName)
 			}
 		}
 
+		//int Counter = 0;
 		for (const auto& TerrainInstance : TerrainInstances)
 		{
 			sMeshData Data;
 			const auto Plane = MeshPrimitives::Create2DPlaneVerticesFromDimension(FDimension2D(16.0f, 16.0f));
 			const auto PlaneTC = MeshPrimitives::GeneratePlaneTextureCoordinate(0.0f);
-			for (std::size_t i = 0; i < Plane.size(); i++)
+			for (std::uint32_t i = 0; i < Plane.size(); i++)
 			{
 				auto& Verts = Plane.at(i);
 				auto& TC = PlaneTC.at(i);
@@ -220,6 +221,7 @@ sDefaultLevel::sDefaultLevel(IWorld* pWorld, std::string InName)
 				VBE.position = FVector(Verts.X, Verts.Y, 0.0f);
 				VBE.texCoord = TC;
 				VBE.Color = FColor::White();
+				VBE.ArrayIndex = TerrainInstance.first;
 				Data.Vertices.push_back(VBE);
 			}
 			Data.Indices = MeshPrimitives::GeneratePlaneIndices(1);
@@ -230,7 +232,7 @@ sDefaultLevel::sDefaultLevel(IWorld* pWorld, std::string InName)
 				Data.InstanceData.push_back(sVertexLayout::sVertexInstanceLayout(Instance.Location));
 			}
 
-			Data.DrawParameters.InstanceCount = TerrainInstance.second.size();
+			Data.DrawParameters.InstanceCount = (std::uint32_t)TerrainInstance.second.size();
 			sMeshComponent::SharedPtr Mesh = sMeshComponent::Create("TerrainMesh_" + std::to_string(TerrainInstance.first), "..//Content//Pixel Adventure 1.tmx", Data);
 			Mesh->SetMaterial(sMaterialManager::Get().GetMaterialInstance("DefaultTexturedMaterial", TerrainInstance.first));
 			Mesh->AttachToComponent(TerrainMeshParent.get());
@@ -299,7 +301,7 @@ sDefaultLevel::sDefaultLevel(IWorld* pWorld, std::string InName)
 		RockHead->Replicate(true);
 	}
 
-	for (std::size_t i = 0; i < ItemCollisionLayer.size(); i++)
+	for (std::uint32_t i = 0; i < ItemCollisionLayer.size(); i++)
 	{
 		const auto& Item = ItemCollisionLayer.at(i);
 		//GItem::SharedPtr Apple = GItem::Create(i%2 ? "Cherries" : "Apple");
@@ -310,32 +312,32 @@ sDefaultLevel::sDefaultLevel(IWorld* pWorld, std::string InName)
 
 	ItemCollisionLayer.clear();
 
-	/*{
-		sEmitter::SharedPtr Emitter = sEmitter::Create("Particle System Test");
-		AddEmitter(Emitter);
+	//{
+	//	sEmitter::SharedPtr Emitter = sEmitter::Create("Particle System Test");
+	//	AddEmitter(Emitter);
 
-		Emitter->SetLocation(FVector(300, 300, 0));
-		sMeshParticleDesc Desc;
-		Desc.SetLifeTime(4.0f);
-		Desc.SpawnRate = 1;
-		Desc.MinVelocity = FVector(1.0f, -5.0f, 0.0f);
-		Desc.MaxVelocity = FVector(-1.0f, -10.0f, 0.0f);
-		Desc.StartColor = FColor(1.0f, 1.0f, 0.0f, 1.0f);
-		Desc.EndColor = FColor(1.0f, 0.0f, 0.0f, 1.0f);
-		{			
-			sParticleShape Shape;
-			auto Plane = MeshPrimitives::Create2DPlaneVerticesFromDimension(FDimension2D(8, 8));
-			const std::vector<FVector2> TC = MeshPrimitives::GeneratePlaneTextureCoordinate();
-			Shape.ShapeIndexes = MeshPrimitives::GeneratePlaneIndices();
-			for (std::size_t i = 0; i < 4; i++)
-				Shape.Shape.push_back(sParticleVertexLayout(FVector(Plane[i]), TC[i]));
-			//Desc.Shapes.push_back(Shape);
-			Desc.Shape = Shape;
-		}
-		MeshParticle::SharedPtr pMeshParticle = MeshParticle::Create(Desc);
-		pMeshParticle->MaterialInstance = sMaterialManager::Get().GetMaterialInstance("ParticleMat", "ParticleMat_MatInstance");
-		Emitter->AddParticle(pMeshParticle);
-	}*/
+	//	Emitter->SetLocation(FVector(300, 300, 0));
+	//	sMeshParticleDesc Desc;
+	//	Desc.SetLifeTime(4.0f);
+	//	Desc.SpawnRate = 10;
+	//	Desc.MinVelocity = FVector(1.0f, -5.0f, 0.0f);
+	//	Desc.MaxVelocity = FVector(-1.0f, -10.0f, 0.0f);
+	//	Desc.StartColor = FColor(1.0f, 1.0f, 0.0f, 1.0f);
+	//	Desc.EndColor = FColor(1.0f, 0.0f, 0.0f, 1.0f);
+	//	{			
+	//		sParticleShape Shape;
+	//		auto Plane = MeshPrimitives::Create2DPlaneVerticesFromDimension(FDimension2D(8, 8));
+	//		const std::vector<FVector2> TC = MeshPrimitives::GeneratePlaneTextureCoordinate();
+	//		Shape.ShapeIndexes = MeshPrimitives::GeneratePlaneIndices();
+	//		for (std::uint32_t i = 0; i < 4; i++)
+	//			Shape.Shape.push_back(sParticleVertexLayout(FVector(Plane[i]), TC[i]));
+	//		//Desc.Shapes.push_back(Shape);
+	//		Desc.Shape = Shape;
+	//	}
+	//	MeshParticle::SharedPtr pMeshParticle = MeshParticle::Create(Desc);
+	//	pMeshParticle->MaterialInstance = sMaterialManager::Get().GetMaterialInstance("ParticleMat", "ParticleMat_MatInstance");
+	//	Emitter->AddParticle(pMeshParticle);
+	//}
 }
 
 sDefaultLevel::~sDefaultLevel()
@@ -476,7 +478,7 @@ void sDefaultLevel::RemoveEmitter(sEmitter* Object, std::size_t LayerIndex, bool
 		Layers[LayerIndex]->RemoveEmitter(Object);
 }
 
-//void sDefaultLevel::SpawnPlayerActor(const std::shared_ptr<sActor>& Actor, std::size_t PlayerIndex)
+//void sDefaultLevel::SpawnPlayerActor(const std::shared_ptr<sActor>& Actor, std::uint32_t PlayerIndex)
 //{
 //	if (PlayerSpawnLocations.size() > 0)
 //	{
@@ -632,13 +634,13 @@ void sDefaultLevel::Reset()
 	tinyxml2::XMLElement* Moveable_Objectgroup = Block_Objectgroup->NextSiblingElement("objectgroup");
 	tinyxml2::XMLElement* Item_Objectgroup = Moveable_Objectgroup->NextSiblingElement("objectgroup");
 	{
-		std::size_t ElementCounter = 0;
+		std::uint32_t ElementCounter = 0;
 		for (auto child = Item_Objectgroup->FirstChildElement("object"); child; child = child->NextSiblingElement("object"))
 			ItemCollisionLayer.push_back(child);
 	}
 
 	{
-		for (std::size_t i = 0; i < ItemCollisionLayer.size(); i++)
+		for (std::uint32_t i = 0; i < ItemCollisionLayer.size(); i++)
 		{
 			const auto& Item = ItemCollisionLayer.at(i);
 			GItem::SharedPtr Apple = GItem::Create("Item_" + std::to_string(i), i % 2 ? "Cherries" : "Apple");
@@ -702,13 +704,13 @@ void sDefaultLevel::Reset_Client()
 	tinyxml2::XMLElement* Moveable_Objectgroup = Block_Objectgroup->NextSiblingElement("objectgroup");
 	tinyxml2::XMLElement* Item_Objectgroup = Moveable_Objectgroup->NextSiblingElement("objectgroup");
 	{
-		std::size_t ElementCounter = 0;
+		std::uint32_t ElementCounter = 0;
 		for (auto child = Item_Objectgroup->FirstChildElement("object"); child; child = child->NextSiblingElement("object"))
 			ItemCollisionLayer.push_back(child);
 	}
 
 	{
-		for (std::size_t i = 0; i < ItemCollisionLayer.size(); i++)
+		for (std::uint32_t i = 0; i < ItemCollisionLayer.size(); i++)
 		{
 			const auto& Item = ItemCollisionLayer.at(i);
 			GItem::SharedPtr Apple = GItem::Create("Item_" + std::to_string(i), i % 2 ? "Cherries" : "Apple");
@@ -795,13 +797,13 @@ void sDefaultLevel::OnConnectedToServer()
 	tinyxml2::XMLElement* Moveable_Objectgroup = Block_Objectgroup->NextSiblingElement("objectgroup");
 	tinyxml2::XMLElement* Item_Objectgroup = Moveable_Objectgroup->NextSiblingElement("objectgroup");
 	{
-		std::size_t ElementCounter = 0;
+		std::uint32_t ElementCounter = 0;
 		for (auto child = Item_Objectgroup->FirstChildElement("object"); child; child = child->NextSiblingElement("object"))
 			ItemCollisionLayer.push_back(child);
 	}
 
 	{
-		for (std::size_t i = 0; i < ItemCollisionLayer.size(); i++)
+		for (std::uint32_t i = 0; i < ItemCollisionLayer.size(); i++)
 		{
 			const auto& Item = ItemCollisionLayer.at(i);
 			GItem::SharedPtr Apple = GItem::Create("Item_" + std::to_string(i), i % 2 ? "Cherries" : "Apple");

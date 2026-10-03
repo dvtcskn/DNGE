@@ -148,7 +148,7 @@ void D3D11ComputeCommandContext::SetConstantBuffer(IConstantBuffer* CB, std::opt
 		const auto& Binding = ActivePipeline->GetDescriptorSetLayoutBinding(RootParameterIndex);
 
 #if _DEBUG
-		if (Binding.GetDescriptorType() != EDescriptorType::eUniformBuffer)
+		if (Binding.GetDescriptorType() != EDescriptorType::UniformBuffer)
 			throw std::runtime_error("Wrong Root Parameter Index.");
 #endif
 
@@ -175,7 +175,7 @@ void D3D11ComputeCommandContext::SetRenderTargetAsResource(IRenderTarget* pRT, s
 		const auto& Binding = ActivePipeline->GetDescriptorSetLayoutBinding(RootParameterIndex);
 
 #if _DEBUG
-		if (Binding.GetDescriptorType() != EDescriptorType::eTexture)
+		if (Binding.GetDescriptorType() != EDescriptorType::Texture)
 			throw std::runtime_error("Wrong Root Parameter Index.");
 #endif
 		const int i = Binding.Location;
@@ -208,7 +208,7 @@ void D3D11ComputeCommandContext::SetRenderTargetsAsResource(std::vector<IRenderT
 		const auto& Binding = ActivePipeline->GetDescriptorSetLayoutBinding(RootParameterIndex);
 
 #if _DEBUG
-		if (Binding.GetDescriptorType() != EDescriptorType::eTexture)
+		if (Binding.GetDescriptorType() != EDescriptorType::Texture)
 			throw std::runtime_error("Wrong Root Parameter Index.");
 #endif
 
@@ -244,7 +244,7 @@ void D3D11ComputeCommandContext::SetUnorderedAccessTarget(IUnorderedAccessTarget
 		const auto& Binding = ActivePipeline->GetDescriptorSetLayoutBinding(RootParameterIndex);
 
 #if _DEBUG
-		if (Binding.GetDescriptorType() != EDescriptorType::eUAV)
+		if (Binding.GetDescriptorType() != EDescriptorType::UAV)
 			throw std::runtime_error("Wrong Root Parameter Index.");
 #endif
 		const int i = Binding.Location;
@@ -278,7 +278,7 @@ void D3D11ComputeCommandContext::SetUnorderedAccessTargets(std::vector<IUnordere
 		const auto& Binding = ActivePipeline->GetDescriptorSetLayoutBinding(RootParameterIndex);
 
 #if _DEBUG
-		if (Binding.GetDescriptorType() != EDescriptorType::eUAV)
+		if (Binding.GetDescriptorType() != EDescriptorType::UAV)
 			throw std::runtime_error("Wrong Root Parameter Index.");
 #endif
 
@@ -316,7 +316,7 @@ void D3D11ComputeCommandContext::SetRenderTargetAsUAV(IRenderTarget* pRT, std::u
 		const auto& Binding = ActivePipeline->GetDescriptorSetLayoutBinding(RootParameterIndex);
 
 #if _DEBUG
-		if (Binding.GetDescriptorType() != EDescriptorType::eTexture)
+		if (Binding.GetDescriptorType() != EDescriptorType::Texture)
 			throw std::runtime_error("Wrong Root Parameter Index.");
 #endif
 		const int i = Binding.Location;
@@ -356,7 +356,7 @@ void D3D11ComputeCommandContext::SetRenderTargetsAsUAV(std::vector<IRenderTarget
 		const auto& Binding = ActivePipeline->GetDescriptorSetLayoutBinding(RootParameterIndex);
 
 #if _DEBUG
-		if (Binding.GetDescriptorType() != EDescriptorType::eTexture)
+		if (Binding.GetDescriptorType() != EDescriptorType::Texture)
 			throw std::runtime_error("Wrong Root Parameter Index.");
 #endif
 
@@ -400,7 +400,7 @@ void D3D11ComputeCommandContext::SetUnorderedAccessTargetAsSRV(IUnorderedAccessT
 		const auto& Binding = ActivePipeline->GetDescriptorSetLayoutBinding(RootParameterIndex);
 
 #if _DEBUG
-		if (Binding.GetDescriptorType() != EDescriptorType::eTexture)
+		if (Binding.GetDescriptorType() != EDescriptorType::Texture)
 			throw std::runtime_error("Wrong Root Parameter Index.");
 #endif
 		const int i = Binding.Location;
@@ -433,7 +433,7 @@ void D3D11ComputeCommandContext::SetUnorderedAccessTargetsAsSRV(std::vector<IUno
 		const auto& Binding = ActivePipeline->GetDescriptorSetLayoutBinding(RootParameterIndex);
 
 #if _DEBUG
-		if (Binding.GetDescriptorType() != EDescriptorType::eTexture)
+		if (Binding.GetDescriptorType() != EDescriptorType::Texture)
 			throw std::runtime_error("Wrong Root Parameter Index.");
 #endif
 
@@ -454,19 +454,19 @@ void D3D11ComputeCommandContext::SetUnorderedAccessTargetsAsSRV(std::vector<IUno
 	}
 }
 
-void D3D11ComputeCommandContext::SetUnorderedAccessBuffer(IUnorderedAccessBuffer* pUAV, std::uint32_t RootParameterIndex)
+void D3D11ComputeCommandContext::SetUnorderedAccessBuffer(IStructuredBuffer* pUAV, std::uint32_t RootParameterIndex)
 {
 }
 
-void D3D11ComputeCommandContext::SetUnorderedAccessBuffers(std::vector<IUnorderedAccessBuffer*> UAVs, std::uint32_t RootParameterIndex)
+void D3D11ComputeCommandContext::SetUnorderedAccessBuffers(std::vector<IStructuredBuffer*> UAVs, std::uint32_t RootParameterIndex)
 {
 }
 
-void D3D11ComputeCommandContext::SetUnorderedAccessBufferAsResource(IUnorderedAccessBuffer* pUAV, std::uint32_t RootParameterIndex)
+void D3D11ComputeCommandContext::SetUnorderedAccessBufferAsResource(IStructuredBuffer* pUAV, std::uint32_t RootParameterIndex)
 {
 }
 
-void D3D11ComputeCommandContext::SetUnorderedAccessBuffersAsResource(std::vector<IUnorderedAccessBuffer*> UAVs, std::uint32_t RootParameterIndex)
+void D3D11ComputeCommandContext::SetUnorderedAccessBuffersAsResource(std::vector<IStructuredBuffer*> UAVs, std::uint32_t RootParameterIndex)
 {
 }
 
@@ -485,7 +485,7 @@ void D3D11ComputeCommandContext::SetDepthTargetAsResource(IDepthTarget* pDT, std
 		const auto& Binding = ActivePipeline->GetDescriptorSetLayoutBinding(RootParameterIndex);
 
 #if _DEBUG
-		if (Binding.GetDescriptorType() != EDescriptorType::eTexture)
+		if (Binding.GetDescriptorType() != EDescriptorType::Texture)
 			throw std::runtime_error("Wrong Root Parameter Index.");
 #endif
 		const int i = Binding.Location;
@@ -518,7 +518,7 @@ void D3D11ComputeCommandContext::SetDepthTargetsAsResource(std::vector<IDepthTar
 		const auto& Binding = ActivePipeline->GetDescriptorSetLayoutBinding(RootParameterIndex);
 
 #if _DEBUG
-		if (Binding.GetDescriptorType() != EDescriptorType::eTexture)
+		if (Binding.GetDescriptorType() != EDescriptorType::Texture)
 			throw std::runtime_error("Wrong Root Parameter Index.");
 #endif
 

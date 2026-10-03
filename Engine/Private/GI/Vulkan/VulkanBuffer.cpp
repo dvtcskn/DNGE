@@ -214,7 +214,7 @@ VulkanVertexBuffer::VulkanVertexBuffer(VulkanDevice* Device, std::string InName,
 	// Bind the buffer with the allocated memory
 	VK_CHECK(vkBindBufferMemory(Owner->Get(), Buffer, Memory, 0));
 
-	UploadBuffer = VulkanUploadBuffer::CreateUnique(Device, InName, InDesc.Size);
+	UploadBuffer = VulkanUploadBuffer::CreateUnique(Device, InName, (std::uint32_t)InDesc.Size);
 	UploadBuffer->Map();
 
 	UpdateSubresource(InSubresource);
@@ -308,7 +308,7 @@ VulkanIndexBuffer::VulkanIndexBuffer(VulkanDevice* Device, std::string InName, c
 	// Bind the buffer with the allocated memory
 	VK_CHECK(vkBindBufferMemory(Owner->Get(), Buffer, Memory, 0));
 
-	UploadBuffer = VulkanUploadBuffer::CreateUnique(Device, InName, InDesc.Size);
+	UploadBuffer = VulkanUploadBuffer::CreateUnique(Device, InName, (std::uint32_t)InDesc.Size);
 	UploadBuffer->Map();
 
 	UpdateSubresource(InSubresource);
@@ -366,10 +366,10 @@ void VulkanIndexBuffer::Unmap()
 		vkUnmapMemory(Owner->Get(), Memory);
 }
 
-VulkanUnorderedAccessBuffer::VulkanUnorderedAccessBuffer(VulkanDevice* InDevice, std::string InName, const BufferLayout& InDesc, bool bSRVAllowed)
+VulkanStructuredBuffer::VulkanStructuredBuffer(VulkanDevice* InDevice, std::string InName, const BufferLayout& InDesc, bool bSRVAllowed)
 {
 }
 
-void VulkanUnorderedAccessBuffer::Map(const void* Ptr, IGraphicsCommandContext* InCMDBuffer)
+void VulkanStructuredBuffer::Map(const void* Ptr, std::size_t Location, IGraphicsCommandContext* InCMDBuffer)
 {
 }

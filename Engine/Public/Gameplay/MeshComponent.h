@@ -60,7 +60,7 @@ public:
 	virtual std::string GetMeshName() const override final { return Mesh->GetName(); }
 	std::string GetPath() const { return Mesh->GetPath(); }
 
-	void SetMaterial(/*std::int32_t Index,*/ sMaterial::sMaterialInstance* Material);
+	void SetMaterial(/*std::int32_t Index,*/ sMaterialInstance* Material);
 
 	virtual void Serialize(sArchive& archive) override;
 

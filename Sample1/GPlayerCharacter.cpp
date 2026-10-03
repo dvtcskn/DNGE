@@ -514,7 +514,7 @@ void GPlayerCharacter::OnJumping()
 
 float GPlayerCharacter::GetDensity() const
 {
-	if (Physics::GetActivePhysicsEngineType() == EPhysicsEngine::eBox2D)
+	if (Physics::GetActivePhysicsEngineType() == EPhysicsEngine::Box2D)
 	{
 		auto Body = pBoxCollision2DComponent->GetRigidBody();
 		return static_cast<sBox2DRigidBody*>(Body)->GetDensity();
@@ -524,7 +524,7 @@ float GPlayerCharacter::GetDensity() const
 
 void GPlayerCharacter::SetDensity(float D)
 {
-	if (Physics::GetActivePhysicsEngineType() == EPhysicsEngine::eBox2D)
+	if (Physics::GetActivePhysicsEngineType() == EPhysicsEngine::Box2D)
 	{
 		auto Body = pBoxCollision2DComponent->GetRigidBody();
 		static_cast<sBox2DRigidBody*>(Body)->SetDensity(D);
@@ -727,7 +727,7 @@ std::int32_t GPlayerCharacter::GetHorizontalMoveDirection() const
 		return HorizontalMoveDirection;
 
 	if (GetNetworkRole() == eNetworkRole::SimulatedProxy)
-		return InputManager.CurrentInput != nullptr ? InputManager.CurrentInput->InputModifier.X : 0;
+		return InputManager.CurrentInput != nullptr ? (std::int32_t)std::trunc(InputManager.CurrentInput->InputModifier.X) : 0;
 	return std::uint32_t();
 }
 
@@ -905,21 +905,27 @@ void GPlayerCharacter::OnBindButton_JumpMovementKey_Released(eGamepadButtons But
 
 void GPlayerCharacter::Net_OnBindKey_RightMovementKey(sDateTime Time, int key)
 {
+	//HorizontalMoveDirection = 1;
+	//Engine::WriteToConsole("RightKey");
 	InputManager.PushBackInput(GNetInputManager::eInput::eRight, key, FVector2(1,0));
 }
 
 void GPlayerCharacter::Net_OnBindKey_RightMovementKey_Released(sDateTime Time, int key, std::uint32_t inFrameCounter)
 {
+	//Engine::WriteToConsole("RightKey_Release");
 	InputManager.SetFrameCountForCurrentOrNextInput(GNetInputManager::eInput::eRight, inFrameCounter);
 }
 
 void GPlayerCharacter::Net_OnBindKey_LeftMovementKey(sDateTime Time, int key)
 {
+	//HorizontalMoveDirection = -1;
+	//Engine::WriteToConsole("LeftKey");
 	InputManager.PushBackInput(GNetInputManager::eInput::eLeft, key, FVector2(-1, 0));
 }
 
 void GPlayerCharacter::Net_OnBindKey_LeftMovementKey_Released(sDateTime Time, int key, std::uint32_t inFrameCounter)
 {
+	//Engine::WriteToConsole("LeftKey_Release");
 	InputManager.SetFrameCountForCurrentOrNextInput(GNetInputManager::eInput::eLeft, inFrameCounter);
 }
 

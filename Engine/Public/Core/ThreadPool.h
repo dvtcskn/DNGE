@@ -26,32 +26,38 @@
 
 #pragma once
 
+#include <condition_variable>
+#include <cstddef>
 #include <functional>
+#include <stdexcept>
 #include <thread>
 #include <list>
 #include <future>
+#include <utility>
 #include <mutex>
 #include <memory>
-#include <condition_variable>
 #include <queue>
 #include <iostream>
 #include <vector>
 #include <type_traits>
 #include "Engine/ClassBody.h"
 
-enum class EThreadStatus {
+enum class EThreadStatus 
+{
 	EThread_Idle,
 	EThread_Waiting,
 	EThread_Running,
 	EThread_Complete,
 };
 
-enum class EThreadState {
+enum class EThreadState
+{
 	EThread_Attached,
 	EThread_Detached,
 };
 
-enum class EThreadType {
+enum class EThreadType 
+{
 	EThread_Deferred,
 	EThread_immediate,
 };
@@ -139,14 +145,14 @@ public:
 		return false;
 	}
 
-	sFORCEINLINE bool GetThreadIsFinished() { return mThread->joinable(); }
-	sFORCEINLINE bool GetThreadIsDetached() { return ThreadState == EThreadState::EThread_Detached; }
-	sFORCEINLINE EThreadStatus GetThreadStatus() { return ThreadStatus; }
-	sFORCEINLINE EThreadType GetThreadType() { return ThreadType; }
-	sFORCEINLINE bool GetThreadIsIdle() { return ThreadStatus == EThreadStatus::EThread_Idle; }
-	sFORCEINLINE bool GetThreadIsWaiting() { return ThreadStatus == EThreadStatus::EThread_Waiting; }
-	sFORCEINLINE bool GetThreadIsComplete() { return ThreadStatus == EThreadStatus::EThread_Complete; }
-	sFORCEINLINE bool GetThreadIsRunning() { return ThreadStatus == EThreadStatus::EThread_Running; }
+	sFORCEINLINE bool GetThreadIsFinished() const { return ThreadStatus == EThreadStatus::EThread_Complete && mThread->joinable(); }
+	sFORCEINLINE bool GetThreadIsDetached() const { return ThreadState == EThreadState::EThread_Detached; }
+	sFORCEINLINE EThreadStatus GetThreadStatus() const { return ThreadStatus; }
+	sFORCEINLINE EThreadType GetThreadType() const { return ThreadType; }
+	sFORCEINLINE bool GetThreadIsIdle() const { return ThreadStatus == EThreadStatus::EThread_Idle; }
+	sFORCEINLINE bool GetThreadIsWaiting() const { return ThreadStatus == EThreadStatus::EThread_Waiting; }
+	sFORCEINLINE bool GetThreadIsComplete() const { return ThreadStatus == EThreadStatus::EThread_Complete; }
+	sFORCEINLINE bool GetThreadIsRunning() const { return ThreadStatus == EThreadStatus::EThread_Running; }
 	sFORCEINLINE void SetThreadStatus(EThreadStatus InStatus) { ThreadStatus = InStatus; }
 
 private:
@@ -184,123 +190,134 @@ private:
 	std::atomic<bool> bLoop;
 };
 
-#if 0
 class ThreadPool
 {
 public:
-	ThreadPool(size_t numThreads) : stop(false)
-	{
-		for (size_t i = 0; i < numThreads; ++i) 
-		{
-			workers.emplace_back([this] {
-				while (true) 
+    explicit ThreadPool(std::size_t ThreadCount = std::thread::hardware_concurrency())
+    {
+        if (ThreadCount == 0)
+            ThreadCount = 1;
+
+        WorkerThreads.reserve(ThreadCount);
+
+        try
+        {
+            for (std::size_t i = 0; i < ThreadCount; ++i)
+                WorkerThreads.emplace_back([this] { WorkerLoop(); });
+        }
+        catch (...)
+        {
+            Stop();
+            throw;
+        }
+    }
+
+    ThreadPool(const ThreadPool&) = delete;
+    ThreadPool& operator=(const ThreadPool&) = delete;
+
+    ~ThreadPool()
+    {
+        Stop();
+    }
+
+    void Stop()
+    {
+        {
+            std::lock_guard<std::mutex> Lock(Mutex);
+            bStop.store(true);
+        }
+
+        Condition.notify_all();
+
+        for (auto& Worker : WorkerThreads)
+        {
+            if (Worker.joinable())
+                Worker.join();
+        }
+
+        WorkerThreads.clear();
+    }
+
+    void QueueJob(std::function<void()> Job)
+    {
+        if (!Job)
+            throw std::invalid_argument("Cannot queue an empty job.");
+
+        {
+            std::lock_guard<std::mutex> Lock(Mutex);
+            if (bStop.load())
+                throw std::logic_error("Cannot queue a job after ThreadPool::Stop().");
+
+            Jobs.push(std::move(Job));
+        }
+
+        Condition.notify_one();
+    }
+
+    template<class F, class... Args>
+    auto Submit(F&& function, Args&&... args) -> std::future<std::invoke_result_t<F, Args...>>
+    {
+        using Result = std::invoke_result_t<F, Args...>;
+
+        auto task = std::make_shared<std::packaged_task<Result()>>(std::bind(std::forward<F>(function), std::forward<Args>(args)...));
+        auto result = task->get_future();
+        QueueJob([task] { (*task)(); });
+        return result;
+    }
+
+    bool HasActiveJobs() const
+    {
+        std::lock_guard<std::mutex> Lock(Mutex);
+        return !Jobs.empty() || ActiveJobs != 0;
+    }
+
+    std::size_t AvailableThreadCount() const
+    {
+        return WorkerThreads.size();
+    }
+
+private:
+    void WorkerLoop()
+    {
+        for (;;)
+        {
+            std::function<void()> Job;
+
+            {
+                std::unique_lock<std::mutex> Lock(Mutex);
+                Condition.wait(Lock, [this] 
 				{
-					std::function<void()> task;
-					{
-						std::unique_lock<std::mutex> lock(queueMutex);
-						condition.wait(lock, [this] { return stop || !tasks.empty(); });
-						if (stop && tasks.empty())
-							return;
-						task = std::move(tasks.front());
-						tasks.pop();
-					}
-					task();
-				}
-			});
-		}
-	}
+                    return bStop.load() || !Jobs.empty();
+				});
 
-	template <class F, class... Args>
-	auto enqueue(F&& f, Args&&... args) -> std::future<std::invoke_result_t<F, Args...>>
-	{
-		using return_type = std::invoke_result_t<F, Args...>;
+                if (bStop.load() && Jobs.empty())
+                    return;
 
-		auto task = std::make_shared<std::packaged_task<return_type()>>(
-			std::bind(std::forward<F>(f), std::forward<Args>(args)...)
-		);
+				Job = std::move(Jobs.front());
+                Jobs.pop();
+                ++ActiveJobs;
+            }
 
-		std::future<return_type> result = task->get_future();
-		{
-			std::unique_lock<std::mutex> lock(queueMutex);
-			if (stop)
-			{
-				throw std::runtime_error("enqueue on stopped ThreadPool");
-			}
+            try
+            {
+				Job();
+            }
+            catch (...)
+            {
+                // log
+            }
 
-			tasks.emplace([task]() { (*task)(); });
-		}
-		condition.notify_one();
-		return result;
-	}
+            {
+                std::lock_guard<std::mutex> Lock(Mutex);
+                --ActiveJobs;
+            }
+        }
+    }
 
-	~ThreadPool() 
-	{
-		{
-			std::unique_lock<std::mutex> lock(queueMutex);
-			stop = true;
-		}
-		condition.notify_all();
-
-		// Wait for all worker threads to finish before destroying the pool
-		for (std::thread& worker : workers)
-		{
-			worker.join();
-		}
-	}
-
-	// Additional function to wait for ongoing tasks to finish gracefully
-	void wait()
-	{
-		{
-			std::unique_lock<std::mutex> lock(queueMutex);
-			stop = true;
-		}
-		condition.notify_all();
-
-		for (std::thread& worker : workers) {
-			worker.join();
-		}
-	}
-
-private:
-	std::vector<std::thread> workers;
-	std::queue<std::function<void()>> tasks;
-	std::mutex queueMutex;
-	std::condition_variable condition;
-	std::atomic<bool> stop;
-};
-
-#endif
-
-class ThreadPool
-{
-	sBaseClassBody(sClassConstructor, ThreadPool)
-public:
-	ThreadPool()
-	{}
-
-	~ThreadPool()
-	{
-		Stop();
-	}
-
-	void Start();
-	void QueueJob(const std::function<void()>& job);
-	void Stop();
-	bool busy();
-
-	/*
-	* to do
-	* return stand-by only Thread Count 
-	*/
-	inline std::size_t AvailableThreadCount() { return threads.size(); }
-
-private:
-	void ThreadLoop();
-
-	std::atomic<bool> should_terminate = false;           // Tells threads to stop looking for jobs
-	std::mutex queue_mutex;                  // Prevents data races to the job queue
-	std::condition_variable mutex_condition; // Allows threads to wait on new jobs or termination 
-	std::vector<std::thread> threads;
-	std::queue<std::function<void()>> jobs;
+    mutable std::mutex Mutex;
+    std::condition_variable Condition;
+    std::queue<std::function<void()>> Jobs;
+    std::vector<std::thread> WorkerThreads;
+    std::size_t ActiveJobs = 0;
+	std::atomic<bool> bStop = false;
 };

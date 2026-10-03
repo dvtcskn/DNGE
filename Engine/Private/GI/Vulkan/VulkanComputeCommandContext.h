@@ -56,10 +56,10 @@ public:
 	virtual void SetUnorderedAccessTargetAsSRV(IUnorderedAccessTarget* pST, std::uint32_t RootParameterIndex) override final;
 	virtual void SetUnorderedAccessTargetsAsSRV(std::vector<IUnorderedAccessTarget*> pSTs, std::uint32_t RootParameterIndex) override final;
 
-	virtual void SetUnorderedAccessBuffer(IUnorderedAccessBuffer* pUAV, std::uint32_t RootParameterIndex) override final;
-	virtual void SetUnorderedAccessBuffers(std::vector<IUnorderedAccessBuffer*> UAVs, std::uint32_t RootParameterIndex) override final;
-	virtual void SetUnorderedAccessBufferAsResource(IUnorderedAccessBuffer* pUAV, std::uint32_t RootParameterIndex) override final;
-	virtual void SetUnorderedAccessBuffersAsResource(std::vector<IUnorderedAccessBuffer*> UAVs, std::uint32_t RootParameterIndex) override final;
+	virtual void SetUnorderedAccessBuffer(IStructuredBuffer* pUAV, std::uint32_t RootParameterIndex) override final;
+	virtual void SetUnorderedAccessBuffers(std::vector<IStructuredBuffer*> UAVs, std::uint32_t RootParameterIndex) override final;
+	virtual void SetUnorderedAccessBufferAsResource(IStructuredBuffer* pUAV, std::uint32_t RootParameterIndex) override final;
+	virtual void SetUnorderedAccessBuffersAsResource(std::vector<IStructuredBuffer*> UAVs, std::uint32_t RootParameterIndex) override final;
 
 	virtual void SetDepthTargetAsResource(IDepthTarget* pDT, std::uint32_t RootParameterIndex) override final;
 	virtual void SetDepthTargetsAsResource(std::vector<IDepthTarget*> DTs, std::uint32_t RootParameterIndex) override final;

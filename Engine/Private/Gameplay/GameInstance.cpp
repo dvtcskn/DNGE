@@ -211,13 +211,13 @@ void sGameInstance::PlayerDisconnected(std::string PlayerName, std::string NetAd
 	OnPlayerDisconnected(PlayerName, NetAddress);
 }
 
-std::size_t sGameInstance::GetNextPlayerIndex()
+std::uint32_t sGameInstance::GetNextPlayerIndex()
 {
 	std::sort(Players.begin(), Players.end(), [](const sPlayer::SharedPtr& a, const sPlayer::SharedPtr& b) {
 		return a->GetPlayerIndex() < b->GetPlayerIndex();
 		});
 
-	std::size_t Index = 0;
+	std::uint32_t Index = 0;
 	for (const auto& Player : Players)
 	{
 		if (Player->GetPlayerIndex() == Index)

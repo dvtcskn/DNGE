@@ -36,8 +36,8 @@ public:
     __declspec(align(256)) struct sToneMappingConstants
     {
         float exposure; 
-        int toneMapper;
-        int gamma2;
+        std::uint32_t toneMapper;
+        std::uint32_t gamma2;
     };
 
 public:
@@ -48,16 +48,14 @@ public:
     virtual IRenderTarget* GetFrameBuffer() const override final { return PostProcessFB.get(); }
     virtual void SetFrameBufferSize(const std::size_t Width, const std::size_t Height);
 
-    virtual bool UseBackBufferAsResource() const override final { return true; }
-    virtual std::size_t GetBackBufferResourceRootParameterIndex() const override final { return 1; }
+    virtual void SetPostProcessResources(IGraphicsCommandContext* Context, IRenderTarget* BackBuffer = nullptr) override final;
 
-    virtual void SetPostProcessResources(IGraphicsCommandContext* Context) override final;
-
-    void SetTonemapper(int Val);
+    void SetTonemapper(std::uint32_t Val);
     int GetTonemapperIndex() const;
 
 private:
     IRenderTarget::SharedPtr PostProcessFB;
+    ISamplerState::SharedPtr Sampler;
     IConstantBuffer::SharedPtr ToneMappingCB;
-    int TonemapperIndex;
+    std::uint32_t TonemapperIndex;
 };

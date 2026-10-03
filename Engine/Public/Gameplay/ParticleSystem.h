@@ -29,6 +29,7 @@
 #include "Engine/AbstractEngine.h"
 #include "Core/Math/CoreMath.h"
 #include "AbstractGI/Material.h"
+#include "AbstractGI/Mesh.h"
 #include <random>
 
 class sEmitter;
@@ -55,7 +56,7 @@ public:
 	virtual void Update(float DT) = 0;
 	virtual void OnUpdateTransform() = 0;
 
-	EParticleType GetParticleType() const { return EParticleType::eCPU; }
+	EParticleType GetParticleType() const { return EParticleType::CPU; }
 
 private:
 	std::string Name;
@@ -149,12 +150,16 @@ public:
 	//std::vector<std::uint32_t> Indexes;
 	bool bIsUpdated;
 
-	sMaterial::sMaterialInstance* MaterialInstance;
+	sMaterialInstance* MaterialInstance;
 
 	IVertexBuffer::SharedPtr VertexBuffer;
 	IVertexBuffer::SharedPtr InstanceBuffer;
 	IIndexBuffer::SharedPtr IndexBuffer;
 	sObjectDrawParameters ObjectDrawParameters;
+
+	MeshBindlessGeometryHandle GeometryHandle;
+	MeshBindlessGeometryHandle GeometryInstanceHandle;
+	MeshIndexBufferHandle IndexBufferHandle;
 
 private:
 	virtual void OnUpdateTransform() override;

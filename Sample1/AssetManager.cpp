@@ -36,8 +36,8 @@ void AssetManager::InitializeResources()
 
 	{
 		std::wstring TextureLoc = L"..//Content//Pixel Adventure 1//Free//Main Characters//Pink Man//Idle (32x32).png";
-		std::size_t FPS = 6; // 10 // 60
-		std::size_t SpriteFPS = 1;
+		std::uint32_t FPS = 6; // 10 // 60
+		std::uint32_t SpriteFPS = 1;
 		sSpriteSheet::SharedPtr SpriteSheet = sSpriteSheet::Create("IDLE");
 		SpriteSheet->FPS = FPS;
 		SpriteSheet->AddSprite(sSprite::Create("Idle_1", TextureLoc, FBounds2D(FVector2(5, 6), FVector2(27, 32))), SpriteFPS, 0);
@@ -57,7 +57,7 @@ void AssetManager::InitializeResources()
 
 	{
 		std::wstring TextureLoc = L"..//Content//Pixel Adventure 1//Free//Main Characters//Pink Man//Run (32x32).png";
-		std::size_t FPS = 6; // 10 // 60
+		std::uint32_t FPS = 6; // 10 // 60
 		sSpriteSheet::SharedPtr Running = sSpriteSheet::Create("Running");
 		Running->FPS = FPS;
 		Running->AddSprite(sSprite::Create("Running_1", TextureLoc, FBounds2D(FVector2(5, 3), FVector2(27, 32))), 1);
@@ -94,7 +94,7 @@ void AssetManager::InitializeResources()
 
 	{
 		std::wstring TextureLoc = L"..//Content//Pixel Adventure 1//Free//Main Characters//Pink Man//Hit (32x32).png";
-		std::size_t FPS = 10; // 10 // 60
+		std::uint32_t FPS = 10; // 10 // 60
 		sSpriteSheet::SharedPtr Hit = sSpriteSheet::Create("Hit", false);
 		Hit->FPS = FPS;
 		Hit->AddSprite(sSprite::Create("Hit_1", TextureLoc, FBounds2D(FVector2(7, 2), FVector2(21, 32))), 1);
@@ -110,7 +110,7 @@ void AssetManager::InitializeResources()
 
 	{
 		std::wstring TextureLoc = L"..//Content//Pixel Adventure 1//Free//Main Characters//Desappearing (96x96).png";
-		std::size_t FPS = 14; // 10 // 60
+		std::uint32_t FPS = 14; // 10 // 60
 		sSpriteSheet::SharedPtr Hit = sSpriteSheet::Create("Dead", false);
 		Hit->FPS = FPS;
 		Hit->AddSprite(sSprite::Create("Dead_1", TextureLoc, FBounds2D(FVector2(38, 34), FVector2(59, 63))), 1);
@@ -126,7 +126,7 @@ void AssetManager::InitializeResources()
 
 	{
 		std::wstring TextureLoc = L"..//Content//Pixel Adventure 1//Free//Items//Fruits//Apple.png";
-		std::size_t FPS = 3; // 10 // 60
+		std::uint32_t FPS = 3; // 10 // 60
 		sSpriteSheet::SharedPtr Sprite = sSpriteSheet::Create("Apple");
 		Sprite->FPS = FPS;
 		Sprite->AddSprite(sSprite::Create("Apple_1", TextureLoc, FBounds2D(FVector2(10, 6), FVector2(22, 21))), 1);
@@ -152,7 +152,7 @@ void AssetManager::InitializeResources()
 
 	{
 		std::wstring TextureLoc = L"..//Content//Pixel Adventure 1//Free//Items//Fruits//Cherries.png";
-		std::size_t FPS = 3; // 10 // 60
+		std::uint32_t FPS = 3; // 10 // 60
 		sSpriteSheet::SharedPtr Sprite = sSpriteSheet::Create("Cherries");
 		Sprite->FPS = FPS;
 		Sprite->AddSprite(sSprite::Create("Cherries_1", TextureLoc, FBounds2D(FVector2(9, 8), FVector2(23, 22))), 1);
@@ -178,7 +178,7 @@ void AssetManager::InitializeResources()
 
 	{
 		std::wstring TextureLoc = L"..//Content//Pixel Adventure 1//Free//Items//Fruits//Collected.png";
-		std::size_t FPS = 5; // 10 // 60
+		std::uint32_t FPS = 5; // 10 // 60
 		sSpriteSheet::SharedPtr Sprite = sSpriteSheet::Create("Collected", false);
 		Sprite->FPS = FPS;
 		Sprite->AddSprite(sSprite::Create("Sprite_1", TextureLoc, FBounds2D(FVector2(12, 11), FVector2(20, 20))), 1);
@@ -192,7 +192,7 @@ void AssetManager::InitializeResources()
 
 	{
 		std::wstring TextureLoc = L"..//Content//Pixel Adventure 1//Free//Traps//Saw//On (38x38).png";
-		std::size_t FPS = 4; // 10 // 60
+		std::uint32_t FPS = 4; // 10 // 60
 		sSpriteSheet::SharedPtr Sprite = sSpriteSheet::Create("Saw");
 		Sprite->FPS = FPS;
 		Sprite->AddSprite(sSprite::Create("Saw_1", TextureLoc, FBounds2D(FVector2(0, 0), FVector2(38, 38))), 1);
@@ -209,7 +209,7 @@ void AssetManager::InitializeResources()
 
 	{
 		std::wstring TextureLoc = L"..//Content//Pixel Adventure 1//Free//Traps//Rock Head//Idle.png";
-		std::size_t FPS = 4; // 10 // 60
+		std::uint32_t FPS = 4; // 10 // 60
 		sSpriteSheet::SharedPtr Sprite = sSpriteSheet::Create("Rock_Head_Idle");
 		Sprite->FPS = FPS;
 		Sprite->AddSprite(sSprite::Create("Idle", TextureLoc, FBounds2D(FVector2(5, 4), FVector2(37, 37))), 1);
@@ -218,7 +218,7 @@ void AssetManager::InitializeResources()
 	}
 	{
 		std::wstring TextureLoc = L"..//Content//Pixel Adventure 1//Free//Traps//Rock Head//Blink (42x42).png";
-		std::size_t FPS = 60; // 10 // 60
+		std::uint32_t FPS = 60; // 10 // 60
 		sSpriteSheet::SharedPtr Sprite = sSpriteSheet::Create("Rock_Head_Blink");
 		Sprite->FPS = FPS;
 		Sprite->AddSprite(sSprite::Create("Rock_Head_Blink_1", TextureLoc, FBounds2D(FVector2(5, 4), FVector2(37, 36))), 1);
@@ -230,7 +230,7 @@ void AssetManager::InitializeResources()
 	}
 	{
 		std::wstring TextureLoc = L"..//Content//Pixel Adventure 1//Free//Traps//Rock Head//Bottom Hit (42x42).png";
-		std::size_t FPS = 8;
+		std::uint32_t FPS = 8;
 		sSpriteSheet::SharedPtr Sprite = sSpriteSheet::Create("Rock_Head_Bottom_Hit", false);
 		Sprite->FPS = FPS;
 		Sprite->AddSprite(sSprite::Create("Rock_Head_Bottom_Hit_1", TextureLoc, FBounds2D(FVector2(0, 9), FVector2(42, 37))), 1);
@@ -242,7 +242,7 @@ void AssetManager::InitializeResources()
 	}
 	{
 		std::wstring TextureLoc = L"..//Content//Pixel Adventure 1//Free//Traps//Rock Head//Top Hit (42x42).png";
-		std::size_t FPS = 8;
+		std::uint32_t FPS = 8;
 		sSpriteSheet::SharedPtr Sprite = sSpriteSheet::Create("Rock_Head_Top_Hit", false);
 		Sprite->FPS = FPS;
 		Sprite->AddSprite(sSprite::Create("Rock_Head_Top_Hit_1", TextureLoc, FBounds2D(FVector2(0, 4), FVector2(42, 32))), 1);
@@ -254,7 +254,7 @@ void AssetManager::InitializeResources()
 	}
 	//{
 	//	std::wstring TextureLoc = L"..//Content//Pixel Adventure 1//Free//Traps//Rock Head//Left Hit (42x42).png";
-	//	std::size_t FPS = 4; // 10 // 60
+	//	std::uint32_t FPS = 4; // 10 // 60
 	//	sSpriteSheet::SharedPtr Sprite = sSpriteSheet::Create("Rock_Head_Left_Hit");
 	//	Sprite->FPS = FPS;
 	//	Sprite->AddSprite(sSprite::Create("Rock_Head_Left_Hit_1", TextureLoc, FBounds2D(FVector2(89, 1), FVector2(118, 39))), 1);
@@ -264,7 +264,7 @@ void AssetManager::InitializeResources()
 	//}
 	//{
 	//	std::wstring TextureLoc = L"..//Content//Pixel Adventure 1//Free//Traps//Rock Head//Right Hit (42x42).png";
-	//	std::size_t FPS = 4; // 10 // 60
+	//	std::uint32_t FPS = 4; // 10 // 60
 	//	sSpriteSheet::SharedPtr Sprite = sSpriteSheet::Create("Rock_Head_Right_Hit");
 	//	Sprite->FPS = FPS;
 	//	Sprite->AddSprite(sSprite::Create("Rock_Head_Right_Hit_1", TextureLoc, FBounds2D(FVector2(92, 1), FVector2(121, 39))), 1);

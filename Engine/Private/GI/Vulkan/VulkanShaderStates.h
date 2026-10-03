@@ -46,23 +46,23 @@ public:
 	{
 		switch (InDesc.FillMode)
 		{
-		case ERasterizerFillMode::eSolid:
+		case ERasterizerFillMode::Solid:
 			RasterizationState.polygonMode = VkPolygonMode::VK_POLYGON_MODE_FILL;
 			break;
-		case  ERasterizerFillMode::eWireframe:
+		case  ERasterizerFillMode::Wireframe:
 			RasterizationState.polygonMode = VkPolygonMode::VK_POLYGON_MODE_LINE;
 			break;
 		}
 
 		switch (InDesc.CullMode)
 		{
-		case ERasterizerCullMode::eCCW:
+		case ERasterizerCullMode::CCW:
 			RasterizationState.cullMode = VkCullModeFlagBits::VK_CULL_MODE_BACK_BIT;
 			break;
-		case ERasterizerCullMode::eCW:
+		case ERasterizerCullMode::CW:
 			RasterizationState.cullMode = VkCullModeFlagBits::VK_CULL_MODE_FRONT_BIT;
 			break;
-		case ERasterizerCullMode::eNone:
+		case ERasterizerCullMode::None:
 			RasterizationState.cullMode = VkCullModeFlagBits::VK_CULL_MODE_NONE;
 			break;
 		}
@@ -101,25 +101,25 @@ private:
 	VkPipelineRasterizationStateCreateInfo RasterizationState;
 };
 
-class VulkanSamplerState
+class VulkanStaticSamplerState
 {
-	sBaseClassBody(sClassConstructor, VulkanSamplerState)
+	sBaseClassBody(sClassConstructor, VulkanStaticSamplerState)
 public:
-	VulkanSamplerState(sSamplerAttributeDesc InDesc)
+	VulkanStaticSamplerState(sSamplerAttributeDesc InDesc)
 		: SamplerDesc(InDesc)
 		, SamplerCreateInfo(VkSamplerCreateInfo(VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO))
 	{
-		SamplerCreateInfo.compareEnable = false; // InDesc.SamplerComparisonFunction != ECompareFunction::eNever;
+		SamplerCreateInfo.compareEnable = false; // InDesc.SamplerComparisonFunction != ECompareFunction::Never;
 
 		auto WrapMpde = [&](ESamplerAddressMode Mode) -> VkSamplerAddressMode
 		{
 			switch (Mode)
 			{
-			case ESamplerAddressMode::eBorder: return VkSamplerAddressMode::VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-			case ESamplerAddressMode::eClamp: return VkSamplerAddressMode::VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-			case ESamplerAddressMode::eMirror: return VkSamplerAddressMode::VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
-			case ESamplerAddressMode::eMirrorOnce: return VkSamplerAddressMode::VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE;
-			case ESamplerAddressMode::eWrap: return VkSamplerAddressMode::VK_SAMPLER_ADDRESS_MODE_REPEAT;
+			case ESamplerAddressMode::Border: return VkSamplerAddressMode::VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+			case ESamplerAddressMode::Clamp: return VkSamplerAddressMode::VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			case ESamplerAddressMode::Mirror: return VkSamplerAddressMode::VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
+			case ESamplerAddressMode::MirrorOnce: return VkSamplerAddressMode::VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE;
+			case ESamplerAddressMode::Wrap: return VkSamplerAddressMode::VK_SAMPLER_ADDRESS_MODE_REPEAT;
 			};
 			return VkSamplerAddressMode();
 		};
@@ -128,41 +128,41 @@ public:
 		{
 			switch (Mode)
 			{
-			case ECompareFunction::eLess: return VkCompareOp::VK_COMPARE_OP_LESS;
-			case ECompareFunction::eLessEqual: return VkCompareOp::VK_COMPARE_OP_LESS_OR_EQUAL;
-			case ECompareFunction::eGreater: return VkCompareOp::VK_COMPARE_OP_GREATER;
-			case ECompareFunction::eGreaterEqual: return VkCompareOp::VK_COMPARE_OP_GREATER_OR_EQUAL;
-			case ECompareFunction::eEqual: return VkCompareOp::VK_COMPARE_OP_EQUAL;
-			case ECompareFunction::eNotEqual: return VkCompareOp::VK_COMPARE_OP_NOT_EQUAL;
-			case ECompareFunction::eNever: return VkCompareOp::VK_COMPARE_OP_NEVER;
-			case ECompareFunction::eAlways: return VkCompareOp::VK_COMPARE_OP_ALWAYS;
+			case ECompareFunction::Less: return VkCompareOp::VK_COMPARE_OP_LESS;
+			case ECompareFunction::LessEqual: return VkCompareOp::VK_COMPARE_OP_LESS_OR_EQUAL;
+			case ECompareFunction::Greater: return VkCompareOp::VK_COMPARE_OP_GREATER;
+			case ECompareFunction::GreaterEqual: return VkCompareOp::VK_COMPARE_OP_GREATER_OR_EQUAL;
+			case ECompareFunction::Equal: return VkCompareOp::VK_COMPARE_OP_EQUAL;
+			case ECompareFunction::NotEqual: return VkCompareOp::VK_COMPARE_OP_NOT_EQUAL;
+			case ECompareFunction::Never: return VkCompareOp::VK_COMPARE_OP_NEVER;
+			case ECompareFunction::Always: return VkCompareOp::VK_COMPARE_OP_ALWAYS;
 			}
 			return VkCompareOp::VK_COMPARE_OP_MAX_ENUM;
 		};
 
 		switch (SamplerDesc.Filter)
 		{
-		case ESamplerFilter::eAnisotropicLinear:
+		case ESamplerFilter::AnisotropicLinear:
 			SamplerCreateInfo.magFilter = VkFilter::VK_FILTER_LINEAR;
 			SamplerCreateInfo.minFilter = VkFilter::VK_FILTER_LINEAR;
 			SamplerCreateInfo.mipmapMode = VkSamplerMipmapMode::VK_SAMPLER_MIPMAP_MODE_LINEAR;
 			break;
-		case ESamplerFilter::eAnisotropicPoint:
+		case ESamplerFilter::AnisotropicPoint:
 			SamplerCreateInfo.magFilter = VkFilter::VK_FILTER_LINEAR;
 			SamplerCreateInfo.minFilter = VkFilter::VK_FILTER_LINEAR;
 			SamplerCreateInfo.mipmapMode = VkSamplerMipmapMode::VK_SAMPLER_MIPMAP_MODE_NEAREST;
 			break;
-		case ESamplerFilter::eTrilinear:
+		case ESamplerFilter::Trilinear:
 			SamplerCreateInfo.magFilter = VkFilter::VK_FILTER_LINEAR;
 			SamplerCreateInfo.minFilter = VkFilter::VK_FILTER_LINEAR;
 			SamplerCreateInfo.mipmapMode = VkSamplerMipmapMode::VK_SAMPLER_MIPMAP_MODE_LINEAR;
 			break;
-		case ESamplerFilter::eBilinear:
+		case ESamplerFilter::Bilinear:
 			SamplerCreateInfo.magFilter = VkFilter::VK_FILTER_LINEAR;
 			SamplerCreateInfo.minFilter = VkFilter::VK_FILTER_LINEAR;
 			SamplerCreateInfo.mipmapMode = VkSamplerMipmapMode::VK_SAMPLER_MIPMAP_MODE_NEAREST;
 			break;
-		case ESamplerFilter::ePoint:
+		case ESamplerFilter::Point:
 			SamplerCreateInfo.magFilter = VkFilter::VK_FILTER_NEAREST;
 			SamplerCreateInfo.minFilter = VkFilter::VK_FILTER_NEAREST;
 			SamplerCreateInfo.mipmapMode = VkSamplerMipmapMode::VK_SAMPLER_MIPMAP_MODE_NEAREST;
@@ -200,7 +200,7 @@ public:
 		SamplerCreateInfo.compareOp = Compare(SamplerDesc.SamplerComparisonFunction);;
 		SamplerCreateInfo.minLod = SamplerDesc.MinMipLevel;
 		SamplerCreateInfo.maxLod = SamplerDesc.MaxMipLevel;		
-		SamplerCreateInfo.maxAnisotropy = SamplerDesc.MaxAnisotropy;
+		SamplerCreateInfo.maxAnisotropy = (float)SamplerDesc.MaxAnisotropy;
 		SamplerCreateInfo.anisotropyEnable = SamplerDesc.MaxAnisotropy > 1 ? true : false;
 	}
 
@@ -212,11 +212,49 @@ public:
 		return Sampler;
 	}
 
-	virtual ~VulkanSamplerState() = default;
+	sSamplerAttributeDesc GetSamplerDesc() const { return SamplerDesc; }
+
+	virtual ~VulkanStaticSamplerState() = default;
 
 private:
 	sSamplerAttributeDesc SamplerDesc;
 	VkSamplerCreateInfo SamplerCreateInfo;
+};
+
+class VulkanSamplerState : public ISamplerState
+{
+	sClassBody(sClassConstructor, VulkanSamplerState, ISamplerState)
+public:
+	VulkanSamplerState(VulkanDevice* InOwner, std::string InName, sSamplerAttributeDesc InDesc)
+		: Super()
+		, Owner(InOwner)
+		, Name(InName)
+		, SamplerState(VulkanStaticSamplerState(InDesc))
+	{
+	}
+
+	VulkanSamplerState(VulkanDevice* InOwner, sSamplerAttributeDesc InDesc)
+		: Super()
+		, Owner(InOwner)
+		, Name("VulkanSamplerState_NoName")
+		, SamplerState(VulkanStaticSamplerState(InDesc))
+	{}
+
+	virtual ~VulkanSamplerState()
+	{
+		Owner = nullptr;
+	}
+
+	virtual std::string GetName() const override { return Name; }
+	virtual sSamplerAttributeDesc GetSamplerDesc() const override { return SamplerState.GetSamplerDesc(); }
+	virtual std::uint32_t GetBindlessIndex() const override { return std::uint32_t(-1); }
+
+	FORCEINLINE VulkanStaticSamplerState Get() const { return SamplerState;	}
+
+private:
+	VulkanDevice* Owner;
+	std::string Name;
+	VulkanStaticSamplerState SamplerState;
 };
 
 class VulkanDepthStencilState
@@ -232,14 +270,14 @@ public:
 		{
 			switch (Mode)
 			{
-			case ECompareFunction::eLess: return VkCompareOp::VK_COMPARE_OP_LESS;
-			case ECompareFunction::eLessEqual: return VkCompareOp::VK_COMPARE_OP_LESS_OR_EQUAL;
-			case ECompareFunction::eGreater: return VkCompareOp::VK_COMPARE_OP_GREATER;
-			case ECompareFunction::eGreaterEqual: return VkCompareOp::VK_COMPARE_OP_GREATER_OR_EQUAL;
-			case ECompareFunction::eEqual: return VkCompareOp::VK_COMPARE_OP_EQUAL;
-			case ECompareFunction::eNotEqual: return VkCompareOp::VK_COMPARE_OP_NOT_EQUAL;
-			case ECompareFunction::eNever: return VkCompareOp::VK_COMPARE_OP_NEVER;
-			case ECompareFunction::eAlways:	return VkCompareOp::VK_COMPARE_OP_ALWAYS;
+			case ECompareFunction::Less: return VkCompareOp::VK_COMPARE_OP_LESS;
+			case ECompareFunction::LessEqual: return VkCompareOp::VK_COMPARE_OP_LESS_OR_EQUAL;
+			case ECompareFunction::Greater: return VkCompareOp::VK_COMPARE_OP_GREATER;
+			case ECompareFunction::GreaterEqual: return VkCompareOp::VK_COMPARE_OP_GREATER_OR_EQUAL;
+			case ECompareFunction::Equal: return VkCompareOp::VK_COMPARE_OP_EQUAL;
+			case ECompareFunction::NotEqual: return VkCompareOp::VK_COMPARE_OP_NOT_EQUAL;
+			case ECompareFunction::Never: return VkCompareOp::VK_COMPARE_OP_NEVER;
+			case ECompareFunction::Always:	return VkCompareOp::VK_COMPARE_OP_ALWAYS;
 			}
 			return VkCompareOp();
 		};
@@ -248,19 +286,19 @@ public:
 		{
 			switch (Mode)
 			{
-			case EStencilOp::eKeep: return VkStencilOp::VK_STENCIL_OP_KEEP;
-			case EStencilOp::eZero: return VkStencilOp::VK_STENCIL_OP_ZERO;
-			case EStencilOp::eReplace: return VkStencilOp::VK_STENCIL_OP_REPLACE;
-			case EStencilOp::eSaturatedIncrement: return VkStencilOp::VK_STENCIL_OP_INCREMENT_AND_CLAMP;
-			case EStencilOp::eSaturatedDecrement:	return VkStencilOp::VK_STENCIL_OP_DECREMENT_AND_CLAMP;
-			case EStencilOp::eInvert:	return VkStencilOp::VK_STENCIL_OP_INVERT;
-			case EStencilOp::eIncrement: return VkStencilOp::VK_STENCIL_OP_INCREMENT_AND_WRAP;
-			case EStencilOp::eDecrement: return VkStencilOp::VK_STENCIL_OP_DECREMENT_AND_WRAP;
+			case EStencilOp::Keep: return VkStencilOp::VK_STENCIL_OP_KEEP;
+			case EStencilOp::Zero: return VkStencilOp::VK_STENCIL_OP_ZERO;
+			case EStencilOp::Replace: return VkStencilOp::VK_STENCIL_OP_REPLACE;
+			case EStencilOp::SaturatedIncrement: return VkStencilOp::VK_STENCIL_OP_INCREMENT_AND_CLAMP;
+			case EStencilOp::SaturatedDecrement:	return VkStencilOp::VK_STENCIL_OP_DECREMENT_AND_CLAMP;
+			case EStencilOp::Invert:	return VkStencilOp::VK_STENCIL_OP_INVERT;
+			case EStencilOp::Increment: return VkStencilOp::VK_STENCIL_OP_INCREMENT_AND_WRAP;
+			case EStencilOp::Decrement: return VkStencilOp::VK_STENCIL_OP_DECREMENT_AND_WRAP;
 			}
 			return VkStencilOp();
 		};
 
-		DepthStencilState.depthTestEnable = (/*InDesc.DepthTest != ECompareFunction::eAlways ||*/ InDesc.bEnableDepthWrite) ? true : false;
+		DepthStencilState.depthTestEnable = (/*InDesc.DepthTest != ECompareFunction::Always ||*/ InDesc.bEnableDepthWrite) ? true : false;
 		DepthStencilState.depthCompareOp = Compare(InDesc.DepthTest);
 		DepthStencilState.depthWriteEnable = InDesc.bEnableDepthWrite;
 
@@ -308,11 +346,11 @@ public:
 		{
 			switch (var)
 			{
-			case EBlendOperation::eAdd: return VkBlendOp::VK_BLEND_OP_ADD;
-			case EBlendOperation::eSubtract: return VkBlendOp::VK_BLEND_OP_SUBTRACT;
-			case EBlendOperation::eMin: return VkBlendOp::VK_BLEND_OP_MIN;
-			case EBlendOperation::eMax: return VkBlendOp::VK_BLEND_OP_MAX;
-			case EBlendOperation::eReverseSubtract: return VkBlendOp::VK_BLEND_OP_REVERSE_SUBTRACT;
+			case EBlendOperation::Add: return VkBlendOp::VK_BLEND_OP_ADD;
+			case EBlendOperation::Subtract: return VkBlendOp::VK_BLEND_OP_SUBTRACT;
+			case EBlendOperation::Min: return VkBlendOp::VK_BLEND_OP_MIN;
+			case EBlendOperation::Max: return VkBlendOp::VK_BLEND_OP_MAX;
+			case EBlendOperation::ReverseSubtract: return VkBlendOp::VK_BLEND_OP_REVERSE_SUBTRACT;
 			}
 			return VkBlendOp();
 		};
@@ -321,18 +359,18 @@ public:
 		{
 			switch (var)
 			{
-			case EBlendFactor::eZero: return VkBlendFactor::VK_BLEND_FACTOR_ZERO;
-			case EBlendFactor::eOne: return VkBlendFactor::VK_BLEND_FACTOR_ONE;
-			case EBlendFactor::eSourceColor: return VkBlendFactor::VK_BLEND_FACTOR_SRC_COLOR;
-			case EBlendFactor::eInverseSourceColor: return VkBlendFactor::VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR;
-			case EBlendFactor::eSourceAlpha: return VkBlendFactor::VK_BLEND_FACTOR_SRC_ALPHA;
-			case EBlendFactor::eInverseSourceAlpha:	return VkBlendFactor::VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-			case EBlendFactor::eDestAlpha: return VkBlendFactor::VK_BLEND_FACTOR_DST_ALPHA;
-			case EBlendFactor::eInverseDestAlpha: return VkBlendFactor::VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA;
-			case EBlendFactor::eDestColor: return VkBlendFactor::VK_BLEND_FACTOR_DST_COLOR;
-			case EBlendFactor::eInverseDestColor: return VkBlendFactor::VK_BLEND_FACTOR_ONE_MINUS_DST_COLOR;
-			case EBlendFactor::eBlendFactor: return VkBlendFactor::VK_BLEND_FACTOR_CONSTANT_COLOR;
-			case EBlendFactor::eInverseBlendFactor: return VkBlendFactor::VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_COLOR;
+			case EBlendFactor::Zero: return VkBlendFactor::VK_BLEND_FACTOR_ZERO;
+			case EBlendFactor::One: return VkBlendFactor::VK_BLEND_FACTOR_ONE;
+			case EBlendFactor::SourceColor: return VkBlendFactor::VK_BLEND_FACTOR_SRC_COLOR;
+			case EBlendFactor::InverseSourceColor: return VkBlendFactor::VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR;
+			case EBlendFactor::SourceAlpha: return VkBlendFactor::VK_BLEND_FACTOR_SRC_ALPHA;
+			case EBlendFactor::InverseSourceAlpha:	return VkBlendFactor::VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+			case EBlendFactor::DestAlpha: return VkBlendFactor::VK_BLEND_FACTOR_DST_ALPHA;
+			case EBlendFactor::InverseDestAlpha: return VkBlendFactor::VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA;
+			case EBlendFactor::DestColor: return VkBlendFactor::VK_BLEND_FACTOR_DST_COLOR;
+			case EBlendFactor::InverseDestColor: return VkBlendFactor::VK_BLEND_FACTOR_ONE_MINUS_DST_COLOR;
+			case EBlendFactor::BlendFactor: return VkBlendFactor::VK_BLEND_FACTOR_CONSTANT_COLOR;
+			case EBlendFactor::InverseBlendFactor: return VkBlendFactor::VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_COLOR;
 			}
 			return VkBlendFactor();
 		};
@@ -341,15 +379,15 @@ public:
 		{
 			switch (var)
 			{
-			case EColorWriteMask::eNONE: return VkColorComponentFlags();
-			case EColorWriteMask::eRED: return VK_COLOR_COMPONENT_R_BIT;
-			case EColorWriteMask::eGREEN: return VK_COLOR_COMPONENT_G_BIT;
-			case EColorWriteMask::eBLUE:	return VK_COLOR_COMPONENT_B_BIT;
-			case EColorWriteMask::eALPHA: return VK_COLOR_COMPONENT_A_BIT;
-			case EColorWriteMask::eRGB: return VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT;
-			case EColorWriteMask::eRGBA:	return VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-			case EColorWriteMask::eRG: return VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT;
-			case EColorWriteMask::eBA: return VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+			case EColorWriteMask::NONE: return VkColorComponentFlags();
+			case EColorWriteMask::RED: return VK_COLOR_COMPONENT_R_BIT;
+			case EColorWriteMask::GREEN: return VK_COLOR_COMPONENT_G_BIT;
+			case EColorWriteMask::BLUE:	return VK_COLOR_COMPONENT_B_BIT;
+			case EColorWriteMask::ALPHA: return VK_COLOR_COMPONENT_A_BIT;
+			case EColorWriteMask::RGB: return VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT;
+			case EColorWriteMask::RGBA:	return VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+			case EColorWriteMask::RG: return VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT;
+			case EColorWriteMask::BA: return VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 			}
 			return VkColorComponentFlags();
 		};
@@ -387,7 +425,7 @@ public:
 		}
 
 		BlendState.pAttachments = BlendAttachments.data();
-		BlendState.attachmentCount = BlendAttachments.size();
+		BlendState.attachmentCount = (std::uint32_t)BlendAttachments.size();
 
 		BlendState.blendConstants[0] = 1.0f;
 		BlendState.blendConstants[1] = 1.0f;
@@ -431,15 +469,15 @@ public:
 		//VertexInputState.pNext = ;
 
 		std::map<std::size_t, sBindingStruct> BindingList;
-		for (std::uint32_t i = 0; i < VertexAttributeDescData.size(); i++)
+		for (std::size_t i = 0; i < VertexAttributeDescData.size(); i++)
 		{
 			VkVertexInputAttributeDescription VertexInputAttributeDescription = {};
-			VertexInputAttributeDescription.location = i;
+			VertexInputAttributeDescription.location = (std::uint32_t)i;
 			VertexInputAttributeDescription.binding = VertexAttributeDescData[i].InputSlot;
 			VertexInputAttributeDescription.format = ConvertFormat_Format_To_VkFormat(VertexAttributeDescData[i].format);
 			VertexInputAttributeDescription.offset = VertexAttributeDescData[i].offset;
 			VertexInputAttributeDescriptions.push_back(VertexInputAttributeDescription);
-			BindingList.insert({ VertexAttributeDescData[i].InputSlot, sBindingStruct(VertexAttributeDescData[i].isInstanced,  VertexAttributeDescData[i].Stride) });
+			BindingList.insert({ VertexAttributeDescData[i].InputSlot, sBindingStruct(VertexAttributeDescData[i].isInstanced, (std::uint32_t)VertexAttributeDescData[i].Stride) });
 		}
 
 		for (const auto& Binding : BindingList)
@@ -461,54 +499,16 @@ public:
 
 	std::uint32_t GetStride(std::uint32_t Binding) const
 	{
-		std::uint32_t Stride = 4;
-		for (auto& Desc : VertexAttributeDescData)
-		{
-			if (Binding != Desc.InputSlot)
-				continue;
+		std::uint32_t Stride = 0;
 
-			switch (Desc.format)
-			{
-			case EFormat::RGBA8_UINT: Stride += sizeof(TVector4<UINT8>); break;
-			case EFormat::RGBA16_UINT: Stride += sizeof(TVector4<UINT16>); break;
-			case EFormat::BGRA8_UNORM: Stride += sizeof(TVector4<UINT8>); break;
-			case EFormat::BGRA8_UNORM_SRGB: Stride += sizeof(TVector4<UINT8>); break;
-			case EFormat::R8_UINT: Stride += sizeof(UINT8); break;
-			case EFormat::R8_UNORM: Stride += sizeof(UINT8); break;
-			case EFormat::R8_SNORM: Stride += sizeof(INT8); break;
-			case EFormat::RG8_UINT: Stride += sizeof(TVector2<UINT8>); break;
-			case EFormat::RG8_UNORM: Stride += sizeof(TVector2<UINT8>); break;
-			case EFormat::R16_UINT: Stride += sizeof(UINT16); break;
-			case EFormat::R16_UNORM: Stride += sizeof(UINT16); break;
-			case EFormat::R16_FLOAT: Stride += sizeof(float); break;
-			case EFormat::RGBA8_UNORM: Stride += sizeof(TVector4<UINT8>); break;
-			case EFormat::SRGBA8_UNORM: Stride += sizeof(TVector4<UINT8>); break;
-			case EFormat::R10G10B10A2_UNORM: Stride += sizeof(TVector4<UINT8>); break;
-			case EFormat::R11G11B10_FLOAT: Stride += sizeof(TVector3<float>); break;
-			case EFormat::RG16_UINT: Stride += sizeof(TVector2<UINT16>); break;
-			case EFormat::RG16_FLOAT: Stride += sizeof(TVector2<float>); break;
-			case EFormat::R32_UINT: Stride += sizeof(UINT32); break;
-			case EFormat::R32_SINT: Stride += sizeof(INT32); break;
-			case EFormat::R32_FLOAT: Stride += sizeof(float); break;
-			case EFormat::RGBA16_FLOAT:	Stride += sizeof(TVector4<float>); break;
-			case EFormat::RGBA16_UNORM:	Stride += sizeof(TVector4<UINT16>); break;
-			case EFormat::RGBA16_SNORM:	Stride += sizeof(TVector4<INT16>); break;
-			case EFormat::RG32_UINT: Stride += sizeof(TVector2<UINT32>); break;
-			case EFormat::RG32_SINT: Stride += sizeof(TVector2<INT32>); break;
-			case EFormat::RG32_FLOAT: Stride += sizeof(TVector2<float>); break;
-			case EFormat::RGB32_UINT: Stride += sizeof(TVector3<UINT32>); break;
-			case EFormat::RGB32_SINT: Stride += sizeof(TVector3<INT32>); break;
-			case EFormat::RGB32_FLOAT: Stride += sizeof(TVector3<float>); break;
-			case EFormat::RGBA32_UINT: Stride += sizeof(TVector4<UINT32>); break;
-			case EFormat::RGBA32_SINT: Stride += sizeof(TVector4<INT32>); break;
-			case EFormat::RGBA32_FLOAT: Stride += sizeof(TVector4<float>); break;
-			case EFormat::D16_UNORM: Stride += sizeof(UINT16); break;
-			case EFormat::D32_FLOAT: Stride += sizeof(UINT32); break;
-			case EFormat::D24_UNORM_S8_UINT: Stride += sizeof(UINT32); break;
-			case EFormat::D32_FLOAT_S8X24_UINT: Stride += sizeof(UINT32); break;
-			}
-		}
 		return Stride;
+	}
+
+	std::uint32_t GetOffset(std::uint32_t Binding) const
+	{
+		std::uint32_t Offset = 0;
+
+		return Offset;
 	}
 
 	VkPipelineVertexInputStateCreateInfo Get() const { return VertexInputState; }
@@ -595,259 +595,6 @@ private:
 	VkDeviceSize TotalAllocatedMemory = 0;
 };
 
-class VulkanPipelineLayout 
-{
-	sBaseClassBody(sClassConstructor, VulkanPipelineLayout)
-public:
-	VulkanPipelineLayout(VkDevice device, std::vector<sDescriptorSetLayoutBinding> Bindings)
-		: m_device(device)
-		, m_pipelineLayout(VK_NULL_HANDLE)
-		, BindingDesc(Bindings)
-	{
-		auto GetStageFlags = [](const eShaderType ShaderType) -> VkShaderStageFlagBits
-		{
-			if (ShaderType == eShaderType::Vertex)
-				return VkShaderStageFlagBits::VK_SHADER_STAGE_VERTEX_BIT;
-			else if (ShaderType == eShaderType::Pixel)
-				return VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT;
-			else if (ShaderType == eShaderType::Geometry)
-				return VkShaderStageFlagBits::VK_SHADER_STAGE_GEOMETRY_BIT;
-			else if (ShaderType == eShaderType::HULL)
-				return VkShaderStageFlagBits::VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
-			else if (ShaderType == eShaderType::Domain)
-				return VkShaderStageFlagBits::VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
-			else if (ShaderType == eShaderType::Mesh)
-				return VkShaderStageFlagBits::VK_SHADER_STAGE_MESH_BIT_EXT;
-			else if (ShaderType == eShaderType::Amplification)
-				return VkShaderStageFlagBits::VK_SHADER_STAGE_TASK_BIT_EXT;
-			return VkShaderStageFlagBits();
-		};
-
-		std::vector<VkDescriptorSetLayoutBinding> descriptorSetLayoutBindings;
-		std::vector<VkDescriptorSetLayout> m_descriptorSetLayouts;
-		std::vector<VkPushConstantRange> m_pushConstantRanges;
-
-		for (const auto& Binding : Bindings)
-		{
-			if (Binding.GetDescriptorType() == EDescriptorType::eUniformBuffer)
-			{
-				descriptorSetLayoutBindings.push_back(VkDescriptorSetLayoutBinding());				
-				descriptorSetLayoutBindings.back().binding = Binding.Location;
-				descriptorSetLayoutBindings.back().descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-				descriptorSetLayoutBindings.back().descriptorCount = Binding.Size;
-				descriptorSetLayoutBindings.back().stageFlags = GetStageFlags(Binding.ShaderType);
-				descriptorSetLayoutBindings.back().pImmutableSamplers = nullptr;
-			}
-			else if (Binding.GetDescriptorType() == EDescriptorType::eSampler)
-			{
-				continue;
-			}
-			else if (Binding.GetDescriptorType() == EDescriptorType::eTexture)
-			{
-				descriptorSetLayoutBindings.push_back(VkDescriptorSetLayoutBinding());
-				descriptorSetLayoutBindings.back().binding = Binding.Location;
-				descriptorSetLayoutBindings.back().descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-				descriptorSetLayoutBindings.back().descriptorCount = Binding.Size;
-				descriptorSetLayoutBindings.back().stageFlags = GetStageFlags(Binding.ShaderType);
-				descriptorSetLayoutBindings.back().pImmutableSamplers = nullptr;
-			}
-			else if (Binding.GetDescriptorType() == EDescriptorType::eUAV)
-			{
-				descriptorSetLayoutBindings.push_back(VkDescriptorSetLayoutBinding());
-				descriptorSetLayoutBindings.back().binding = Binding.Location;
-				descriptorSetLayoutBindings.back().descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-				descriptorSetLayoutBindings.back().descriptorCount = Binding.Size;
-				descriptorSetLayoutBindings.back().stageFlags = GetStageFlags(Binding.ShaderType);
-				descriptorSetLayoutBindings.back().pImmutableSamplers = nullptr;
-			}
-			else if (Binding.GetDescriptorType() == EDescriptorType::e32BitConstant)
-			{
-				m_pushConstantRanges.push_back(VkPushConstantRange());
-				m_pushConstantRanges.back().offset = 0;
-				m_pushConstantRanges.back().size = Binding.Size;
-				m_pushConstantRanges.back().stageFlags = GetStageFlags(Binding.ShaderType);
-			}
-		}
-
-		// create the descriptor set layout
-		/*VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlagsInfo = {};
-		bindingFlagsInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
-		bindingFlagsInfo.bindingCount = static_cast<uint32_t>(bindingFlags.size());
-		bindingFlagsInfo.pBindingFlags = bindingFlags.data();*/
-
-		VkDescriptorSetLayoutCreateInfo layoutInfo = {};
-		layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-		//layoutInfo.pNext = &bindingFlagsInfo;
-		layoutInfo.bindingCount = static_cast<uint32_t>(descriptorSetLayoutBindings.size());
-		layoutInfo.pBindings = descriptorSetLayoutBindings.data();
-
-		VkDescriptorSetLayout m_DescriptorSetLayout;
-		VkResult res = vkCreateDescriptorSetLayout(m_device, &layoutInfo, nullptr, &m_DescriptorSetLayout);
-		m_descriptorSetLayouts.push_back(m_DescriptorSetLayout);
-
-		VkPipelineLayoutCreateInfo createInfo{};
-		createInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-		createInfo.setLayoutCount = static_cast<uint32_t>(m_descriptorSetLayouts.size());
-		createInfo.pSetLayouts = m_descriptorSetLayouts.data();
-		createInfo.pushConstantRangeCount = static_cast<uint32_t>(m_pushConstantRanges.size());
-		createInfo.pPushConstantRanges = m_pushConstantRanges.data();
-
-		if (vkCreatePipelineLayout(m_device, &createInfo, nullptr, &m_pipelineLayout) != VK_SUCCESS)
-			throw std::runtime_error("Failed to create pipeline layout.");
-	}
-
-	~VulkanPipelineLayout()
-	{
-		if (m_pipelineLayout != VK_NULL_HANDLE) {
-			vkDestroyPipelineLayout(m_device, m_pipelineLayout, nullptr);
-		}
-	}
-
-	VkDescriptorPool GenerateDescriptorPool(std::uint32_t numSets) const
-	{
-		auto AddDescriptorTypeToPool = [](std::vector<VkDescriptorPoolSize>&poolSizes, VkDescriptorType type, std::uint32_t count)
-		{
-			auto it = poolSizes.begin();
-			for (; it != poolSizes.end(); ++it)
-			{
-				if (type == it->type)
-				{
-					it->descriptorCount += count;
-					return;
-				}
-			}
-
-			if (it == poolSizes.end())
-			{
-				VkDescriptorPoolSize poolSize;
-				poolSize.type = type;
-				poolSize.descriptorCount = count;
-				poolSizes.push_back(poolSize);
-			}
-		};
-
-		std::vector<VkDescriptorPoolSize> poolSizes;
-		std::uint32_t Samplercount = 0;
-		for (const auto& Binding : BindingDesc)
-		{
-			if (Binding.GetDescriptorType() == EDescriptorType::eUniformBuffer)
-			{
-				AddDescriptorTypeToPool(poolSizes, VkDescriptorType::VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, numSets * Binding.Size);
-			}
-			else if (Binding.GetDescriptorType() == EDescriptorType::eSampler)
-			{
-				Samplercount++;
-				continue;
-			}
-			else if (Binding.GetDescriptorType() == EDescriptorType::eTexture)
-			{
-				AddDescriptorTypeToPool(poolSizes, VkDescriptorType::VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, numSets * Binding.Size);
-			}
-			else if (Binding.GetDescriptorType() == EDescriptorType::eUAV)
-			{
-				AddDescriptorTypeToPool(poolSizes, VkDescriptorType::VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, numSets * Binding.Size);
-			}
-			else if (Binding.GetDescriptorType() == EDescriptorType::e32BitConstant)
-			{
-			}
-		}
-
-		if (Samplercount > 0)
-			AddDescriptorTypeToPool(poolSizes, VK_DESCRIPTOR_TYPE_SAMPLER, numSets * Samplercount);
-
-		// no need to add push constants
-
-		VkDescriptorPoolCreateInfo poolInfo{};
-		poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-		poolInfo.pNext = nullptr;
-		poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-		poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
-		poolInfo.pPoolSizes = poolSizes.data();
-		poolInfo.maxSets = numSets;
-
-		VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
-		VkResult res = vkCreateDescriptorPool(m_device, &poolInfo, nullptr, &descriptorPool);
-
-		return descriptorPool;
-	}
-
-	VkPipelineLayout Get() const
-	{
-		return m_pipelineLayout;
-	}
-
-private:
-	VkDevice m_device;
-	VkPipelineLayout m_pipelineLayout;
-	std::vector<sDescriptorSetLayoutBinding> BindingDesc;
-};
-
-class VulkanDescriptorSet
-{
-	sBaseClassBody(sClassConstructor, VulkanDescriptorSet)
-public:
-	VulkanDescriptorSet(VulkanDevice* device, VkDescriptorPool descriptorPool, VkDescriptorSetLayout descriptorSetLayout, std::uint32_t Size = 16535)
-		: Device(device)
-	{
-		VkDescriptorSetAllocateInfo allocateInfo{};
-		allocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-		allocateInfo.descriptorPool = descriptorPool;
-		allocateInfo.descriptorSetCount = 1;
-		allocateInfo.pSetLayouts = &descriptorSetLayout;
-
-		VkDescriptorSetVariableDescriptorCountAllocateInfoEXT count_info{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO_EXT };
-		count_info.descriptorSetCount = 1;
-		// This number is the max allocatable count
-		std::uint32_t max_binding = 4;
-		count_info.pDescriptorCounts = &max_binding;
-		count_info.pNext = nullptr;
-		//allocateInfo.pNext = &count_info;
-
-		VkResult Result = vkAllocateDescriptorSets(Device->Get(), &allocateInfo, &descriptorSet);
-		if (Result != VK_SUCCESS)
-			throw std::runtime_error("Failed to allocate descriptor sets");
-	}
-
-	~VulkanDescriptorSet()
-	{
-		descriptorSet = VK_NULL_HANDLE;
-		Device = nullptr;
-	}
-
-	void UpdateImageDescriptor(uint32_t binding, uint32_t arrayIndex, VkDescriptorImageInfo* imageInfo)
-	{
-		VkWriteDescriptorSet writeDescriptorSet{};
-		writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		writeDescriptorSet.dstSet = descriptorSet;
-		writeDescriptorSet.dstBinding = binding;
-		writeDescriptorSet.dstArrayElement = arrayIndex;
-		writeDescriptorSet.descriptorCount = 1;
-		writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		writeDescriptorSet.pImageInfo = imageInfo;
-
-		vkUpdateDescriptorSets(Device->Get(), 1, &writeDescriptorSet, 0, nullptr);
-	}
-
-	void UpdateBufferDescriptor(uint32_t binding, uint32_t arrayIndex, VkDescriptorBufferInfo* bufferInfo)
-	{
-		VkWriteDescriptorSet writeDescriptorSet{};
-		writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		writeDescriptorSet.dstSet = descriptorSet;
-		writeDescriptorSet.dstBinding = binding;
-		writeDescriptorSet.dstArrayElement = arrayIndex;
-		writeDescriptorSet.descriptorCount = 1;
-		writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		writeDescriptorSet.pBufferInfo = bufferInfo;
-
-		vkUpdateDescriptorSets(Device->Get(), 1, &writeDescriptorSet, 0, nullptr);
-	}
-
-	VkDescriptorSet descriptorSet;
-
-private:
-	VulkanDevice* Device;
-};
-
 class VulkanBindlessDescriptorPool 
 {
 	sBaseClassBody(sClassConstructor, VulkanBindlessDescriptorPool)
@@ -864,27 +611,27 @@ public:
 
 	~VulkanBindlessDescriptorPool() 
 	{
-		vkDestroyDescriptorPool(Device->Get(), descriptorPool, nullptr);
-		vkDestroyDescriptorSetLayout(Device->Get(), descriptorSetLayout, nullptr);
+		vkDestroyDescriptorPool(Device->Get(), bindlessPool, nullptr);
+		vkDestroyDescriptorSetLayout(Device->Get(), bindlessLayout, nullptr);
 	}
 
 	VkDescriptorSetLayout GetDescriptorSetLayout() const 
 	{
-		return descriptorSetLayout;
+		return bindlessLayout;
 	}
 
 	VkDescriptorSet GetDescriptorSet() const
 	{
-		return descriptorSet;
+		return globalBindlessSet;
 	}
 
 	void UpdateImageDescriptor(uint32_t binding, uint32_t arrayIndex, VkDescriptorImageInfo* imageInfo)
 	{
 		VkWriteDescriptorSet writeDescriptorSet{};
 		writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		writeDescriptorSet.dstSet = descriptorSet;
+		writeDescriptorSet.dstSet = globalBindlessSet;
 		writeDescriptorSet.dstBinding = binding;
-		writeDescriptorSet.dstArrayElement = arrayIndex;
+		writeDescriptorSet.dstArrayElement = arrayIndex;	// The bindless ?
 		writeDescriptorSet.descriptorCount = 1;
 		writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		writeDescriptorSet.pImageInfo = imageInfo;
@@ -896,9 +643,9 @@ public:
 	{
 		VkWriteDescriptorSet writeDescriptorSet{};
 		writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		writeDescriptorSet.dstSet = descriptorSet;
+		writeDescriptorSet.dstSet = globalBindlessSet;
 		writeDescriptorSet.dstBinding = binding;
-		writeDescriptorSet.dstArrayElement = arrayIndex;
+		writeDescriptorSet.dstArrayElement = arrayIndex;	// The bindless ?
 		writeDescriptorSet.descriptorCount = 1;
 		writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 		writeDescriptorSet.pBufferInfo = bufferInfo;
@@ -909,168 +656,221 @@ public:
 private:
 	void CreateDescriptorPool() 
 	{
-		std::vector<VkDescriptorPoolSize> poolSizes = {
-			{ VK_DESCRIPTOR_TYPE_SAMPLER, maxImageDescriptors },
-			{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, maxImageDescriptors },
-			{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, maxImageDescriptors },
-			{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, maxBufferDescriptors },
-		};
+		VkDescriptorPoolSize poolSize{};
+		poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		poolSize.descriptorCount = maxBindlessResources;
 
-		VkDescriptorPoolCreateInfo poolCreateInfo{};
-		poolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-		poolCreateInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
-		poolCreateInfo.pPoolSizes = poolSizes.data();
-		poolCreateInfo.maxSets = 16536;
-		poolCreateInfo.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT/* | VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT */;
+		VkDescriptorPoolCreateInfo poolInfo{};
+		poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+		poolInfo.poolSizeCount = 1;
+		poolInfo.pPoolSizes = &poolSize;
+		poolInfo.maxSets = 1;
+		poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
 
-		if (vkCreateDescriptorPool(Device->Get(), &poolCreateInfo, nullptr, &descriptorPool) != VK_SUCCESS)
-			throw std::runtime_error("Failed to create descriptor pool");
+		vkCreateDescriptorPool(Device->Get(), &poolInfo, nullptr, &bindlessPool);
 	}
 
 	void CreateDescriptorSetLayout() 
 	{
-		std::vector<VkDescriptorSetLayoutBinding> bindings = 
+		/*auto GetStageFlags = [](const eShaderType ShaderType) -> VkShaderStageFlagBits
+			{
+				if (ShaderType == eShaderType::Vertex)
+					return VkShaderStageFlagBits::VK_SHADER_STAGE_VERTEX_BIT;
+				else if (ShaderType == eShaderType::Pixel)
+					return VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT;
+				else if (ShaderType == eShaderType::Geometry)
+					return VkShaderStageFlagBits::VK_SHADER_STAGE_GEOMETRY_BIT;
+				else if (ShaderType == eShaderType::HULL)
+					return VkShaderStageFlagBits::VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
+				else if (ShaderType == eShaderType::Domain)
+					return VkShaderStageFlagBits::VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
+				else if (ShaderType == eShaderType::Mesh)
+					return VkShaderStageFlagBits::VK_SHADER_STAGE_MESH_BIT_EXT;
+				else if (ShaderType == eShaderType::Amplification)
+					return VkShaderStageFlagBits::VK_SHADER_STAGE_TASK_BIT_EXT;
+				return VkShaderStageFlagBits();
+			};
+
+		std::vector<VkDescriptorSetLayoutBinding> descriptorSetLayoutBindings;
+		std::vector<VkPushConstantRange> m_pushConstantRanges;
+
+		for (const auto& Binding : Bindings)
 		{
-			{ 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr },
-			{ 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr },
-			{ 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr },
-			{ 3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr },
-			{ 4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr },
-			{ 10, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr },
-			{ 11, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr },
-			{ 12, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT, nullptr },
-			{ 13, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT, nullptr },
-		};
+			if (Binding.GetDescriptorType() == EDescriptorType::UniformBuffer)
+			{
+				descriptorSetLayoutBindings.push_back(VkDescriptorSetLayoutBinding());
+				descriptorSetLayoutBindings.back().binding = Binding.Location;
+				descriptorSetLayoutBindings.back().descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+				descriptorSetLayoutBindings.back().descriptorCount = Binding.Size;
+				descriptorSetLayoutBindings.back().stageFlags = GetStageFlags(Binding.ShaderType);
+				descriptorSetLayoutBindings.back().pImmutableSamplers = nullptr;
+			}
+			else if (Binding.GetDescriptorType() == EDescriptorType::Sampler)
+			{
+				descriptorSetLayoutBindings.push_back(VkDescriptorSetLayoutBinding());
+				descriptorSetLayoutBindings.back().binding = Binding.Location;
+				descriptorSetLayoutBindings.back().descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+				descriptorSetLayoutBindings.back().descriptorCount = Binding.Size;
+				descriptorSetLayoutBindings.back().stageFlags = GetStageFlags(Binding.ShaderType);
+				descriptorSetLayoutBindings.back().pImmutableSamplers = nullptr;
+			}
+			else if (Binding.GetDescriptorType() == EDescriptorType::Texture)
+			{
+				continue;
+			}
+			else if (Binding.GetDescriptorType() == EDescriptorType::UAV)
+			{
+				descriptorSetLayoutBindings.push_back(VkDescriptorSetLayoutBinding());
+				descriptorSetLayoutBindings.back().binding = Binding.Location;
+				descriptorSetLayoutBindings.back().descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+				descriptorSetLayoutBindings.back().descriptorCount = Binding.Size;
+				descriptorSetLayoutBindings.back().stageFlags = GetStageFlags(Binding.ShaderType);
+				descriptorSetLayoutBindings.back().pImmutableSamplers = nullptr;
+			}
+			else if (Binding.GetDescriptorType() == EDescriptorType::e32BitConstant)
+			{
+				m_pushConstantRanges.push_back(VkPushConstantRange());
+				m_pushConstantRanges.back().offset = 0;
+				m_pushConstantRanges.back().size = Binding.Size;
+				m_pushConstantRanges.back().stageFlags = GetStageFlags(Binding.ShaderType);
+			}
+		}
+		
+		layoutInfo.pBindings = descriptorSetLayoutBindings.data();
 
-		VkDescriptorSetLayoutCreateInfo layoutCreateInfo{};
-		layoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-		layoutCreateInfo.bindingCount = static_cast<uint32_t>(bindings.size());
-		layoutCreateInfo.pBindings = bindings.data();
-		layoutCreateInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
+		*/
 
-		std::vector<VkDescriptorBindingFlags> bindless_flags;
-		bindless_flags.push_back(VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT_EXT);
-		bindless_flags.push_back(VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT_EXT);
-		bindless_flags.push_back(VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT_EXT);
-		bindless_flags.push_back(VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT_EXT);
-		bindless_flags.push_back(VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT_EXT);
-		bindless_flags.push_back(VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT_EXT);
-		bindless_flags.push_back(VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT_EXT);
-		bindless_flags.push_back(VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT_EXT);
-		bindless_flags.push_back(VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT_EXT);
-		//bindless_flags.back() |= VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT_EXT;
-		VkDescriptorSetLayoutBindingFlagsCreateInfoEXT extended_info{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO_EXT, nullptr };
-		extended_info.bindingCount = static_cast<uint32_t>(bindings.size());
-		extended_info.pBindingFlags = bindless_flags.data();
+		//std::vector<VkDescriptorSetLayoutBinding> bindings = {
+		//	// Binding 0: Textures
+		//	{ 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 500000, VK_SHADER_STAGE_ALL, nullptr },
 
-		layoutCreateInfo.pNext = &extended_info;
+		//	// Binding 1: StructuredBuffers
+		//	{ 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,        100000, VK_SHADER_STAGE_ALL, nullptr },
 
-		if (vkCreateDescriptorSetLayout(Device->Get(), &layoutCreateInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS)
-			throw std::runtime_error("Failed to create descriptor set layout");
+		//	// Binding 2: UAV Textures
+		//	{ 2, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,         10000,  VK_SHADER_STAGE_ALL, nullptr }
+		//};
+
+		VkDescriptorSetLayoutBinding binding{};
+		binding.binding = 0;
+		binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		binding.descriptorCount = maxBindlessResources;
+		binding.stageFlags = VK_SHADER_STAGE_ALL;
+
+		VkDescriptorBindingFlags bindlessFlags =
+			VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT |
+			VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT |
+			VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT;
+
+		VkDescriptorSetLayoutBindingFlagsCreateInfo extendedInfo{};
+		extendedInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
+		extendedInfo.bindingCount = 1;
+		extendedInfo.pBindingFlags = &bindlessFlags;
+
+		VkDescriptorSetLayoutCreateInfo layoutInfo{};
+		layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		layoutInfo.pNext = &extendedInfo;
+		layoutInfo.bindingCount = 1;
+		layoutInfo.pBindings = &binding;
+		layoutInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
+
+		vkCreateDescriptorSetLayout(Device->Get(), &layoutInfo, nullptr, &bindlessLayout);
 	}
 
 	void AllocateDescriptorSets() 
 	{
-		VkDescriptorSetAllocateInfo allocateInfo{};
-		allocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-		allocateInfo.descriptorPool = descriptorPool;
-		allocateInfo.descriptorSetCount = 1;
-		allocateInfo.pSetLayouts = &descriptorSetLayout;
+		uint32_t maxBinding = maxBindlessResources - 1;
 
-		VkDescriptorSetVariableDescriptorCountAllocateInfoEXT count_info{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO_EXT };
-		std::uint32_t max_binding = 1;// maxImageDescriptors /*+ maxBufferDescriptors - 1*/;
-		count_info.descriptorSetCount = 1;
-		// This number is the max allocatable count
-		count_info.pDescriptorCounts = &max_binding;
-		//allocateInfo.pNext = &count_info;
+		VkDescriptorSetVariableDescriptorCountAllocateInfo countInfo{};
+		countInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO;
+		countInfo.descriptorSetCount = 1;
+		countInfo.pDescriptorCounts = &maxBinding;
 
-		if (vkAllocateDescriptorSets(Device->Get(), &allocateInfo, &descriptorSet) != VK_SUCCESS)
-			throw std::runtime_error("Failed to allocate descriptor sets");
+		VkDescriptorSetAllocateInfo allocInfo{};
+		allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+		allocInfo.pNext = &countInfo;
+		allocInfo.descriptorPool = bindlessPool;
+		allocInfo.descriptorSetCount = 1;
+		allocInfo.pSetLayouts = &bindlessLayout;
+
+		vkAllocateDescriptorSets(Device->Get(), &allocInfo, &globalBindlessSet);
 	}
+
+	//VkDescriptorPool GenerateDescriptorPool(std::uint32_t numSets) const
+	//{
+	//	auto AddDescriptorTypeToPool = [](std::vector<VkDescriptorPoolSize>& poolSizes, VkDescriptorType type, std::uint32_t count)
+	//		{
+	//			auto it = poolSizes.begin();
+	//			for (; it != poolSizes.end(); ++it)
+	//			{
+	//				if (type == it->type)
+	//				{
+	//					it->descriptorCount += count;
+	//					return;
+	//				}
+	//			}
+
+	//			if (it == poolSizes.end())
+	//			{
+	//				VkDescriptorPoolSize poolSize;
+	//				poolSize.type = type;
+	//				poolSize.descriptorCount = count;
+	//				poolSizes.push_back(poolSize);
+	//			}
+	//		};
+
+	//	std::vector<VkDescriptorPoolSize> poolSizes;
+	//	std::uint32_t Samplercount = 0;
+	//	for (const auto& Binding : BindingDesc)
+	//	{
+	//		if (Binding.GetDescriptorType() == EDescriptorType::UniformBuffer)
+	//		{
+	//			AddDescriptorTypeToPool(poolSizes, VkDescriptorType::VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, numSets * Binding.Size);
+	//		}
+	//		else if (Binding.GetDescriptorType() == EDescriptorType::Sampler)
+	//		{
+	//			Samplercount++;
+	//			continue;
+	//		}
+	//		else if (Binding.GetDescriptorType() == EDescriptorType::Texture)
+	//		{
+	//			AddDescriptorTypeToPool(poolSizes, VkDescriptorType::VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, numSets * Binding.Size);
+	//		}
+	//		else if (Binding.GetDescriptorType() == EDescriptorType::UAV)
+	//		{
+	//			AddDescriptorTypeToPool(poolSizes, VkDescriptorType::VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, numSets * Binding.Size);
+	//		}
+	//		else if (Binding.GetDescriptorType() == EDescriptorType::e32BitConstant)
+	//		{
+	//		}
+	//	}
+
+	//	if (Samplercount > 0)
+	//		AddDescriptorTypeToPool(poolSizes, VK_DESCRIPTOR_TYPE_SAMPLER, numSets * Samplercount);
+
+	//	// no need to add push constants
+
+	//	VkDescriptorPoolCreateInfo poolInfo{};
+	//	poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	//	poolInfo.pNext = nullptr;
+	//	poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+	//	poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
+	//	poolInfo.pPoolSizes = poolSizes.data();
+	//	poolInfo.maxSets = numSets;
+
+	//	VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
+	//	VkResult res = vkCreateDescriptorPool(m_device, &poolInfo, nullptr, &descriptorPool);
+
+	//	return descriptorPool;
+	//}
 
 private:
 	VulkanDevice* Device;
-	VkDescriptorPool descriptorPool;
-	VkDescriptorSetLayout descriptorSetLayout;
-	VkDescriptorSet descriptorSet;
+	VkDescriptorPool bindlessPool;
+	VkDescriptorSetLayout bindlessLayout;
+	VkDescriptorSet globalBindlessSet;
 	uint32_t maxImageDescriptors;
 	uint32_t maxBufferDescriptors;
-};
 
-class VulkanPushDescriptorPool
-{
-	sBaseClassBody(sClassConstructor, VulkanPushDescriptorPool)
-public:
-	VulkanPushDescriptorPool(VulkanDevice* device, uint32_t maxImageDescriptors = 16536, uint32_t maxBufferDescriptors = 16536)
-		: Device(device)
-		, maxImageDescriptors(maxImageDescriptors)
-		, maxBufferDescriptors(maxBufferDescriptors)
-	{
-		CreateDescriptorPool();
-		CreateDescriptorSetLayout();
-	}
-
-	~VulkanPushDescriptorPool()
-	{
-		vkDestroyDescriptorPool(Device->Get(), descriptorPool, nullptr);
-		vkDestroyDescriptorSetLayout(Device->Get(), descriptorSetLayout, nullptr);
-	}
-
-	VkDescriptorSetLayout GetDescriptorSetLayout() const
-	{
-		return descriptorSetLayout;
-	}
-
-private:
-	void CreateDescriptorPool()
-	{
-		std::vector<VkDescriptorPoolSize> poolSizes = {
-			{ VK_DESCRIPTOR_TYPE_SAMPLER, maxImageDescriptors },
-			{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, maxImageDescriptors },
-			{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, maxImageDescriptors },
-			{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, maxBufferDescriptors },
-		};
-
-		VkDescriptorPoolCreateInfo poolCreateInfo{};
-		poolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-		poolCreateInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
-		poolCreateInfo.pPoolSizes = poolSizes.data();
-		poolCreateInfo.maxSets = 16536;
-		poolCreateInfo.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT/* | VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT */;
-
-		if (vkCreateDescriptorPool(Device->Get(), &poolCreateInfo, nullptr, &descriptorPool) != VK_SUCCESS)
-			throw std::runtime_error("Failed to create descriptor pool");
-	}
-
-	void CreateDescriptorSetLayout()
-	{
-		std::vector<VkDescriptorSetLayoutBinding> bindings =
-		{
-			{ 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr },
-			{ 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr },
-			{ 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr },
-			{ 3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr },
-			{ 4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr },
-			{ 10, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr },
-			{ 11, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr },
-			{ 12, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT, nullptr },
-			{ 13, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT, nullptr },
-		};
-
-		VkDescriptorSetLayoutCreateInfo layoutCreateInfo{};
-		layoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-		layoutCreateInfo.bindingCount = static_cast<uint32_t>(bindings.size());
-		layoutCreateInfo.pBindings = bindings.data();
-		layoutCreateInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT | VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT;
-
-		if (vkCreateDescriptorSetLayout(Device->Get(), &layoutCreateInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS)
-			throw std::runtime_error("Failed to create descriptor set layout");
-	}
-
-private:
-	VulkanDevice* Device;
-	VkDescriptorPool descriptorPool;
-	VkDescriptorSetLayout descriptorSetLayout;
-	uint32_t maxImageDescriptors;
-	uint32_t maxBufferDescriptors;
+	uint32_t maxBindlessResources = 100000;
 };

@@ -165,7 +165,7 @@ bool sSpriteAnimationManager::IsFlipped() const
 	return SpriteSheetComponent->IsFlipped();
 }
 
-void sSpriteAnimationManager::BindFunctionOnAnimationFrame(std::string Name, std::size_t Frame, EAnimationState State, std::function<void()> fOnFrame)
+void sSpriteAnimationManager::BindFunctionOnAnimationFrame(std::string Name, std::uint32_t Frame, EAnimationState State, std::function<void()> fOnFrame)
 {
 	States.insert(std::make_pair(Name, sAnimFunc(Frame, State, fOnFrame)));
 }

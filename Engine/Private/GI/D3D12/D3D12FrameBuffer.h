@@ -64,7 +64,16 @@ public:
 	virtual bool IsSRV_Allowed() const override final { return bIsSRVSupported; }
 	virtual bool IsUAV_Allowed() const override final { return bIsUAVSupported; }
 
+	virtual std::uint32_t GetSRVBindlessIndex() const override final { return SRV.GetHeapIndex(); }
+	virtual std::uint32_t GetUAVBindlessIndex() const override final { return UAV.GetHeapIndex(); }
+
 	D3D12_RESOURCE_STATES CurrentState;
+	// Enhanced Barrier States
+	D3D12_BARRIER_ACCESS AccessState;
+	D3D12_BARRIER_SYNC SyncState;
+
+	virtual ResourceSharedHandle* GetSharedHandle() const override final { return nullptr; }
+	virtual bool CopyFrom(IRenderTarget* RenderTarget) override final { return false; }
 
 private:
 	std::string Name;
@@ -108,6 +117,12 @@ public:
 	EFormat GetFormat() const { return Format; }
 
 	D3D12_RESOURCE_STATES CurrentState;
+	// Enhanced Barrier States
+	D3D12_BARRIER_ACCESS AccessState;
+	D3D12_BARRIER_SYNC SyncState;
+
+	virtual ResourceSharedHandle* GetSharedHandle() const override final { return nullptr; }
+	virtual bool CopyFrom(IDepthTarget* DepthTarget) override final { return false; }
 
 private:
 	std::string Name;
@@ -145,9 +160,18 @@ public:
 	bool IsSRVSupported() const { return bIsSRVSupported; }
 	virtual bool IsSRV_Allowed() const override final { return bIsSRVSupported; }
 
+	virtual std::uint32_t GetSRVBindlessIndex() const override final { return SRV.GetHeapIndex(); }
+	virtual std::uint32_t GetUAVBindlessIndex() const override final { return UAV.GetHeapIndex(); }
+
 	EFormat GetFormat() const { return Format; }
 
 	D3D12_RESOURCE_STATES CurrentState;
+	// Enhanced Barrier States
+	D3D12_BARRIER_ACCESS AccessState;
+	D3D12_BARRIER_SYNC SyncState;
+
+	virtual ResourceSharedHandle* GetSharedHandle() const override final { return nullptr; }
+	virtual bool CopyFrom(IUnorderedAccessTarget* UnorderedAccessTarget) override final { return false; }
 
 private:
 	std::string Name;
@@ -237,4 +261,6 @@ public:
 
 	virtual IDepthTarget* GetDepthTarget() const override final { return DepthTarget.get(); }
 	virtual void SetDepthTarget(const IDepthTarget::SharedPtr& DepthTarget) override final;
+
+	virtual bool CopyFrom(IFrameBuffer* FrameBuffer) override final;
 };

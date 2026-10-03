@@ -95,7 +95,7 @@ VulkanRenderTarget::VulkanRenderTarget(VulkanDevice* InOwner, const std::string 
 		{
 			DescriptorImageInfo.imageLayout = VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 			DescriptorImageInfo.imageView = View;
-			VulkanSamplerState Sampler = VulkanSamplerState(sSamplerAttributeDesc(ESamplerStateMode::eAnisotropicWrap));
+			VulkanStaticSamplerState Sampler = VulkanStaticSamplerState(sSamplerAttributeDesc(ESamplerStateMode::AnisotropicWrap));
 			DescriptorImageInfo.sampler = Sampler.Get(InOwner->Get());
 		}
 	}
@@ -288,43 +288,43 @@ VulkanFrameBuffer::VulkanFrameBuffer(VulkanDevice* InOwner, const std::string In
 	{
 		const auto& FB = AttachmentInfo.FrameBuffer[i];
 
-		if (FB.AttachmentType == eFrameBufferAttachmentType::eUAV)
+		if (FB.AttachmentType == EFrameBufferAttachmentType::UAV)
 		{
 			UnorderedAccessTargets.push_back(VulkanUnorderedAccessTarget::Create(Owner, Name + "_UAV_" + std::to_string(UnorderedAccessTargets.size()), FB.Format, FDesc, false));
 		}
-		else if (FB.AttachmentType == eFrameBufferAttachmentType::eUAV_SRV)
+		else if (FB.AttachmentType == EFrameBufferAttachmentType::UAV_SRV)
 		{
 			UnorderedAccessTargets.push_back(VulkanUnorderedAccessTarget::Create(Owner, Name + "_UAV_" + std::to_string(UnorderedAccessTargets.size()), FB.Format, FDesc, true));
 		}
-		else if (FB.AttachmentType == eFrameBufferAttachmentType::eRT)
+		else if (FB.AttachmentType == EFrameBufferAttachmentType::RT)
 		{
 			RenderTargets.push_back(VulkanRenderTarget::Create(Owner, Name + "_RenderTarget_" + std::to_string(RenderTargets.size()), FB.Format, FDesc, false, false));
 		}
-		else if (FB.AttachmentType == eFrameBufferAttachmentType::eRT_SRV)
+		else if (FB.AttachmentType == EFrameBufferAttachmentType::RT_SRV)
 		{
 			RenderTargets.push_back(VulkanRenderTarget::Create(Owner, Name + "_RenderTarget_" + std::to_string(RenderTargets.size()), FB.Format, FDesc, true, false));
 		}
-		else if (FB.AttachmentType == eFrameBufferAttachmentType::eRT_UAV)
+		else if (FB.AttachmentType == EFrameBufferAttachmentType::RT_UAV)
 		{
 			RenderTargets.push_back(VulkanRenderTarget::Create(Owner, Name + "_RenderTarget_" + std::to_string(RenderTargets.size()), FB.Format, FDesc, false, true));
 		}
-		else if (FB.AttachmentType == eFrameBufferAttachmentType::eRT_SRV_UAV)
+		else if (FB.AttachmentType == EFrameBufferAttachmentType::RT_SRV_UAV)
 		{
 			RenderTargets.push_back(VulkanRenderTarget::Create(Owner, Name + "_RenderTarget_" + std::to_string(RenderTargets.size()), FB.Format, FDesc, true, true));
 		}
-		else if (FB.AttachmentType == eFrameBufferAttachmentType::eDepth)
+		else if (FB.AttachmentType == EFrameBufferAttachmentType::Depth)
 		{
 
 		}
-		else if (FB.AttachmentType == eFrameBufferAttachmentType::eDepth_SRV)
+		else if (FB.AttachmentType == EFrameBufferAttachmentType::Depth_SRV)
 		{
 
 		}
-		else if (FB.AttachmentType == eFrameBufferAttachmentType::eDepth_UAV)
+		else if (FB.AttachmentType == EFrameBufferAttachmentType::Depth_UAV)
 		{
 
 		}
-		else if (FB.AttachmentType == eFrameBufferAttachmentType::eDepth_SRV_UAV)
+		else if (FB.AttachmentType == EFrameBufferAttachmentType::Depth_SRV_UAV)
 		{
 
 		}
@@ -368,22 +368,22 @@ void VulkanFrameBuffer::AttachRenderTarget(const IRenderTarget::SharedPtr& Rende
 {
 	if (auto RT = std::dynamic_pointer_cast<VulkanRenderTarget>(RenderTarget))
 	{
-		eFrameBufferAttachmentType AttachmentType;
+		EFrameBufferAttachmentType AttachmentType;
 		if (!RT->IsSRV_Allowed() && !RT->IsUAV_Allowed())
 		{
-			AttachmentType = eFrameBufferAttachmentType::eRT;
+			AttachmentType = EFrameBufferAttachmentType::RT;
 		}
 		else if (RT->IsSRV_Allowed() && !RT->IsUAV_Allowed())
 		{
-			AttachmentType = eFrameBufferAttachmentType::eRT_SRV;
+			AttachmentType = EFrameBufferAttachmentType::RT_SRV;
 		}
 		else if (!RT->IsSRV_Allowed() && RT->IsUAV_Allowed())
 		{
-			AttachmentType = eFrameBufferAttachmentType::eRT_UAV;
+			AttachmentType = EFrameBufferAttachmentType::RT_UAV;
 		}
 		else if (RT->IsSRV_Allowed() && RT->IsUAV_Allowed())
 		{
-			AttachmentType = eFrameBufferAttachmentType::eRT_SRV_UAV;
+			AttachmentType = EFrameBufferAttachmentType::RT_SRV_UAV;
 		}
 
 		if (Index.has_value())
@@ -402,14 +402,14 @@ void VulkanFrameBuffer::AttachUnorderedAccessTarget(const IUnorderedAccessTarget
 {
 	if (auto ST = std::dynamic_pointer_cast<VulkanUnorderedAccessTarget>(UnorderedAccessTarget))
 	{
-		eFrameBufferAttachmentType AttachmentType;
+		EFrameBufferAttachmentType AttachmentType;
 		if (!ST->IsSRV_Allowed())
 		{
-			AttachmentType = eFrameBufferAttachmentType::eUAV;
+			AttachmentType = EFrameBufferAttachmentType::UAV;
 		}
 		else if (ST->IsSRV_Allowed())
 		{
-			AttachmentType = eFrameBufferAttachmentType::eUAV_SRV;
+			AttachmentType = EFrameBufferAttachmentType::UAV_SRV;
 		}
 
 		if (Index.has_value())
@@ -432,4 +432,9 @@ void VulkanFrameBuffer::SetDepthTarget(const IDepthTarget::SharedPtr& InDepthTar
 		DepthTarget = DT;
 		AttachmentInfo.DepthFormat = DepthTarget->GetFormat();
 	}
+}
+
+bool VulkanFrameBuffer::CopyFrom(IFrameBuffer* FrameBuffer)
+{
+	return false;
 }

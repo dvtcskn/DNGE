@@ -27,8 +27,10 @@
 #include "pch.h"
 #include "Engine/MemoryManager.h"
 
-namespace MemoryManager
-{
+#define MemoryLeakDetector 0
+
+//namespace MemoryManager
+//{
 
 #if MemoryLeakDetector
 
@@ -70,4 +72,4 @@ namespace MemoryManager
 		std::free(ptr);
 	}
 #endif
-}
+//}

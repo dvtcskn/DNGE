@@ -34,20 +34,58 @@ D3D12DescriptorHandle::D3D12DescriptorHandle(/*D3D12DescriptorHeap* pOwner,*/ D3
     //, DescriptorSize(inDescriptorSize)
     , CPUDescriptor(D3D12_CPU_DESCRIPTOR_HANDLE(~0u))
     , GPUDescriptor(D3D12_GPU_DESCRIPTOR_HANDLE(~0u))
-    , fDeallocate(nullptr)
+	, HeapIndex(uint32_t(-1))
+    , Owner(std::weak_ptr<D3D12DescriptorHeap>())
     //, Owner(pOwner)
 {}
 
 D3D12DescriptorHandle::~D3D12DescriptorHandle()
 {
-    if (fDeallocate)
-        fDeallocate(this);
+    Release();
+}
 
-    fDeallocate = nullptr;
+void D3D12DescriptorHandle::Release()
+{
+    if (!Owner.expired())
+    {
+        if (std::shared_ptr<D3D12DescriptorHeap> PTR = Owner.lock())
+            PTR->Free(this);
+    }
+
+    Owner.reset();
 
     CPUDescriptor = D3D12_CPU_DESCRIPTOR_HANDLE(~0u);
     GPUDescriptor = D3D12_GPU_DESCRIPTOR_HANDLE(~0u);
     HeapIndex = ~0u;
+}
+
+D3D12DescriptorHeap::D3D12DescriptorHeap(D3D12DescriptorHeapManager* NewOwner, ID3D12Device* pDevice, const D3D12_DESCRIPTOR_HEAP_TYPE Type, const uint32_t Count)
+    : Owner(NewOwner)
+    //, TotalFreedDescriptorSize(0)
+    , IncrementSize(pDevice->GetDescriptorHandleIncrementSize(Type))
+    , TotalAllocatedDescriptorCount(0)
+    , TotalDescriptorSize(Count)
+    , Heap(nullptr)
+    , HeapType(Type)
+{
+    D3D12_DESCRIPTOR_HEAP_DESC descHeap;
+    descHeap.NumDescriptors = TotalDescriptorSize;
+    descHeap.Type = HeapType;
+    descHeap.NodeMask = 0;
+    descHeap.Flags = HeapType == D3D12_DESCRIPTOR_HEAP_TYPE_RTV || HeapType == D3D12_DESCRIPTOR_HEAP_TYPE_DSV ? D3D12_DESCRIPTOR_HEAP_FLAG_NONE : D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+    ThrowIfFailed(pDevice->CreateDescriptorHeap(&descHeap, IID_PPV_ARGS(&Heap)));
+#if _DEBUG
+    Heap->SetName(L"D3D12DescriptorHeap");
+#endif
+}
+
+D3D12DescriptorHeap::~D3D12DescriptorHeap()
+{
+    Heap->Release();
+    Heap = nullptr;
+    Owner = nullptr;
+
+    FreedDescriptorIndices.clear();
 }
 
 D3D12DescriptorHeapManager::D3D12DescriptorHeapManager(D3D12Device* InOwner)
@@ -75,31 +113,3 @@ void D3D12DescriptorHeapManager::SetHeaps(ID3D12GraphicsCommandList* cmd)
     cmd->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 }
 
-D3D12DescriptorHeapManager::D3D12DescriptorHeap::D3D12DescriptorHeap(D3D12DescriptorHeapManager* pOwner, ID3D12Device* pDevice, const D3D12_DESCRIPTOR_HEAP_TYPE Type, const uint32_t Count)
-    : Owner(pOwner)
-    //, TotalFreedDescriptorSize(0)
-    , IncrementSize(pDevice->GetDescriptorHandleIncrementSize(Type))
-    , TotalAllocatedDescriptorCount(0)
-    , TotalDescriptorSize(Count)
-    , Heap(nullptr)
-    , HeapType(Type)
-{
-    D3D12_DESCRIPTOR_HEAP_DESC descHeap;
-    descHeap.NumDescriptors = TotalDescriptorSize;
-    descHeap.Type = HeapType;
-    descHeap.NodeMask = 0;
-    descHeap.Flags = HeapType == D3D12_DESCRIPTOR_HEAP_TYPE_RTV || HeapType == D3D12_DESCRIPTOR_HEAP_TYPE_DSV ? D3D12_DESCRIPTOR_HEAP_FLAG_NONE : D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-    ThrowIfFailed(pDevice->CreateDescriptorHeap(&descHeap, IID_PPV_ARGS(&Heap)));
-#if _DEBUG
-    Heap->SetName(L"D3D12DescriptorHeap");
-#endif
-}
-
-D3D12DescriptorHeapManager::D3D12DescriptorHeap::~D3D12DescriptorHeap()
-{
-    Heap->Release();
-    Heap = nullptr;
-    Owner = nullptr;
-
-    FreedDescriptorIndices.clear();
-}

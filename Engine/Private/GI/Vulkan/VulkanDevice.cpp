@@ -30,6 +30,8 @@
 #include "Engine/AbstractEngine.h"
 #include "Utilities/FileManager.h"
 #include <queue>
+#include <fstream>
+#include <filesystem>
 
 //#define VK_NO_PROTOTYPES
 //#include "volk.h"
@@ -552,7 +554,7 @@ bool validate_extensions(const std::vector<const char*>& required, const std::ve
 		if (!found)
 		{
 			// Output an error message for the missing extension
-			Engine::WriteToConsole("Error: Required extension not found: " + *extension_name);
+			Engine::WriteToConsole("Warning: Required extension not found: " + std::string(extension_name));
 			all_found = false;
 		}
 	}
@@ -578,7 +580,7 @@ bool validate_layers(const std::vector<const char*>& required, const std::vector
 
 		if (!found)
 		{
-			Engine::WriteToConsole("Error: Required layer not found: " + *layer_name);
+			Engine::WriteToConsole("Warning: Required layer not found: " + std::string(layer_name));
 			all_found = false;
 		}
 	}
@@ -662,10 +664,234 @@ uint32_t GetQueueFamilyIndex(std::vector<VkQueueFamilyProperties> queue_family_p
 
 	throw std::runtime_error("Could not find a matching queue family index");
 }
-
-VulkanDevice::VulkanDevice(const GPUDeviceCreateInfo& DeviceCreateInfo) 
-	: Super()
+class ScopedSetEnvVar
 {
+public:
+	ScopedSetEnvVar(std::string name)
+		: name(name)
+	{
+		assert(!name.empty());
+	}
+
+	ScopedSetEnvVar(std::string name, std::string value)
+		: name(name)
+	{
+		set(value);
+	}
+
+	~ScopedSetEnvVar()
+	{
+		restore();
+	}
+
+	void set(std::string value)
+	{
+		restore();
+		if (auto ov = getEnv(name.data()))
+		{
+			oldValue = ov;
+		}
+		putEnv((name + std::string("=") + value).c_str());
+	}
+
+	void restore()
+	{
+		if (!oldValue.empty())
+		{
+			putEnv((name + std::string("=") + oldValue).c_str());
+			oldValue.clear();
+		}
+	}
+
+private:
+	void putEnv(const char* env)
+	{
+		// POSIX putenv needs 'env' to live beyond the call
+		envCopy = env;
+
+		[[maybe_unused]] auto r = ::_putenv(envCopy.c_str());
+		assert(r == 0);
+	}
+
+	const char* getEnv(const char* name)
+	{
+		char* pathBuffer = nullptr;
+		size_t bufferSize = 0;
+		::_dupenv_s(&pathBuffer, &bufferSize, name);
+		return pathBuffer;
+	}
+
+	std::string name;
+	std::string oldValue;
+	std::string envCopy;
+};
+
+class ScopedSetIcdFilenames
+{
+public:
+	ScopedSetIcdFilenames() = default;
+	ScopedSetIcdFilenames(const char* driverPath)
+	{
+		std::ofstream fout(icdFileName);
+		assert(fout && "Failed to create generated icd file");
+		fout << R"raw({ "file_format_version": "1.0.0", "ICD": { "library_path": ")raw" << driverPath << R"raw(", "api_version": "1.0.5" } } )raw";
+		fout.close();
+
+		setEnvVar.set(icdFileName);
+	}
+
+	~ScopedSetIcdFilenames()
+	{
+		if (std::filesystem::exists("vk_swiftshader_generated_icd.json"))
+		{
+			//std::filesystem::remove("vk_swiftshader_generated_icd.json");
+		}
+	}
+
+private:
+	static constexpr const char* icdFileName = "vk_swiftshader_generated_icd.json";
+	ScopedSetEnvVar setEnvVar{ "VK_ICD_FILENAMES" };
+};
+
+std::vector<const char*> getDriverPaths()
+{
+	std::vector<const char*> Paths;
+	Paths.push_back("vk_swiftshader.dll");
+	return Paths;
+}
+
+bool fileExists(const char* path)
+{
+	std::ifstream f(path);
+	return f.good();
+}
+
+std::string findDriverPath()
+{
+	for (auto& path : getDriverPaths())
+	{
+		if (fileExists(path))
+			return path;
+	}
+
+#if(OS_LINUX || OS_ANDROID || OS_FUCHSIA)
+	// On Linux-based OSes, the lib path may be resolved by dlopen
+	for (auto& path : getDriverPaths())
+	{
+		auto lib = dlopen(path, RTLD_LAZY | RTLD_LOCAL);
+		if (lib)
+		{
+			char libPath[2048] = { '\0' };
+			dlinfo(lib, RTLD_DI_ORIGIN, libPath);
+			dlclose(lib);
+			return std::string{ libPath } + "/" + path;
+		}
+	}
+#endif
+
+	return {};
+}
+
+std::unique_ptr<vk::detail::DynamicLoader> loadDriver(bool LOAD_SWIFTSHADER_DIRECTLY)
+{
+	auto driverPath = findDriverPath();
+	assert(!driverPath.empty());
+
+	if (LOAD_SWIFTSHADER_DIRECTLY)
+	{
+		return std::make_unique<vk::detail::DynamicLoader>(driverPath);
+	}
+
+	// Load SwiftShader via loader
+
+	// Set VK_ICD_FILENAMES env var so it gets picked up by the loading of the ICD driver
+	auto setIcdFilenames = std::make_unique<ScopedSetIcdFilenames>(driverPath.c_str());
+
+	std::unique_ptr<vk::detail::DynamicLoader> dl;
+#ifndef VULKAN_HPP_NO_EXCEPTIONS
+	try
+	{
+		dl = std::make_unique<vk::detail::DynamicLoader>();
+	}
+	catch (std::exception& ex)
+	{
+		std::cerr << "vk::detail::DynamicLoader exception: " << ex.what() << std::endl;
+		std::cerr << "Falling back to loading SwiftShader directly (i.e. no validation layers)" << std::endl;
+		dl = std::make_unique<vk::detail::DynamicLoader>(driverPath);
+	}
+#else
+	dl = std::make_unique<vk::detail::DynamicLoader>();
+#endif
+
+	return dl;
+}
+
+void* lookup(HMODULE DLL, const char* name)
+{
+	return GetProcAddress((HMODULE)DLL, name);
+}
+
+template<typename T>
+bool lookup(HMODULE DLL, T* ptr, const char* name)
+{
+	void* sym = lookup(DLL, name);
+	if (sym == nullptr)
+	{
+		return false;
+	}
+	*ptr = reinterpret_cast<T>(sym);
+	return true;
+}
+
+VulkanDevice::VulkanDevice(const GPUCreateInfo& DeviceCreateInfo, std::uint32_t InDeviceIndex)
+	: Super()
+	, GPUIndex(DeviceCreateInfo.PrimaryGPU.GPUIndex)
+	, DeviceType(DeviceCreateInfo.PrimaryGPU.DeviceType)
+	, DeviceIndex(InDeviceIndex)
+{
+	//std::unique_ptr<vk::detail::DynamicLoader> dl = loadDriver(true);
+	//assert(dl && dl->success());
+
+	//PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr = dl->getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
+	
+	//auto vkCreateInstance = reinterpret_cast<PFN_vkCreateInstance>(vkGetInstanceProcAddr);
+
+//	VKAPI_ATTR PFN_vkVoidFunction(VKAPI_CALL * vk_icdGetInstanceProcAddr)(VkInstance instance, const char* pName);
+//
+//	HMODULE  dll = LoadLibraryA("vk_swiftshader.dll");
+//	if (!lookup(dll, &vk_icdGetInstanceProcAddr, "vk_icdGetInstanceProcAddr"))
+//	{
+//		// Nope, attempt to use the loader version.
+//		if (!lookup(dll, &vk_icdGetInstanceProcAddr, "vkGetInstanceProcAddr"))
+//		{
+//
+//		}
+//	}
+//
+//#define VK_GLOBAL(N, R, ...)                              \
+//	if(auto pfn = vk_icdGetInstanceProcAddr(nullptr, #N)) \
+//	{                                                     \
+//		N = reinterpret_cast<decltype(N)>(pfn);           \
+//	}
+////#include "VkGlobalFuncs.hpp"
+//#undef VK_GLOBAL
+
+	//VkApplicationInfo appest{
+	//	.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
+	//	.pApplicationName = "Game Engine",
+	//	.pEngineName = "DNGE",
+	//	.apiVersion = VK_MAKE_VERSION(1, 4, 0) };
+	//VkInstanceCreateInfo instance_infotest{
+	//	.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+	//	.pApplicationInfo = &appest,
+	//	//.enabledLayerCount = (uint32_t)requested_validation_layers.size(),
+	//	//.ppEnabledLayerNames = requested_validation_layers.data(),
+	//	//.enabledExtensionCount = (uint32_t)required_instance_extensions.size(),
+	//	//.ppEnabledExtensionNames = required_instance_extensions.data()
+	//};
+
+	//VK_CHECK(vkCreateInstance(&instance_infotest, nullptr, &instance));
+
 	Engine::WriteToConsole("Initializing Vulkan instance.");
 
 	uint32_t instance_extension_count;
@@ -675,26 +901,6 @@ VulkanDevice::VulkanDevice(const GPUDeviceCreateInfo& DeviceCreateInfo)
 	VK_CHECK(vkEnumerateInstanceExtensionProperties(nullptr, &instance_extension_count, available_instance_extensions.data()));
 
 	std::vector<const char*> required_instance_extensions{ VK_KHR_SURFACE_EXTENSION_NAME };
-
-#if defined(VK_DEBUG) || defined(VK_VALIDATION_LAYERS)
-	bool has_debug_utils = false;
-	for (const auto& ext : available_instance_extensions)
-	{
-		if (strncmp(ext.extensionName, VK_EXT_DEBUG_UTILS_EXTENSION_NAME, strlen(VK_EXT_DEBUG_UTILS_EXTENSION_NAME)) == 0)
-		{
-			has_debug_utils = true;
-			break;
-		}
-	}
-	if (has_debug_utils)
-	{
-		required_instance_extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-	}
-	else
-	{
-		Engine::WriteToConsole("{VK_EXT_DEBUG_UTILS_EXTENSION_NAME} is not available; disabling debug utils messenger");
-	}
-#endif
 
 #if defined(VK_USE_PLATFORM_ANDROID_KHR)
 	required_instance_extensions.push_back(VK_KHR_ANDROID_SURFACE_EXTENSION_NAME);
@@ -714,9 +920,40 @@ VulkanDevice::VulkanDevice(const GPUDeviceCreateInfo& DeviceCreateInfo)
 #	pragma error Platform not supported
 #endif
 
-	required_instance_extensions.push_back("VK_KHR_get_surface_capabilities2");
-	if (!validate_extensions(required_instance_extensions, available_instance_extensions))
+#if defined(VK_DEBUG) || defined(VK_VALIDATION_LAYERS)
+	required_instance_extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+	required_instance_extensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
+#endif
+	required_instance_extensions.push_back(VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME);
+	required_instance_extensions.push_back(VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME);
+	//required_instance_extensions.push_back(VK_EXT_DIRECT_MODE_DISPLAY_EXTENSION_NAME);
+	//required_instance_extensions.push_back(VK_KHR_DISPLAY_EXTENSION_NAME);
+	//required_instance_extensions.push_back(VK_EXT_DISPLAY_SURFACE_COUNTER_EXTENSION_NAME);
+	required_instance_extensions.push_back(VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME);
+	required_instance_extensions.push_back(VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_EXTENSION_NAME);
+	required_instance_extensions.push_back(VK_KHR_DEVICE_GROUP_CREATION_EXTENSION_NAME);
+	required_instance_extensions.push_back(VK_KHR_EXTERNAL_FENCE_CAPABILITIES_EXTENSION_NAME);
+	//required_instance_extensions.push_back(VK_KHR_SURFACE_MAINTENANCE_1_EXTENSION_NAME);
+	//required_instance_extensions.push_back(VK_KHR_GET_DISPLAY_PROPERTIES_2_EXTENSION_NAME);
+	//required_instance_extensions.push_back(VK_NV_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME);
+
+	//required_instance_extensions.push_back("VK_KHR_get_surface_capabilities2");
+	bool AllRequiredInstanceExtFound = validate_extensions(required_instance_extensions, available_instance_extensions);
+	if (AllRequiredInstanceExtFound)
 	{
+		bool InstanceExt = true;
+		if (InstanceExt)
+		{
+			Engine::WriteToConsole("Required Instance Extensions:");
+			for (const auto& Ext : required_instance_extensions)
+				Engine::WriteToConsole(Ext);
+		}
+	}
+	else
+	{
+		Engine::WriteToConsole("Required Instance Extensions:");
+		for (const auto& Ext : required_instance_extensions)
+			Engine::WriteToConsole(Ext);
 		throw std::runtime_error("Required instance extensions are missing.");
 	}
 
@@ -734,17 +971,20 @@ VulkanDevice::VulkanDevice(const GPUDeviceCreateInfo& DeviceCreateInfo)
 	requested_validation_layers.insert(requested_validation_layers.end(), optimal_validation_layers.begin(), optimal_validation_layers.end());
 #endif
 
-	if (validate_layers(requested_validation_layers, supported_validation_layers))
+	bool AllRequiredLayersFound = validate_layers(requested_validation_layers, supported_validation_layers);
+	if (AllRequiredLayersFound)
 	{
-		Engine::WriteToConsole("Enabled Validation Layers:");
-		for (const auto& layer : requested_validation_layers)
+		bool PrintLayers = true;
+		if (PrintLayers)
 		{
-			Engine::WriteToConsole("	\t " + *layer);
+			Engine::WriteToConsole("Requested Validation Layers:");
+			for (const auto& layer : requested_validation_layers)
+				Engine::WriteToConsole(layer);
 		}
 	}
 	else
 	{
-		throw std::runtime_error("Required validation layers are missing.");
+		//throw std::runtime_error("Required validation layers are missing.");
 	}
 
 	VkApplicationInfo app{
@@ -763,23 +1003,22 @@ VulkanDevice::VulkanDevice(const GPUDeviceCreateInfo& DeviceCreateInfo)
 
 #if defined(VK_DEBUG) || defined(VK_VALIDATION_LAYERS)
 	VkDebugUtilsMessengerCreateInfoEXT debug_messenger_create_info = { VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT };
-	if (has_debug_utils)
-	{
-		debug_messenger_create_info.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT;
-		debug_messenger_create_info.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT;
-		debug_messenger_create_info.pfnUserCallback = FDebugCallback;
 
-		instance_info.pNext = &debug_messenger_create_info;
-	}
+	debug_messenger_create_info.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT;
+	debug_messenger_create_info.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT;
+	debug_messenger_create_info.pfnUserCallback = FDebugCallback;
+
+	instance_info.pNext = &debug_messenger_create_info;
 #endif
 
 	VK_CHECK(vkCreateInstance(&instance_info, nullptr, &instance));
 	//instance = vk::createInstance(instance_info);
 	//instance = vk::raii::Instance(context, instance_info);
 
-	Viewport = VulkanViewport::CreateUnique(this, static_cast<HWND*>(DeviceCreateInfo.pHWND));
+	//if (bIsPrimaryGPU)
+		Viewport = VulkanViewport::CreateUnique(this, static_cast<HWND*>(DeviceCreateInfo.pHWND));
 
-	bool Result = GetAdapter(DeviceCreateInfo.GPUIndex, PhysicalDevice, FamilyProperties, DeviceProperties);
+	bool Result = GetAdapter(DeviceCreateInfo.PrimaryGPU.GPUIndex, PhysicalDevice, FamilyProperties, DeviceProperties);
 	if (!Result)
 	{
 		std::uint32_t gpu_count = 0;
@@ -793,6 +1032,8 @@ VulkanDevice::VulkanDevice(const GPUDeviceCreateInfo& DeviceCreateInfo)
 		}
 	}
 
+	Engine::WriteToConsole(DeviceProperties.deviceName);
+
 	std::uint32_t device_extension_count;
 	VK_CHECK(vkEnumerateDeviceExtensionProperties(PhysicalDevice, nullptr, &device_extension_count, nullptr));
 
@@ -802,9 +1043,36 @@ VulkanDevice::VulkanDevice(const GPUDeviceCreateInfo& DeviceCreateInfo)
 	// Since this sample has visual output, the device needs to support the swapchain extension
 	std::vector<const char*> required_device_extensions{ VK_KHR_SWAPCHAIN_EXTENSION_NAME };
 	//required_device_extensions.push_back("VK_EXT_full_screen_exclusive");
-	if (!validate_extensions(required_device_extensions, device_extensions))
+	required_device_extensions.push_back("VK_KHR_shader_float16_int8");
+	required_device_extensions.push_back("VK_KHR_16bit_storage");
+	required_device_extensions.push_back("VK_EXT_shader_atomic_float");
+	bool AllRequiredExtFound = validate_extensions(required_device_extensions, device_extensions);
+	if (AllRequiredExtFound)
 	{
-		Engine::WriteToConsole("Required device extensions are missing");
+		bool PrintDeviceExtensions = true;
+		if (PrintDeviceExtensions)
+		{
+			Engine::WriteToConsole("Required Device Extensions:");
+			for (const auto& layer : required_device_extensions)
+				Engine::WriteToConsole(layer);
+		}
+	}
+	else
+	{
+		//throw std::runtime_error("Required required device extensions are missing.");
+	}
+
+	{
+		VkPhysicalDeviceShaderFloat16Int8FeaturesKHR float16Features = {};
+		float16Features.sType = VkStructureType::VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES;
+		float16Features.pNext = VK_NULL_HANDLE;
+
+		VkPhysicalDeviceFeatures2 PhysicalDeviceFeatures = {};
+		PhysicalDeviceFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+		PhysicalDeviceFeatures.pNext = &float16Features;
+		vkGetPhysicalDeviceFeatures2(PhysicalDevice, &PhysicalDeviceFeatures);
+		if (!float16Features.shaderFloat16)
+			Engine::WriteToConsole("16 bit float not supported.");
 	}
 
 	{
@@ -832,7 +1100,6 @@ VulkanDevice::VulkanDevice(const GPUDeviceCreateInfo& DeviceCreateInfo)
 
 	}
 
-	// Enable only specific Vulkan 1.3 features
 	VkPhysicalDeviceExtendedDynamicStateFeaturesEXT enable_extended_dynamic_state_features = {
 		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT,
 		.pNext = VK_NULL_HANDLE,
@@ -845,28 +1112,14 @@ VulkanDevice::VulkanDevice(const GPUDeviceCreateInfo& DeviceCreateInfo)
 		.dynamicRendering = VK_TRUE,
 	};
 
-	/*VkPhysicalDeviceDescriptorIndexingFeatures DescriptorIndexingFeatures{
-		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES,
-		.pNext = &enable_vulkan13_features,
-		.descriptorBindingPartiallyBound = true,
-		.runtimeDescriptorArray = true,
-	};*/
-
 	VkPhysicalDeviceVulkan12Features enable_vulkan12_features = {
 		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
 		.pNext = &enable_vulkan13_features,
-		//.timelineSemaphore = VK_TRUE,
+		.shaderSampledImageArrayNonUniformIndexing = TRUE,
+		.descriptorBindingSampledImageUpdateAfterBind = TRUE,
+		.descriptorBindingPartiallyBound = TRUE,
+		.descriptorBindingVariableDescriptorCount = TRUE,
 	};
-
-	enable_vulkan12_features.descriptorBindingPartiallyBound = true;
-	enable_vulkan12_features.runtimeDescriptorArray = true;
-	enable_vulkan12_features.shaderSampledImageArrayNonUniformIndexing = true;
-	enable_vulkan12_features.descriptorBindingSampledImageUpdateAfterBind = true;
-	enable_vulkan12_features.shaderUniformBufferArrayNonUniformIndexing = true;
-	enable_vulkan12_features.descriptorBindingUniformBufferUpdateAfterBind = true;
-	enable_vulkan12_features.shaderStorageBufferArrayNonUniformIndexing = true;
-	enable_vulkan12_features.descriptorBindingStorageBufferUpdateAfterBind = true;
-	enable_vulkan12_features.descriptorBindingVariableDescriptorCount = true;
 
 	VkPhysicalDevicePushDescriptorPropertiesKHR pushDescriptorProperties{};
 	pushDescriptorProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PUSH_DESCRIPTOR_PROPERTIES_KHR;
@@ -874,7 +1127,16 @@ VulkanDevice::VulkanDevice(const GPUDeviceCreateInfo& DeviceCreateInfo)
 	VkPhysicalDeviceFeatures2 enable_device_features2{
 		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
 		.pNext = &enable_vulkan12_features };
-	// Create the logical device
+
+	/*VkPhysicalDevicePerStageDescriptorSetFeaturesNV perStageFeatures = {
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PER_STAGE_DESCRIPTOR_SET_FEATURES_NV,
+		.perStageDescriptorSet = VK_TRUE,
+	};
+	perStageFeatures.pNext = &enable_device_features2;
+
+	VkPhysicalDeviceDescriptorIndexingFeatures descriptorIndexingFeatures = {};
+	descriptorIndexingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
+	descriptorIndexingFeatures.pNext = &perStageFeatures;*/
 
 	vkGetPhysicalDeviceFeatures2(PhysicalDevice, &enable_device_features2);
 
@@ -882,7 +1144,6 @@ VulkanDevice::VulkanDevice(const GPUDeviceCreateInfo& DeviceCreateInfo)
 
 	float queue_priority = 1.0f;
 
-	// Create one queue
 	VkDeviceQueueCreateInfo queue_info{
 		.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
 		.queueFamilyIndex = static_cast<std::uint32_t>(FamilyProperties.graphicsQueueFamilyIndex),
@@ -910,17 +1171,13 @@ VulkanDevice::VulkanDevice(const GPUDeviceCreateInfo& DeviceCreateInfo)
 		DeviceQueueCreateInfos.push_back(copy_queue_info);
 	}
 
-	//VkPhysicalDeviceFeatures PhysicalDeviceFeatures = {};
-	//PhysicalDeviceFeatures.shaderFloat64 = true;
-	//vkGetPhysicalDeviceFeatures(PhysicalDevice, &PhysicalDeviceFeatures);
-
 	required_device_extensions.push_back(VK_EXT_FULL_SCREEN_EXCLUSIVE_EXTENSION_NAME);
 	//required_device_extensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
 	required_device_extensions.push_back(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
 
 	VkDeviceCreateInfo device_info{
 		.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-		.pNext = &enable_device_features2,
+		.pNext = &enable_vulkan12_features,
 		.queueCreateInfoCount = (std::uint32_t)DeviceQueueCreateInfos.size(),
 		.pQueueCreateInfos = DeviceQueueCreateInfos.data(),
 		.enabledExtensionCount = (std::uint32_t)(required_device_extensions.size()),
@@ -942,10 +1199,7 @@ VulkanDevice::VulkanDevice(const GPUDeviceCreateInfo& DeviceCreateInfo)
 #endif
 
 #if defined(VK_DEBUG) || defined(VK_VALIDATION_LAYERS)
-	if (has_debug_utils)
-	{
-		VK_CHECK(vkCreateDebugUtilsMessengerEXT(instance, &debug_messenger_create_info, nullptr, &debug_callback));
-	}
+	VK_CHECK(vkCreateDebugUtilsMessengerEXT(instance, &debug_messenger_create_info, nullptr, &debug_callback));
 	s_vkSetDebugUtilsObjectName = (PFN_vkSetDebugUtilsObjectNameEXT)vkGetDeviceProcAddr(Device, "vkSetDebugUtilsObjectNameEXT");
 	s_vkCmdBeginDebugUtilsLabel = (PFN_vkCmdBeginDebugUtilsLabelEXT)vkGetDeviceProcAddr(Device, "vkCmdBeginDebugUtilsLabelEXT");
 	s_vkCmdEndDebugUtilsLabel = (PFN_vkCmdEndDebugUtilsLabelEXT)vkGetDeviceProcAddr(Device, "vkCmdEndDebugUtilsLabelEXT");
@@ -955,7 +1209,6 @@ VulkanDevice::VulkanDevice(const GPUDeviceCreateInfo& DeviceCreateInfo)
 
 	{
 		BindlessDescriptorPool = VulkanBindlessDescriptorPool::CreateUnique(this);
-		PushDescriptorPool = VulkanPushDescriptorPool::CreateUnique(this);
 	}
 	{
 		ShaderCompiler = DXCShaderCompiler::CreateUnique();
@@ -983,7 +1236,6 @@ VulkanDevice::~VulkanDevice()
 	Viewport = nullptr;
 
 	BindlessDescriptorPool = nullptr;
-	PushDescriptorPool = nullptr;
 
 	IMCommandBuffer = nullptr;
 	CommandPoolManager = nullptr;
@@ -995,12 +1247,14 @@ VulkanDevice::~VulkanDevice()
 
 void VulkanDevice::InitWindow(void* InHWND, std::uint32_t InWidth, std::uint32_t InHeight, bool bFullscreen)
 {
-	Viewport->InitWindow(static_cast<HWND*>(InHWND), InWidth, InHeight, bFullscreen);
+	if (IsPrimaryGPU())
+		Viewport->InitWindow(static_cast<HWND*>(InHWND), InWidth, InHeight, bFullscreen);
 }
 
 void VulkanDevice::BeginFrame()
 {
-	Viewport->BeginFrame();
+	if (IsPrimaryGPU())
+		Viewport->BeginFrame();
 }
 
 bool VulkanDevice::GetAdapter(std::optional<short> Index, VkPhysicalDevice& GPU, QueueFamilyProperties& FamilyProperties, VkPhysicalDeviceProperties& properties) const
@@ -1108,22 +1362,44 @@ bool VulkanDevice::GetAdapter(std::optional<short> Index, VkPhysicalDevice& GPU,
 
 void VulkanDevice::Present(IRenderTarget* pRT)
 {
-	Viewport->Present(pRT);
+	if (IsPrimaryGPU())
+		Viewport->Present(pRT);
 }
 
 bool VulkanDevice::IsFullScreen() const
 {
-	return Viewport->IsFullScreen();
+	if (IsPrimaryGPU())
+		return Viewport->IsFullScreen();
+	return false;
 }
 
 bool VulkanDevice::IsVsyncEnabled() const
 {
-	return Viewport->IsVsyncEnabled();
+	if (IsPrimaryGPU())
+		return Viewport->IsVsyncEnabled();
+	return false;
 }
 
 std::uint32_t VulkanDevice::GetVsyncInterval() const
 {
-	return Viewport->GetVsyncInterval();
+	if (IsPrimaryGPU())
+		return Viewport->GetVsyncInterval();
+	return -1;
+}
+
+void VulkanDevice::GPUFlush()
+{
+
+}
+
+void VulkanDevice::WaitForGPU()
+{
+
+}
+
+void VulkanDevice::WaitForCPU()
+{
+
 }
 
 uint32_t VulkanDevice::GetMemoryType(uint32_t type_filter, VkMemoryPropertyFlags properties)
@@ -1155,22 +1431,26 @@ uint32_t VulkanDevice::GetMemoryType(uint32_t type_filter, VkMemoryPropertyFlags
 
 void VulkanDevice::ResizeWindow(std::size_t Width, std::size_t Height)
 {
-	Viewport->ResizeSwapChain(Width, Height);
+	if (IsPrimaryGPU())
+		Viewport->ResizeSwapChain(Width, Height);
 }
 
 void VulkanDevice::FullScreen(const bool value)
 {
-	Viewport->FullScreen(value);
+	if (IsPrimaryGPU())
+		Viewport->FullScreen(value);
 }
 
 void VulkanDevice::Vsync(const bool value)
 {
-	Viewport->Vsync(value);
+	if (IsPrimaryGPU())
+		Viewport->Vsync(value);
 }
 
 void VulkanDevice::VsyncInterval(const std::uint32_t value)
 {
-	Viewport->VsyncInterval(value);
+	if (IsPrimaryGPU())
+		Viewport->VsyncInterval(value);
 }
 
 std::vector<sDisplayMode> VulkanDevice::GetAllSupportedResolutions() const
@@ -1221,17 +1501,39 @@ std::vector<sDisplayMode> VulkanDevice::GetAllSupportedResolutions() const
 
 sScreenDimension VulkanDevice::GetBackBufferDimension() const
 {
-	return Viewport->GetScreenDimension();
+	if (IsPrimaryGPU())
+		return Viewport->GetScreenDimension();
+	return sScreenDimension();
 }
 
 EFormat VulkanDevice::GetBackBufferFormat() const
 {
-	return Viewport->GetFormat();
+	if (IsPrimaryGPU())
+		return Viewport->GetFormat();
+	return EFormat::UNKNOWN;
 }
 
 sViewport VulkanDevice::GetViewport() const
 {
-	return Viewport->GetViewport();
+	if (IsPrimaryGPU())
+		return Viewport->GetViewport();
+	return sViewport();
+}
+
+std::uint32_t VulkanDevice::GetBackBufferSize() const
+{
+	if (!Viewport)
+		return std::uint32_t(-1);
+
+	return Viewport->GetBackBufferCount();
+}
+
+std::uint32_t VulkanDevice::GetCurrentBackBufferIndex() const
+{
+	if (!Viewport)
+		return std::uint32_t(-1);
+
+	return Viewport->GetCurrentBackBufferIndex();
 }
 
 void VulkanDevice::SetPerfMarkerBegin(VkCommandBuffer cmd_buf, const char* name)
@@ -1446,11 +1748,6 @@ void VulkanDevice::ResetCommandBuffer(VkCommandBuffer CommandBuffer)
 	CommandBufferManager->ResetCommandBuffer(CommandBuffer);
 }
 
-VkDescriptorSetLayout VulkanDevice::GetPushDescriptorSetLayout() const
-{
-	return PushDescriptorPool->GetDescriptorSetLayout();
-}
-
 VkDescriptorSetLayout VulkanDevice::GetBindlessDescriptorSetLayout() const
 {
 	return BindlessDescriptorPool->GetDescriptorSetLayout();
@@ -1491,7 +1788,7 @@ void VulkanDevice::RecycleFence(VkFence Fence)
 	SyncManager->RecycleFence(Fence);
 }
 
-IShader* VulkanDevice::CompileShader(const sShaderAttachment& Attachment, bool Spirv)
+IShader* VulkanDevice::CompileVkShader(const sShaderAttachment& Attachment, bool Spirv)
 {
 	if (sShaderManager::Get().IsShaderExist(Attachment.GetLocation(), Attachment.FunctionName))
 		return sShaderManager::Get().GetShader(Attachment.GetLocation(), Attachment.FunctionName);
@@ -1502,7 +1799,7 @@ IShader* VulkanDevice::CompileShader(const sShaderAttachment& Attachment, bool S
 	return pShader.get();
 }
 
-IShader* VulkanDevice::CompileShader(std::wstring InSrcFile, std::string InFunctionName, eShaderType InProfile, bool Spirv, std::vector<sShaderDefines> InDefines)
+IShader* VulkanDevice::CompileVkShader(std::wstring InSrcFile, std::string InFunctionName, eShaderType InProfile, bool Spirv, std::vector<sShaderDefines> InDefines)
 {
 	if (sShaderManager::Get().IsShaderExist(InSrcFile, InFunctionName))
 		return sShaderManager::Get().GetShader(InSrcFile, InFunctionName);
@@ -1513,7 +1810,7 @@ IShader* VulkanDevice::CompileShader(std::wstring InSrcFile, std::string InFunct
 	return pShader.get();
 }
 
-IShader* VulkanDevice::CompileShader(const void* InCode, std::size_t Size, std::string InFunctionName, eShaderType InProfile, bool Spirv, std::vector<sShaderDefines> InDefines)
+IShader* VulkanDevice::CompileVkShader(const void* InCode, std::size_t Size, std::string InFunctionName, eShaderType InProfile, bool Spirv, std::vector<sShaderDefines> InDefines)
 {
 	if (sShaderManager::Get().IsShaderExist(L"", InFunctionName))
 		return sShaderManager::Get().GetShader(L"", InFunctionName);
@@ -1522,6 +1819,39 @@ IShader* VulkanDevice::CompileShader(const void* InCode, std::size_t Size, std::
 	//IShader::SharedPtr pShader = pShaderCompiler->Compile(InCode, Size, InFunctionName, InProfile, InDefines);
 	sShaderManager::Get().StoreShader(pShader);
 	return pShader.get();
+}
+
+IShader::SharedPtr VulkanDevice::CompileShader(const sShaderAttachment& Attachment)
+{
+	if (sShaderManager::Get().IsShaderExist(Attachment.GetLocation(), Attachment.FunctionName))
+		return sShaderManager::Get().GetShaderAsShared(Attachment.GetLocation(), Attachment.FunctionName);
+
+	IShader::SharedPtr pShader = ShaderCompiler->Compile(Attachment, true);
+	//IShader::SharedPtr pShader = pShaderCompiler->Compile(Attachment);
+	sShaderManager::Get().StoreShader(pShader);
+	return pShader;
+}
+
+IShader::SharedPtr VulkanDevice::CompileShader(std::wstring InSrcFile, std::string InFunctionName, eShaderType InProfile, std::vector<sShaderDefines> InDefines)
+{
+	if (sShaderManager::Get().IsShaderExist(InSrcFile, InFunctionName))
+		return sShaderManager::Get().GetShaderAsShared(InSrcFile, InFunctionName);
+
+	IShader::SharedPtr pShader = ShaderCompiler->Compile(InSrcFile, InFunctionName, InProfile, true, InDefines);
+	//IShader::SharedPtr pShader = pShaderCompiler->Compile(InSrcFile, InFunctionName, InProfile, InDefines);
+	sShaderManager::Get().StoreShader(pShader);
+	return pShader;
+}
+
+IShader::SharedPtr VulkanDevice::CompileShader(const void* InCode, std::size_t Size, std::string InFunctionName, eShaderType InProfile, std::vector<sShaderDefines> InDefines)
+{
+	if (sShaderManager::Get().IsShaderExist(L"", InFunctionName))
+		return sShaderManager::Get().GetShaderAsShared(L"", InFunctionName);
+
+	IShader::SharedPtr pShader = ShaderCompiler->Compile(InCode, Size, InFunctionName, InProfile, true, InDefines);
+	//IShader::SharedPtr pShader = pShaderCompiler->Compile(InCode, Size, InFunctionName, InProfile, InDefines);
+	sShaderManager::Get().StoreShader(pShader);
+	return pShader;
 }
 
 IGraphicsCommandContext::SharedPtr VulkanDevice::CreateGraphicsCommandContext()
@@ -1584,6 +1914,36 @@ IIndexBuffer::UniquePtr VulkanDevice::CreateUniqueIndexBuffer(std::string InName
 	return VulkanIndexBuffer::CreateUnique(this, InName, InDesc, InSubresource);
 }
 
+IByteAddressBuffer::SharedPtr VulkanDevice::CreateByteAddressBuffer(std::string InName, std::uint64_t Size, bool bReadWriteAllowed)
+{
+	return nullptr;
+}
+
+IByteAddressBuffer::UniquePtr VulkanDevice::CreateUniqueByteAddressBuffer(std::string InName, std::uint64_t Size, bool bReadWriteAllowed)
+{
+	return nullptr;
+}
+
+IStructuredBuffer::SharedPtr VulkanDevice::CreateStructuredBuffer(std::string InName, const BufferLayout& InDesc, bool bSRVAllowed)
+{
+	return nullptr;
+}
+
+IStructuredBuffer::UniquePtr VulkanDevice::CreateUniqueStructuredBuffer(std::string InName, const BufferLayout& InDesc, bool bSRVAllowed)
+{
+	return nullptr;
+}
+
+IIndirectBuffer::SharedPtr VulkanDevice::CreateIndirectBuffer(std::string InName, BufferLayout NewLayout)
+{
+	return IIndirectBuffer::SharedPtr();
+}
+
+IIndirectBuffer::UniquePtr VulkanDevice::CreateUniqueIndirectBuffer(std::string InName, BufferLayout NewLayout)
+{
+	return IIndirectBuffer::UniquePtr();
+}
+
 IFrameBuffer::SharedPtr VulkanDevice::CreateFrameBuffer(const std::string InName, const sFrameBufferAttachmentInfo& InAttachments)
 {
 	return VulkanFrameBuffer::Create(this, InName, InAttachments);
@@ -1592,6 +1952,16 @@ IFrameBuffer::SharedPtr VulkanDevice::CreateFrameBuffer(const std::string InName
 IFrameBuffer::UniquePtr VulkanDevice::CreateUniqueFrameBuffer(const std::string InName, const sFrameBufferAttachmentInfo& InAttachments)
 {
 	return VulkanFrameBuffer::CreateUnique(this, InName, InAttachments);
+}
+
+ISamplerState::SharedPtr VulkanDevice::CreateSamplerState(const std::string InName, const sSamplerAttributeDesc& InDesc)
+{
+	return VulkanSamplerState::Create(this, InName, InDesc);
+}
+
+ISamplerState::UniquePtr VulkanDevice::CreateUniqueSamplerState(const std::string InName, const sSamplerAttributeDesc& InDesc)
+{
+	return VulkanSamplerState::CreateUnique(this, InName, InDesc);
 }
 
 IRenderTarget::SharedPtr VulkanDevice::CreateRenderTarget(const std::string InName, const EFormat Format, const sFBODesc& Desc)

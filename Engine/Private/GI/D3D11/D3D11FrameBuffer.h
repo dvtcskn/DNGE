@@ -52,7 +52,13 @@ public:
 	virtual bool IsSRV_Allowed() const override final { return ShaderResource != nullptr; }
 	virtual bool IsUAV_Allowed() const override final { return UnorderedAccessView != nullptr; }
 
+	virtual std::uint32_t GetSRVBindlessIndex() const override final { return std::uint32_t(-1); }
+	virtual std::uint32_t GetUAVBindlessIndex() const override final { return std::uint32_t(-1); }
+
 	EFormat GetFormat() const { return Format; }
+
+	virtual ResourceSharedHandle* GetSharedHandle() const override final { return nullptr; }
+	virtual bool CopyFrom(IRenderTarget* RenderTarget) override final { return false; }
 
 private:
 	std::string Name;
@@ -86,6 +92,9 @@ public:
 
 	EFormat GetFormat() const { return Format; }
 
+	virtual ResourceSharedHandle* GetSharedHandle() const override final { return nullptr; }
+	virtual bool CopyFrom(IDepthTarget* DepthTarget) override final { return false; }
+
 private:
 	std::string Name;
 	EFormat Format;
@@ -116,7 +125,13 @@ public:
 	bool IsSRVSupported() const { return bIsSRVSupported; }
 	virtual bool IsSRV_Allowed() const override final { return bIsSRVSupported; }
 
+	virtual std::uint32_t GetSRVBindlessIndex() const override final { return std::uint32_t(-1); }
+	virtual std::uint32_t GetUAVBindlessIndex() const override final { return std::uint32_t(-1); }
+
 	EFormat GetFormat() const { return Format; }
+
+	virtual ResourceSharedHandle* GetSharedHandle() const override final { return nullptr; }
+	virtual bool CopyFrom(IUnorderedAccessTarget* UnorderedAccessTarget) override final { return false; }
 
 private:
 	std::string Name;
@@ -204,6 +219,8 @@ public:
 
 	virtual IDepthTarget* GetDepthTarget() const override final { return DepthTarget.get(); }
 	virtual void SetDepthTarget(const IDepthTarget::SharedPtr& DepthTarget) override final;
+
+	virtual bool CopyFrom(IFrameBuffer* FrameBuffer) override final;
 
 	void ApplyFrameBuffer(IGraphicsCommandContext* InCMDBuffer = nullptr, std::optional<std::size_t> FBOIndex = std::nullopt);
 	void ApplyFrameBuffer(ID3D11DeviceContext1* InCMDBuffer = nullptr, std::optional<std::size_t> FBOIndex = std::nullopt);

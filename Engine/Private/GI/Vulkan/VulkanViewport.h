@@ -45,13 +45,14 @@ public:
 
 	void FullScreen(const bool value);
 	void Vsync(const bool value);
-	void VsyncInterval(const std::size_t value);
+	void VsyncInterval(const std::uint32_t value);
 
 	bool IsFullScreen() const { return bIsFullScreen; }
 	bool IsVsyncEnabled() const { return bVSYNC; }
-	std::size_t GetVsyncInterval() const { return Vsync_Interval; }
+	std::uint32_t GetVsyncInterval() const { return Vsync_Interval; }
 
 	FORCEINLINE std::uint32_t GetBackBufferCount() const { return (std::uint32_t)SwapchainImages.size(); }
+	FORCEINLINE std::uint32_t GetCurrentBackBufferIndex() const { return FrameIndex; }
 
 	FORCEINLINE const sViewport& GetViewport() { return Viewport; }
 	FORCEINLINE std::uint32_t GetViewportWidth() const { return SizeX; }
@@ -104,7 +105,7 @@ private:
 
 	bool bIsFullScreen;
 	bool bVSYNC;
-	std::int32_t Vsync_Interval;
+	std::uint32_t Vsync_Interval;
 	VkSurfaceFullScreenExclusiveInfoEXT      surface_full_screen_exclusive_info_EXT;
 	VkSurfaceFullScreenExclusiveWin32InfoEXT surface_full_screen_exclusive_Win32_info_EXT;
 

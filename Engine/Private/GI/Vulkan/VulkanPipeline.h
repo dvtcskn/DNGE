@@ -58,6 +58,9 @@ public:
 		return Compiled;
 	}
 
+	virtual ERenderPass GetRenderPass() const override final { return Desc.RenderPass; }
+	virtual IRootSignature* GetRootSignature() const override final { return nullptr; }
+	virtual bool IsIndirectCommandAvailable() const override final { return false; }
 	virtual bool Compile(IFrameBuffer* FrameBuffer = nullptr) override final;
 	virtual bool Compile(IRenderTarget* RT, IDepthTarget* Depth = nullptr) override final;
 	virtual bool Compile(std::vector<IRenderTarget*> RTs, IDepthTarget* Depth = nullptr) override final;

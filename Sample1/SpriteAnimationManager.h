@@ -44,12 +44,12 @@ struct sSpriteAnimationGraph
 
 struct sAnimFunc
 {
-	std::size_t Frame;
+	std::uint32_t Frame;
 	EAnimationState State;
 	std::function<void()> fOnFrame;
 
 	sAnimFunc() = default;
-	sAnimFunc(std::size_t InFrame, EAnimationState InState, std::function<void()> InfOnFrame)
+	sAnimFunc(std::uint32_t InFrame, EAnimationState InState, std::function<void()> InfOnFrame)
 		: Frame(InFrame)
 		, State(InState)
 		, fOnFrame(InfOnFrame)
@@ -80,7 +80,7 @@ public:
 
 	bool IsFlipped() const;
 
-	void BindFunctionOnAnimationFrame(std::string Name, std::size_t Frame, EAnimationState State, std::function<void()> fOnFrame);
+	void BindFunctionOnAnimationFrame(std::string Name, std::uint32_t Frame, EAnimationState State, std::function<void()> fOnFrame);
 
 	std::map<std::string, sAnimFunc> States;
 

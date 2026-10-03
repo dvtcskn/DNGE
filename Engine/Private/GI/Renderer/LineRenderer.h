@@ -25,16 +25,15 @@
 */
 #pragma once
 
-#include "IRenderer.h"
 #include "AbstractGI/Material.h"
 #include "AbstractGI/UIMaterialStyle.h"
 #include "Gameplay/ICanvas.h"
 #include "Utilities/Input.h"
 #include "Gameplay/CameraManager.h"
 
-class sLineRenderer : public IRenderer
+class sLineRenderer : public IRenderPass
 {
-	sClassBody(sClassConstructor, sLineRenderer, IRenderer)
+	sClassBody(sClassConstructor, sLineRenderer, IRenderPass)
 private:
 	struct sLineVertexBufferEntry
 	{
@@ -51,7 +50,7 @@ private:
 	{
 		enum class ELineType
 		{
-			eLine,
+			Line,
 			eBound,
 		};
 		struct LinesVertexData
@@ -83,8 +82,8 @@ public:
 	virtual void BeginPlay() override final;
 	virtual void Tick(const double DeltaTime) override final;
 
-	void Render(IRenderTarget* BackBuffer, IConstantBuffer* CameraCB, ICamera* pCamera, std::optional<sViewport> Viewport);
-	void Render(IGraphicsCommandContext* CMD, bool Exec, IRenderTarget* BackBuffer, IConstantBuffer* CameraCB, ICamera* pCamera, std::optional<sViewport> Viewport);
+	void Render(IRenderTarget* BackBuffer, std::uint32_t CameraBindlessIndex, std::optional<sViewport> Viewport);
+	void Render(IGraphicsCommandContext* CMD, bool Exec, IRenderTarget* BackBuffer, std::uint32_t CameraBindlessIndex, std::optional<sViewport> Viewport);
 
 	virtual void SetRenderSize(std::size_t Width, std::size_t Height) override final;
 	virtual void OnInputProcess(const GMouseInput& MouseInput, const GKeyboardChar& KeyboardChar) override final;
@@ -97,7 +96,7 @@ private:
 
 	IGraphicsCommandContext::SharedPtr GraphicsCommandContext;
 	sMaterial::SharedPtr DefaultEngineMat;
-	sMaterial::sMaterialInstance::SharedPtr DefaultMatInstance;
+	sMaterialInstance::SharedPtr DefaultMatInstance;
 
 	IVertexBuffer::SharedPtr VertexBuffer;
 

@@ -63,9 +63,9 @@ private:
 
 		virtual sObjectDrawParameters GetDrawParameters() const override final { return Owner->Sprite->GetDrawParameters(); }
 
-		virtual std::vector<sMaterial::sMaterialInstance*> GetMaterialInstances() const override final { return std::vector<sMaterial::sMaterialInstance*>{Owner->Sprite->GetMaterialInstance()}; }
+		virtual std::vector<sMaterialInstance*> GetMaterialInstances() const override final { return std::vector<sMaterialInstance*>{Owner->Sprite->GetMaterialInstance()}; }
 		virtual std::int32_t GetNumMaterials() const override final { return 1; }
-		virtual sMaterial::sMaterialInstance* GetMaterialInstance(/*std::int32_t Index = 0*/) const override final { return Owner->Sprite->GetMaterialInstance(); }
+		virtual sMaterialInstance* GetMaterialInstance(/*std::int32_t Index = 0*/) const override final { return Owner->Sprite->GetMaterialInstance(); }
 		virtual std::string GetMaterialName(/*std::int32_t Index = 0*/) const override final { return Owner->Sprite->GetMaterialInstance()->GetName(); }
 
 		virtual void Serialize(sArchive& archive) override {}

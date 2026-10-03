@@ -26,28 +26,333 @@
 
 #include "pch.h"
 #include "AbstractGI/Material.h"
+#include "AbstractGI/TextureManager.h"
 
-void sMaterial::sMaterialInstance::AddTexture(const ITexture2D::SharedPtr& Texture)
+MaterialInstanceBindlessHandle::~MaterialInstanceBindlessHandle()
 {
-	Textures.push_back(Texture);
+	Release();
 }
 
-void sMaterial::sMaterialInstance::AddTexture(std::wstring InPath, std::string InName, std::uint32_t DefaultRootParameterIndex)
+void MaterialInstanceBindlessHandle::Release()
 {
-	Textures.push_back(ITexture2D::Create(InPath, InName, DefaultRootParameterIndex));
+	if (!Owner.expired())
+	{
+		if (std::shared_ptr<sMaterialInstanceContainer> PTR = Owner.lock())
+			PTR->Free(this);
+	}
+
+	Owner.reset();
+
+	StructureIndex = std::uint32_t(-1);
+	BindlessIndex = std::uint32_t(-1);
 }
 
-void sMaterial::sMaterialInstance::AddTexture(std::string InName, void* InData, size_t InSize, sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex)
+void MaterialInstanceBindlessHandle::UpdateMaterialInstanceDescriptor(const IMaterialInstanceDescriptor* Data)
 {
-	Textures.push_back(ITexture2D::Create(Name + "_" + std::to_string(Textures.size()), InData, InSize, InDesc, DefaultRootParameterIndex));
+	if (!Owner.expired())
+	{
+		if (std::shared_ptr<sMaterialInstanceContainer> PTR = Owner.lock())
+			PTR->UpdateMaterialInstanceDescriptor(this, Data);
+	}
 }
 
-void sMaterial::sMaterialInstance::BindConstantBuffer(IConstantBuffer::SharedPtr InCB)
+sMaterialInstance::sMaterialInstance(sMaterial* InParent, std::string& InName)
+	: Parent(InParent)
+	, Name(InName)
+	, Path(InName)
+	, Handle(MaterialInstanceBindlessHandle(eMaterialLayoutType::Default))
+	, BindingLayout(new sMaterialBindingDefaultLayout())
 {
-	ConstantBuffers.push_back(InCB);
+	sMaterialInstanceContainerManager::Get().AllocateMaterialInstanceDescriptor(&Handle);
 }
 
-IConstantBuffer::SharedPtr sMaterial::sMaterialInstance::GetConstantBuffer(std::string Name) const
+bool sMaterialInstance::IsCompiled() const 
+{
+	return Parent->IsCompiled();
+}
+
+bool sMaterialInstance::Compile(IFrameBuffer* FrameBuffer)
+{
+	return Parent->Compile(FrameBuffer);
+}
+
+bool sMaterialInstance::Compile(IRenderTarget* RT, IDepthTarget* Depth)
+{
+	return Parent->Compile(RT, Depth);
+}
+
+bool sMaterialInstance::Compile(std::vector<IRenderTarget*> RTs, IDepthTarget* Depth)
+{
+	return Parent->Compile(RTs, Depth);
+}
+
+void sMaterialInstance::ApplyMaterialInstance(IGraphicsCommandContext* InCMDBuffer) const
+{
+	//if (GPU::IsBindlessRendererEnabled())
+	//{
+
+	//}
+	//else
+	//{
+	//	//std::uint32_t i = 0;
+	//	for (auto& Texture : Textures)
+	//	{
+	//		InCMDBuffer->SetTexture2D(Texture.get()/*, Texture->GetDefaultRootParameterIndex() + i*/);
+	//		//i++;
+	//	}
+
+	//	for (auto& ConstantBuffer : ConstantBuffers)
+	//	{
+	//		InCMDBuffer->SetConstantBuffer(ConstantBuffer.get());
+	//	}
+
+	//	for (auto& UAV : UnorderedAccessBuffers)
+	//	{
+	//		InCMDBuffer->SetUnorderedAccessBufferAsResource(UAV.get());
+	//	}
+	//}
+}
+
+void sMaterialInstance::SetMaterialInstanceBindingLayout(IMaterialBindingLayout* NewBindingLayout)
+{
+	if (!NewBindingLayout)
+		return;
+
+	MaterialInstanceAttributes Attributes;
+	if (BindingLayout)
+	{
+		Attributes = BindingLayout->GetAttributes();
+		delete BindingLayout;
+	}
+	BindingLayout = NewBindingLayout;
+	BindingLayout->SetAttributes(Attributes);
+
+	Handle.Release();
+	Handle = MaterialInstanceBindlessHandle(BindingLayout->GetLayoutType());
+	sMaterialInstanceContainerManager::Get().AllocateMaterialInstanceDescriptor(&Handle);
+
+	for (std::size_t i = 0; i < Textures.size(); i++)
+	{
+		auto Texture = Textures[i];
+		if (BindingLayout->AddTextureBinding(i, Texture->GetBindlessIndex()))
+		{
+			Handle.UpdateMaterialInstanceDescriptor(BindingLayout->GetDescriptor());
+		}
+		else
+		{
+			Engine::WriteToConsole("Material Binding Layout size too small, couldn't add Texture Binding.");
+			break;
+		}
+	}
+
+	for (std::size_t i = 0; i < ConstantBuffers.size(); i++)
+	{
+		auto ConstantBuffer = ConstantBuffers[i];
+		if (BindingLayout->AddConstantBufferBinding(i, ConstantBuffer->GetBindlessIndex()))
+		{
+			Handle.UpdateMaterialInstanceDescriptor(BindingLayout->GetDescriptor());
+		}
+		else
+		{
+			Engine::WriteToConsole("Material Binding Layout size too small, couldn't add Constant Buffer Binding.");
+			break;
+		}
+	}
+
+	for (std::size_t i = 0; i < UnorderedAccessBuffers.size(); i++)
+	{
+		auto UAV = UnorderedAccessBuffers[i];
+		if (BindingLayout->AddUAVBinding(i, UAV->GetBindlessIndex()))
+		{
+			Handle.UpdateMaterialInstanceDescriptor(BindingLayout->GetDescriptor());
+		}
+		else
+		{
+			Engine::WriteToConsole("Material Binding Layout size too small, couldn't add UAV Binding.");
+			break;
+		}
+	}
+}
+
+std::uint32_t sMaterialInstance::GetStructureId() const
+{
+	return Handle.GetBindlessStructureIndex();
+}
+
+std::uint32_t sMaterialInstance::GetId() const
+{
+	//std::hash<std::string> StringHasher;
+	//return StringHasher(Name);
+	return Handle.GetBindlessIndex();
+}
+
+ERenderPass sMaterialInstance::GetRenderPass() const
+{
+	return Parent->GetRenderPass();
+}
+
+bool sMaterialInstance::AddTexture(const ITexture2D::SharedPtr& Texture)
+{
+	if (!BindingLayout || !Texture)
+		return false;
+	if (BindingLayout->AddTextureBinding((std::uint32_t)Textures.size(), Texture->GetBindlessIndex()))
+	{
+		Textures.push_back(Texture);
+		Handle.UpdateMaterialInstanceDescriptor(BindingLayout->GetDescriptor());
+		return true;
+	}
+	return false;
+}
+
+bool sMaterialInstance::AddTexture(std::wstring InPath, std::string InName, std::uint32_t DefaultRootParameterIndex)
+{
+	if (!BindingLayout)
+		return false;
+	auto Texture = ITexture2D::Create(InPath, InName, DefaultRootParameterIndex);
+	if (!Texture)
+		return false;
+	if (BindingLayout->AddTextureBinding((std::uint32_t)Textures.size(), Texture->GetBindlessIndex()))
+	{
+		Textures.push_back(Texture);
+		Handle.UpdateMaterialInstanceDescriptor(BindingLayout->GetDescriptor());
+		return true;
+	}
+	else
+	{
+		Texture = nullptr;
+		sTextureManager::Get().DestroyTexture(InPath, InName);
+		return false;
+	}
+
+	return true;
+}
+
+bool sMaterialInstance::AddTexture(std::string InName, void* InData, size_t InSize, sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex)
+{
+	if (!BindingLayout)
+		return false;
+	auto Texture = ITexture2D::Create(Name + "_" + std::to_string(Textures.size()), InData, InSize, InDesc, DefaultRootParameterIndex);
+	if (!Texture)
+		return false;
+	if (BindingLayout->AddTextureBinding((std::uint32_t)Textures.size(), Texture->GetBindlessIndex()))
+	{
+		Textures.push_back(Texture);
+		Handle.UpdateMaterialInstanceDescriptor(BindingLayout->GetDescriptor());
+		return true;
+	}
+	else
+	{
+		Texture = nullptr;
+		return false;
+	}
+	return false;
+}
+
+bool sMaterialInstance::AddSampler(const ISamplerState::SharedPtr& Sampler)
+{
+	if (!BindingLayout || !Sampler)
+		return false;
+	if (BindingLayout->AddSamplerBinding((std::uint32_t)Samplers.size(), Sampler->GetBindlessIndex()))
+	{
+		Samplers.push_back(Sampler);
+		Handle.UpdateMaterialInstanceDescriptor(BindingLayout->GetDescriptor());
+		return true;
+	}
+	return false;
+}
+
+bool sMaterialInstance::AddSampler(const sSamplerAttributeDesc& Desc)
+{
+	if (!BindingLayout)
+		return false;
+	auto Sampler = ISamplerState::Create(Name + "_Sampler_" + std::to_string(Samplers.size()), Desc);
+	if (!Sampler)
+		return false;
+	if (BindingLayout->AddSamplerBinding((std::uint32_t)Samplers.size(), Sampler->GetBindlessIndex()))
+	{
+		Samplers.push_back(Sampler);
+		Handle.UpdateMaterialInstanceDescriptor(BindingLayout->GetDescriptor());
+		return true;
+	}
+	else
+	{
+		Sampler = nullptr;
+	}
+	return false;
+}
+
+bool sMaterialInstance::AddSampler(std::uint32_t Index, std::uint32_t BindlessIndex)
+{
+	if (!BindingLayout)
+		return false;
+	if (BindingLayout->AddSamplerBinding(Index, BindlessIndex))
+	{
+		Handle.UpdateMaterialInstanceDescriptor(BindingLayout->GetDescriptor());
+		return true;
+	}
+	return false;
+}
+
+bool sMaterialInstance::SetAttributes(MaterialInstanceAttributes Attributes)
+{
+	if (!BindingLayout)
+		return false;
+
+	if (BindingLayout->SetAttributes(Attributes))
+	{
+		Handle.UpdateMaterialInstanceDescriptor(BindingLayout->GetDescriptor());
+		return true;
+	}
+	return false;
+}
+
+std::vector<std::uint32_t> sMaterialInstance::GetTextureHeapIndices() const
+{
+	std::vector<std::uint32_t> Indices;
+	for (const auto& Texture : Textures)
+	{
+		Indices.push_back(Texture->GetBindlessIndex());
+	}
+	return Indices;
+}
+
+std::vector<std::uint32_t> sMaterialInstance::GetConstantBufferHeapIndices() const
+{
+	std::vector<std::uint32_t> Indices;
+	for (const auto& ConstantBuffer : ConstantBuffers)
+	{
+		Indices.push_back(ConstantBuffer->GetBindlessIndex());
+	}
+	return Indices;
+}
+
+bool sMaterialInstance::BindConstantBuffer(IConstantBuffer::SharedPtr InCB)
+{
+	if (!BindingLayout || !InCB)
+		return false;
+	if (BindingLayout->AddConstantBufferBinding((std::uint32_t)ConstantBuffers.size(), InCB->GetBindlessIndex()))
+	{
+		ConstantBuffers.push_back(InCB);
+		Handle.UpdateMaterialInstanceDescriptor(BindingLayout->GetDescriptor());
+		return true;
+	}
+	return false;
+}
+
+bool sMaterialInstance::BindUnorderedAccessBuffer(IStructuredBuffer::SharedPtr UAV)
+{
+	if (!BindingLayout || !UAV)
+		return false;
+	if (BindingLayout->AddUAVBinding((std::uint32_t)UnorderedAccessBuffers.size(), UAV->GetBindlessIndex()))
+	{
+		UnorderedAccessBuffers.push_back(UAV);
+		Handle.UpdateMaterialInstanceDescriptor(BindingLayout->GetDescriptor());
+		return true;
+	}
+	return false;
+}
+
+IConstantBuffer::SharedPtr sMaterialInstance::GetConstantBuffer(std::string Name) const
 {
 	for (auto CBs : ConstantBuffers)
 	{
@@ -59,25 +364,17 @@ IConstantBuffer::SharedPtr sMaterial::sMaterialInstance::GetConstantBuffer(std::
 	return nullptr;
 }
 
-void sMaterial::sMaterialInstance::UpdateTexture(std::size_t TextureIndex, const void* pSrcData, std::size_t RowPitch, std::size_t MinX, std::size_t MinY, std::size_t MaxX, std::size_t MaxY)
+void sMaterialInstance::UpdateTexture(std::size_t TextureIndex, const void* pSrcData, std::size_t RowPitch, std::size_t MinX, std::size_t MinY, std::size_t MaxX, std::size_t MaxY)
 {
 	Textures[(uint32_t)TextureIndex]->UpdateTexture(pSrcData, RowPitch, MinX, MinY, MaxX, MaxY);
 }
 
-void sMaterial::sMaterialInstance::ApplyMaterialInstance(IGraphicsCommandContext* InCMDBuffer) const
+bool sMaterialInstance::IsIndirectCommandAvailable() const
 {
-	for (auto& Texture : Textures)
-	{
-		InCMDBuffer->SetTexture2D(Texture.get());
-	}
-
-	for (auto& ConstantBuffer : ConstantBuffers)
-	{
-		InCMDBuffer->SetConstantBuffer(ConstantBuffer.get());
-	}
+	return Parent && Parent->IsIndirectCommandAvailable();
 }
 
-void sMaterial::sMaterialInstance::Serialize() const
+void sMaterialInstance::Serialize() const
 {
 	/*MaterialInstanceAsset Asset;
 	Asset.Name = Name;
@@ -96,19 +393,6 @@ void sMaterial::sMaterialInstance::Serialize() const
 	Asset.Write();*/
 }
 
-sMaterial::sMaterialInstance::SharedPtr sMaterial::CreateInstance(std::string InName)
-{
-	auto Mat = GetInstance(InName);
-	if (Mat)
-	{
-		return Mat;
-	}
-
-	auto Instance = std::make_shared<sMaterialInstance>(this, InName);
-	Instances.push_back(Instance);
-	return Instance;
-}
-
 sMaterial::sMaterial(std::string InName, EMaterialBlendMode InBlendMode, sPipelineDesc InPipelineDesc)
 	: Name(InName)
 	, MaterialUsage(EMaterialUsage::BeforPostProcess)
@@ -118,7 +402,7 @@ sMaterial::sMaterial(std::string InName, EMaterialBlendMode InBlendMode, sPipeli
 	Pipeline = IPipeline::Create(InName, InPipelineDesc);
 }
 
-sMaterial::sMaterial(std::string InName, EMaterialBlendMode InBlendMode, sPipelineDesc InPipelineDesc, std::vector<sDescriptorSetLayoutBinding> InDescriptorSetLayout,
+sMaterial::sMaterial(std::string InName, EMaterialBlendMode InBlendMode, sPipelineDesc InPipelineDesc, std::vector<sShaderBinding> InDescriptorSetLayout,
 	std::vector<sShaderAttachment> InAttachments, std::vector<sVertexAttributeDesc> InVertexLayout)
 	: Name(InName)
 	, MaterialUsage(EMaterialUsage::BeforPostProcess)
@@ -136,13 +420,48 @@ sMaterial::~sMaterial()
 	}
 	Instances.clear();
 
-	for (auto& ConstantBuffer : ConstantBuffers)
+	for (auto& Sampler : Samplers)
 	{
-		ConstantBuffer = nullptr;
+		Sampler.second = nullptr;
 	}
-	ConstantBuffers.clear();
+	Samplers.clear();
 
 	Pipeline = nullptr;
+}
+
+sMaterialInstance::SharedPtr sMaterial::CreateInstance(std::string InName)
+{
+	auto Mat = GetInstance(InName);
+	if (Mat)
+	{
+		return Mat;
+	}
+
+	auto Instance = std::make_shared<sMaterialInstance>(this, InName);
+	Instances.push_back(Instance);
+	return Instance;
+}
+
+ERenderPass sMaterial::GetRenderPass() const
+{
+	return Pipeline->GetRenderPass();
+}
+
+bool sMaterial::AddSampler(const ISamplerState::SharedPtr& Sampler)
+{
+	if (!Sampler)
+		return false;
+	Samplers.insert({ Samplers.size(), Sampler });
+	return true;
+}
+
+bool sMaterial::AddSampler(const sSamplerAttributeDesc& Desc)
+{
+	auto Sampler = ISamplerState::Create(Name + "_Sampler_" + std::to_string(Samplers.size()), Desc);
+	if (!Sampler)
+		return false;
+	Samplers.insert({ Samplers.size(), Sampler });
+	return true;
 }
 
 bool sMaterial::Compile(IFrameBuffer* FrameBuffer)
@@ -165,31 +484,14 @@ bool sMaterial::Recompile()
 	return Pipeline->Recompile();
 }
 
+bool sMaterial::IsIndirectCommandAvailable() const
+{
+	return Pipeline && Pipeline->IsIndirectCommandAvailable();
+}
+
 void sMaterial::ApplyMaterial(IGraphicsCommandContext* InCMDBuffer) const
 {
 	InCMDBuffer->SetPipeline(Pipeline.get());
-
-	for (auto& ConstantBuffer : ConstantBuffers)
-	{
-		InCMDBuffer->SetConstantBuffer(ConstantBuffer.get());
-	}
-}
-
-IConstantBuffer::SharedPtr sMaterial::GetConstantBuffer(std::string Name) const
-{
-	for (auto CBs : ConstantBuffers)
-	{
-		if (CBs->GetName() == Name)
-		{
-			return CBs;
-		}
-	}
-	return nullptr;
-}
-
-void sMaterial::BindConstantBuffer(IConstantBuffer::SharedPtr InCB)
-{
-	ConstantBuffers.push_back(InCB);
 }
 
 void sMaterial::Serialize()

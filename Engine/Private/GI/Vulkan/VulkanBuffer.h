@@ -78,6 +78,7 @@ public:
 	virtual ~VulkanConstantBuffer();
 
 	FORCEINLINE virtual std::string GetName() const override final { return Name; };
+	virtual std::uint32_t GetBindlessIndex() const override final {	return std::uint32_t(-1); }
 
 	VkBuffer GetBuffer() const { return Buffer; }
 	void* GetData() const { return pData; }
@@ -89,6 +90,9 @@ public:
 
 	VkDescriptorBufferInfo DescriptorInfo;
 	std::uint32_t GetSize() const;
+
+	virtual ResourceSharedHandle* GetSharedHandle() const override final { return nullptr; }
+	virtual bool CopyFrom(IConstantBuffer* ConstantBuffer) override final { return false; }
 };
 
 class VulkanVertexBuffer final : public IVertexBuffer
@@ -119,6 +123,9 @@ public:
 	void* pData;
 	void Map(const void* Ptr = nullptr, IGraphicsCommandContext* InCMDBuffer = nullptr);
 	void Unmap();
+
+	virtual ResourceSharedHandle* GetSharedHandle() const override final { return nullptr; }
+	virtual bool CopyFrom(IVertexBuffer* VertexBuffer) override final { return false; }
 };
 
 class VulkanIndexBuffer final : public IIndexBuffer
@@ -148,28 +155,35 @@ public:
 	void* pData;
 	void Map(const void* Ptr = nullptr, IGraphicsCommandContext* InCMDBuffer = nullptr);
 	void Unmap();
+
+	virtual ResourceSharedHandle* GetSharedHandle() const override final { return nullptr; }
+	virtual bool CopyFrom(IIndexBuffer* IndexBuffer) override final { return false; }
 };
 
-class VulkanUnorderedAccessBuffer final : public IUnorderedAccessBuffer
+class VulkanStructuredBuffer final : public IStructuredBuffer
 {
-	sClassBody(sClassConstructor, VulkanUnorderedAccessBuffer, IUnorderedAccessBuffer)
+	sClassBody(sClassConstructor, VulkanStructuredBuffer, IStructuredBuffer)
 private:
 	std::string Name;
 
 public:
-	VulkanUnorderedAccessBuffer(VulkanDevice* InDevice, std::string InName, const BufferLayout& InDesc, bool bSRVAllowed = true);
+	VulkanStructuredBuffer(VulkanDevice* InDevice, std::string InName, const BufferLayout& InDesc, bool bSRVAllowed = true);
 
-	virtual ~VulkanUnorderedAccessBuffer()
+	virtual ~VulkanStructuredBuffer()
 	{
 
 	}
 
 	FORCEINLINE virtual std::string GetName() const override final { return Name; };
+	virtual std::uint32_t GetBindlessIndex() const override final {	return std::uint32_t(-1); }
 
 	virtual bool IsSRV_Allowed() const { return false; }
 
 	VkBuffer GetBuffer() const { return VK_NULL_HANDLE; }
 	virtual std::size_t GetSize() const override final { return 0; }
 	virtual bool IsMapable() const override final { return false; }
-	virtual void Map(const void* Ptr, IGraphicsCommandContext* InCMDBuffer = nullptr) override final;
+	virtual void Map(const void* Ptr, std::size_t Location, IGraphicsCommandContext* InCMDBuffer = nullptr) override final;
+
+	virtual ResourceSharedHandle* GetSharedHandle() const override final { return nullptr; }
+	virtual bool CopyFrom(IStructuredBuffer* UnorderedAccessBuffer) override final { return false; }
 };

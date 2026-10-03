@@ -29,6 +29,8 @@
 #include "Utilities/FileManager.h"
 #include "Core/Archive.h"
 
+#include <limits> 
+
 OBJImporter::OBJImporter()
 {
 }
@@ -200,7 +202,7 @@ bool OBJImporter::Import(const std::string& path, bool bFlipTextCoordY)
 		}
 		else if (Var == "f")
 		{
-			std::vector<std::string> Indexes;
+			/*std::vector<std::string> Indexes;
 			std::string IndexLine;
 			for (const char& Word : Line)
 			{
@@ -252,7 +254,7 @@ bool OBJImporter::Import(const std::string& path, bool bFlipTextCoordY)
 					continue;
 				}
 				idx++;
-			}
+			}*/
 
 			//for (const auto& String : Indexes)
 			//{
@@ -263,6 +265,79 @@ bool OBJImporter::Import(const std::string& path, bool bFlipTextCoordY)
 			//	//obj.Parts[PartCounter].Faces.push_back(Index - 1);
 			//	//obj.Parts[PartCounter].FacesByMaterial[CurrentMaterialName].push_back(Index - 1);
 			//}
+
+			//-------------------------------------------------------------------------------------
+
+			constexpr std::uint32_t InvalidIndex =
+				std::numeric_limits<std::uint32_t>::max();
+
+			// OBJ indices are 1-based; negative indices count backward
+			// from the end of the corresponding global array.
+			auto ParseIndex = [InvalidIndex](const std::string& text, std::size_t count)
+				-> std::uint32_t
+				{
+					if (text.empty())
+						return InvalidIndex;
+
+					const long long raw = std::stoll(text);
+					const long long index = raw > 0
+						? raw - 1
+						: raw < 0 ? static_cast<long long>(count) + raw : -1;
+
+					if (index < 0 || static_cast<std::size_t>(index) >= count)
+						return InvalidIndex;
+
+					return static_cast<std::uint32_t>(index);
+				};
+
+			std::vector<OBJ::Face> polygon;
+			std::istringstream faceLine(Line.substr(VarOffset + 1));
+			std::string token;
+
+			while (faceLine >> token)
+			{
+				const auto firstSlash = token.find('/');
+				const auto secondSlash = firstSlash == std::string::npos
+					? std::string::npos
+					: token.find('/', firstSlash + 1);
+
+				const std::string positionText = token.substr(0, firstSlash);
+				const std::string textureText =
+					firstSlash == std::string::npos ? "" :
+					token.substr(firstSlash + 1,
+						secondSlash == std::string::npos
+						? std::string::npos
+						: secondSlash - firstSlash - 1);
+				const std::string normalText =
+					secondSlash == std::string::npos ? "" : token.substr(secondSlash + 1);
+
+				OBJ::Face vertex{};
+				vertex.MeshIndex = static_cast<std::uint32_t>(PartCounter);
+				vertex.Position = ParseIndex(positionText, obj.Verts.size());
+				vertex.TextureCoord = ParseIndex(textureText, obj.TextureCoords.size());
+				vertex.Normals = ParseIndex(normalText, obj.Normals.size());
+
+				if (vertex.Position == InvalidIndex)
+					return false; // A face vertex must have a valid position index.
+
+				polygon.push_back(vertex);
+			}
+
+			if (polygon.size() < 3)
+				return false;
+
+			// Fan triangulation: (0, 1, 2), (0, 2, 3), ...
+			for (std::size_t i = 1; i + 1 < polygon.size(); ++i)
+			{
+				const OBJ::Face triangle[] = { polygon[0], polygon[i], polygon[i + 1] };
+
+				for (const OBJ::Face& face : triangle)
+				{
+					obj.Faces.push_back(face);
+					obj.Parts[PartCounter].Faces.push_back(face);
+					obj.Parts[PartCounter].FacesByMaterial[CurrentMaterialName].push_back(face);
+				}
+			}
 		}
 	}
 

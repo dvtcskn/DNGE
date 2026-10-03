@@ -32,6 +32,74 @@
 #include "Gameplay/MeshComponent.h"
 #include "Utilities/FileManager.h"
 
+struct GeometrySceneDescriptor : public IBindlessSceneDescriptor
+{
+	std::uint32_t VertexBufferStructureIndex = std::uint32_t(-1);
+	std::uint32_t VertexBufferLocation = std::uint32_t(-1);
+	std::uint32_t VertexBufferStride = std::uint32_t(-1);
+	std::uint32_t VertexInstanceBufferLocation = std::uint32_t(-1);
+	std::uint32_t VertexInstanceBufferStride = std::uint32_t(-1);
+	std::uint32_t StructureIndex = std::uint32_t(-1);
+	std::uint32_t MaterialIndex = std::uint32_t(-1);
+	std::uint32_t CameraConstantBuffer = std::uint32_t(-1);
+	std::uint32_t ObjectConstantBuffer = std::uint32_t(-1);
+	std::uint32_t TimeConstantBuffer = std::uint32_t(-1);
+
+	inline bool IsValid(bool bCheckForInstances = false) const
+	{
+		return (VertexBufferStructureIndex != std::uint32_t(-1) &&
+			VertexBufferLocation != std::uint32_t(-1) &&
+			VertexBufferStride != std::uint32_t(-1) &&
+			StructureIndex != std::uint32_t(-1) &&
+			MaterialIndex != std::uint32_t(-1) &&
+			CameraConstantBuffer != std::uint32_t(-1) &&
+			ObjectConstantBuffer != std::uint32_t(-1) &&
+			TimeConstantBuffer != std::uint32_t(-1)) && 
+			(!bCheckForInstances || (VertexInstanceBufferLocation != std::uint32_t(-1) && VertexInstanceBufferStride != std::uint32_t(-1)));
+	}
+};
+
+struct GeometrySceneIndirectCommand
+{
+	GeometrySceneDescriptor Descriptor;
+	sObjectDrawParameters DrawArgs;
+};
+
+struct sGeometrySceneDescriptor : public IBindlessSceneContainer
+{
+	GeometrySceneDescriptor Descriptor;
+
+	sGeometrySceneDescriptor(GeometrySceneDescriptor NewDescriptor)
+		: Descriptor(NewDescriptor)
+	{}
+
+	virtual const IBindlessSceneDescriptor* GetDescriptor() const override final
+	{
+		return &Descriptor;
+	}
+
+	virtual std::uint32_t Size() const override final
+	{
+		return 10;
+	}
+
+	virtual std::vector<std::uint32_t> GetAllBindlessIndices() const override final
+	{
+		std::vector<std::uint32_t> BindlessIndices;
+		BindlessIndices.push_back(Descriptor.VertexBufferStructureIndex);
+		BindlessIndices.push_back(Descriptor.VertexBufferLocation);
+		BindlessIndices.push_back(Descriptor.VertexBufferStride);
+		BindlessIndices.push_back(Descriptor.VertexInstanceBufferLocation);
+		BindlessIndices.push_back(Descriptor.VertexInstanceBufferStride);
+		BindlessIndices.push_back(Descriptor.StructureIndex);
+		BindlessIndices.push_back(Descriptor.MaterialIndex);
+		BindlessIndices.push_back(Descriptor.CameraConstantBuffer);
+		BindlessIndices.push_back(Descriptor.ObjectConstantBuffer);
+		BindlessIndices.push_back(Descriptor.TimeConstantBuffer);
+		return BindlessIndices;
+	}
+};
+
 class sRenderer::sGBuffer
 {
 	sBaseClassBody(sClassConstructor, sRenderer::sGBuffer);
@@ -41,64 +109,51 @@ public:
 		, GraphicsCommandContext(CMD ? CMD : IGraphicsCommandContext::Create())
 		, ScreenDimension(sScreenDimension(Width, Height))
 		, TimeBuffer(sTimeBuffer())
+		, IndirectBuffer(nullptr)
+		, bEnableExecuteIndirect(true)
 	{
 		BufferLayout BufferDesc;
 		BufferDesc.Size = sizeof(sTimeBuffer);
-		TimeCB = IConstantBuffer::Create("TimeCB", BufferDesc, 2/* GPU::GetGBufferTextureEntryPoint() + GPU::GetGBufferTextureSize()*/); // 2
+		TimeCB = IConstantBuffer::Create("TimeCB", BufferDesc, 2);
 
 		{
 			sFrameBufferAttachmentInfo AttachmentInfo;
 			AttachmentInfo.Desc.Dimensions.X = (std::uint32_t)ScreenDimension.Width;
 			AttachmentInfo.Desc.Dimensions.Y = (std::uint32_t)ScreenDimension.Height;
-			AttachmentInfo.AddFrameBuffer(GPU::GetBackBufferFormat()); // finalColor
+			AttachmentInfo.AddFrameBuffer(GPU::GetBackBufferFormat()/*, EFrameBufferAttachmentType::RT_SRV_UAV*/); // finalColor
 			AttachmentInfo.DepthFormat = GPU::GetDefaultDepthFormat();
 			GBuffer = IFrameBuffer::Create("GBuffer", AttachmentInfo);
 		}
 
 		{
-			sPipelineDesc pPipelineDesc;
-			pPipelineDesc.BlendAttribute = sBlendAttributeDesc(EBlendStateMode::eOpaque);
-			pPipelineDesc.DepthStencilAttribute = sDepthStencilAttributeDesc(true, true);
-			pPipelineDesc.DepthStencilAttribute.DepthTest = ECompareFunction::eGreaterEqual;
-			pPipelineDesc.PrimitiveTopologyType = EPrimitiveType::eTRIANGLE_LIST;
-			pPipelineDesc.RasterizerAttribute = sRasterizerAttributeDesc();
+			IndirectLayoutBindingDesc = sIndirectLayoutBindingDesc(EDrawTypes::DrawIndexedInstanced, 2, sizeof(GeometrySceneIndirectCommand), 1);
+			IndirectBuffer = IIndirectBuffer::Create("GeometryPassIndirectBuffer", BufferLayout(1024 * 1024 * 4, sizeof(GeometrySceneIndirectCommand)));
+		}
 
-			std::vector<sVertexAttributeDesc> VertexLayout =
-			{
-				{ "POSITION",	EFormat::RGB32_FLOAT,   0, offsetof(sVertexLayout, position),    false, sizeof(sVertexLayout) },
-				{ "NORMAL",		EFormat::RGB32_FLOAT,   0, offsetof(sVertexLayout, normal),      false, sizeof(sVertexLayout) },
-				{ "TEXCOORD",	EFormat::RG32_FLOAT,    0, offsetof(sVertexLayout, texCoord),    false, sizeof(sVertexLayout) },
-				{ "COLOR",		EFormat::RGBA32_FLOAT,  0, offsetof(sVertexLayout, Color),		 false, sizeof(sVertexLayout) },
-				{ "TANGENT",	EFormat::RGB32_FLOAT,   0, offsetof(sVertexLayout, tangent),     false, sizeof(sVertexLayout) },
-				{ "BINORMAL",	EFormat::RGB32_FLOAT,   0, offsetof(sVertexLayout, binormal),    false, sizeof(sVertexLayout) },
-				{ "ARRAYINDEX",	EFormat::R32_UINT,	    0, offsetof(sVertexLayout, ArrayIndex),  false, sizeof(sVertexLayout) },
-			};
-			pPipelineDesc.VertexLayout = VertexLayout;
+		{
+			sPipelineDesc pPipelineDesc = sPipelineDesc::CreateDefaultPipelineDesc(ERenderPass::GBuffer, EBlendStateMode::Opaque, ECompareFunction::GreaterEqual, true, EVertexLayoutType::DefaultVertexLayout, false, IndirectLayoutBindingDesc);
 
-			pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Vertex, 13));	// Model CB 0
-			pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Vertex, 12));
-			pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Pixel, 11));	// 0
-			pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eTexture, eShaderType::Pixel, 0));
-
-			pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eSampler, eShaderType::Pixel, 0));
-
+			pPipelineDesc.Bindings.push_back(sShaderBinding(EDescriptorType::e32BitConstant, eShaderType::All, 0, 10));
+			std::vector<sShaderAttachment> ShaderAttachments;
 			pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment(FileManager::GetShaderFolderW() + L"GBufferVS.hlsl", "GeometryVS", eShaderType::Vertex));
 			pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment(FileManager::GetShaderFolderW() + L"GBufferPS.hlsl", "GeometryPS", eShaderType::Pixel));
 
 			DefaultEngineMat = sMaterial::Create("DefaultEngineMat", EMaterialBlendMode::Opaque, pPipelineDesc);
 			DefaultEngineMat->Compile(GBuffer.get());
-			//DefaultEngineMat->BindConstantBuffer(CameraCB);
 		}
 
 		DefaultMatInstance = DefaultEngineMat->CreateInstance("DefaultEngineMatInstance");
 		if (FileManager::fileExists(FileManager::GetTextureFolderW() + L"DefaultWhiteGrid.DDS"))
 		{
-			//DefaultMatInstance->AddTexture(FileManager::GetTextureFolderW() + L"DefaultWhiteGrid.DDS", "DefaultEngineTexture", 3);
+			DefaultMatInstance->AddTexture(FileManager::GetTextureFolderW() + L"DefaultWhiteGrid.DDS", "DefaultEngineTexture", 3);
+			DefaultMatInstance->AddSampler(sSamplerAttributeDesc(ESamplerStateMode::AnisotropicLinear));
 			//MatInstance->AddTexture(L"..//Content\\Textures\\bfn.DDS", 3);
 		}
 	}
+
 	~sGBuffer()
 	{
+		IndirectBuffer = nullptr;
 		DefaultEngineMat = nullptr;
 		DefaultMatInstance = nullptr;
 		GraphicsCommandContext = nullptr;
@@ -122,18 +177,35 @@ public:
 
 	void Tick(double DeltaTime)
 	{
-		TimeBuffer.Time += DeltaTime;
+		TimeBuffer.Time += (float)DeltaTime;
 		TimeCB->Map(&TimeBuffer);
 	}
 
-	IRenderTarget* Render(ILevel* Level, std::size_t index, ICamera* pCamera, std::optional<sViewport> Viewport)
+	sIndirectLayoutBindingDesc GetIndirectLayoutBindingDesc() const
 	{
-		//std::size_t MeshCompHashCode = sMeshComponent::GetStaticHashCode();
-		//std::size_t MeshHashCode = IMesh::GetStaticHashCode();
+		return IndirectLayoutBindingDesc;
+	}
+
+	/*IRenderTarget* Render(ILevel* Level, std::size_t index, ICamera* pCamera, std::optional<sViewport> Viewport)
+	{
+		std::vector<IndirectCommand> IndirectCommands;
+		std::uint64_t ArgumentOffset = 0;
 
 		sMaterial* LastMaterial = nullptr;
 		std::vector<IMesh*> BlendedMeshes;
 		std::vector<IMesh*> LatestMeshes;
+
+		auto ExecuteRemainingIndirectCommands = [&](IGraphicsCommandContext* CMD) -> void
+			{
+				if (bEnableExecuteIndirect && IndirectCommands.size() > 0)
+				{
+					IndirectBuffer->SetArgument(IndirectCommands.data(), IndirectCommands.size(), ArgumentOffset);
+					ArgumentOffset += sizeof(IndirectCommand) * IndirectCommands.size();
+					IndirectCommands.clear();
+
+					CMD->ExecuteIndirect(IndirectBuffer.get());
+				}
+			};
 
 		std::function<void(EMaterialBlendMode, IMesh*, IGraphicsCommandContext*)> Draw;
 		Draw = [&](EMaterialBlendMode BlendMode, IMesh* Mesh, IGraphicsCommandContext* CMD)
@@ -158,6 +230,9 @@ public:
 					{
 						if (LastMaterial != pMaterial)
 						{
+							if (bEnableExecuteIndirect)
+								ExecuteRemainingIndirectCommands(CMD);
+
 							LastMaterial = pMaterial;
 							LastMaterial->ApplyMaterial(CMD);
 						}
@@ -171,6 +246,9 @@ public:
 						if (!DefaultEngineMat->IsCompiled())
 							DefaultEngineMat->Compile(GBuffer.get());
 
+						if (bEnableExecuteIndirect)
+							ExecuteRemainingIndirectCommands(CMD);
+
 						LastMaterial = DefaultEngineMat.get();
 						LastMaterial->ApplyMaterial(CMD);
 					}
@@ -178,21 +256,50 @@ public:
 				}
 
 				{
-					CMD->SetVertexBuffer(Mesh->GetVertexBuffer());
-					if (Mesh->HasInstanceBuffer())
-						CMD->SetVertexBuffer(Mesh->GetInstanceBuffer(), 1);
-					CMD->SetIndexBuffer(Mesh->GetIndexBuffer());
-
 					if (Mesh->IsUpdateRequired())
 						Mesh->UpdateMesh(CMD);
 
-					CMD->SetConstantBuffer(CameraCBs[index].get());
-					CMD->SetConstantBuffer(Mesh->GetMeshConstantBuffer());
-					CMD->SetConstantBuffer(TimeCB.get());
-					for (std::size_t i = 0; i < Mesh->GetSecondaryConstantBufferCount(); i++)
-						CMD->SetConstantBuffer(Mesh->GetSecondaryConstantBuffer(i));
+					GeometrySceneDescriptor GeometrySceneDescriptor;
+					if (auto GeometryHandle = Mesh->GetGeometryHandle())
+					{
+						if (GeometryHandle->IsValid())
+						{
+							GeometrySceneDescriptor.VertexBufferStructureIndex = GeometryHandle->GetBindlessStructureIndex();
+							GeometrySceneDescriptor.VertexBufferLocation = (std::uint32_t)GeometryHandle->GetLocation();
+							GeometrySceneDescriptor.VertexBufferStride = (std::uint32_t)GeometryHandle->GetElementSize();
+						}
+						if (auto GeometryInstanceHandle = Mesh->GetGeometryInstanceHandle())
+						{
+							if (GeometryInstanceHandle->IsValid())
+							{
+								GeometrySceneDescriptor.VertexInstanceBufferLocation = (std::uint32_t)GeometryInstanceHandle->GetLocation();
+								GeometrySceneDescriptor.VertexInstanceBufferStride = GeometryInstanceHandle->GetElementSize();
+							}
+						}
+					}
+					GeometrySceneDescriptor.StructureIndex = pMaterialInstace ? pMaterialInstace->GetStructureId() : DefaultMatInstance->GetStructureId();
+					GeometrySceneDescriptor.MaterialIndex = pMaterialInstace ? pMaterialInstace->GetId() : DefaultMatInstance->GetId();
+					GeometrySceneDescriptor.CameraConstantBuffer = CameraCBs[index]->GetBindlessIndex();
+					GeometrySceneDescriptor.ObjectConstantBuffer = Mesh->GetMeshConstantBuffer()->GetBindlessIndex();
+					GeometrySceneDescriptor.TimeConstantBuffer = TimeCB->GetBindlessIndex();
 
-					CMD->DrawIndexedInstanced(Mesh->GetDrawParameters());
+
+					if (bEnableExecuteIndirect)
+					{
+						IndirectCommand Command;
+						Command.Descriptor = GeometrySceneDescriptor;
+						Command.DrawArgs = Mesh->GetDrawParameters();
+
+						IndirectCommands.push_back(Command);
+
+					}
+					else
+					{
+						//CMD->Set32BitConstants(0, &GeometrySceneDescriptor, 5, 0);					
+						sGeometrySceneDescriptor SceneDescriptor(GeometrySceneDescriptor);
+						CMD->SetBindlessDescriptor(0, &SceneDescriptor);
+						CMD->DrawIndexedInstanced(Mesh->GetDrawParameters());
+					}
 				}
 			};
 
@@ -216,7 +323,7 @@ public:
 			};
 
 		{
-			GraphicsCommandContext->BeginRecordCommandList(ERenderPass::eGBuffer);
+			GraphicsCommandContext->BeginRecordCommandList(ERenderPass::GBuffer);
 
 			UpdateCameraBuffer(pCamera, index, GraphicsCommandContext.get());
 
@@ -230,6 +337,9 @@ public:
 
 			GraphicsCommandContext->SetScissorRect(0, 0, (std::uint32_t)ScreenDimension.Height, (std::uint32_t)ScreenDimension.Width);
 
+			auto IndexBuffer = sMeshGeometryContainerManager::Get().GetIndexBuffer();
+			GraphicsCommandContext->SetIndexBuffer(IndexBuffer);
+
 			auto LayerCount = Level->LayerCount();
 
 			for (size_t Layer = 0; Layer < LayerCount; Layer++)
@@ -239,6 +349,8 @@ public:
 				{
 					Draw(EMaterialBlendMode::Opaque, Level->GetMesh(i, Layer), GraphicsCommandContext.get());
 				}
+				if (IndirectCommands.size() > 0)
+					ExecuteRemainingIndirectCommands(GraphicsCommandContext.get());
 
 				auto ActorCount = Level->ActorCount(Layer);
 				for (size_t i = 0; i < ActorCount; i++)
@@ -249,29 +361,246 @@ public:
 
 					fDraw(EMaterialBlendMode::Opaque, Obj->GetRootComponent(), GraphicsCommandContext.get());
 				}
+				if (IndirectCommands.size() > 0)
+					ExecuteRemainingIndirectCommands(GraphicsCommandContext.get());
 
 				for (const auto& Mesh : BlendedMeshes)
 				{
 					Draw(EMaterialBlendMode::Masked, Mesh, GraphicsCommandContext.get());
 				}
 				BlendedMeshes.clear();
+				if (IndirectCommands.size() > 0)
+					ExecuteRemainingIndirectCommands(GraphicsCommandContext.get());
 
 				for (const auto& Mesh : LatestMeshes)
 				{
 					Draw(EMaterialBlendMode::Opaque, Mesh, GraphicsCommandContext.get());
 				}
 				LatestMeshes.clear();
+				if (IndirectCommands.size() > 0)
+					ExecuteRemainingIndirectCommands(GraphicsCommandContext.get());
 
 				for (const auto& Mesh : BlendedMeshes)
 				{
 					Draw(EMaterialBlendMode::Masked, Mesh, GraphicsCommandContext.get());
 				}
 				BlendedMeshes.clear();
+				if (IndirectCommands.size() > 0)
+					ExecuteRemainingIndirectCommands(GraphicsCommandContext.get());
 			}
 
 			GraphicsCommandContext->FinishRecordCommandList();
-			GraphicsCommandContext->ExecuteCommandList();
+			// Deferred means Execute later, Batch command
+			GraphicsCommandContext->ExecuteCommandList(ECommandContextExecuteType::Deferred);
 		}
+
+		return GBuffer->GetRenderTarget(0);
+	}*/
+
+	IRenderTarget* Render(ILevel* Level, std::size_t index, ICamera* pCamera, std::optional<sViewport> Viewport)
+	{
+		if (!Level || !pCamera)
+			return nullptr;
+
+		std::vector<GeometrySceneIndirectCommand> IndirectCommands;
+		std::uint64_t ArgumentOffset = 0;
+
+		std::vector<IMesh*> BlendedMeshes;
+		std::vector<IMesh*> LatestMeshes;
+		sMaterial* LastMaterial = nullptr;
+
+		auto FlushIndirectCommands = [&](IGraphicsCommandContext* CMD)
+			{
+				if (!bEnableExecuteIndirect || IndirectCommands.empty())
+					return;
+
+				const std::size_t CommandCount = IndirectCommands.size();
+				IndirectBuffer->SetArgument(IndirectCommands.data(), CommandCount, ArgumentOffset);
+
+				ArgumentOffset += sizeof(GeometrySceneIndirectCommand) * CommandCount;
+				IndirectCommands.clear();
+
+				CMD->ExecuteIndirect(IndirectBuffer.get());
+			};
+
+		auto DrawMesh = [&](EMaterialBlendMode BlendMode, IMesh* Mesh, IGraphicsCommandContext* CMD, bool bDeferLatest)
+			{
+				if (!Mesh)
+					return;
+
+				if (bDeferLatest &&
+					Mesh->GeMeshRenderPriority() == EMeshRenderPriority::Latest)
+				{
+					LatestMeshes.push_back(Mesh);
+					return;
+				}
+
+				auto MaterialInstance = Mesh->GetMaterialInstance();
+				sMaterial* Material = nullptr;
+
+				if (MaterialInstance)
+				{
+					if (!MaterialInstance->IsCompiled())
+						MaterialInstance->Compile(GBuffer.get());
+
+					Material = MaterialInstance->GetParent();
+
+					if (BlendMode == EMaterialBlendMode::Opaque && Material && Material->BlendMode == EMaterialBlendMode::Masked)
+					{
+						BlendedMeshes.push_back(Mesh);
+						return;
+					}
+				}
+
+				if (Material)
+				{
+					if (LastMaterial != Material)
+					{
+						FlushIndirectCommands(CMD);
+						LastMaterial = Material;
+						LastMaterial->ApplyMaterial(CMD);
+					}
+
+					MaterialInstance->ApplyMaterialInstance(CMD);
+				}
+				else
+				{
+					if (!DefaultEngineMat->IsCompiled())
+						DefaultEngineMat->Compile(GBuffer.get());
+
+					if (LastMaterial != DefaultEngineMat.get())
+					{
+						FlushIndirectCommands(CMD);
+						LastMaterial = DefaultEngineMat.get();
+						LastMaterial->ApplyMaterial(CMD);
+					}
+
+					DefaultMatInstance->ApplyMaterialInstance(CMD);
+				}
+
+				if (Mesh->IsUpdateRequired())
+					Mesh->UpdateMesh(CMD);
+
+				GeometrySceneDescriptor Descriptor;
+
+				bool bInstance = false;
+				if (auto GeometryHandle = Mesh->GetGeometryHandle(); GeometryHandle && GeometryHandle->IsValid())
+				{
+					Descriptor.VertexBufferStructureIndex =	GeometryHandle->GetBindlessStructureIndex();
+					Descriptor.VertexBufferLocation = static_cast<std::uint32_t>(GeometryHandle->GetLocation());
+					Descriptor.VertexBufferStride = static_cast<std::uint32_t>(GeometryHandle->GetElementSize());
+
+					if (auto InstanceHandle = Mesh->GetGeometryInstanceHandle(); InstanceHandle && InstanceHandle->IsValid())
+					{
+						Descriptor.VertexInstanceBufferLocation = static_cast<std::uint32_t>(InstanceHandle->GetLocation());
+						Descriptor.VertexInstanceBufferStride =	static_cast<std::uint32_t>(InstanceHandle->GetElementSize());
+						bInstance = true;
+					}
+				}
+				else
+				{
+					// invalid vertex-buffer
+					return;
+				}
+
+				//auto IndexBuffer = Mesh->GetIndexBuffer();
+				//GraphicsCommandContext->SetIndexBuffer(IndexBuffer);
+				//auto VertexBuffer = Mesh->GetVertexBuffer();
+				//GraphicsCommandContext->SetVertexBuffer(VertexBuffer);
+
+				Descriptor.StructureIndex = MaterialInstance ? MaterialInstance->GetStructureId() : DefaultMatInstance->GetStructureId();
+				Descriptor.MaterialIndex = MaterialInstance	? MaterialInstance->GetId()	: DefaultMatInstance->GetId();
+				Descriptor.CameraConstantBuffer = CameraCBs[index]->GetBindlessIndex();
+				Descriptor.ObjectConstantBuffer = Mesh->GetMeshConstantBuffer()->GetBindlessIndex();
+				Descriptor.TimeConstantBuffer = TimeCB->GetBindlessIndex();
+
+				if (!Descriptor.IsValid(bInstance))
+					throw std::runtime_error("Invalid GeometrySceneDescriptor for mesh: " + Mesh->GetName());
+					
+				if (bEnableExecuteIndirect && LastMaterial->IsIndirectCommandAvailable())
+				{
+					GeometrySceneIndirectCommand Command;
+					Command.Descriptor = Descriptor;
+					Command.DrawArgs = Mesh->GetDrawParameters();
+					IndirectCommands.push_back(Command);
+				}
+				else
+				{
+					sGeometrySceneDescriptor SceneDescriptor(Descriptor);
+					CMD->SetBindlessDescriptor(0, &SceneDescriptor);
+					auto DrawParams = Mesh->GetDrawParameters();
+					//DrawParams.StartIndexLocation = 0;
+					CMD->DrawIndexedInstanced(DrawParams);
+				}
+			};
+
+		auto DrawComponent = [&](auto&& Self, EMaterialBlendMode BlendMode, sPrimitiveComponent* Component,	IGraphicsCommandContext* CMD) -> void
+			{
+				if (!Component || Component->IsHidden())
+					return;
+
+				if (auto MeshComponent = Cast<IMeshComponent>(Component))
+					DrawMesh(BlendMode, MeshComponent->GetMesh(), CMD, true);
+
+				const std::size_t ChildCount = Component->GetChildrenSize();
+				for (std::size_t ChildIndex = 0; ChildIndex < ChildCount; ++ChildIndex)
+					Self(Self, BlendMode, Component->GetChild(ChildIndex), CMD);
+			};
+
+		auto DrawQueuedMeshes = [&](std::vector<IMesh*>& Meshes, EMaterialBlendMode BlendMode, IGraphicsCommandContext* CMD)
+			{
+				for (IMesh* Mesh : Meshes)
+					DrawMesh(BlendMode, Mesh, CMD, false);
+
+				Meshes.clear();
+				FlushIndirectCommands(CMD);
+			};
+
+		GraphicsCommandContext->BeginRecordCommandList(ERenderPass::GBuffer);
+
+		UpdateCameraBuffer(pCamera, index, GraphicsCommandContext.get());
+		GraphicsCommandContext->SetFrameBuffer(GBuffer.get());
+
+		if (Viewport.has_value())
+			GraphicsCommandContext->SetViewport(*Viewport);
+		else
+			GraphicsCommandContext->SetViewport(sViewport(ScreenDimension));
+
+		GraphicsCommandContext->SetScissorRect(0, 0, static_cast<std::uint32_t>(ScreenDimension.Height), static_cast<std::uint32_t>(ScreenDimension.Width));
+
+		auto IndexBuffer = sMeshGeometryContainerManager::Get().GetIndexBuffer();
+		GraphicsCommandContext->SetIndexBuffer(IndexBuffer);
+
+		const std::size_t LayerCount = Level->LayerCount();
+		for (std::size_t Layer = 0; Layer < LayerCount; ++Layer)
+		{
+			const std::size_t MeshCount = Level->MeshCount(Layer);
+			for (std::size_t MeshIndex = 0; MeshIndex < MeshCount; ++MeshIndex)
+			{
+				DrawMesh(EMaterialBlendMode::Opaque, Level->GetMesh(MeshIndex, Layer), GraphicsCommandContext.get(), true);
+			}
+			FlushIndirectCommands(GraphicsCommandContext.get());
+
+			const std::size_t ActorCount = Level->ActorCount(Layer);
+			for (std::size_t ActorIndex = 0; ActorIndex < ActorCount; ++ActorIndex)
+			{
+				auto Actor = Level->GetActor(ActorIndex, Layer);
+				if (!Actor || Actor->IsHidden())
+					continue;
+
+				DrawComponent(DrawComponent, EMaterialBlendMode::Opaque, Actor->GetRootComponent(),	GraphicsCommandContext.get());
+			}
+			FlushIndirectCommands(GraphicsCommandContext.get());
+
+			DrawQueuedMeshes(BlendedMeshes,	EMaterialBlendMode::Masked,	GraphicsCommandContext.get());
+
+			DrawQueuedMeshes(LatestMeshes, EMaterialBlendMode::Opaque, GraphicsCommandContext.get());
+
+			DrawQueuedMeshes(BlendedMeshes, EMaterialBlendMode::Masked,	GraphicsCommandContext.get());
+		}
+
+		GraphicsCommandContext->FinishRecordCommandList();
+		GraphicsCommandContext->ExecuteCommandList(ECommandContextExecuteType::Deferred, 0);
 
 		return GBuffer->GetRenderTarget(0);
 	}
@@ -323,7 +652,7 @@ public:
 		sFrameBufferAttachmentInfo AttachmentInfo;
 		AttachmentInfo.Desc.Dimensions.X = (std::uint32_t)ScreenDimension.Width;
 		AttachmentInfo.Desc.Dimensions.Y = (std::uint32_t)ScreenDimension.Height;
-		AttachmentInfo.AddFrameBuffer(GPU::GetBackBufferFormat()); // finalColor
+		AttachmentInfo.AddFrameBuffer(GPU::GetBackBufferFormat()/*, EFrameBufferAttachmentType::RT_SRV_UAV*/); // finalColor
 		AttachmentInfo.DepthFormat = GPU::GetDefaultDepthFormat();
 		GBuffer = IFrameBuffer::Create("GBuffer", AttachmentInfo);
 	}
@@ -340,8 +669,11 @@ private:
 	sScreenDimension ScreenDimension;
 
 	IGraphicsCommandContext::SharedPtr GraphicsCommandContext;
+	IIndirectBuffer::SharedPtr IndirectBuffer;
+	sIndirectLayoutBindingDesc IndirectLayoutBindingDesc;
+	bool bEnableExecuteIndirect;
 	sMaterial::SharedPtr DefaultEngineMat;
-	sMaterial::sMaterialInstance::SharedPtr DefaultMatInstance;
+	sMaterialInstance::SharedPtr DefaultMatInstance;
 	std::vector<IConstantBuffer::SharedPtr> CameraCBs;
 
 	__declspec(align(256)) struct sCameraBuffer
@@ -353,21 +685,20 @@ private:
 
 	sCameraBuffer CameraBuffer;
 
-	__declspec(align(256)) struct sTimeBuffer
+	/*__declspec(align(256))*/ struct sTimeBuffer
 	{
-		double Time;
+		float Time;
 	};
-	static_assert((sizeof(sTimeBuffer) % 256) == 0, "Constant Buffer size must be 256-byte aligned");
-
 	sTimeBuffer TimeBuffer;
 	IConstantBuffer::SharedPtr TimeCB;
+	//static_assert((sizeof(sTimeBuffer) % 256) == 0, "Constant Buffer size must be 256-byte aligned");
 };
 
 sRenderer::sRenderer(std::size_t Width, std::size_t Height)
 	: FinalRenderTarget(nullptr)
 	, GraphicsCommandContext(IGraphicsCommandContext::Create())
 	, World(nullptr)
-	, GBufferClearMode(EGBufferClear::Driver)
+	, GBufferClearMode(ERendererClear::Driver)
 	, ScreenDimension(sScreenDimension(Width, Height))
 	, InternalBaseRenderResolution(sScreenDimension(Width, Height))
 	, GBuffer(sGBuffer::CreateUnique(Width, Height))
@@ -419,6 +750,100 @@ void sRenderer::Tick(const double DeltaTime)
 	GBuffer->Tick(DeltaTime);
 	LineRenderer->Tick(DeltaTime);
 	pParticleRenderer->Tick(DeltaTime);
+}
+
+void sRenderer::RegisterMaterial(sMaterial* Material)
+{
+	if (!Material->IsCompiled())
+		CompileMaterial(Material, false);
+
+	switch (Material->GetRenderPass())
+	{
+	case ERenderPass::GBuffer:
+		break;
+	case ERenderPass::Line:
+		break;
+	case ERenderPass::Particle:
+		break;
+	case ERenderPass::PostProcess:
+		break;
+	case ERenderPass::UI:
+		break;
+	}
+}
+
+void sRenderer::CompileMaterial(sMaterial* Material, bool bRecompile)
+{
+	switch (Material->GetRenderPass())
+	{
+	case ERenderPass::GBuffer:
+	{
+		if (!Material->IsCompiled())
+			Material->Compile(GBuffer->GetGBuffer());
+		break;
+	}
+	case ERenderPass::Line:
+		break;
+	case ERenderPass::Particle:
+		break;
+	case ERenderPass::PostProcess:
+		break;
+	case ERenderPass::UI:
+		break;
+	}
+}
+
+void sRenderer::CompilePipeline(IPipeline* Pipeline, bool bRecompile)
+{
+	switch (Pipeline->GetRenderPass())
+	{
+	case ERenderPass::GBuffer:
+		break;
+	case ERenderPass::Line:
+		break;
+	case ERenderPass::Particle:
+		break;
+	case ERenderPass::PostProcess:
+		break;
+	case ERenderPass::UI:
+		break;
+	}
+}
+
+sIndirectLayoutBindingDesc sRenderer::GetRenderPassIndirectLayoutBindingDesc(ERenderPass RenderPass) const
+{
+	switch (RenderPass)
+	{
+		case ERenderPass::GBuffer:
+			return GBuffer->GetIndirectLayoutBindingDesc();
+		case ERenderPass::Line:
+			break;
+		case ERenderPass::Particle:
+			return pParticleRenderer->GetIndirectLayoutBindingDesc();
+		case ERenderPass::PostProcess:
+			return PostProcessRenderer->GetIndirectLayoutBindingDesc();
+		case ERenderPass::UI:
+			break;
+	}
+	return sIndirectLayoutBindingDesc();
+}
+
+IFrameBuffer* sRenderer::GetFrameBuffer(ERenderPass RenderPass) const
+{
+	switch (RenderPass)
+	{
+	case ERenderPass::GBuffer:
+		return GBuffer->GetGBuffer();
+	case ERenderPass::Line:
+		break;
+	case ERenderPass::Particle:
+		break;
+	case ERenderPass::PostProcess:
+		break;
+	case ERenderPass::UI:
+		break;
+	}
+	return nullptr;
 }
 
 void sRenderer::AddViewportInstance(sViewportInstance* ViewportInstance, std::optional<std::size_t> Priority)
@@ -490,7 +915,7 @@ void sRenderer::Render()
 	if (!World)
 		return;
 
-	if (GBufferClearMode == EGBufferClear::Driver/* || GBufferClearMode == EGBufferClear::Sky*/)
+	if (GBufferClearMode == ERendererClear::Driver/* || GBufferClearMode == ERendererClear::Sky*/)
 	{
 		GBuffer->ClearGBuffer();
 	}
@@ -509,10 +934,6 @@ void sRenderer::Render()
 		}
 	}
 
-	/*
-	* To Do:
-	* Batch Command Context 
-	*/
 	if (PlayerCount > 0)
 	{
 		std::size_t Count = GameInstance->IsSplitScreenEnabled() ? PlayerCount : PlayerCount > 0 ? 1 : 0;
@@ -526,17 +947,17 @@ void sRenderer::Render()
 				continue;
 
 			FinalRenderTarget = GBuffer->Render(World->GetActiveLevel(), i, ViewportInstance->pCamera.get(), ViewportInstance->Viewport);
-			LineRenderer->Render(FinalRenderTarget, GBuffer->GetCameraConstantBuffer(i), ViewportInstance->pCamera.get(), ViewportInstance->Viewport);
-			if (GPU::GetGIType() != EGITypes::eVulkan)
-				pParticleRenderer->Render(World->GetActiveLevel(), ViewportInstance->pCamera.get(), FinalRenderTarget, ViewportInstance->Viewport);
+			LineRenderer->Render(FinalRenderTarget, GBuffer->GetCameraConstantBuffer(i)->GetBindlessIndex(), ViewportInstance->Viewport);
+			pParticleRenderer->Render(World->GetActiveLevel(), GBuffer->GetCameraConstantBuffer(i)->GetBindlessIndex(), FinalRenderTarget, ViewportInstance->Viewport);
 		}
 	}
+
 	{
 		for (std::size_t i = 0; i < ViewportInstances.size(); i++)
 		{
 			sViewportInstance* ViewportInstance = ViewportInstances[i];
 			FinalRenderTarget = GBuffer->Render(World->GetActiveLevel(), i, ViewportInstance->pCamera.get(), ViewportInstance->Viewport);
-			pParticleRenderer->Render(World->GetActiveLevel(), ViewportInstance->pCamera.get(), FinalRenderTarget, ViewportInstance->Viewport);
+			pParticleRenderer->Render(World->GetActiveLevel(), GBuffer->GetCameraConstantBuffer(i)->GetBindlessIndex(), FinalRenderTarget, ViewportInstance->Viewport);
 		}
 	}
 
@@ -552,9 +973,6 @@ void sRenderer::Render()
 		FinalRenderTarget = ToneMapping->GetFrameBuffer();
 	}
 
-	if (GPU::GetGIType() == EGITypes::eVulkan)
-		return;
-
 	for (const auto& PP : PostProcess[EPostProcessRenderOrder::AfterTonemap])
 	{
 		PostProcessRenderer->Render(PP.get(), FinalRenderTarget, std::nullopt);
@@ -567,6 +985,10 @@ void sRenderer::Render()
 		FinalRenderTarget = PP->GetFrameBuffer();
 	}
 
+	/*
+	* To Do:
+	* Use 1 Command Context for all GUI
+	*/
 	if (PlayerCount > 0)
 	{
 		for (std::size_t i = 0; i < PlayerCount; i++)
@@ -617,7 +1039,7 @@ void sRenderer::Render()
 			}
 		}
 	}
-	CanvasRenderer->Render(World->GetCanvases(), FinalRenderTarget, std::nullopt);
+	//CanvasRenderer->Render(World->GetCanvases(), FinalRenderTarget, std::nullopt);
 
 	for (const auto& PP : PostProcess[EPostProcessRenderOrder::AfterUI])
 	{
@@ -684,7 +1106,7 @@ int sRenderer::GetTonemapperIndex() const
 	return ToneMapping->GetTonemapperIndex();
 }
 
-void sRenderer::SetGBufferClearMode(EGBufferClear Mode)
+void sRenderer::SetRendererClearMode(ERendererClear Mode)
 {
 	GBufferClearMode = Mode;
 }

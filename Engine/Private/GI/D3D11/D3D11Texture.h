@@ -55,6 +55,7 @@ public:
 
 	virtual std::string GetName() const override final { return Name; }
 	virtual std::wstring GetPath() const override final { return Path; }
+	virtual std::uint32_t GetBindlessIndex() const override final { return std::uint32_t(-1); }
 
 	virtual sTextureDesc GetDesc() const override final { return Desc; }
 
@@ -72,6 +73,9 @@ public:
 
 	ID3D11Texture2D* GetTexture() const { return pTexture.Get(); }
 	ID3D11ShaderResourceView* GetTextureSRV() const { return pTextureSRV.Get(); }
+
+	virtual ResourceSharedHandle* GetSharedHandle() const override final { return nullptr; }
+	virtual bool CopyFrom(ITexture2D* Texture2D) override final { return false; }
 
 private:
 	D3D11Device* Owner;

@@ -47,6 +47,10 @@ public:
 	virtual void VsyncInterval(const std::uint32_t value) = 0;
 	virtual std::uint32_t GetVsyncInterval() const = 0;
 
+	virtual void GPUFlush() = 0;
+	virtual void WaitForGPU() = 0;
+	virtual void WaitForCPU() = 0;
+
 	virtual EGITypes GetGIType() const = 0;
 	virtual sGPUInfo GetGPUInfo() const = 0;
 
@@ -54,9 +58,12 @@ public:
 	virtual EFormat GetBackBufferFormat() const = 0;
 	virtual sViewport GetViewport() const = 0;
 
-	virtual IShader* CompileShader(const sShaderAttachment& Attachment, bool Spirv = false) = 0;
-	virtual IShader* CompileShader(std::wstring InSrcFile, std::string InFunctionName, eShaderType InProfile, bool Spirv = false, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>()) = 0;
-	virtual IShader* CompileShader(const void* InCode, std::size_t Size, std::string InFunctionName, eShaderType InProfile, bool Spirv = false, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>()) = 0;
+	virtual std::uint32_t GetBackBufferSize() const = 0;
+	virtual std::uint32_t GetCurrentBackBufferIndex() const = 0;
+
+	virtual IShader::SharedPtr CompileShader(const sShaderAttachment& Attachment) = 0;
+	virtual IShader::SharedPtr CompileShader(std::wstring InSrcFile, std::string InFunctionName, eShaderType InProfile, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>()) = 0;
+	virtual IShader::SharedPtr CompileShader(const void* InCode, std::size_t Size, std::string InFunctionName, eShaderType InProfile, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>()) = 0;
 
 	virtual std::vector<sDisplayMode> GetAllSupportedResolutions() const = 0;
 
@@ -78,8 +85,20 @@ public:
 	virtual IIndexBuffer::SharedPtr CreateIndexBuffer(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource = nullptr) = 0;
 	virtual IIndexBuffer::UniquePtr CreateUniqueIndexBuffer(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource = nullptr) = 0;
 
+	virtual IByteAddressBuffer::SharedPtr CreateByteAddressBuffer(std::string InName, std::uint64_t Size, bool bReadWriteAllowed) = 0;
+	virtual IByteAddressBuffer::UniquePtr CreateUniqueByteAddressBuffer(std::string InName, std::uint64_t Size, bool bReadWriteAllowed) = 0;
+
+	virtual IStructuredBuffer::SharedPtr CreateStructuredBuffer(std::string InName, const BufferLayout& InDesc, bool bSRVAllowed = true) = 0;
+	virtual IStructuredBuffer::UniquePtr CreateUniqueStructuredBuffer(std::string InName, const BufferLayout& InDesc, bool bSRVAllowed = true) = 0;
+
+	virtual IIndirectBuffer::SharedPtr CreateIndirectBuffer(std::string InName, BufferLayout NewLayout) = 0;
+	virtual IIndirectBuffer::UniquePtr CreateUniqueIndirectBuffer(std::string InName, BufferLayout NewLayout) = 0;
+
 	virtual IFrameBuffer::SharedPtr CreateFrameBuffer(const std::string InName, const sFrameBufferAttachmentInfo& InAttachments) = 0;
 	virtual IFrameBuffer::UniquePtr CreateUniqueFrameBuffer(const std::string InName, const sFrameBufferAttachmentInfo& InAttachments) = 0;
+
+	virtual ISamplerState::SharedPtr CreateSamplerState(const std::string InName, const sSamplerAttributeDesc& InDesc) = 0;
+	virtual ISamplerState::UniquePtr CreateUniqueSamplerState(const std::string InName, const sSamplerAttributeDesc& InDesc) = 0;
 
 	virtual IRenderTarget::SharedPtr CreateRenderTarget(const std::string InName, const EFormat Format, const sFBODesc& Desc) = 0;
 	virtual IRenderTarget::UniquePtr CreateUniqueRenderTarget(const std::string InName, const EFormat Format, const sFBODesc& Desc) = 0;

@@ -1264,7 +1264,7 @@ namespace
         DDS_LOADER_FLAGS loadFlags,
         _Outptr_ VkImage* texture, 
         _Outptr_ VkDeviceMemory& Memory,
-        _Outptr_ sTextureDesc& TextureDesc) noexcept
+        _Outptr_ sTextureDesc& TextureDesc) /*noexcept*/
     {
         if (!Device)
             return E_POINTER;
@@ -1303,20 +1303,20 @@ namespace
 
         VkFormat VulkanFormat = ConvertFormat_Format_To_VkFormat(ConvertFormat_DXGI_To_Format(format));
 
-        TextureDesc.ArraySize = arraySize;
-        TextureDesc.Dimensions.X = width;
-        TextureDesc.Dimensions.Y = height;
+        TextureDesc.ArraySize = (std::uint32_t)arraySize;
+        TextureDesc.Dimensions.X = (std::uint32_t)width;
+        TextureDesc.Dimensions.Y = (std::uint32_t)height;
         TextureDesc.Format = ConvertFormat_DXGI_To_Format(format);
-        TextureDesc.MipLevels = mipCount;
+        TextureDesc.MipLevels = (std::uint32_t)mipCount;
 
         VkImageCreateInfo imageInfo = {};
         imageInfo.sType = VkStructureType::VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
         imageInfo.imageType = ImageType;
-        imageInfo.extent.width = width;
-        imageInfo.extent.height = height;
-        imageInfo.extent.depth = depth;
-        imageInfo.mipLevels = mipCount;
-        imageInfo.arrayLayers = arraySize;
+        imageInfo.extent.width = (std::uint32_t)width;
+        imageInfo.extent.height = (std::uint32_t)height;
+        imageInfo.extent.depth = (std::uint32_t)depth;
+        imageInfo.mipLevels = (std::uint32_t)mipCount;
+        imageInfo.arrayLayers = (std::uint32_t)arraySize;
         imageInfo.format = VulkanFormat;
         imageInfo.tiling = VkImageTiling::VK_IMAGE_TILING_OPTIMAL;
         imageInfo.initialLayout = VkImageLayout::VK_IMAGE_LAYOUT_UNDEFINED;

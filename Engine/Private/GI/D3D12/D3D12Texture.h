@@ -45,6 +45,7 @@ public:
 
 	virtual std::string GetName() const override final { return Name; }
 	virtual std::wstring GetPath() const override final { return Path; }
+	virtual std::uint32_t GetBindlessIndex() const  override final { return SRV.GetHeapIndex(); }
 
 	virtual sTextureDesc GetDesc() const override final { return Desc; }
 
@@ -66,6 +67,13 @@ public:
 	virtual void SaveToFile(std::wstring InPath) const override final {}
 
 	D3D12_RESOURCE_STATES CurrentState;
+	// Enhanced Barrier States
+	D3D12_BARRIER_LAYOUT CurrentBarrierLayout;
+	D3D12_BARRIER_SYNC CurrentSyncState;
+	D3D12_BARRIER_ACCESS CurrentAccessState;
+
+	virtual ResourceSharedHandle* GetSharedHandle() const override final { return nullptr; }
+	virtual bool CopyFrom(ITexture2D* Texture2D) override final { return false; }
 
 private:
 	void CreateShaderResourceView(ID3D12Device* device, ID3D12Resource* tex, D3D12_CPU_DESCRIPTOR_HANDLE srvDescriptor, bool isCubeMap);

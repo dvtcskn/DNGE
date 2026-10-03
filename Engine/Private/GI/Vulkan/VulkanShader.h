@@ -49,7 +49,7 @@ public:
 	virtual std::wstring GetPath() const override final { return Path; }
 	virtual eShaderType Type() const override final { return ShaderType; }
 	virtual void* GetByteCode() const override final { return nullptr; }
-	virtual std::uint32_t GetByteCodeSize() const override final { return 0; }
+	virtual std::size_t GetByteCodeSize() const override final { return 0; }
 
 private:
 	std::string Name;

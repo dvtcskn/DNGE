@@ -100,19 +100,19 @@ void VulkanComputeCommandContext::SetUnorderedAccessTargetsAsSRV(std::vector<IUn
 {
 }
 
-void VulkanComputeCommandContext::SetUnorderedAccessBuffer(IUnorderedAccessBuffer* pUAV, std::uint32_t RootParameterIndex)
+void VulkanComputeCommandContext::SetUnorderedAccessBuffer(IStructuredBuffer* pUAV, std::uint32_t RootParameterIndex)
 {
 }
 
-void VulkanComputeCommandContext::SetUnorderedAccessBuffers(std::vector<IUnorderedAccessBuffer*> UAVs, std::uint32_t RootParameterIndex)
+void VulkanComputeCommandContext::SetUnorderedAccessBuffers(std::vector<IStructuredBuffer*> UAVs, std::uint32_t RootParameterIndex)
 {
 }
 
-void VulkanComputeCommandContext::SetUnorderedAccessBufferAsResource(IUnorderedAccessBuffer* pUAV, std::uint32_t RootParameterIndex)
+void VulkanComputeCommandContext::SetUnorderedAccessBufferAsResource(IStructuredBuffer* pUAV, std::uint32_t RootParameterIndex)
 {
 }
 
-void VulkanComputeCommandContext::SetUnorderedAccessBuffersAsResource(std::vector<IUnorderedAccessBuffer*> UAVs, std::uint32_t RootParameterIndex)
+void VulkanComputeCommandContext::SetUnorderedAccessBuffersAsResource(std::vector<IStructuredBuffer*> UAVs, std::uint32_t RootParameterIndex)
 {
 }
 

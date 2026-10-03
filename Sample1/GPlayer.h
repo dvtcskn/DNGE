@@ -35,7 +35,7 @@ class GPlayer : public sPlayer
 {
 	sClassBody(sClassConstructor, GPlayer, sPlayer)
 public:
-	GPlayer(sGameInstance* InOwner, std::size_t InPlayerIndex);
+	GPlayer(sGameInstance* InOwner, std::uint32_t InPlayerIndex);
 	virtual ~GPlayer();
 
 	virtual void OnBeginPlay() override;

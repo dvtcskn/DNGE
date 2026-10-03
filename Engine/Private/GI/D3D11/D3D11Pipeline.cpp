@@ -42,16 +42,16 @@ D3D11Pipeline::D3D11Pipeline(D3D11Device* InDevice, const std::string& InName, c
 	{
 		switch (Type)
 		{
-		case EPrimitiveType::ePOINT_LIST:
+		case EPrimitiveType::POINT_LIST:
 			return D3D_PRIMITIVE_TOPOLOGY_POINTLIST;
 			break;
-		case EPrimitiveType::eTRIANGLE_LIST:
+		case EPrimitiveType::TRIANGLE_LIST:
 			return D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 			break;
-		case EPrimitiveType::eTRIANGLE_STRIP:
+		case EPrimitiveType::TRIANGLE_STRIP:
 			return D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
 			break;
-		case EPrimitiveType::eLINE_LIST:
+		case EPrimitiveType::LINE_LIST:
 			return D3D_PRIMITIVE_TOPOLOGY_LINELIST;
 			break;
 		/*case EPrimitiveType::ePATCH_1_CONTROL_POINT:
@@ -66,14 +66,14 @@ D3D11Pipeline::D3D11Pipeline(D3D11Device* InDevice, const std::string& InName, c
 		}
 	};
 
-	DescriptorSetLayout = InDesc.DescriptorSetLayout;
+	DescriptorSetLayout = InDesc.Bindings;
 	ShaderAttachments = InDesc.ShaderAttachments;
 	if (ShaderAttachments.size() == 0)
 		throw std::runtime_error("No Shader attached.");
 
 	for (const auto& Attachment : ShaderAttachments)
 	{
-		auto Shader = Cast<D3D11CompiledShader>(Owner->CompileShader(Attachment));
+		auto Shader = Cast<D3D11CompiledShader>(Owner->CompileD3D11Shader(Attachment));
 
 		if (InDesc.VertexLayout.size() > 0 && Attachment.Type == eShaderType::Vertex && !VertexAttribute)
 		{
@@ -89,10 +89,9 @@ D3D11Pipeline::D3D11Pipeline(D3D11Device* InDevice, const std::string& InName, c
 
 	for (const auto& Binding : DescriptorSetLayout)
 	{
-		if (Binding.GetDescriptorType() == EDescriptorType::eSampler)
+		if (Binding.GetDescriptorType() == EDescriptorType::Sampler)
 		{
-			auto SamplerDesc = Binding.GetSamplerDesc();
-			D3D11SamplerState::SharedPtr SS = D3D11SamplerState::Create(Owner, SamplerDesc.has_value() ? *SamplerDesc : sSamplerAttributeDesc());
+			D3D11SamplerState::SharedPtr SS = D3D11SamplerState::Create(Owner, Binding.SamplerDesc);
 			SamplerStates.insert({ Binding.Location, SS->Get() });
 		}
 	}
@@ -218,12 +217,12 @@ void D3D11Pipeline::SetStencilRef(ID3D11DeviceContext1* Context, std::uint32_t R
 		Context->OMSetDepthStencilState(nullptr, 0);
 }
 
-std::optional<sDescriptorSetLayoutBinding> D3D11Pipeline::GetDescriptorSetConstantBufferLayoutBinding(std::size_t index) const
+std::optional<sShaderBinding> D3D11Pipeline::GetDescriptorSetConstantBufferLayoutBinding(std::size_t index) const
 {
 	std::size_t i = 0;
 	for (auto& DescriptorSet : DescriptorSetLayout)
 	{
-		if (DescriptorSet.GetDescriptorType() == EDescriptorType::eUniformBuffer)
+		if (DescriptorSet.GetDescriptorType() == EDescriptorType::UniformBuffer)
 		{
 			if (index == i)
 				return DescriptorSet;
@@ -234,12 +233,12 @@ std::optional<sDescriptorSetLayoutBinding> D3D11Pipeline::GetDescriptorSetConsta
 	return std::nullopt;
 }
 
-std::optional<sDescriptorSetLayoutBinding> D3D11Pipeline::GetDescriptorSetTextureLayoutBinding(std::size_t index) const
+std::optional<sShaderBinding> D3D11Pipeline::GetDescriptorSetTextureLayoutBinding(std::size_t index) const
 {
 	std::size_t i = 0;
 	for (auto& DescriptorSet : DescriptorSetLayout)
 	{
-		if (DescriptorSet.GetDescriptorType() == EDescriptorType::eTexture)
+		if (DescriptorSet.GetDescriptorType() == EDescriptorType::Texture)
 		{
 			if (index == i)
 				return DescriptorSet;
@@ -260,7 +259,7 @@ bool D3D11Pipeline::Recompile()
 
 	for (auto& Attachment : ShaderAttachments)
 	{
-		auto Shader = Cast<D3D11CompiledShader>(Owner->CompileShader(Attachment));
+		auto Shader = Cast<D3D11CompiledShader>(Owner->CompileD3D11Shader(Attachment));
 
 		/*if (InVertexLayout.size() > 0 && Attachment.Type == EShaderType::Vertex && !VertexAttribute)
 		{
@@ -281,26 +280,25 @@ D3D11ComputePipeline::D3D11ComputePipeline(D3D11Device* InDevice, const std::str
 	, Desc(InDesc)
 	, ShaderAttachment(InDesc.ShaderAttachment)
 {
-	for (const auto& Binding : Desc.DescriptorSetLayout)
+	for (const auto& Binding : Desc.Bindings)
 	{
-		if (Binding.GetDescriptorType() == EDescriptorType::eSampler)
+		if (Binding.GetDescriptorType() == EDescriptorType::Sampler)
 		{
-			auto SamplerDesc = Binding.GetSamplerDesc();
-			D3D11SamplerState::SharedPtr SS = D3D11SamplerState::Create(Owner, SamplerDesc.has_value() ? *SamplerDesc : sSamplerAttributeDesc());
+			D3D11SamplerState::SharedPtr SS = D3D11SamplerState::Create(Owner, Binding.SamplerDesc);
 			SamplerStates.insert({ Binding.Location, SS->Get() });
 		}
 	}
 
 	if (!ShaderAttachment.IsCodeValid())
 	{
-		auto pShader = Cast<D3D11CompiledShader>(Owner->CompileShader(ShaderAttachment.GetLocation(), ShaderAttachment.FunctionName, eShaderType::Compute, false, ShaderAttachment.ShaderDefines));
+		auto pShader = Cast<D3D11CompiledShader>(Owner->CompileD3D11Shader(ShaderAttachment.GetLocation(), ShaderAttachment.FunctionName, eShaderType::Compute, false, ShaderAttachment.ShaderDefines));
 		if (!pShader->IsCompiled())
 			pShader->CreateD3D11Shader();
 		Shader = pShader->GetShader();
 	}
 	else
 	{
-		auto pShader = Cast<D3D11CompiledShader>(Owner->CompileShader(ShaderAttachment.GetByteCode(), ShaderAttachment.GetByteCodeSize(), ShaderAttachment.FunctionName, eShaderType::Compute, false, ShaderAttachment.ShaderDefines));
+		auto pShader = Cast<D3D11CompiledShader>(Owner->CompileD3D11Shader(ShaderAttachment.GetByteCode(), ShaderAttachment.GetByteCodeSize(), ShaderAttachment.FunctionName, eShaderType::Compute, false, ShaderAttachment.ShaderDefines));
 		if (!pShader->IsCompiled())
 			pShader->CreateD3D11Shader();
 		Shader = pShader->GetShader();
@@ -317,26 +315,25 @@ void D3D11ComputePipeline::ApplyPipeline(ID3D11DeviceContext1* Context) const
 
 bool D3D11ComputePipeline::Recompile()
 {
-	for (const auto& Binding : Desc.DescriptorSetLayout)
+	for (const auto& Binding : Desc.Bindings)
 	{
-		if (Binding.GetDescriptorType() == EDescriptorType::eSampler)
+		if (Binding.GetDescriptorType() == EDescriptorType::Sampler)
 		{
-			auto SamplerDesc = Binding.GetSamplerDesc();
-			D3D11SamplerState::SharedPtr SS = D3D11SamplerState::Create(Owner, SamplerDesc.has_value() ? *SamplerDesc : sSamplerAttributeDesc());
+			D3D11SamplerState::SharedPtr SS = D3D11SamplerState::Create(Owner, Binding.SamplerDesc);
 			SamplerStates.insert({ Binding.Location, SS->Get() });
 		}
 	}
 
 	if (!ShaderAttachment.IsCodeValid())
 	{
-		auto pShader = Cast<D3D11CompiledShader>(Owner->CompileShader(ShaderAttachment.GetLocation(), ShaderAttachment.FunctionName, eShaderType::Compute, false, ShaderAttachment.ShaderDefines));
+		auto pShader = Cast<D3D11CompiledShader>(Owner->CompileD3D11Shader(ShaderAttachment.GetLocation(), ShaderAttachment.FunctionName, eShaderType::Compute, false, ShaderAttachment.ShaderDefines));
 		if (!pShader->IsCompiled())
 			pShader->CreateD3D11Shader();
 		Shader = pShader->GetShader();
 	}
 	else
 	{
-		auto pShader = Cast<D3D11CompiledShader>(Owner->CompileShader(ShaderAttachment.GetByteCode(), ShaderAttachment.GetByteCodeSize(), ShaderAttachment.FunctionName, eShaderType::Compute, false, ShaderAttachment.ShaderDefines));
+		auto pShader = Cast<D3D11CompiledShader>(Owner->CompileD3D11Shader(ShaderAttachment.GetByteCode(), ShaderAttachment.GetByteCodeSize(), ShaderAttachment.FunctionName, eShaderType::Compute, false, ShaderAttachment.ShaderDefines));
 		if (!pShader->IsCompiled())
 			pShader->CreateD3D11Shader();
 		Shader = pShader->GetShader();

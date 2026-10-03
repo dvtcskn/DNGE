@@ -1,7 +1,7 @@
 /* ---------------------------------------------------------------------------------------
 * MIT License
 *
-* Copyright (c) 2023 Davut Coþkun.
+* Copyright (c) 2023 Davut Coï¿½kun.
 * All rights reserved.
 *
 * Permission is hereby granted, free of charge, to any person obtaining
@@ -43,7 +43,10 @@
 
 #pragma comment(lib, "dxcompiler.lib")
 
+//#pragma comment(lib, "WinPixEventRuntime.lib")
+
 #pragma comment(lib, "box2d.lib")
+
 
 #define WINDOW_STYLE_NORMAL					(WS_VISIBLE | WS_OVERLAPPEDWINDOW | WS_CAPTION)
 #define WINDOW_STYLE_BORDERLESS				(WS_VISIBLE | WS_POPUP | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_POPUP)
@@ -150,15 +153,23 @@ WindowsPlatform::WindowsPlatform()
 	RECT rect = ArrangeWindow(RECT({ 0, 0, static_cast<LONG>(WindowWidth), static_cast<LONG>(WindowHeight) }));
 	CreateViewport(L"Sample1", rect, WindowFullscreen);
 
-	GPUDeviceCreateInfo GPUCreateInfo;
-	GPUCreateInfo.Type = EGITypes::eD3D12;
-	GPUCreateInfo.GPUIndex = -1;
-	GPUCreateInfo.Width = WindowWidth;
-	GPUCreateInfo.Height = WindowHeight;
-	GPUCreateInfo.Fullscreen = WindowFullscreen;
-	GPUCreateInfo.pHWND = GetHWND();
+	GPUCreateInfo CreateInfo;
+	CreateInfo.PrimaryGPU.Type = EGITypes::D3D12;
+	CreateInfo.PrimaryGPU.DeviceType = EGPUDeviceType::Software;
+	CreateInfo.Width = WindowWidth;
+	CreateInfo.Height = WindowHeight;
+	CreateInfo.Fullscreen = WindowFullscreen;
+	CreateInfo.pHWND = GetHWND();
 
-	Engine = sEngine::CreateUnique(GPUCreateInfo, sWorld2D::Create());
+	Engine = sEngine::CreateUnique(CreateInfo,
+#if BulletPhysics
+		BulletWorld::Create()
+#elif PhysXEngine
+		PhysXWorld::Create()
+#else
+		sWorld2D::Create()
+#endif
+	);
 
 	//Engine->InitWindow(GetHWND(), WindowWidth, WindowHeight, WindowFullscreen);
 	Engine->SetInternalBaseRenderResolution(640, 360);
@@ -174,6 +185,8 @@ WindowsPlatform::WindowsPlatform()
 	//Engine->SetEngineFixedTargetElapsedSeconds(true, 1.0/60.0);
 
 	WindowMode(2);
+
+	//Engine->RunOnEngineThread();
 }
 
 WindowsPlatform::~WindowsPlatform()
@@ -188,8 +201,8 @@ WindowsPlatform::~WindowsPlatform()
 		Network::Disconnect();
 	if (Network::IsServerRunning())
 		Network::DestroySession();
-	Engine = nullptr;
 	AssetManager::Get().Destroy();
+	Engine = nullptr;
 }
 
 bool WindowsPlatform::CreateViewport(std::wstring title, RECT rect, bool bfullscreen)
@@ -616,7 +629,7 @@ void WindowsPlatform::WindowMode(const int value)
 	}
 }
 
-void WindowsPlatform::ResizeWindow(std::size_t Width, std::size_t Height)
+void WindowsPlatform::ResizeWindow(std::uint32_t Width, std::uint32_t Height)
 {
 	WindowWidth = (uint32_t)Width;
 	WindowHeight = (uint32_t)Height;

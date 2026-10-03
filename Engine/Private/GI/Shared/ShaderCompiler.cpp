@@ -63,6 +63,18 @@ DXCShaderCompiler::DXCShaderCompiler()
     ThrowIfFailed(::DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&pUtils)));
     ThrowIfFailed(::DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&pCompiler)));
     ThrowIfFailed(pUtils->CreateDefaultIncludeHandler(&IncludeHandler));
+
+   // ComPtr<IDxcPdbUtils2> pdb = nullptr;
+   // ThrowIfFailed(::DxcCreateInstance(CLSID_DxcPdbUtils, IID_PPV_ARGS(&pdb)));
+
+   // IDxcVersionInfo* DxcVersionInfo = nullptr;
+   // HRESULT HR = pdb->GetVersionInfo(&DxcVersionInfo);
+
+   // ComPtr<IDxcVersionInfo3> DxcVersionInfo3;
+   //// HR = DxcVersionInfo->QueryInterface(IID_PPV_ARGS(DxcVersionInfo3.GetAddressOf()));
+   // 
+   // char* sTR = nullptr;
+   // HR = DxcVersionInfo3->GetCustomVersionString(&sTR);
 }
 
 DXCShaderCompiler::~DXCShaderCompiler()
@@ -114,7 +126,7 @@ IShader::SharedPtr DXCShaderCompiler::CompileShader(const void* InCode, std::siz
     Arguments.push_back(L"-E");
     Arguments.push_back(FunctionName.c_str());
 
-    auto Type = [](eShaderType InType) -> LPCWSTR
+    auto ShaderProfile = [](eShaderType InType) -> LPCWSTR
     {
          switch (InType)
          {
@@ -130,9 +142,9 @@ IShader::SharedPtr DXCShaderCompiler::CompileShader(const void* InCode, std::siz
          return L" ";
     };
 
-    // -T for the target profile (eg. 'ps_6_6')
+    // -T for the target profile (eg. 'ps_6_7')
     Arguments.push_back(L"-T");
-    Arguments.push_back(Type(InProfile));
+    Arguments.push_back(ShaderProfile(InProfile));
 
     if (Spirv)
     {

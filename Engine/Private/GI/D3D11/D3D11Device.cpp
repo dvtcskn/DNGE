@@ -42,9 +42,11 @@
 
 #define DEBUG_D3DDEVICE 1
 
-D3D11Device::D3D11Device(const GPUDeviceCreateInfo& DeviceCreateInfo)
+D3D11Device::D3D11Device(const GPUCreateInfo& DeviceCreateInfo, std::uint32_t InDeviceIndex)
 	: VendorId(0)
-	, GPUIndex(DeviceCreateInfo.GPUIndex)
+	, GPUIndex(DeviceCreateInfo.PrimaryGPU.GPUIndex)
+	, DeviceType(DeviceCreateInfo.PrimaryGPU.DeviceType)
+	, DeviceIndex(InDeviceIndex)
 {
 	auto WideStringToString = [](const std::wstring& utf16) -> std::string
 		{
@@ -117,12 +119,9 @@ D3D11Device::D3D11Device(const GPUDeviceCreateInfo& DeviceCreateInfo)
 
 	bool bWarp = false;
 
-	if (GPUIndex.has_value())
+	if (DeviceType == EGPUDeviceType::Software)
 	{
-		if (GPUIndex <= -1)
-		{
-			bWarp = true;
-		}
+		bWarp = true;
 	}
 
 	while (FeatureIndex < 10)
@@ -161,12 +160,9 @@ D3D11Device::D3D11Device(const GPUDeviceCreateInfo& DeviceCreateInfo)
 	ShaderCompiler = D3D11ShaderCompiler::CreateUnique(this);
 
 	{
-		if (GPUIndex.has_value())
+		if (DeviceType == EGPUDeviceType::Software)
 		{
-			if (GPUIndex <= -1)
-			{
-				std::cout << "WARP Device" << std::endl;
-			}
+			std::cout << "WARP Device" << std::endl;
 		}
 		std::wcout << AdapterDesc.Description << std::endl;
 		std::cout << AdapterDesc.DeviceId << std::endl;
@@ -243,25 +239,25 @@ D3D11Device::~D3D11Device()
 #endif
 }
 
-D3D11Viewport* D3D11Device::GetViewportContext() const
-{
-	return Viewport.get();
-}
-
 void D3D11Device::InitWindow(void* InHWND, std::uint32_t InWidth, std::uint32_t InHeight, bool bFullscreen)
 {
-	if (!Viewport)
-		Viewport = std::make_unique<D3D11Viewport>(this, DXGIFactory, InWidth, InHeight, bFullscreen, (HWND)InHWND);
+	if (IsPrimaryGPU())
+	{
+		if (!Viewport)
+			Viewport = std::make_unique<D3D11Viewport>(this, DXGIFactory, InWidth, InHeight, bFullscreen, (HWND)InHWND);
+	}
 }
 
 void D3D11Device::BeginFrame()
 {
-	Viewport->BeginFrame();
+	if (IsPrimaryGPU())
+		Viewport->BeginFrame();
 }
 
 void D3D11Device::Present(IRenderTarget* pRT)
 {
-	Viewport->Present(pRT);
+	if (IsPrimaryGPU())
+		Viewport->Present(pRT);
 
 	Direct3DDeviceIMContext->DiscardView(Viewport->GetCurrentBackBufferRT());
 	Direct3DDeviceIMContext->ClearState();
@@ -269,57 +265,106 @@ void D3D11Device::Present(IRenderTarget* pRT)
 
 bool D3D11Device::IsFullScreen() const
 {
-	return Viewport->IsFullScreen();
+	if (IsPrimaryGPU())
+		return Viewport->IsFullScreen();
+	return false;
 }
 
 bool D3D11Device::IsVsyncEnabled() const
 {
-	return Viewport->IsVsyncEnabled();
+	if (IsPrimaryGPU())
+		return Viewport->IsVsyncEnabled();
+	return false;
 }
 
 std::uint32_t D3D11Device::GetVsyncInterval() const
 {
-	return Viewport->GetVsyncInterval();
+	if (IsPrimaryGPU())
+		return Viewport->GetVsyncInterval();
+	return -1;
+}
+
+void D3D11Device::GPUFlush()
+{
+
+}
+
+void D3D11Device::WaitForGPU()
+{
+
+}
+
+void D3D11Device::WaitForCPU()
+{
+
 }
 
 void D3D11Device::ResizeWindow(std::size_t Width, std::size_t Height)
 {
-	Viewport->ResizeSwapChain(Width, Height);
+	if (IsPrimaryGPU())
+		Viewport->ResizeSwapChain(Width, Height);
 }
 
 void D3D11Device::FullScreen(const bool value)
 {
-	Viewport->FullScreen(value);
+	if (IsPrimaryGPU())
+		Viewport->FullScreen(value);
 }
 
 void D3D11Device::Vsync(const bool value)
 {
-	Viewport->Vsync(value);
+	if (IsPrimaryGPU())
+		Viewport->Vsync(value);
 }
 
 void D3D11Device::VsyncInterval(const std::uint32_t value)
 {
-	Viewport->VsyncInterval(value);
+	if (IsPrimaryGPU())
+		Viewport->VsyncInterval(value);
 }
 
 std::vector<sDisplayMode> D3D11Device::GetAllSupportedResolutions() const
 {
-	return Viewport->GetAllSupportedResolutions();
+	if (IsPrimaryGPU())
+		return Viewport->GetAllSupportedResolutions();
+	return std::vector<sDisplayMode>();
 }
 
 sScreenDimension D3D11Device::GetBackBufferDimension() const
 {
-	return Viewport->GetScreenDimension();
+	if (IsPrimaryGPU())
+		return Viewport->GetScreenDimension();
+	return sScreenDimension();
 }
 
 EFormat D3D11Device::GetBackBufferFormat() const
 {
-	return Viewport->GetBackBufferFormat();
+	if (IsPrimaryGPU())
+		return Viewport->GetBackBufferFormat();
+	return EFormat::UNKNOWN;
 }
 
 sViewport D3D11Device::GetViewport() const
 {
-	return Viewport->GetViewport();
+	if (IsPrimaryGPU())
+		return Viewport->GetViewport();
+	return sViewport();
+}
+
+std::uint32_t D3D11Device::GetBackBufferSize() const
+{
+	if (!Viewport)
+		return std::uint32_t(-1);
+
+	return Viewport->GetBackBufferCount();
+}
+
+std::uint32_t D3D11Device::GetCurrentBackBufferIndex() const
+{
+	if (!Viewport)
+		return std::uint32_t(-1);
+
+	return Viewport->GetCurrentBackBufferIndex();
 }
 
 IDXGIAdapter1* D3D11Device::GetAdapter(std::optional<short> Index)
@@ -410,7 +455,7 @@ bool D3D11Device::GetDeviceIdentification(std::wstring& InVendorID, std::wstring
 	return true;
 }
 
-IShader* D3D11Device::CompileShader(const sShaderAttachment& Attachment, bool Spirv)
+IShader* D3D11Device::CompileD3D11Shader(const sShaderAttachment& Attachment, bool Spirv)
 {
 	if (sShaderManager::Get().IsShaderExist(Attachment.GetLocation(), Attachment.FunctionName))
 		return sShaderManager::Get().GetShader(Attachment.GetLocation(), Attachment.FunctionName);
@@ -420,7 +465,7 @@ IShader* D3D11Device::CompileShader(const sShaderAttachment& Attachment, bool Sp
 	return pShader.get();
 }
 
-IShader* D3D11Device::CompileShader(std::wstring InSrcFile, std::string InFunctionName, eShaderType InProfile, bool Spirv, std::vector<sShaderDefines> InDefines)
+IShader* D3D11Device::CompileD3D11Shader(std::wstring InSrcFile, std::string InFunctionName, eShaderType InProfile, bool Spirv, std::vector<sShaderDefines> InDefines)
 {
 	if (sShaderManager::Get().IsShaderExist(InSrcFile, InFunctionName))
 		return sShaderManager::Get().GetShader(InSrcFile, InFunctionName);
@@ -430,7 +475,7 @@ IShader* D3D11Device::CompileShader(std::wstring InSrcFile, std::string InFuncti
 	return pShader.get();
 }
 
-IShader* D3D11Device::CompileShader(const void* InCode, std::size_t Size, std::string InFunctionName, eShaderType InProfile, bool Spirv, std::vector<sShaderDefines> InDefines)
+IShader* D3D11Device::CompileD3D11Shader(const void* InCode, std::size_t Size, std::string InFunctionName, eShaderType InProfile, bool Spirv, std::vector<sShaderDefines> InDefines)
 {
 	if (sShaderManager::Get().IsShaderExist(L"", InFunctionName))
 		return sShaderManager::Get().GetShader(L"", InFunctionName);
@@ -438,6 +483,36 @@ IShader* D3D11Device::CompileShader(const void* InCode, std::size_t Size, std::s
 	IShader::SharedPtr pShader = ShaderCompiler->Compile(InCode, Size, InFunctionName, InProfile, InDefines);
 	sShaderManager::Get().StoreShader(pShader);
 	return pShader.get();
+}
+
+IShader::SharedPtr D3D11Device::CompileShader(const sShaderAttachment& Attachment)
+{
+	if (sShaderManager::Get().IsShaderExist(Attachment.GetLocation(), Attachment.FunctionName))
+		return sShaderManager::Get().GetShaderAsShared(Attachment.GetLocation(), Attachment.FunctionName);
+
+	IShader::SharedPtr pShader = ShaderCompiler->Compile(Attachment);
+	sShaderManager::Get().StoreShader(pShader);
+	return pShader;
+}
+
+IShader::SharedPtr D3D11Device::CompileShader(std::wstring InSrcFile, std::string InFunctionName, eShaderType InProfile, std::vector<sShaderDefines> InDefines)
+{
+	if (sShaderManager::Get().IsShaderExist(InSrcFile, InFunctionName))
+		return sShaderManager::Get().GetShaderAsShared(InSrcFile, InFunctionName);
+
+	IShader::SharedPtr pShader = ShaderCompiler->Compile(InSrcFile, InFunctionName, InProfile, InDefines);
+	sShaderManager::Get().StoreShader(pShader);
+	return pShader;
+}
+
+IShader::SharedPtr D3D11Device::CompileShader(const void* InCode, std::size_t Size, std::string InFunctionName, eShaderType InProfile, std::vector<sShaderDefines> InDefines)
+{
+	if (sShaderManager::Get().IsShaderExist(L"", InFunctionName))
+		return sShaderManager::Get().GetShaderAsShared(L"", InFunctionName);
+
+	IShader::SharedPtr pShader = ShaderCompiler->Compile(InCode, Size, InFunctionName, InProfile, InDefines);
+	sShaderManager::Get().StoreShader(pShader);
+	return pShader;
 }
 
 IGraphicsCommandContext::SharedPtr D3D11Device::CreateGraphicsCommandContext()
@@ -500,6 +575,36 @@ IIndexBuffer::UniquePtr D3D11Device::CreateUniqueIndexBuffer(std::string InName,
 	return D3D11IndexBuffer::CreateUnique(this, InName, InDesc, InSubresource);
 }
 
+IByteAddressBuffer::SharedPtr D3D11Device::CreateByteAddressBuffer(std::string InName, std::uint64_t Size, bool bReadWriteAllowed)
+{
+	return nullptr;
+}
+
+IByteAddressBuffer::UniquePtr D3D11Device::CreateUniqueByteAddressBuffer(std::string InName, std::uint64_t Size, bool bReadWriteAllowed)
+{
+	return nullptr;
+}
+
+IStructuredBuffer::SharedPtr D3D11Device::CreateStructuredBuffer(std::string InName, const BufferLayout& InDesc, bool bSRVAllowed)
+{
+	return nullptr;
+}
+
+IStructuredBuffer::UniquePtr D3D11Device::CreateUniqueStructuredBuffer(std::string InName, const BufferLayout& InDesc, bool bSRVAllowed)
+{
+	return nullptr;
+}
+
+IIndirectBuffer::SharedPtr D3D11Device::CreateIndirectBuffer(std::string InName, BufferLayout NewLayout)
+{
+	return IIndirectBuffer::SharedPtr();
+}
+
+IIndirectBuffer::UniquePtr D3D11Device::CreateUniqueIndirectBuffer(std::string InName, BufferLayout NewLayout)
+{
+	return IIndirectBuffer::UniquePtr();
+}
+
 IFrameBuffer::SharedPtr D3D11Device::CreateFrameBuffer(const std::string InName, const sFrameBufferAttachmentInfo& InAttachments)
 {
 	return D3D11FrameBuffer::Create(this, InName, InAttachments);
@@ -508,6 +613,16 @@ IFrameBuffer::SharedPtr D3D11Device::CreateFrameBuffer(const std::string InName,
 IFrameBuffer::UniquePtr D3D11Device::CreateUniqueFrameBuffer(const std::string InName, const sFrameBufferAttachmentInfo& InAttachments)
 {
 	return D3D11FrameBuffer::CreateUnique(this, InName, InAttachments);
+}
+
+ISamplerState::SharedPtr D3D11Device::CreateSamplerState(const std::string InName, const sSamplerAttributeDesc& InDesc)
+{
+	return D3DX11SamplerState::Create(this, InName, InDesc);
+}
+
+ISamplerState::UniquePtr D3D11Device::CreateUniqueSamplerState(const std::string InName, const sSamplerAttributeDesc& InDesc)
+{
+	return D3DX11SamplerState::CreateUnique(this, InName, InDesc);
 }
 
 IRenderTarget::SharedPtr D3D11Device::CreateRenderTarget(const std::string InName, const EFormat Format, const sFBODesc& Desc)

@@ -17,17 +17,37 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-#include "tonemappers.hlsl"
+#include "Tonemappers.hlsl"
+
+#ifndef BINDLESS
+#define BINDLESS 0
+#endif
 
 //--------------------------------------------------------------------------------------
 // Constant Buffer
 //--------------------------------------------------------------------------------------
-cbuffer cbPerFrame : register(b13)
+#if BINDLESS
+struct TonemappingAttributes
+{
+    float u_exposure;
+    uint  u_toneMapper;
+    uint  u_gamma2;
+};
+struct PerFrame
+{
+    uint HDRTexture;
+    uint Sampler;
+    uint Attributes;
+};
+ConstantBuffer<PerFrame> PerFrameCB : register(b0);
+#else
+cbuffer cbPerFrame : register(b0)
 {
     float u_exposure : packoffset(c0.x);
     int   u_toneMapper : packoffset(c0.y);
     int   u_gamma2 : packoffset(c0.z);
 }
+#endif
 
 //--------------------------------------------------------------------------------------
 // I/O Structures
@@ -40,8 +60,10 @@ struct VERTEX
 //--------------------------------------------------------------------------------------
 // Texture definitions
 //--------------------------------------------------------------------------------------
+#if !BINDLESS
 Texture2D        HDR              :register(t0);
 SamplerState     samLinearWrap    :register(s0);
+#endif
 
 
 float3 Pattern(float2 vTexcoord)
@@ -82,9 +104,31 @@ float3 Tonemap(float3 color, float exposure, int tonemapper)
 // Main function
 //--------------------------------------------------------------------------------------
 
+#if BINDLESS
 float4 mainPS(VERTEX Input) : SV_Target
 {
-    if (u_exposure < 0)
+    ConstantBuffer<TonemappingAttributes> Frame = ResourceDescriptorHeap[PerFrameCB.Attributes];
+
+    if (Frame.u_exposure < 0)
+    {
+        Texture2D HDRTexture = ResourceDescriptorHeap[PerFrameCB.HDRTexture]; 
+        SamplerState mySampler = SamplerDescriptorHeap[PerFrameCB.Sampler];
+        return HDRTexture.Sample(mySampler, Input.vTexcoord);
+    }
+
+    Texture2D HDRTexture = ResourceDescriptorHeap[PerFrameCB.HDRTexture]; 
+    SamplerState mySampler = SamplerDescriptorHeap[PerFrameCB.Sampler];
+    float4 texColor = HDRTexture.Sample(mySampler, Input.vTexcoord);
+
+    float3 color = Tonemap(texColor.rgb, Frame.u_exposure, Frame.u_toneMapper);
+    if (Frame.u_gamma2 == 1)
+        color = sqrt(color);
+    return float4(color, 1);
+}
+#else
+float4 mainPS(VERTEX Input) : SV_Target
+{
+    if (Frame.u_exposure < 0)
     {
         return HDR.Sample(samLinearWrap, Input.vTexcoord);
     }
@@ -96,3 +140,4 @@ float4 mainPS(VERTEX Input) : SV_Target
         color = sqrt(color);
     return float4(color, 1);
 }
+#endif

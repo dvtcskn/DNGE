@@ -1,7 +1,7 @@
-/* ---------------------------------------------------------------------------------------
+﻿/* ---------------------------------------------------------------------------------------
 * MIT License
 *
-* Copyright (c) 2023 Davut Co�kun.
+* Copyright (c) 2023 Davut Coşkun.
 * All rights reserved.
 *
 * Permission is hereby granted, free of charge, to any person obtaining
@@ -36,7 +36,7 @@
 #define sFORCEINLINE __forceinline
 #endif
 
-	// Functions that became constexpr in C++20
+// Functions that became constexpr in C++20
 #if _MSVC_LANG >= 202002L
 #ifndef sCONSTEXPR20
 #define sCONSTEXPR20 constexpr

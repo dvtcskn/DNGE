@@ -81,15 +81,33 @@ D3D12RenderTarget::D3D12RenderTarget(D3D12Device* InOwner, const std::string InN
 		//	states |= D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
 
 		auto HeapDesc = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-		HRESULT hr = InOwner->Get()->CreateCommittedResource(
-			&HeapDesc,
-			D3D12_HEAP_FLAG_NONE,
-			&resourceDesc,
-			states,
-			&clearValue,
-			IID_PPV_ARGS(&Texture));
 
-		assert(hr == S_OK);
+		const bool IsEnhancedBarriersSupported = InOwner->IsEnhancedBarriersSupported();
+		if (IsEnhancedBarriersSupported)
+		{
+			auto Desc1 = CD3DX12_RESOURCE_DESC1(resourceDesc);
+			ThrowIfFailed(InOwner->GetDevice()->CreateCommittedResource3(
+				&HeapDesc,
+				D3D12_HEAP_FLAG_NONE,
+				&Desc1,
+				D3D12_BARRIER_LAYOUT_UNDEFINED,
+				&clearValue,
+				nullptr,
+				0,
+				nullptr,
+				IID_PPV_ARGS(&Texture)));
+		}
+		else
+		{
+			HRESULT hr = InOwner->Get()->CreateCommittedResource(
+				&HeapDesc,
+				D3D12_HEAP_FLAG_NONE,
+				&resourceDesc,
+				states,
+				&clearValue,
+				IID_PPV_ARGS(&Texture));
+			assert(hr == S_OK);
+		}
 
 #if _DEBUG
 		Texture->SetName(FileManager::StringToWstring(InName).c_str());
@@ -230,15 +248,34 @@ D3D12DepthTarget::D3D12DepthTarget(D3D12Device* InOwner, const std::string InNam
 		}
 
 		auto HeapDesc = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-		HRESULT hr = InOwner->Get()->CreateCommittedResource(
-			&HeapDesc,
-			D3D12_HEAP_FLAG_NONE,
-			&resourceDesc,
-			states,
-			&clearValue,
-			IID_PPV_ARGS(&Texture));
 
-		assert(hr == S_OK);
+		const bool IsEnhancedBarriersSupported = InOwner->IsEnhancedBarriersSupported();
+		if (IsEnhancedBarriersSupported)
+		{
+			auto Desc1 = CD3DX12_RESOURCE_DESC1(resourceDesc);
+			ThrowIfFailed(InOwner->GetDevice()->CreateCommittedResource3(
+				&HeapDesc,
+				D3D12_HEAP_FLAG_NONE,
+				&Desc1,
+				D3D12_BARRIER_LAYOUT_UNDEFINED,
+				&clearValue,
+				nullptr,
+				0,
+				nullptr,
+				IID_PPV_ARGS(&Texture)));
+		}
+		else
+		{
+			HRESULT hr = InOwner->Get()->CreateCommittedResource(
+				&HeapDesc,
+				D3D12_HEAP_FLAG_NONE,
+				&resourceDesc,
+				states,
+				&clearValue,
+				IID_PPV_ARGS(&Texture));
+
+			assert(hr == S_OK);
+		}
 
 #if _DEBUG
 		Texture->SetName(FileManager::StringToWstring(InName).c_str());
@@ -357,15 +394,34 @@ D3D12UnorderedAccessTarget::D3D12UnorderedAccessTarget(D3D12Device* InOwner, con
 		//states |= D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
 
 		auto HeapDesc = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-		HRESULT hr = InOwner->Get()->CreateCommittedResource(
-			&HeapDesc,
-			D3D12_HEAP_FLAG_NONE,
-			&resourceDesc,
-			states,
-			0,
-			IID_PPV_ARGS(&Texture));
 
-		assert(hr == S_OK);
+		const bool IsEnhancedBarriersSupported = InOwner->IsEnhancedBarriersSupported();
+		if (IsEnhancedBarriersSupported)
+		{
+			auto Desc1 = CD3DX12_RESOURCE_DESC1(resourceDesc);
+			ThrowIfFailed(InOwner->GetDevice()->CreateCommittedResource3(
+				&HeapDesc,
+				D3D12_HEAP_FLAG_NONE,
+				&Desc1,
+				D3D12_BARRIER_LAYOUT_UNDEFINED,
+				nullptr,
+				nullptr,
+				0,
+				nullptr,
+				IID_PPV_ARGS(&Texture)));
+		}
+		else
+		{
+			HRESULT hr = InOwner->Get()->CreateCommittedResource(
+				&HeapDesc,
+				D3D12_HEAP_FLAG_NONE,
+				&resourceDesc,
+				states,
+				0,
+				IID_PPV_ARGS(&Texture));
+
+			assert(hr == S_OK);
+		}
 
 #if _DEBUG
 		Texture->SetName(FileManager::StringToWstring(InName).c_str());
@@ -446,43 +502,43 @@ D3D12FrameBuffer::D3D12FrameBuffer(D3D12Device* InOwner, std::string InName, con
 	{
 		const auto& FB = AttachmentInfo.FrameBuffer[i];
 
-		if (FB.AttachmentType == eFrameBufferAttachmentType::eUAV)
+		if (FB.AttachmentType == EFrameBufferAttachmentType::UAV)
 		{
 			UnorderedAccessTargets.push_back(D3D12UnorderedAccessTarget::Create(Owner, Name + "_UAV_" + std::to_string(UnorderedAccessTargets.size()), FB.Format, FDesc, false));
 		}
-		else if (FB.AttachmentType == eFrameBufferAttachmentType::eUAV_SRV)
+		else if (FB.AttachmentType == EFrameBufferAttachmentType::UAV_SRV)
 		{
 			UnorderedAccessTargets.push_back(D3D12UnorderedAccessTarget::Create(Owner, Name + "_UAV_" + std::to_string(UnorderedAccessTargets.size()), FB.Format, FDesc, true));
 		}
-		else if (FB.AttachmentType == eFrameBufferAttachmentType::eRT)
+		else if (FB.AttachmentType == EFrameBufferAttachmentType::RT)
 		{
 			RenderTargets.push_back(D3D12RenderTarget::Create(Owner, Name + "_RenderTarget_" + std::to_string(RenderTargets.size()), FB.Format, FDesc, false, false));
 		}
-		else if (FB.AttachmentType == eFrameBufferAttachmentType::eRT_SRV)
+		else if (FB.AttachmentType == EFrameBufferAttachmentType::RT_SRV)
 		{
 			RenderTargets.push_back(D3D12RenderTarget::Create(Owner, Name + "_RenderTarget_" + std::to_string(RenderTargets.size()), FB.Format, FDesc, true, false));
 		}
-		else if (FB.AttachmentType == eFrameBufferAttachmentType::eRT_UAV)
+		else if (FB.AttachmentType == EFrameBufferAttachmentType::RT_UAV)
 		{
 			RenderTargets.push_back(D3D12RenderTarget::Create(Owner, Name + "_RenderTarget_" + std::to_string(RenderTargets.size()), FB.Format, FDesc, false, true));
 		}
-		else if (FB.AttachmentType == eFrameBufferAttachmentType::eRT_SRV_UAV)
+		else if (FB.AttachmentType == EFrameBufferAttachmentType::RT_SRV_UAV)
 		{
 			RenderTargets.push_back(D3D12RenderTarget::Create(Owner, Name + "_RenderTarget_" + std::to_string(RenderTargets.size()), FB.Format, FDesc, true, true));
 		}
-		else if (FB.AttachmentType == eFrameBufferAttachmentType::eDepth)
+		else if (FB.AttachmentType == EFrameBufferAttachmentType::Depth)
 		{
 
 		}
-		else if (FB.AttachmentType == eFrameBufferAttachmentType::eDepth_SRV)
+		else if (FB.AttachmentType == EFrameBufferAttachmentType::Depth_SRV)
 		{
 
 		}
-		else if (FB.AttachmentType == eFrameBufferAttachmentType::eDepth_UAV)
+		else if (FB.AttachmentType == EFrameBufferAttachmentType::Depth_UAV)
 		{
 
 		}
-		else if (FB.AttachmentType == eFrameBufferAttachmentType::eDepth_SRV_UAV)
+		else if (FB.AttachmentType == EFrameBufferAttachmentType::Depth_SRV_UAV)
 		{
 
 		}
@@ -498,22 +554,22 @@ void D3D12FrameBuffer::AttachRenderTarget(const IRenderTarget::SharedPtr& Render
 {
 	if (auto RT = std::dynamic_pointer_cast<D3D12RenderTarget>(RenderTarget))
 	{
-		eFrameBufferAttachmentType AttachmentType;
+		EFrameBufferAttachmentType AttachmentType;
 		if (!RT->IsSRV_Allowed() && !RT->IsUAV_Allowed())
 		{
-			AttachmentType = eFrameBufferAttachmentType::eRT;
+			AttachmentType = EFrameBufferAttachmentType::RT;
 		}
 		else if (RT->IsSRV_Allowed() && !RT->IsUAV_Allowed())
 		{
-			AttachmentType = eFrameBufferAttachmentType::eRT_SRV;
+			AttachmentType = EFrameBufferAttachmentType::RT_SRV;
 		}
 		else if (!RT->IsSRV_Allowed() && RT->IsUAV_Allowed())
 		{
-			AttachmentType = eFrameBufferAttachmentType::eRT_UAV;
+			AttachmentType = EFrameBufferAttachmentType::RT_UAV;
 		}
 		else if (RT->IsSRV_Allowed() && RT->IsUAV_Allowed())
 		{
-			AttachmentType = eFrameBufferAttachmentType::eRT_SRV_UAV;
+			AttachmentType = EFrameBufferAttachmentType::RT_SRV_UAV;
 		}
 
 		if (Index.has_value())
@@ -532,14 +588,14 @@ void D3D12FrameBuffer::AttachUnorderedAccessTarget(const IUnorderedAccessTarget:
 {
 	if (auto ST = std::dynamic_pointer_cast<D3D12UnorderedAccessTarget>(UnorderedAccessTarget))
 	{
-		eFrameBufferAttachmentType AttachmentType;
+		EFrameBufferAttachmentType AttachmentType;
 		if (!ST->IsSRV_Allowed())
 		{
-			AttachmentType = eFrameBufferAttachmentType::eUAV;
+			AttachmentType = EFrameBufferAttachmentType::UAV;
 		}
 		else if (ST->IsSRV_Allowed())
 		{
-			AttachmentType = eFrameBufferAttachmentType::eUAV_SRV;
+			AttachmentType = EFrameBufferAttachmentType::UAV_SRV;
 		}
 
 		if (Index.has_value())
@@ -562,4 +618,9 @@ void D3D12FrameBuffer::SetDepthTarget(const IDepthTarget::SharedPtr& InDepthTarg
 		DepthTarget = DT;
 		AttachmentInfo.DepthFormat = DepthTarget->GetFormat();
 	}
+}
+
+bool D3D12FrameBuffer::CopyFrom(IFrameBuffer* FrameBuffer)
+{
+	return false;
 }

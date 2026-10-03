@@ -53,7 +53,8 @@ public:
 	~D3D12Viewport();
 
 	void BeginFrame();
-	void Present(IRenderTarget* pRT);
+	void OnPresent(IRenderTarget* pRT);
+	void Present();
 
 	void ResizeSwapChain(std::size_t Width, std::size_t Height);
 	void FullScreen(const bool value);
@@ -71,13 +72,15 @@ public:
 	FORCEINLINE const D3D12_VIEWPORT& GetD3D12Viewport() { return viewport; }
 	FORCEINLINE std::uint32_t GetViewportWidth() const { return SizeX; }
 	FORCEINLINE std::uint32_t GetViewportHeight() const { return SizeY; }
-	FORCEINLINE std::uint64_t GetFrameIndex() const { return FrameIndex; }
 	FORCEINLINE sViewport GetViewport() { return sViewport((std::uint32_t)viewport.Width, (std::uint32_t)viewport.Height, (std::uint32_t)viewport.TopLeftX, (std::uint32_t)viewport.TopLeftY, viewport.MinDepth, viewport.MaxDepth); }
 	FORCEINLINE EFormat GetBackBufferFormat() const { return BackBufferFormat; }
 	FORCEINLINE sScreenDimension GetScreenDimension() const { return sScreenDimension(SizeX, SizeY); }
 
+	FORCEINLINE std::uint32_t GetBackBufferCount() const { return 2; }
+	FORCEINLINE std::uint32_t GetCurrentBackBufferIndex() const { return CurrentBackBuffer; }
+
+private:
 	void CreateRenderTargets();
-	void CopyToBackBuffer(IRenderTarget* pRT);
 
 private:
 	D3D12Device* Owner;
@@ -116,8 +119,6 @@ private:
 
 	UINT SwapChainBufferCount;
 	std::uint32_t CurrentBackBuffer;
-
-	std::uint64_t FrameIndex;
 
 	DXGI_PRESENT_PARAMETERS PresentParams;
 

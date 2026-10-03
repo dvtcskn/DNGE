@@ -40,7 +40,7 @@ D3D12ComputeCommandContext::D3D12ComputeCommandContext(D3D12Device* InDevice)
 {
 	auto Device = Owner->GetDevice();
 	CommandAllocator = Owner->RequestCommandAllocator(D3D12_COMMAND_LIST_TYPE_COMPUTE);
-	ThrowIfFailed(Device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_COMPUTE, CommandAllocator, nullptr, IID_PPV_ARGS(&CommandList)));
+	ThrowIfFailed(Device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_COMPUTE, CommandAllocator.Get(), nullptr, IID_PPV_ARGS(&CommandList)));
 	CommandList->Close();
 	bIsClosed = true;
 #if _DEBUG
@@ -57,7 +57,7 @@ D3D12ComputeCommandContext::~D3D12ComputeCommandContext()
 
 void D3D12ComputeCommandContext::BeginRecordCommandList()
 {
-	WaitForGPU();
+	//WaitForGPU();
 	Open();
 
 	{
@@ -72,9 +72,19 @@ void D3D12ComputeCommandContext::FinishRecordCommandList()
 
 void D3D12ComputeCommandContext::ExecuteCommandList()
 {
-	Owner->ExecuteComputeCommandLists(CommandList.Get()/*, bWaitForCompletion*/);
+	const auto fenceValue = Owner->ExecuteComputeCommandLists(ECommandContextExecuteType::Immediate, 0, this /*CommandList.Get()*//*, bWaitForCompletion*/);
 
-	Owner->DiscardCommandAllocator(D3D12_COMMAND_LIST_TYPE_COMPUTE, CommandAllocator);
+	Owner->DiscardCommandAllocator(D3D12_COMMAND_LIST_TYPE_COMPUTE, CommandAllocator, fenceValue);
+
+	///*if (ExecuteType == ECommandContextExecuteType::Immediate)
+	//{
+	//	Owner->DiscardCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, CommandAllocator, fenceValue);
+	//}
+	//else if (ExecuteType == ECommandContextExecuteType::Deferred)
+	//{
+	//	bIsPendingForExecute = true;
+	//}*/
+
 	CommandAllocator = nullptr;
 	bWaitForCompletion = false;
 }
@@ -84,7 +94,7 @@ void D3D12ComputeCommandContext::Open()
 	if (!CommandAllocator)
 		CommandAllocator = Owner->RequestCommandAllocator(D3D12_COMMAND_LIST_TYPE_COMPUTE);
 
-	ThrowIfFailed(CommandList->Reset(CommandAllocator, nullptr));
+	ThrowIfFailed(CommandList->Reset(CommandAllocator.Get(), nullptr));
 	bIsClosed = false;
 	bWaitForCompletion = false;
 }
@@ -103,7 +113,7 @@ void D3D12ComputeCommandContext::ResourceBarrier(UINT NumBarriers, const D3D12_R
 void D3D12ComputeCommandContext::WaitForGPU()
 {
 	Owner->GPUSignal();
-	Owner->CPUWait();
+	Owner->CpuWait(D3D12_COMMAND_LIST_TYPE_COMPUTE);
 }
 
 void D3D12ComputeCommandContext::SetFrameBuffer(IFrameBuffer* pFB, std::optional<std::size_t> FBOIndex)
@@ -300,19 +310,19 @@ void D3D12ComputeCommandContext::SetUnorderedAccessTargetsAsSRV(std::vector<IUno
 	}
 }
 
-void D3D12ComputeCommandContext::SetUnorderedAccessBuffer(IUnorderedAccessBuffer* pUAV, std::uint32_t RootParameterIndex)
+void D3D12ComputeCommandContext::SetUnorderedAccessBuffer(IStructuredBuffer* pUAV, std::uint32_t RootParameterIndex)
 {
 }
 
-void D3D12ComputeCommandContext::SetUnorderedAccessBuffers(std::vector<IUnorderedAccessBuffer*> UAVs, std::uint32_t RootParameterIndex)
+void D3D12ComputeCommandContext::SetUnorderedAccessBuffers(std::vector<IStructuredBuffer*> UAVs, std::uint32_t RootParameterIndex)
 {
 }
 
-void D3D12ComputeCommandContext::SetUnorderedAccessBufferAsResource(IUnorderedAccessBuffer* pUAV, std::uint32_t RootParameterIndex)
+void D3D12ComputeCommandContext::SetUnorderedAccessBufferAsResource(IStructuredBuffer* pUAV, std::uint32_t RootParameterIndex)
 {
 }
 
-void D3D12ComputeCommandContext::SetUnorderedAccessBuffersAsResource(std::vector<IUnorderedAccessBuffer*> UAVs, std::uint32_t RootParameterIndex)
+void D3D12ComputeCommandContext::SetUnorderedAccessBuffersAsResource(std::vector<IStructuredBuffer*> UAVs, std::uint32_t RootParameterIndex)
 {
 }
 
@@ -378,7 +388,7 @@ void D3D12ComputeCommandContext::ExecuteIndirect(IIndirectBuffer* IndirectBuffer
 void D3D12ComputeCommandContext::ClearState()
 {
 	CommandList->ClearState(nullptr);
-	CommandList->Reset(CommandAllocator, nullptr);
+	CommandList->Reset(CommandAllocator.Get(), nullptr);
 	CommandList->Close();
 
 	bIsClosed = true;

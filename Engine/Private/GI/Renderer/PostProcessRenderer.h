@@ -25,7 +25,6 @@
 */
 #pragma once
 
-#include "IRenderer.h"
 #include "AbstractGI/Material.h"
 #include "AbstractGI/UIMaterialStyle.h"
 #include "Gameplay/ICanvas.h"
@@ -33,9 +32,9 @@
 #include "Gameplay/CameraManager.h"
 #include "AbstractGI/PostProcess.h"
 
-class sPostProcessRenderer : public IRenderer
+class sPostProcessRenderer : public IRenderPass
 {
-	sClassBody(sClassConstructor, sPostProcessRenderer, IRenderer)
+	sClassBody(sClassConstructor, sPostProcessRenderer, IRenderPass)
 public:
 	sPostProcessRenderer(std::size_t Width, std::size_t Height);
 	virtual ~sPostProcessRenderer();
@@ -51,6 +50,11 @@ public:
 
 	virtual void SetRenderSize(std::size_t Width, std::size_t Height) override final;
 	virtual void OnInputProcess(const GMouseInput& MouseInput, const GKeyboardChar& KeyboardChar) override final;
+
+	virtual sIndirectLayoutBindingDesc GetIndirectLayoutBindingDesc() const
+	{
+		return sIndirectLayoutBindingDesc();
+	}
 
 private:
 	sScreenDimension ScreenDimension;

@@ -370,7 +370,7 @@ struct MaterialAsset : public DNGEAsset
 		std::vector<sVertexAttributeDesc> VertexLayout;
 		mutable std::uint32_t VertexLayoutSize;
 
-		std::vector<sDescriptorSetLayoutBinding> DescriptorSetLayout;
+		std::vector<sShaderBinding> DescriptorSetLayout;
 		mutable std::uint32_t DescriptorSetLayoutSize;
 
 		std::vector<sShaderAttachment> ShaderAttachments;

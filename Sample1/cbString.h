@@ -73,7 +73,7 @@ public:
 		}
 		return nullptr;
 	}
-	cbgui::cbIFontFamily* GetFontFamily(const std::size_t& Index = 0) const
+	cbgui::cbIFontFamily* GetFontFamily(const std::uint32_t& Index = 0) const
 	{
 		if (Index >= Fonts.size())
 			return nullptr;

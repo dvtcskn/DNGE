@@ -244,7 +244,7 @@ void sCameraManager::SplitViewport()
 			* 4 Top
 			* 4 Bottom
 			*/
-			std::size_t Horizontal = PlayerCount == 2 ? 2 : std::ceil((float)PlayerCount / 2.0f);
+			std::size_t Horizontal = PlayerCount == 2 ? 2 : static_cast<std::size_t>(std::ceil((float)PlayerCount / 2.0f));
 			std::size_t Vertical = PlayerCount > 2 ? 2 : 1;
 
 			ViewportInstance->Viewport = sViewport(GPU::GetInternalBaseRenderResolution());
@@ -254,7 +254,7 @@ void sCameraManager::SplitViewport()
 			std::size_t TopLeftX = (std::uint32_t)(BaseDimension.Width / Horizontal) * ((PlayerIndex > (Horizontal - 1)) ? (std::uint32_t)(PlayerIndex - Horizontal) : (std::uint32_t)(PlayerIndex));
 			std::size_t TopLeftY = (PlayerIndex > (Horizontal - 1) ? (std::uint32_t)(BaseDimension.Height / Vertical) : 0);
 
-			ViewportInstance->Viewport = sViewport((std::uint32_t)(BaseDimension.Width / Horizontal), (std::uint32_t)(BaseDimension.Height / Vertical), TopLeftX, TopLeftY);
+			ViewportInstance->Viewport = sViewport((std::uint32_t)(BaseDimension.Width / Horizontal), (std::uint32_t)(BaseDimension.Height / Vertical), (std::uint32_t)TopLeftX, (std::uint32_t)TopLeftY);
 		}
 			break;
 		case ESplitScreenType::Horizontal:

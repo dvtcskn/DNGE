@@ -509,18 +509,18 @@ namespace cbgui
 				GradientConstantBuffer->Map(&GradientIdx);
 			}
 			{
-				sMaterial::sMaterialInstance* GradientColorInstance = sMaterialManager::Get().CreateMaterialInstance("Default_GUI_GradientMat", "Default_GUI_Gradient_MatInstance");
+				sMaterialInstance* GradientColorInstance = sMaterialManager::Get().CreateMaterialInstance("Default_GUI_GradientMat", "Default_GUI_Gradient_MatInstance");
 				GradientColorInstance->BindConstantBuffer(GradientConstantBuffer);
 				DefaultGUIGradientColorMatStyle = UIMaterialStyle::Create("GradientImage", UIMaterial::Create(GradientColorInstance));
 				GradientColorInstance = nullptr;
 			}
 			{
-				sMaterial::sMaterialInstance* AppleUIMatInstance = sMaterialManager::Get().CreateMaterialInstance("Default_GUI_TexturedMaterial", "AppleMatInstance");
+				sMaterialInstance* AppleUIMatInstance = sMaterialManager::Get().CreateMaterialInstance("Default_GUI_TexturedMaterial", "AppleMatInstance");
 				AppleUIMatStyle = UIMaterialStyle::Create("AppleImage", UIMaterial::Create(AppleUIMatInstance));
 				AppleUIMatInstance = nullptr;
 			}
 			{
-				sMaterial::sMaterialInstance* CherrieUIMatInstance = sMaterialManager::Get().CreateMaterialInstance("Default_GUI_TexturedMaterial", "CherrieMatInstance");
+				sMaterialInstance* CherrieUIMatInstance = sMaterialManager::Get().CreateMaterialInstance("Default_GUI_TexturedMaterial", "CherrieMatInstance");
 				CherrieUIMatStyle = UIMaterialStyle::Create("CherrieImage", UIMaterial::Create(CherrieUIMatInstance));
 				CherrieUIMatInstance = nullptr;
 			}

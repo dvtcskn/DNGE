@@ -37,7 +37,7 @@ class sEngine final
 {
 	sBaseClassBody(sClassConstructor, sEngine);
 public:
-	sEngine(const GPUDeviceCreateInfo& CreateInfo, const IPhysicalWorld::SharedPtr& PhysicalWorld);
+	sEngine(const GPUCreateInfo& CreateInfo, const IPhysicalWorld::SharedPtr& PhysicalWorld);
 	//sEngine(const EGITypes GIType, const IPhysicalWorld::SharedPtr& PhysicalWorld, std::optional<short> GPUIndex = std::nullopt, void* InHWND = nullptr);
 	~sEngine();
 
@@ -46,6 +46,8 @@ public:
 	void EngineInternalTick();
 
 	void BeginPlay();
+	//void RunOnEngineThread();
+	//bool IsRunningOnEngineThread() const;
 	void PhysicsTick(const double DeltaTime);
 	void FixedTick(const double DeltaTime);
 	/*
@@ -89,13 +91,11 @@ public:
 	sScreenDimension GetInternalBaseRenderResolution() const;
 	void SetInternalBaseRenderResolution(std::size_t Width, std::size_t Height);
 
-	void SetGBufferClearMode(EGBufferClear Mode);
-	EGBufferClear GetGBufferClearMode() const;
-
 	void InputProcess(const GMouseInput& MouseInput, const GKeyboardChar& KeyboardChar);
 
 private:
 	bool bWindowInitialized;
+	//std::atomic<bool> bIsRunningOnEngineThread;
 	StepTimer mStepTimer;
 	StepTimer FixedStepTimer;
 	sScreenDimension ScreenDimension;

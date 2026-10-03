@@ -28,6 +28,44 @@
 #include "LineRenderer.h"
 #include "Utilities/FileManager.h"
 
+struct LineSceneDescriptor : public IBindlessSceneDescriptor
+{
+	std::uint32_t CameraConstantBuffer = std::uint32_t(-1);
+};
+
+struct sLineSceneDescriptor : public IBindlessSceneContainer
+{
+	LineSceneDescriptor Descriptor;
+
+	sLineSceneDescriptor(LineSceneDescriptor NewDescriptor)
+		: Descriptor(NewDescriptor)
+	{}
+
+	virtual const IBindlessSceneDescriptor* GetDescriptor() const override final
+	{
+		return &Descriptor;
+	}
+
+	virtual std::vector<std::uint32_t> GetAllBindlessIndices() const override final
+	{
+		std::vector<std::uint32_t> BindlessIndices;
+		BindlessIndices.push_back(Descriptor.CameraConstantBuffer);
+		return BindlessIndices;
+	}
+
+	virtual std::vector<std::uint32_t> GetAllConstantBufferBindlessIndices() const override final
+	{
+		std::vector<std::uint32_t> BindlessIndices;
+		BindlessIndices.push_back(Descriptor.CameraConstantBuffer);
+		return BindlessIndices;
+	}
+
+	virtual std::uint32_t GetConstantBuffereSize() const override final
+	{
+		return 1;
+	}
+};
+
 sLineRenderer::sLineRenderer(std::size_t Width, std::size_t Height)
 	: Super()
 	, GraphicsCommandContext(IGraphicsCommandContext::Create())
@@ -39,25 +77,19 @@ sLineRenderer::sLineRenderer(std::size_t Width, std::size_t Height)
 		Desc.Stride = sizeof(sLineVertexBufferEntry);
 		VertexBuffer = IVertexBuffer::Create("LineRendererVB", Desc, nullptr);
 	}
-	
-	sPipelineDesc pPipelineDesc;
+
+	sPipelineDesc pPipelineDesc(ERenderPass::Line);
 	pPipelineDesc.BlendAttribute = sBlendAttributeDesc();
-	pPipelineDesc.DepthStencilAttribute = sDepthStencilAttributeDesc(false);
-	//pPipelineDesc.DepthStencilAttribute.DepthTest = ECompareFunction::eAlways;
-	pPipelineDesc.PrimitiveTopologyType = EPrimitiveType::eLINE_LIST;
+	pPipelineDesc.DepthStencilAttribute = sDepthStencilAttributeDesc(ECompareFunction::LessEqual, false);
+	//pPipelineDesc.DepthStencilAttribute.DepthTest = ECompareFunction::Always;
+	pPipelineDesc.PrimitiveTopologyType = EPrimitiveType::LINE_LIST;
 	pPipelineDesc.RasterizerAttribute = sRasterizerAttributeDesc();
 	pPipelineDesc.RasterizerAttribute.bEnableLineAA = true;
-	pPipelineDesc.RasterizerAttribute.CullMode = ERasterizerCullMode::eNone;
+	pPipelineDesc.RasterizerAttribute.CullMode = ERasterizerCullMode::None;
 
-	std::vector<sVertexAttributeDesc> VertexLayout =
-	{
-		{ "POSITION",	EFormat::RGB32_FLOAT,   0, offsetof(sLineVertexBufferEntry, position),    false, sizeof(sLineVertexBufferEntry) },
-		{ "COLOR",		EFormat::RGBA32_FLOAT,  0, offsetof(sLineVertexBufferEntry, Color),       false, sizeof(sLineVertexBufferEntry) },
-	};
-	pPipelineDesc.VertexLayout = VertexLayout;
+	pPipelineDesc.VertexLayout = sVertexAttributeDesc::GetDefaultLineVertexLayout();
 
-	pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Vertex, 13));	// Model CB
-	//pPipelineDesc.DescriptorSetLayout.push_back(sDescriptorSetLayoutBinding(EDescriptorType::eUniformBuffer, eShaderType::Vertex, 10));
+	pPipelineDesc.Bindings.push_back(sShaderBinding(EDescriptorType::e32BitConstant, eShaderType::Vertex, 0, 1));
 
 	std::vector<sShaderAttachment> ShaderAttachments;
 	pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment(FileManager::GetShaderFolderW() + L"GBufferVS.hlsl", "GeometryVSLine", eShaderType::Vertex));
@@ -91,7 +123,7 @@ void sLineRenderer::Tick(const double DeltaTime)
 	{
 		if ((*it).Time.has_value())
 		{
-			(*it).Time = (*it).Time.value() - DeltaTime;
+			(*it).Time = (*it).Time.value() - static_cast<float>(DeltaTime);
 			if ((*it).Time.value() <= 0.0f)
 			{
 				auto LineType = (*it).LineType;
@@ -99,7 +131,7 @@ void sLineRenderer::Tick(const double DeltaTime)
 
 				bReorder = true;
 
-				if (LineType == sLines::ELineType::eLine)
+				if (LineType == sLines::ELineType::Line)
 				{
 					if (Lines.LineCount > 0)
 						Lines.LineCount--;
@@ -148,7 +180,7 @@ void sLineRenderer::DrawLine(const FVector& Start, const FVector& End, const FCo
 	Data.Vertices = VertexAttributes;
 	Data.Time = Time;
 	Data.Location = ((Lines.BoundCount * 8) + (Lines.LineCount * 2)) * sizeof(sLineVertexBufferEntry);
-	Data.LineType = sLines::ELineType::eLine;
+	Data.LineType = sLines::ELineType::Line;
 
 	BufferSubresource Subresource;
 	Subresource.pSysMem = VertexAttributes.data();
@@ -210,12 +242,12 @@ void sLineRenderer::DrawBound(const FBoundingBox& Box, const FColor& Color, std:
 	Lines.VertexData.push_back(Data);
 }
 
-void sLineRenderer::Render(IRenderTarget* BackBuffer, IConstantBuffer* CameraCB, ICamera* pCamera, std::optional<sViewport> Viewport)
+void sLineRenderer::Render(IRenderTarget* BackBuffer, std::uint32_t CameraBindlessIndex, std::optional<sViewport> Viewport)
 {
 	if (Lines.GetDrawCount() == 0)
 		return;
 
-	GraphicsCommandContext->BeginRecordCommandList(ERenderPass::eGBuffer);
+	GraphicsCommandContext->BeginRecordCommandList(ERenderPass::GBuffer);
 
 	GraphicsCommandContext->SetRenderTarget(BackBuffer);
 
@@ -227,7 +259,7 @@ void sLineRenderer::Render(IRenderTarget* BackBuffer, IConstantBuffer* CameraCB,
 	GraphicsCommandContext->SetScissorRect(0, 0, (std::uint32_t)ScreenDimension.Height, (std::uint32_t)ScreenDimension.Width);
 
 	if (!DefaultEngineMat->IsCompiled())
-		DefaultEngineMat->Compile();
+		DefaultEngineMat->Compile(BackBuffer);
 
 	DefaultEngineMat->ApplyMaterial(GraphicsCommandContext.get());
 	DefaultMatInstance->ApplyMaterialInstance(GraphicsCommandContext.get());
@@ -235,21 +267,26 @@ void sLineRenderer::Render(IRenderTarget* BackBuffer, IConstantBuffer* CameraCB,
 	GraphicsCommandContext->SetVertexBuffer(VertexBuffer.get());
 	//GraphicsCommandContext->SetIndexBuffer(IndexBuffer.get());
 
-	GraphicsCommandContext->SetConstantBuffer(CameraCB);
+	//GraphicsCommandContext->SetConstantBuffer(CameraCB);
+	LineSceneDescriptor SceneDescriptor;
+	SceneDescriptor.CameraConstantBuffer = CameraBindlessIndex;
+	//GraphicsCommandContext->Set32BitConstants(0, &SceneDescriptor, 1, 0);
+	sLineSceneDescriptor Descriptor(SceneDescriptor);
+	GraphicsCommandContext->SetBindlessDescriptor(0, &Descriptor);
 
 	//GraphicsCommandContext->DrawIndexedInstanced(LineDrawParams);
 	GraphicsCommandContext->Draw((std::uint32_t)Lines.GetDrawCount());
 
 	GraphicsCommandContext->FinishRecordCommandList();
-	GraphicsCommandContext->ExecuteCommandList();
+	GraphicsCommandContext->ExecuteCommandList(ECommandContextExecuteType::Deferred, 1);
 }
 
-void sLineRenderer::Render(IGraphicsCommandContext* CMD, bool Exec, IRenderTarget* BackBuffer, IConstantBuffer* CameraCB, ICamera* pCamera, std::optional<sViewport> Viewport)
+void sLineRenderer::Render(IGraphicsCommandContext* CMD, bool Exec, IRenderTarget* BackBuffer, std::uint32_t CameraBindlessIndex, std::optional<sViewport> Viewport)
 {
 	if (Lines.GetDrawCount() == 0)
 		return;
 
-	CMD->BeginRecordCommandList(ERenderPass::eGBuffer);
+	CMD->BeginRecordCommandList(ERenderPass::GBuffer);
 
 	CMD->SetRenderTarget(BackBuffer);
 
@@ -261,7 +298,7 @@ void sLineRenderer::Render(IGraphicsCommandContext* CMD, bool Exec, IRenderTarge
 	CMD->SetScissorRect(0, 0, (std::uint32_t)ScreenDimension.Height, (std::uint32_t)ScreenDimension.Width);
 
 	if (!DefaultEngineMat->IsCompiled())
-		DefaultEngineMat->Compile();
+		DefaultEngineMat->Compile(BackBuffer);
 
 	DefaultEngineMat->ApplyMaterial(CMD);
 	DefaultMatInstance->ApplyMaterialInstance(CMD);
@@ -269,7 +306,11 @@ void sLineRenderer::Render(IGraphicsCommandContext* CMD, bool Exec, IRenderTarge
 	CMD->SetVertexBuffer(VertexBuffer.get());
 	//GraphicsCommandContext->SetIndexBuffer(IndexBuffer.get());
 
-	CMD->SetConstantBuffer(CameraCB);
+	LineSceneDescriptor SceneDescriptor;
+	SceneDescriptor.CameraConstantBuffer = CameraBindlessIndex;
+	//GraphicsCommandContext->Set32BitConstants(0, &SceneDescriptor, 1, 0);
+	sLineSceneDescriptor Descriptor(SceneDescriptor);
+	CMD->SetBindlessDescriptor(0, &Descriptor);
 
 	//GraphicsCommandContext->DrawIndexedInstanced(LineDrawParams);
 	CMD->Draw((std::uint32_t)Lines.GetDrawCount());

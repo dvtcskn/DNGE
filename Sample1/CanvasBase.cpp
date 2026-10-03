@@ -61,13 +61,13 @@ namespace cbgui
 		}
 
 		{
-			sMaterial::sMaterialInstance* FontInstance = sMaterialManager::Get().GetMaterialInstance("Default_Font_Mat", "Default_Font_Mat_Instance");
+			sMaterialInstance* FontInstance = sMaterialManager::Get().GetMaterialInstance("Default_Font_Mat", "Default_Font_Mat_Instance");
 			DefaultGUIFontMatStyle = UIFontMaterialStyle::Create("Font", "DejaVu Sans", UIMaterial::Create(FontInstance));
 			FontInstance = nullptr;
 		}
 
 		{
-			sMaterial::sMaterialInstance* FlatColorInstance = sMaterialManager::Get().GetMaterialInstance("Default_GUI_Mat", "Default_GUI_MatInstance");
+			sMaterialInstance* FlatColorInstance = sMaterialManager::Get().GetMaterialInstance("Default_GUI_Mat", "Default_GUI_MatInstance");
 			DefaultGUIFlatColorMatStyle = UIMaterialStyle::Create("Image", UIMaterial::Create(FlatColorInstance));
 			FlatColorInstance = nullptr;
 		}

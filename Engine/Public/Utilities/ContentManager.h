@@ -260,7 +260,7 @@ public:
 
 		//			for (std::uint32_t i = 0; i < Asset.mPipelineAsset.DescriptorSetLayoutSize; i++)
 		//			{
-		//				sDescriptorSetLayoutBinding DSL;
+		//				sShaderBinding DSL;
 		//				unsigned char DescriptorType = 0;
 		//				archive >> DescriptorType;
 		//				DSL.DescriptorType = static_cast<EDescriptorType>(DescriptorType);
@@ -640,7 +640,7 @@ public:
 
 		//		for (std::uint32_t i = 0; i < Asset.mPipelineAsset.DescriptorSetLayoutSize; i++)
 		//		{
-		//			sDescriptorSetLayoutBinding DSL;
+		//			sShaderBinding DSL;
 		//			unsigned char DescriptorType = 0;
 		//			archive >> DescriptorType;
 		//			DSL.DescriptorType = static_cast<EDescriptorType>(DescriptorType);

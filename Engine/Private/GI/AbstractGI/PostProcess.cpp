@@ -47,18 +47,18 @@ namespace
             }";
 };
 
-sPostProcess::sPostProcess(const sShaderAttachment& PostProcessShader, const std::vector<sDescriptorSetLayoutBinding>& DescriptorSetLayout,
+sPostProcess::sPostProcess(const sShaderAttachment& PostProcessShader, const std::vector<sShaderBinding>& DescriptorSetLayout,
 	const sDepthStencilAttributeDesc& DepthStencil, const sBlendAttributeDesc& Blend)
 	: Pipeline(nullptr)
 {
 	sPipelineDesc pPipelineDesc;
 	pPipelineDesc.BlendAttribute = Blend;
 	pPipelineDesc.DepthStencilAttribute = DepthStencil;
-	pPipelineDesc.PrimitiveTopologyType = EPrimitiveType::eTRIANGLE_LIST;
+	pPipelineDesc.PrimitiveTopologyType = EPrimitiveType::TRIANGLE_LIST;
 	pPipelineDesc.RasterizerAttribute = sRasterizerAttributeDesc();
-	pPipelineDesc.RasterizerAttribute.CullMode = ERasterizerCullMode::eNone;
+	pPipelineDesc.RasterizerAttribute.CullMode = ERasterizerCullMode::None;
 
-	pPipelineDesc.DescriptorSetLayout = DescriptorSetLayout;
+	pPipelineDesc.Bindings = DescriptorSetLayout;
 
 	pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment((void*)vertexShader.data(), vertexShader.length(), "FullScreenTriangleVS", eShaderType::Vertex));
 	//pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment(L"..//Content\\Shaders\\PostProcess.hlsl", "FullScreenTriangleVS", eShaderType::Vertex));
@@ -72,7 +72,7 @@ sPostProcess::~sPostProcess()
 	Pipeline = nullptr;
 }
 
-void sPostProcess::SetPipeline(const sShaderAttachment& PostProcessShader, const std::vector<sDescriptorSetLayoutBinding>& DescriptorSetLayout,
+void sPostProcess::SetPipeline(const sShaderAttachment& PostProcessShader, const std::vector<sShaderBinding>& DescriptorSetLayout,
 	const sDepthStencilAttributeDesc& DepthStencil, const sBlendAttributeDesc& Blend)
 {
 	Pipeline = nullptr;
@@ -80,11 +80,11 @@ void sPostProcess::SetPipeline(const sShaderAttachment& PostProcessShader, const
 	sPipelineDesc pPipelineDesc;
 	pPipelineDesc.BlendAttribute = Blend;
 	pPipelineDesc.DepthStencilAttribute = DepthStencil;
-	pPipelineDesc.PrimitiveTopologyType = EPrimitiveType::eTRIANGLE_LIST;
+	pPipelineDesc.PrimitiveTopologyType = EPrimitiveType::TRIANGLE_LIST;
 	pPipelineDesc.RasterizerAttribute = sRasterizerAttributeDesc();
-	pPipelineDesc.RasterizerAttribute.CullMode = ERasterizerCullMode::eNone;
+	pPipelineDesc.RasterizerAttribute.CullMode = ERasterizerCullMode::None;
 
-	pPipelineDesc.DescriptorSetLayout = DescriptorSetLayout;
+	pPipelineDesc.Bindings = DescriptorSetLayout;
 
 	pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment((void*)vertexShader.data(), vertexShader.length(), "FullScreenTriangleVS", eShaderType::Vertex));
 	//pPipelineDesc.ShaderAttachments.push_back(sShaderAttachment(L"..//Content\\Shaders\\PostProcess.hlsl", "FullScreenTriangleVS", eShaderType::Vertex));
@@ -93,7 +93,7 @@ void sPostProcess::SetPipeline(const sShaderAttachment& PostProcessShader, const
 	Pipeline = IPipeline::CreateUnique("PostProcess", pPipelineDesc);
 }
 
-void sPostProcess::SetPostProcessResources(IGraphicsCommandContext* Context)
+void sPostProcess::SetPostProcessResources(IGraphicsCommandContext* Context, IRenderTarget* BackBuffer)
 {
 	//Context->SetPipeline(PostProcess->GetPipeline());
 }

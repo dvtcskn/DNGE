@@ -71,7 +71,7 @@ private:
 	};
 
 public:
-	VulkanDevice(const GPUDeviceCreateInfo& DeviceCreateInfo);
+	VulkanDevice(const GPUCreateInfo& DeviceCreateInfo, std::uint32_t InDeviceIndex);
 	virtual ~VulkanDevice();
 	virtual void InitWindow(void* HWND, std::uint32_t Width, std::uint32_t Height, bool Fullscreen) override final;
 	virtual void BeginFrame() override final;
@@ -87,7 +87,6 @@ public:
 
 	void ResetCommandBuffer(VkCommandBuffer CommandBuffer);
 
-	VkDescriptorSetLayout GetPushDescriptorSetLayout() const;
 	VkDescriptorSetLayout GetBindlessDescriptorSetLayout() const;
 	VkDescriptorSet GetBindlessDescriptorSet() const;
 	void UpdateBindlessImageDescriptor(uint32_t binding, uint32_t arrayIndex, VkDescriptorImageInfo* imageInfo);
@@ -127,14 +126,21 @@ public:
 	virtual bool IsVsyncEnabled() const override final;
 	virtual std::uint32_t GetVsyncInterval() const override final;
 
+	virtual void GPUFlush() override final;
+	virtual void WaitForGPU() override final;
+	virtual void WaitForCPU() override final;
+
 	virtual std::vector<sDisplayMode> GetAllSupportedResolutions() const override final;
 
-	virtual EGITypes GetGIType() const override final { return EGITypes::eVulkan; }
+	virtual EGITypes GetGIType() const override final { return EGITypes::Vulkan; }
 	virtual sGPUInfo GetGPUInfo() const override final { return sGPUInfo(); }
 
 	virtual sScreenDimension GetBackBufferDimension() const override final;
 	virtual EFormat GetBackBufferFormat() const override final;
 	virtual sViewport GetViewport() const override final;
+
+	virtual std::uint32_t GetBackBufferSize() const override final;
+	virtual std::uint32_t GetCurrentBackBufferIndex() const override final;
 
 	void SetPerfMarkerBegin(VkCommandBuffer cmd_buf, const char* name);
 	void SetPerfMarkerEnd(VkCommandBuffer cmd_buf);
@@ -145,9 +151,13 @@ public:
 	VkDeviceMemory AllocateMemory(/*std::string ClassID,*/ VkDeviceSize size, uint32_t type_filter, VkMemoryPropertyFlags properties);
 	void FreeMemory(VkDeviceMemory memory);
 
-	virtual IShader* CompileShader(const sShaderAttachment& Attachment, bool Spirv = false) override final;
-	virtual IShader* CompileShader(std::wstring InSrcFile, std::string InFunctionName, eShaderType InProfile, bool Spirv = false, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>()) override final;
-	virtual IShader* CompileShader(const void* InCode, std::size_t Size, std::string InFunctionName, eShaderType InProfile, bool Spirv = false, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>()) override final;
+	IShader* CompileVkShader(const sShaderAttachment& Attachment, bool Spirv = false);
+	IShader* CompileVkShader(std::wstring InSrcFile, std::string InFunctionName, eShaderType InProfile, bool Spirv = false, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>());
+	IShader* CompileVkShader(const void* InCode, std::size_t Size, std::string InFunctionName, eShaderType InProfile, bool Spirv = false, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>());
+
+	virtual IShader::SharedPtr CompileShader(const sShaderAttachment& Attachment) override final;
+	virtual IShader::SharedPtr CompileShader(std::wstring InSrcFile, std::string InFunctionName, eShaderType InProfile, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>()) override final;
+	virtual IShader::SharedPtr CompileShader(const void* InCode, std::size_t Size, std::string InFunctionName, eShaderType InProfile, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>()) override final;
 
 	virtual IGraphicsCommandContext::SharedPtr CreateGraphicsCommandContext() override final;
 	virtual IGraphicsCommandContext::UniquePtr CreateUniqueGraphicsCommandContext() override final;
@@ -167,8 +177,20 @@ public:
 	virtual IIndexBuffer::SharedPtr CreateIndexBuffer(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource = nullptr) override final;
 	virtual IIndexBuffer::UniquePtr CreateUniqueIndexBuffer(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource = nullptr) override final;
 
+	virtual IByteAddressBuffer::SharedPtr CreateByteAddressBuffer(std::string InName, std::uint64_t Size, bool bReadWriteAllowed) override final;
+	virtual IByteAddressBuffer::UniquePtr CreateUniqueByteAddressBuffer(std::string InName, std::uint64_t Size, bool bReadWriteAllowed) override final;
+
+	virtual IStructuredBuffer::SharedPtr CreateStructuredBuffer(std::string InName, const BufferLayout& InDesc, bool bSRVAllowed = true) override final;
+	virtual IStructuredBuffer::UniquePtr CreateUniqueStructuredBuffer(std::string InName, const BufferLayout& InDesc, bool bSRVAllowed = true) override final;
+
+	virtual IIndirectBuffer::SharedPtr CreateIndirectBuffer(std::string InName, BufferLayout NewLayout) override final;
+	virtual IIndirectBuffer::UniquePtr CreateUniqueIndirectBuffer(std::string InName, BufferLayout NewLayout) override final;
+
 	virtual IFrameBuffer::SharedPtr CreateFrameBuffer(const std::string InName, const sFrameBufferAttachmentInfo& InAttachments) override final;
 	virtual IFrameBuffer::UniquePtr CreateUniqueFrameBuffer(const std::string InName, const sFrameBufferAttachmentInfo& InAttachments) override final;
+
+	virtual ISamplerState::SharedPtr CreateSamplerState(const std::string InName, const sSamplerAttributeDesc& InDesc) override final;
+	virtual ISamplerState::UniquePtr CreateUniqueSamplerState(const std::string InName, const sSamplerAttributeDesc& InDesc) override final;
 
 	virtual IRenderTarget::SharedPtr CreateRenderTarget(const std::string InName, const EFormat Format, const sFBODesc& Desc) override final;
 	virtual IRenderTarget::UniquePtr CreateUniqueRenderTarget(const std::string InName, const EFormat Format, const sFBODesc& Desc) override final;
@@ -220,6 +242,16 @@ public:
 		return IMCommandBuffer.get();
 	}
 
+	FORCEINLINE bool IsPrimaryGPU() const
+	{
+		return DeviceIndex == 0;
+	}
+
+	FORCEINLINE std::uint32_t GetDeviceIndex() const
+	{
+		return DeviceIndex;
+	}
+
 private:
 	VkInstance instance = VK_NULL_HANDLE;
 	VkDevice Device;
@@ -229,6 +261,10 @@ private:
 	VkPhysicalDeviceMemoryProperties PhysicalDeviceMemoryProperties;
 	VkPhysicalDeviceLimits deviceLimits;
 	VkDebugUtilsMessengerEXT debug_callback = VK_NULL_HANDLE;
+
+	std::optional<std::uint32_t> GPUIndex;
+	EGPUDeviceType DeviceType;
+	std::uint32_t DeviceIndex;
 
 	std::unique_ptr<VulkanCommandBuffer> IMCommandBuffer;
 
@@ -254,5 +290,4 @@ private:
 	std::unique_ptr<VulkanSyncManager> SyncManager;
 
 	std::unique_ptr<VulkanBindlessDescriptorPool> BindlessDescriptorPool;
-	std::unique_ptr<VulkanPushDescriptorPool> PushDescriptorPool;
 };

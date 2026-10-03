@@ -46,10 +46,12 @@ public:
 
 	FORCEINLINE ID3D11DeviceContext1* Get() const { return DeferredCTX.Get(); }
 
-	virtual void BeginRecordCommandList(const ERenderPass RenderPass = ERenderPass::eNONE) override final;
+	virtual bool BeginRecordCommandList(const ERenderPass RenderPass = ERenderPass::NONE) override final;
 	virtual void FinishRecordCommandList() override final;
-	virtual void ExecuteCommandList() override final;
+	virtual void ExecuteCommandList(ECommandContextExecuteType ExecuteType = ECommandContextExecuteType::Immediate, std::uint32_t Order = std::uint32_t(-1)) override final;
 	virtual void ClearState() override final;
+
+	virtual bool IsRecorded() const override final { return false; }
 
 	virtual void* GetInternalCommandContext() override final { return DeferredCTX.Get(); }
 
@@ -75,8 +77,8 @@ public:
 	virtual void CopyRenderTarget(IRenderTarget* Dest, IRenderTarget* Source) override final;
 	virtual void CopyDepthBuffer(IDepthTarget* Dest, IDepthTarget* Source) override final;
 
-	virtual void SetUnorderedAccessBufferAsResource(IUnorderedAccessBuffer* pUAV, std::uint32_t RootParameterIndex) override final;
-	virtual void SetUnorderedAccessBuffersAsResource(std::vector<IUnorderedAccessBuffer*> UAVs, std::uint32_t RootParameterIndex) override final;
+	virtual void SetUnorderedAccessBufferAsResource(IStructuredBuffer* pUAV, std::optional<std::uint32_t> RootParameterIndex = std::nullopt) override final;
+	virtual void SetUnorderedAccessBuffersAsResource(std::vector<IStructuredBuffer*> UAVs, std::optional<std::uint32_t> RootParameterIndex = std::nullopt) override final;
 
 	virtual void SetPipeline(IPipeline* Pipeline) override final;
 
@@ -90,6 +92,11 @@ public:
 	virtual void UpdateBufferSubresource(IVertexBuffer* Buffer, std::size_t Location, std::size_t Size, const void* pSrcData) override final;
 	virtual void UpdateBufferSubresource(IIndexBuffer* Buffer, BufferSubresource* Subresource) override final;
 	virtual void UpdateBufferSubresource(IIndexBuffer* Buffer, std::size_t Location, std::size_t Size, const void* pSrcData) override final;
+
+	virtual void Set32BitConstant(std::uint32_t RootParameterIndex, std::uint32_t SrcData, std::uint32_t DestOffsetIn32BitValues = 0) override final;
+	virtual void Set32BitConstants(std::uint32_t RootParameterIndex, const void* pSrcData, std::uint32_t Num32BitValuesToSet = 1, std::uint32_t DestOffsetIn32BitValues = 0) override final;
+
+	virtual void SetBindlessDescriptor(std::uint32_t RootParameterIndex, IBindlessSceneContainer* Container) override final;
 
 	virtual void Draw(std::uint32_t VertexCount, std::uint32_t VertexStartOffset = 0) override final;
 	virtual void DrawInstanced(std::uint32_t VertexCountPerInstance, std::uint32_t InstanceCount, std::uint32_t StartVertexLocation, std::uint32_t StartInstanceLocation) override final;

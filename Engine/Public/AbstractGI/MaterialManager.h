@@ -81,7 +81,9 @@ public:
 
 	inline void StoreMaterial(const sMaterial::SharedPtr& Material)
 	{
-		Materials.push_back(Material);
+		if (!Material->IsCompiled())
+			GPU::CompileMaterial(Material.get(), false);
+		Materials.push_back(Material);		
 	}
 	inline sMaterial* GetMaterial(std::string MaterialName) const
 	{
@@ -106,34 +108,44 @@ public:
 		return nullptr;
 	}
 
-	inline sMaterial::sMaterialInstance* CreateMaterialInstance(std::string MaterialName, std::string InstanceName) const
+	inline sMaterialInstance* CreateMaterialInstance(std::string MaterialName, std::string InstanceName) const
 	{
 		auto Material = GetMaterial(MaterialName);
 		if (Material)
 			return Material->CreateInstance(InstanceName).get();
 		return nullptr;
 	}
-	inline sMaterial::sMaterialInstance::SharedPtr CreateSharedMaterialInstance(std::string MaterialName, std::string InstanceName) const
+	inline sMaterialInstance::SharedPtr CreateSharedMaterialInstance(std::string MaterialName, std::string InstanceName) const
 	{
 		auto Material = GetMaterial(MaterialName);
 		return Material->CreateInstance(InstanceName);
 	}
-	
-	inline sMaterial::sMaterialInstance* GetMaterialInstance(std::string MaterialName, std::string InstanceName) const
+
+	inline sMaterialInstance* GetMaterialInstance(std::uint32_t Index) const
+	{
+		for (auto& Material : Materials)
+		{
+			auto Instance = Material->GetInstanceById(Index);
+			if (Instance)
+				return Instance.get();
+		}
+		return nullptr;
+	}
+	inline sMaterialInstance* GetMaterialInstance(std::string MaterialName, std::string InstanceName) const
 	{
 		auto Material = GetMaterial(MaterialName);
 		if (Material)
 			return Material->GetInstance(InstanceName).get();
 		return nullptr;
 	}
-	inline sMaterial::sMaterialInstance* GetMaterialInstance(std::string MaterialName, std::size_t Index) const
+	inline sMaterialInstance* GetMaterialInstance(std::string MaterialName, std::size_t Index) const
 	{
 		auto Material = GetMaterial(MaterialName);
 		if (Material)
 			return Material->GetInstance(Index).get();
 		return nullptr;
 	}
-	inline sMaterial::sMaterialInstance::SharedPtr GetSharedMaterialInstance(std::string MaterialName, std::string InstanceName) const
+	inline sMaterialInstance::SharedPtr GetSharedMaterialInstance(std::string MaterialName, std::string InstanceName) const
 	{
 		auto Material = GetMaterial(MaterialName);
 		return Material->GetInstance(InstanceName);

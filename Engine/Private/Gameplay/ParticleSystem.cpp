@@ -140,8 +140,18 @@ MeshParticle::MeshParticle(sMeshParticleDesc InDesc, sEmitter* InOwner)
 	, bIsUpdated(false)
 	, MaterialInstance(nullptr)
 	//, bIsInstanced(true)
+	, GeometryHandle(MeshBindlessGeometryHandle((std::uint32_t)InDesc.Shape.Shape.size(), sizeof(sParticleVertexLayout)))
+	, GeometryInstanceHandle(MeshBindlessGeometryHandle((std::uint32_t)0, sizeof(sParticleVertexLayout::sParticleInstanceLayout)))
+	, IndexBufferHandle(MeshIndexBufferHandle((std::uint32_t)InDesc.Shape.ShapeIndexes.size()))
 {
-	ParticlePool.resize((Desc.SpawnRate * Desc.MaxLifeTime + 2));
+	ParticlePool.resize((std::size_t)std::trunc(Desc.SpawnRate * Desc.MaxLifeTime + 2));
+
+	sMeshGeometryContainerManager::Get().AllocateHandle(&GeometryHandle);
+	GeometryHandle.UpdateGeometry(Desc.Shape.Shape.data());
+	//sMeshGeometryContainerManager::Get().AllocateHandle(&GeometryInstanceHandle);
+	//GeometryInstanceHandle.UpdateGeometry(Data.InstanceData.data());
+	sMeshGeometryContainerManager::Get().AllocateHandle(&IndexBufferHandle);
+	IndexBufferHandle.UpdateIndexBuffer(Desc.Shape.ShapeIndexes.data());
 
 	{
 		BufferLayout Layout;
@@ -172,12 +182,12 @@ MeshParticle::MeshParticle(sMeshParticleDesc InDesc, sEmitter* InOwner)
 		}
 	}
 
-	ObjectDrawParameters.IndexCountPerInstance = Desc.Shape.ShapeIndexes.size();
-	ObjectDrawParameters.InstanceCount = (Desc.SpawnRate * Desc.MaxLifeTime + 2);
+	ObjectDrawParameters.IndexCountPerInstance = (std::uint32_t)Desc.Shape.ShapeIndexes.size();
+	ObjectDrawParameters.InstanceCount = (std::uint32_t)std::trunc(Desc.SpawnRate * Desc.MaxLifeTime + 2);
 
 	{
 		BufferLayout Layout;
-		Layout.Size = Desc.Shape.Shape.size() * (Desc.SpawnRate * Desc.MaxLifeTime + 2) * sizeof(sParticleVertexLayout::sParticleInstanceLayout);
+		Layout.Size = (std::uint64_t)std::trunc(Desc.Shape.Shape.size() * (Desc.SpawnRate * Desc.MaxLifeTime + 2) * sizeof(sParticleVertexLayout::sParticleInstanceLayout));
 		Layout.Stride = sizeof(sParticleVertexLayout::sParticleInstanceLayout);
 		InstanceBuffer = IVertexBuffer::CreateUnique("MeshInstanceParticle_VB", Layout);
 	}
@@ -185,6 +195,10 @@ MeshParticle::MeshParticle(sMeshParticleDesc InDesc, sEmitter* InOwner)
 
 MeshParticle::~MeshParticle()
 {
+	sMeshGeometryContainerManager::Get().DeallocateHandle(&GeometryHandle);
+	sMeshGeometryContainerManager::Get().DeallocateHandle(&GeometryInstanceHandle);
+	sMeshGeometryContainerManager::Get().DeallocateHandle(&IndexBufferHandle);
+
 	MaterialInstance = nullptr;
 	VertexBuffer = nullptr;
 	InstanceBuffer = nullptr;
@@ -315,6 +329,17 @@ void MeshParticle::Update(float DT)
 						//ParticleBufferVertexes.push_back(sParticleVertexBufferEntry(FVector::Zero(), FVector2D::Zero()));
 					}
 				}
+			}
+
+			{
+				if (GeometryInstanceHandle.Descriptor.NumberOfElement != (std::uint32_t)ParticleBufferVertexes.size())
+				{
+					if (GeometryInstanceHandle.IsValid())
+						sMeshGeometryContainerManager::Get().DeallocateHandle(&GeometryInstanceHandle);
+					GeometryInstanceHandle = MeshBindlessGeometryHandle((std::uint32_t)ParticleBufferVertexes.size(), sizeof(sParticleVertexLayout::sParticleInstanceLayout));
+					sMeshGeometryContainerManager::Get().AllocateHandle(&GeometryInstanceHandle);
+				}
+				GeometryInstanceHandle.UpdateGeometry(ParticleBufferVertexes.data());
 			}
 		}
 

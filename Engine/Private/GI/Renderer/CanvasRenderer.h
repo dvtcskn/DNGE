@@ -25,15 +25,14 @@
 */
 #pragma once
 
-#include "IRenderer.h"
 #include "AbstractGI/Material.h"
 #include "AbstractGI/UIMaterialStyle.h"
 #include "Gameplay/ICanvas.h"
 #include "Utilities/Input.h"
 
-class sCanvasRenderer final : public IRenderer
+class sCanvasRenderer final : public IRenderPass
 {
-	sClassBody(sClassConstructor, sCanvasRenderer, IRenderer);
+	sClassBody(sClassConstructor, sCanvasRenderer, IRenderPass);
 public:
 	sCanvasRenderer(std::size_t Width, std::size_t Height);
 	virtual ~sCanvasRenderer();

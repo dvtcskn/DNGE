@@ -38,6 +38,10 @@
 #pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "dxguid.lib")
 
+#if Pix3_Enabled && _DEBUG
+#include <pix3.h>
+#endif
+
 D3D12Viewport::SharedPtr D3D12Viewport::Create(D3D12Device* InOwner, ComPtr<IDXGIFactory4> InFactory, std::uint32_t InSizeX, std::uint32_t InSizeY, bool bInIsFullscreen, HWND InHandle)
 {
 	return std::make_shared<D3D12Viewport>(InOwner, InFactory, InSizeX, InSizeY, bInIsFullscreen, InHandle);
@@ -51,7 +55,6 @@ D3D12Viewport::D3D12Viewport(D3D12Device* InOwner, ComPtr<IDXGIFactory4> InFacto
 	, WindowHandle(InHandle)
 	, SwapChainBufferCount(2)
 	, CurrentBackBuffer(0)
-	, FrameIndex(0)
 	, m_rtvDescriptorSize(0)
 	, SyncInterval(1)
 	, bIsFullScreen(IsFullscreen)
@@ -94,7 +97,7 @@ D3D12Viewport::D3D12Viewport(D3D12Device* InOwner, ComPtr<IDXGIFactory4> InFacto
 
 	InFactory->MakeWindowAssociation(InHandle, DXGI_MWA_VALID);
 
-	FrameIndex = SwapChain->GetCurrentBackBufferIndex();
+	CurrentBackBuffer = SwapChain->GetCurrentBackBufferIndex();
 
 	viewport = { 0.0f, 0.0f, (float)InSizeX,  (float)InSizeY, 0.0f, 1.0f };
 
@@ -112,8 +115,8 @@ D3D12Viewport::D3D12Viewport(D3D12Device* InOwner, ComPtr<IDXGIFactory4> InFacto
 D3D12Viewport::~D3D12Viewport()
 {
 	{
-		Owner->GPUSignal();
-		Owner->CPUWait();
+		//Owner->GPUSignal();
+		//Owner->CpuWait(D3D12_COMMAND_LIST_TYPE_DIRECT);
 
 		SwapChain->SetFullscreenState(false, nullptr);
 	}
@@ -147,28 +150,35 @@ void D3D12Viewport::CreateRenderTargets()
 
 void D3D12Viewport::BeginFrame()
 {
-	FrameIndex = SwapChain->GetCurrentBackBufferIndex();
+	CurrentBackBuffer = SwapChain->GetCurrentBackBufferIndex();
 }
 
-void D3D12Viewport::Present(IRenderTarget* pRT)
+void D3D12Viewport::OnPresent(IRenderTarget* pRT)
 {
-	CopyToBackBuffer(pRT);
+	if (!pRT)
+		return;
 
-	SwapChain->Present(!bIsVSYNCEnabled ? 0 : SyncInterval, !bIsVSYNCEnabled && !bIsFullScreen ? DXGI_PRESENT_ALLOW_TEARING : 0);
-
-	//Owner->GPUSignal();
-	Owner->CPUWait();
-}
-
-void D3D12Viewport::CopyToBackBuffer(IRenderTarget* pRT)
-{
 	auto CMDList = Owner->GetIMCommandList();
 	CMDList->BeginRecordCommandList();
+#if Pix3_Enabled && _DEBUG
+	PIXBeginEvent(CMDList->Get(), 0, L"D3D12Viewport::OnPresent");
+#endif
 
-	CMDList->CopyResource(RTV[FrameIndex].renderTarget.Get(), D3D12_RESOURCE_STATE_PRESENT, static_cast<D3D12RenderTarget*>(pRT)->GetD3D12Texture(), static_cast<D3D12RenderTarget*>(pRT)->CurrentState);
+	CMDList->CopyResource(RTV[CurrentBackBuffer].renderTarget.Get(), D3D12_RESOURCE_STATE_PRESENT, static_cast<D3D12RenderTarget*>(pRT)->GetD3D12Texture(), static_cast<D3D12RenderTarget*>(pRT)->CurrentState);
 
+#if Pix3_Enabled && _DEBUG
+	PIXEndEvent(CMDList->Get());
+#endif
 	CMDList->FinishRecordCommandList();
-	CMDList->ExecuteCommandList();
+	CMDList->ExecuteCommandList(ECommandContextExecuteType::Deferred, std::uint32_t(-1));
+}
+
+void D3D12Viewport::Present()
+{
+	SwapChain->Present(!bIsVSYNCEnabled ? 0 : SyncInterval, !bIsVSYNCEnabled && !bIsFullScreen ? DXGI_PRESENT_ALLOW_TEARING : 0);
+
+	if (Owner->IsSoftwareDevice())
+		Owner->CpuWait(D3D12_COMMAND_LIST_TYPE_DIRECT);
 }
 
 void D3D12Viewport::ResizeSwapChain(std::size_t Width, std::size_t Height)
@@ -181,12 +191,12 @@ void D3D12Viewport::ResizeSwapChain(std::size_t Width, std::size_t Height)
 		RTV[i].Release();
 
 	Owner->GPUSignal();
-	Owner->CPUWait();
+	Owner->CpuWait(D3D12_COMMAND_LIST_TYPE_DIRECT);
 
 	SwapChain->ResizeBuffers(SwapChainBufferCount, SizeX, SizeY, ConvertFormat_Format_To_DXGI(BackBufferFormat),
 		DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING | DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH);
 
-	FrameIndex = SwapChain->GetCurrentBackBufferIndex();
+	CurrentBackBuffer = SwapChain->GetCurrentBackBufferIndex();
 
 	CreateRenderTargets();
 

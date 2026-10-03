@@ -111,7 +111,7 @@ void sWorld::SetActiveLevel(const std::string& Name)
 		Level->Reset();
 	}
 
-	for (std::size_t i = 0; i < Levels.size(); i++)
+	for (std::uint32_t i = 0; i < Levels.size(); i++)
 	{
 		if (Levels[i]->GetName() == Name)
 		{

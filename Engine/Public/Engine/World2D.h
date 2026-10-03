@@ -98,7 +98,7 @@ public:
 
 	virtual void SetPhysicsInternalTick(std::optional<double> Tick) override final;
 	virtual std::optional<double> GetPhysicsInternalTick() const override final { return InternalTick; }
-	virtual EPhysicsEngine GetPhysicsEngineType() const override final { return EPhysicsEngine::eBox2D; }
+	virtual EPhysicsEngine GetPhysicsEngineType() const override final { return EPhysicsEngine::Box2D; }
 
 	virtual float GetPhysicalWorldScale() const override final { return PhysicalWorldScale; }
 

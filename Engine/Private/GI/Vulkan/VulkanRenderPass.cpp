@@ -19,7 +19,7 @@ VulkanRenderpass::VulkanRenderpass(VulkanDevice* InDevice, std::string InName, c
 			attachmentDescs[i].loadOp = VkAttachmentLoadOp::VK_ATTACHMENT_LOAD_OP_CLEAR;
 			attachmentDescs[i].storeOp = VkAttachmentStoreOp::VK_ATTACHMENT_STORE_OP_STORE;
 
-			if (FrameBuffer[i].AttachmentType == eFrameBufferAttachmentType::eDepth)
+			if (FrameBuffer[i].AttachmentType == EFrameBufferAttachmentType::Depth)
 			{
 				attachmentDescs[i].stencilLoadOp = VkAttachmentLoadOp::VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 				attachmentDescs[i].stencilStoreOp = VkAttachmentStoreOp::VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -86,7 +86,7 @@ VulkanRenderpass::VulkanRenderpass(VulkanDevice* InDevice, std::string InName, c
 	dependencies[1].dependencyFlags = vk::DependencyFlagBits::eByRegion;*/
 
 	std::uint32_t NumDependencies = 0;
-	VkSubpassDependency SubpassDependencies[2];
+	//VkSubpassDependency SubpassDependencies[2];
 
 	// DepthReadSubpass
 	//{
@@ -146,6 +146,9 @@ VulkanRenderpass::VulkanRenderpass(VulkanDevice* InDevice, std::string InName, c
 
 VulkanRenderpass::~VulkanRenderpass()
 {
-	//Device->Get()->destroyRenderPass(renderPass);
+	if (Device && RenderPass)
+	{
+		//vkDestroyRenderPass(Device->Get(), RenderPass, nullptr);
+	}
 	Device = nullptr;
 }

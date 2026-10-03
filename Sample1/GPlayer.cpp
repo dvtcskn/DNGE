@@ -28,7 +28,7 @@
 #include "GPlayer.h"
 #include "GPlayerCharacter.h"
 
-GPlayer::GPlayer(sGameInstance* InOwner, std::size_t InPlayerIndex)
+GPlayer::GPlayer(sGameInstance* InOwner, std::uint32_t InPlayerIndex)
 	: Super(InOwner, InPlayerIndex, GPlayerController::Create(this), GPlayerCharacter::Create("GPlayerCharacter"))
 {}
 

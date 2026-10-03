@@ -45,21 +45,28 @@
 
 using namespace Microsoft::WRL;
 
+#ifndef Pix3_Enabled
+#define Pix3_Enabled 0
+#endif
+
 class D3D12Viewport;
 class D3D12Texture;
 class D3D12CommandBuffer;
 class D3D12CopyCommandBuffer;
-struct D3D12DescriptorHandle;
+class D3D12ComputeCommandContext;
 class D3D12DescriptorHeapManager;
 class D3D12Fence;
 class D3D12ShaderCompiler;
 class DXCShaderCompiler;
+class D3D12RootSignature;
+class D3D12Pipeline;
+struct D3D12DescriptorHandle;
 
 class D3D12Device final : public IAbstractGIDevice
 {
 	sClassBody(sClassConstructor, D3D12Device, IAbstractGIDevice)
 public:
-	D3D12Device(const GPUDeviceCreateInfo& DeviceCreateInfo);
+	D3D12Device(const GPUCreateInfo& DeviceCreateInfo, std::uint32_t InDeviceIndex);
 	virtual ~D3D12Device();
 	virtual void InitWindow(void* HWND, std::uint32_t Width, std::uint32_t Height, bool Fullscreen) override final;
 	virtual void BeginFrame() override final;
@@ -68,20 +75,25 @@ public:
 	IDXGIAdapter* FindAdapter(const WCHAR* InTargetName) const;
 	IDXGIAdapter1* GetAdapter(std::optional<short> Index = std::nullopt) const;
 
-	void ExecuteDirectCommandLists(ID3D12CommandList* pCommandList, bool WaitForCompletion = false);
-	void ExecuteComputeCommandLists(ID3D12CommandList* pCommandList, bool WaitForCompletion = false);
-	void ExecuteCopyCommandLists(ID3D12CommandList* pCommandList, bool WaitForCompletion = false);
+	bool IsCommandBufferPendingForExecute(ICommandContext* CommandContext) const;
+	void OnCommandBufferDestroyed(ICommandContext* CommandContext);
 
-	void GPUSignal(D3D12_COMMAND_LIST_TYPE Type = D3D12_COMMAND_LIST_TYPE::D3D12_COMMAND_LIST_TYPE_DIRECT);
-	void CPUWait(D3D12_COMMAND_LIST_TYPE Type = D3D12_COMMAND_LIST_TYPE::D3D12_COMMAND_LIST_TYPE_DIRECT);
+	std::uint64_t ExecuteDirectCommandLists(ECommandContextExecuteType ExecuteType, std::uint32_t Order, D3D12CommandBuffer* pCommandList, bool WaitForCompletion = false);
+	std::uint64_t ExecuteComputeCommandLists(ECommandContextExecuteType ExecuteType, std::uint32_t Order, D3D12ComputeCommandContext* pCommandList, bool WaitForCompletion = false);
+	std::uint64_t ExecuteCopyCommandLists(ECommandContextExecuteType ExecuteType, std::uint32_t Order, D3D12CopyCommandBuffer* pCommandList, bool WaitForCompletion = false);
 
-	ID3D12CommandAllocator* RequestCommandAllocator(D3D12_COMMAND_LIST_TYPE Type, std::optional<std::uint64_t> CompletedFenceValue = std::nullopt);
-	void DiscardCommandAllocator(D3D12_COMMAND_LIST_TYPE Type, ID3D12CommandAllocator* Allocator, std::optional<std::uint64_t> FenceValue = std::nullopt);
+	std::uint64_t GPUSignal(D3D12_COMMAND_LIST_TYPE Type = D3D12_COMMAND_LIST_TYPE::D3D12_COMMAND_LIST_TYPE_DIRECT);
+	void CpuWaitForFence(D3D12_COMMAND_LIST_TYPE Type, std::uint64_t FenceValue);
+	void CpuWait(D3D12_COMMAND_LIST_TYPE Type);
+
+	ComPtr<ID3D12CommandAllocator> RequestCommandAllocator(D3D12_COMMAND_LIST_TYPE Type);
+	void DiscardCommandAllocator(D3D12_COMMAND_LIST_TYPE Type, ComPtr<ID3D12CommandAllocator> Allocator, std::uint64_t FenceValue);
 
 	void GPUFlush(D3D12_COMMAND_LIST_TYPE queueType);
-	void GPUFlush();
 
 	void SetHeaps(ID3D12GraphicsCommandList* cmd);
+	ID3D12DescriptorHeap* GetHeap() const;
+
 	void AllocateDescriptor(D3D12DescriptorHandle* DescriptorHandle);
 	void DeallocateDescriptor(D3D12DescriptorHandle* DescriptorHandle);
 
@@ -94,22 +106,35 @@ public:
 	virtual void Vsync(const bool value) override final;
 	virtual void VsyncInterval(const std::uint32_t value) override final;
 
+	virtual void GPUFlush() override final;
+	virtual void WaitForGPU() override final;
+	virtual void WaitForCPU() override final;
+
 	virtual bool IsFullScreen() const override final;
 	virtual bool IsVsyncEnabled() const override final;
 	virtual std::uint32_t GetVsyncInterval() const override final;
 
 	virtual std::vector<sDisplayMode> GetAllSupportedResolutions() const override final;
 
-	virtual EGITypes GetGIType() const override final { return EGITypes::eD3D12; }
+	virtual EGITypes GetGIType() const override final { return EGITypes::D3D12; }
 	virtual sGPUInfo GetGPUInfo() const override final { return sGPUInfo(); }
 
 	virtual sScreenDimension GetBackBufferDimension() const override final;
 	virtual EFormat GetBackBufferFormat() const override final;
 	virtual sViewport GetViewport() const override final;
 
-	virtual IShader* CompileShader(const sShaderAttachment& Attachment, bool Spirv = false) override final;
-	virtual IShader* CompileShader(std::wstring InSrcFile, std::string InFunctionName, eShaderType InProfile, bool Spirv = false, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>()) override final;
-	virtual IShader* CompileShader(const void* InCode, std::size_t Size, std::string InFunctionName, eShaderType InProfile, bool Spirv = false, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>()) override final;
+	virtual std::uint32_t GetBackBufferSize() const override final;
+	virtual std::uint32_t GetCurrentBackBufferIndex() const override final;
+
+	std::shared_ptr<D3D12RootSignature> CreateRootSignature(const std::vector<sShaderBinding>& Bindings, const sIndirectLayoutBindingDesc& IndirectDesc);
+
+	IShader* CompileD3D12Shader(const sShaderAttachment& Attachment, bool Spirv = false);
+	IShader* CompileD3D12Shader(std::wstring InSrcFile, std::string InFunctionName, eShaderType InProfile, bool Spirv = false, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>());
+	IShader* CompileD3D12Shader(const void* InCode, std::size_t Size, std::string InFunctionName, eShaderType InProfile, bool Spirv = false, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>());
+
+	virtual IShader::SharedPtr CompileShader(const sShaderAttachment& Attachment) override final;
+	virtual IShader::SharedPtr CompileShader(std::wstring InSrcFile, std::string InFunctionName, eShaderType InProfile, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>()) override final;
+	virtual IShader::SharedPtr CompileShader(const void* InCode, std::size_t Size, std::string InFunctionName, eShaderType InProfile, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>()) override final;
 
 	virtual IGraphicsCommandContext::SharedPtr CreateGraphicsCommandContext() override final;
 	virtual IGraphicsCommandContext::UniquePtr CreateUniqueGraphicsCommandContext() override final;
@@ -129,8 +154,20 @@ public:
 	virtual IIndexBuffer::SharedPtr CreateIndexBuffer(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource = nullptr) override final;
 	virtual IIndexBuffer::UniquePtr CreateUniqueIndexBuffer(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource = nullptr) override final;
 
+	virtual IByteAddressBuffer::SharedPtr CreateByteAddressBuffer(std::string InName, std::uint64_t Size, bool bReadWriteAllowed) override final;
+	virtual IByteAddressBuffer::UniquePtr CreateUniqueByteAddressBuffer(std::string InName, std::uint64_t Size, bool bReadWriteAllowed) override final;
+
+	virtual IStructuredBuffer::SharedPtr CreateStructuredBuffer(std::string InName, const BufferLayout& InDesc, bool bSRVAllowed = true) override final;
+	virtual IStructuredBuffer::UniquePtr CreateUniqueStructuredBuffer(std::string InName, const BufferLayout& InDesc, bool bSRVAllowed = true) override final;
+
+	virtual IIndirectBuffer::SharedPtr CreateIndirectBuffer(std::string InName, BufferLayout NewLayout) override final;
+	virtual IIndirectBuffer::UniquePtr CreateUniqueIndirectBuffer(std::string InName, BufferLayout NewLayout) override final;
+
 	virtual IFrameBuffer::SharedPtr CreateFrameBuffer(const std::string InName, const sFrameBufferAttachmentInfo& InAttachments) override final;
 	virtual IFrameBuffer::UniquePtr CreateUniqueFrameBuffer(const std::string InName, const sFrameBufferAttachmentInfo& InAttachments) override final;
+
+	virtual ISamplerState::SharedPtr CreateSamplerState(const std::string InName, const sSamplerAttributeDesc& InDesc) override final;
+	virtual ISamplerState::UniquePtr CreateUniqueSamplerState(const std::string InName, const sSamplerAttributeDesc& InDesc) override final;
 
 	virtual IRenderTarget::SharedPtr CreateRenderTarget(const std::string InName, const EFormat Format, const sFBODesc& Desc) override final;
 	virtual IRenderTarget::UniquePtr CreateUniqueRenderTarget(const std::string InName, const EFormat Format, const sFBODesc& Desc) override final;
@@ -157,7 +194,10 @@ public:
 	//virtual ITiledTexture::UniquePtr CreateUniqueTiledTexture(const std::string InName, const std::uint32_t InTileX, const std::uint32_t InTileY, const sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex = 0) override final;
 
 private:
-	std::optional<std::int32_t> GPUIndex;
+	std::optional<std::uint32_t> GPUIndex;
+	EGPUDeviceType DeviceType;
+	std::uint32_t DeviceIndex;
+
 	ComPtr<ID3D12Device> Direct3DDevice;
 	ComPtr<IDXGIFactory4> DxgiFactory;
 	ComPtr<ID3D12CommandQueue> GraphicsQueue;
@@ -165,6 +205,16 @@ private:
 	ComPtr<ID3D12CommandQueue> CopyQueue;
 
 	ComPtr<ID3D12Device14> Direct3DDevice14;
+
+	struct PendingSubmission
+	{
+		ICommandContext* CommandBuffer = nullptr;
+		ComPtr<ID3D12CommandList> CommandList;
+		D3D12_COMMAND_LIST_TYPE Type;
+		ComPtr<ID3D12CommandAllocator> Allocator;
+	};
+	std::map<D3D12_COMMAND_LIST_TYPE, std::vector<PendingSubmission>> DeferredCommandLists;
+	std::mutex Mutex;
 
 	D3D_FEATURE_LEVEL FeatureLevel;
 
@@ -179,43 +229,38 @@ private:
 
 	bool bTypedUAVLoadSupport_R11G11B10_FLOAT;
 	bool bTypedUAVLoadSupport_R16G16B16A16_FLOAT;
-	bool bEnhancedBarriersSupport;
-	D3D12_RENDER_PASS_TIER RenderPassTier;
+
+	bool bIsEnhancedBarriersSupported;
 
 	std::uint32_t VendorId;
 
 	std::map<D3D12_COMMAND_LIST_TYPE, D3D12Fence*> Fences;
 
-	struct CommandAllocatorPool
-	{
-		std::vector<ID3D12CommandAllocator*> m_AllocatorPool;
-		std::queue<std::pair<uint64_t, ID3D12CommandAllocator*>> m_ReadyAllocators;
-		std::mutex m_AllocatorMutex;
-
-		CommandAllocatorPool() = default;
-		~CommandAllocatorPool()
-		{
-			for (size_t i = 0; i < m_AllocatorPool.size(); ++i)
-				m_AllocatorPool[i]->Release();
-
-			m_AllocatorPool.clear();
-		}
-	};
-
-	std::map<D3D12_COMMAND_LIST_TYPE, CommandAllocatorPool> CMDAllocatorPool;
-
 	std::unique_ptr<DXCShaderCompiler> ShaderCompiler;
 	//std::unique_ptr<D3D12ShaderCompiler> pD3D12ShaderCompiler;
+
+	std::map<std::size_t, ISamplerState::SharedPtr> SamplerCache;
+	std::map<std::size_t, std::shared_ptr<D3D12RootSignature>> RootSignatureCache;
+	//std::map<std::string, std::shared_ptr<D3D12Pipeline>> PipelineCache;
 
 public:
 	FORCEINLINE ID3D12Device* Get() const
 	{
 		return Direct3DDevice.Get();
 	}
-
-	FORCEINLINE ID3D12Device* GetDevice() const
+	FORCEINLINE ID3D12Device14* GetDevice() const
 	{
-		return Direct3DDevice.Get();
+		return Direct3DDevice14.Get();
+	}
+
+	FORCEINLINE bool IsPrimaryGPU() const
+	{
+		return DeviceIndex == 0;
+	}
+
+	FORCEINLINE std::uint32_t GetDeviceIndex() const
+	{
+		return DeviceIndex;
 	}
 
 	FORCEINLINE ID3D12CommandQueue* GetGraphicsQueue() const
@@ -243,6 +288,11 @@ public:
 		return IMCopyCommandList.get();
 	}
 
+	FORCEINLINE bool IsEnhancedBarriersSupported() const
+	{
+		return false; //bIsEnhancedBarriersSupported;
+	}
+
 	FORCEINLINE bool Is_DXGI_FORMAT_R11G11B10_FLOAT_Supported() const
 	{
 		return bTypedUAVLoadSupport_R11G11B10_FLOAT;
@@ -250,10 +300,6 @@ public:
 	FORCEINLINE bool Is_DXGI_FORMAT_R16G16B16A16_FLOAT_Supported() const
 	{
 		return bTypedUAVLoadSupport_R16G16B16A16_FLOAT;
-	}
-	FORCEINLINE bool IsEnhancedBarriersSupported() const
-	{
-		return bEnhancedBarriersSupport;
 	}
 
 	FORCEINLINE ComPtr<IDXGIFactory4> GetFactory() const
@@ -287,8 +333,6 @@ private:
 		return Fence.get();
 	}*/
 
-	D3D12Viewport* GetViewportContext() const;
-
 	FORCEINLINE D3D12DescriptorHeapManager* GetDescriptorHeapManager() const
 	{
 		return DescriptorHeapManager.get();
@@ -296,5 +340,6 @@ private:
 
 private:
 	class D3D12CommandAllocatorPool;
-	std::unique_ptr<D3D12CommandAllocatorPool> CommandAllocatorPool;
+	class D3D12CommandAllocatorManager;
+	std::unique_ptr<D3D12CommandAllocatorManager> CommandAllocatorPool;
 };

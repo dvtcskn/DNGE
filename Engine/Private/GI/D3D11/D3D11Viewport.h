@@ -64,6 +64,7 @@ public:
 
 	FORCEINLINE ID3D11RenderTargetView* GetCurrentBackBufferRT() const { return RenderTargets[0].Get(); }
 	FORCEINLINE std::uint32_t GetBackBufferCount() const { return BackBufferCount; }
+	FORCEINLINE std::uint32_t GetCurrentBackBufferIndex() const { return CurrentBackBuffer;	}
 
 	FORCEINLINE ComPtr<IDXGISwapChain3> GetSwapChain() const { return SwapChain; }
 	FORCEINLINE HWND GetHandle() const { return WindowHandle; }

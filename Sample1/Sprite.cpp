@@ -53,6 +53,18 @@ sSprite::sSprite(const std::string& InName, const std::wstring& TextureAtlasPath
 	auto Texture = ITexture2D::CreateEmpty(InName, Desc, 4/*GPU::GetGBufferTextureEntryPoint()*/);
 	Texture->UpdateTexture(AtlasTexture.get(), 0, 0, IntVector2(0, 0), InSpriteBound);
 	MaterialInstance->AddTexture(Texture);
+
+	sSamplerAttributeDesc sampler(ESamplerStateMode::PointBorder);
+	sampler.Filter = ESamplerFilter::Point;
+	sampler.AddressU = ESamplerAddressMode::Clamp;
+	sampler.AddressV = ESamplerAddressMode::Clamp;
+	sampler.AddressW = ESamplerAddressMode::Clamp;
+	sampler.MipBias = 0;
+	sampler.MinMipLevel = -FLT_MAX;
+	sampler.MaxMipLevel = FLT_MAX;
+	sampler.MaxAnisotropy = 1;
+	sampler.BorderColor = FColor::Transparent();
+	MaterialInstance->AddSampler(sampler);
 	//MaterialInstance->BindConstantBuffer(AnimationCB);
 
 	{
@@ -77,7 +89,7 @@ sSprite::sSprite(const std::string& InName, const std::wstring& TextureAtlasPath
 		std::array<FVector2, 4> PlaneTC = { P1, P2, P3, P4 };*/
 
 		std::vector<sVertexLayout> Vertices;
-		for (std::size_t i = 0; i < Plane.size(); i++)
+		for (std::uint32_t i = 0; i < Plane.size(); i++)
 		{
 			auto& Verts = Plane.at(i);
 			auto& TC = PlaneTC.at(i);
@@ -98,6 +110,14 @@ sSprite::sSprite(const std::string& InName, const std::wstring& TextureAtlasPath
 			BufferSubresource Subresource = BufferSubresource(Indices.data(), Indices.size() * sizeof(std::uint32_t));
 			IndexBuffer = (IIndexBuffer::Create(Name, BufferLayout(Indices.size() * sizeof(std::uint32_t), sizeof(std::uint32_t)), &Subresource));
 		}
+
+		GeometryHandle = MeshBindlessGeometryHandle((std::uint32_t)Vertices.size(), sizeof(sVertexLayout));
+		sMeshGeometryContainerManager::Get().AllocateHandle(&GeometryHandle);
+		GeometryHandle.UpdateGeometry(Vertices.data());
+		IndexBufferHandle = MeshIndexBufferHandle((std::uint32_t)Indices.size());
+		sMeshGeometryContainerManager::Get().AllocateHandle(&IndexBufferHandle);
+		IndexBufferHandle.UpdateIndexBuffer(Indices.data());
+		ObjectDrawParameters.StartIndexLocation = IndexBufferHandle.GetStartIndexLocation();
 	}
 }
 
@@ -113,9 +133,21 @@ sSprite::sSprite(const std::string& InName, ITexture2D* TextureAtlas, const FBou
 	Desc.Dimensions.Y = (std::uint32_t)InSpriteBound.GetHeight();
 	Desc.Format = TextureAtlas->GetDesc().Format;
 	Desc.MipLevels = 1;
-	auto Texture = ITexture2D::CreateEmpty(InName, Desc, GPU::GetGBufferTextureEntryPoint());
+	auto Texture = ITexture2D::CreateEmpty(InName, Desc, 0);
 	Texture->UpdateTexture(TextureAtlas, 0, 0, IntVector2(0, 0), InSpriteBound);
 	MaterialInstance->AddTexture(Texture);
+
+	sSamplerAttributeDesc sampler(ESamplerStateMode::PointBorder);
+	sampler.Filter = ESamplerFilter::Point;
+	sampler.AddressU = ESamplerAddressMode::Clamp;
+	sampler.AddressV = ESamplerAddressMode::Clamp;
+	sampler.AddressW = ESamplerAddressMode::Clamp;
+	sampler.MipBias = 0;
+	sampler.MinMipLevel = -FLT_MAX;
+	sampler.MaxMipLevel = FLT_MAX;
+	sampler.MaxAnisotropy = 1;
+	sampler.BorderColor = FColor::Transparent();
+	MaterialInstance->AddSampler(sampler);
 
 	{
 		const auto Plane = MeshPrimitives::Create2DPlaneVerticesFromDimension(InSpriteBound.GetDimension());
@@ -139,7 +171,7 @@ sSprite::sSprite(const std::string& InName, ITexture2D* TextureAtlas, const FBou
 		std::array<FVector2, 4> PlaneTC = { P1, P2, P3, P4 };*/
 
 		std::vector<sVertexLayout> Vertices;
-		for (std::size_t i = 0; i < Plane.size(); i++)
+		for (std::uint32_t i = 0; i < Plane.size(); i++)
 		{
 			auto& Verts = Plane.at(i);
 			auto& TC = PlaneTC.at(i);
@@ -160,6 +192,14 @@ sSprite::sSprite(const std::string& InName, ITexture2D* TextureAtlas, const FBou
 			BufferSubresource Subresource = BufferSubresource(Indices.data(), Indices.size() * sizeof(std::uint32_t));
 			IndexBuffer = (IIndexBuffer::Create(Name, BufferLayout(Indices.size() * sizeof(std::uint32_t), sizeof(std::uint32_t)), &Subresource));
 		}
+
+		GeometryHandle = MeshBindlessGeometryHandle((std::uint32_t)Vertices.size(), sizeof(sVertexLayout));
+		sMeshGeometryContainerManager::Get().AllocateHandle(&GeometryHandle);
+		GeometryHandle.UpdateGeometry(Vertices.data());
+		IndexBufferHandle = MeshIndexBufferHandle((std::uint32_t)Indices.size());
+		sMeshGeometryContainerManager::Get().AllocateHandle(&IndexBufferHandle);
+		IndexBufferHandle.UpdateIndexBuffer(Indices.data());
+		ObjectDrawParameters.StartIndexLocation = IndexBufferHandle.GetStartIndexLocation();
 	}
 }
 
@@ -167,7 +207,7 @@ sSprite::sSprite(const std::string& InName, ITexture2D* TextureAtlas, const FBou
 	: sSprite(InName, TextureAtlas, InSpriteBound, sMaterialManager::Get().GetMaterial(DefaultMaterialName))
 {}
 
-sSprite::sSprite(const std::string& InName, const FBounds2D& InSpriteBound, sMaterial::sMaterialInstance* AtlasMaterialInstance)
+sSprite::sSprite(const std::string& InName, const FBounds2D& InSpriteBound, sMaterialInstance* AtlasMaterialInstance)
 	: Name(InName)
 	, SpriteBound(InSpriteBound)
 	, MaterialInstance(AtlasMaterialInstance)
@@ -193,7 +233,7 @@ sSprite::sSprite(const std::string& InName, const FBounds2D& InSpriteBound, sMat
 		std::array<FVector2, 4> PlaneTC = { P1, P2, P3, P4 };
 
 		std::vector<sVertexLayout> Vertices;
-		for (std::size_t i = 0; i < Plane.size(); i++)
+		for (std::uint32_t i = 0; i < Plane.size(); i++)
 		{
 			auto& Verts = Plane.at(i);
 			auto& TC = PlaneTC.at(i);
@@ -214,11 +254,21 @@ sSprite::sSprite(const std::string& InName, const FBounds2D& InSpriteBound, sMat
 			BufferSubresource Subresource = BufferSubresource(Indices.data(), Indices.size() * sizeof(std::uint32_t));
 			IndexBuffer = (IIndexBuffer::Create(Name, BufferLayout(Indices.size() * sizeof(std::uint32_t), sizeof(std::uint32_t)), &Subresource));
 		}
+
+		GeometryHandle = MeshBindlessGeometryHandle((std::uint32_t)Vertices.size(), sizeof(sVertexLayout));
+		sMeshGeometryContainerManager::Get().AllocateHandle(&GeometryHandle);
+		GeometryHandle.UpdateGeometry(Vertices.data());
+		IndexBufferHandle = MeshIndexBufferHandle((std::uint32_t)Indices.size());
+		sMeshGeometryContainerManager::Get().AllocateHandle(&IndexBufferHandle);
+		IndexBufferHandle.UpdateIndexBuffer(Indices.data());
+		ObjectDrawParameters.StartIndexLocation = IndexBufferHandle.GetStartIndexLocation();
 	}
 }
 
 sSprite::~sSprite()
 {
+	sMeshGeometryContainerManager::Get().DeallocateHandle(&GeometryHandle);
+	sMeshGeometryContainerManager::Get().DeallocateHandle(&IndexBufferHandle);
 	//AnimationCB = nullptr;
 	VertexBuffer = nullptr;
 	IndexBuffer = nullptr;
@@ -302,7 +352,7 @@ sObjectDrawParameters sSpriteSheet::GetDrawParameters(std::size_t SpriteIndex) c
 	return KeyFrames.at(SpriteIndex)->Sprite->GetDrawParameters();
 }
 
-sMaterial::sMaterialInstance* sSpriteSheet::GetMaterialInstance(std::size_t SpriteIndex) const
+sMaterialInstance* sSpriteSheet::GetMaterialInstance(std::size_t SpriteIndex) const
 {
 	return KeyFrames.at(SpriteIndex)->Sprite->GetMaterialInstance();
 }
@@ -317,7 +367,7 @@ sSprite* sSpriteSheet::GetSprite(std::size_t index) const
 	return KeyFrames.at(index)->Sprite.get();
 }
 
-sSpriteSheetKeyFrame* sSpriteSheet::GetKeyFrame(std::size_t index) const
+sSpriteSheetKeyFrame* sSpriteSheet::GetKeyFrame(std::uint32_t index) const
 {
 	return KeyFrames.at(index);
 }

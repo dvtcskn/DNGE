@@ -39,6 +39,8 @@ public:
 	virtual ~D3D12ComputeCommandContext();
 
 	FORCEINLINE ID3D12GraphicsCommandList* Get() const { return CommandList.Get(); }
+	FORCEINLINE ComPtr<ID3D12CommandList> GetAsCOM() const { return CommandList; }
+	FORCEINLINE ComPtr<ID3D12CommandAllocator> GetAllocator() const { return CommandAllocator; }
 	FORCEINLINE ID3D12Device* GetDevice() const { return Owner->GetDevice(); }
 
 	virtual void* GetInternalCommandContext() override final { return CommandList.Get(); }
@@ -68,10 +70,10 @@ public:
 	virtual void SetUnorderedAccessTargetAsSRV(IUnorderedAccessTarget* pST, std::uint32_t RootParameterIndex) override final;
 	virtual void SetUnorderedAccessTargetsAsSRV(std::vector<IUnorderedAccessTarget*> pSTs, std::uint32_t RootParameterIndex) override final;
 
-	virtual void SetUnorderedAccessBuffer(IUnorderedAccessBuffer* pUAV, std::uint32_t RootParameterIndex) override final;
-	virtual void SetUnorderedAccessBuffers(std::vector<IUnorderedAccessBuffer*> UAVs, std::uint32_t RootParameterIndex) override final;
-	virtual void SetUnorderedAccessBufferAsResource(IUnorderedAccessBuffer* pUAV, std::uint32_t RootParameterIndex) override final;
-	virtual void SetUnorderedAccessBuffersAsResource(std::vector<IUnorderedAccessBuffer*> UAVs, std::uint32_t RootParameterIndex) override final;
+	virtual void SetUnorderedAccessBuffer(IStructuredBuffer* pUAV, std::uint32_t RootParameterIndex) override final;
+	virtual void SetUnorderedAccessBuffers(std::vector<IStructuredBuffer*> UAVs, std::uint32_t RootParameterIndex) override final;
+	virtual void SetUnorderedAccessBufferAsResource(IStructuredBuffer* pUAV, std::uint32_t RootParameterIndex) override final;
+	virtual void SetUnorderedAccessBuffersAsResource(std::vector<IStructuredBuffer*> UAVs, std::uint32_t RootParameterIndex) override final;
 
 	virtual void SetDepthTargetAsResource(IDepthTarget* pDT, std::uint32_t RootParameterIndex) override final;
 	virtual void SetDepthTargetsAsResource(std::vector<IDepthTarget*> DTs, std::uint32_t RootParameterIndex) override final;
@@ -86,7 +88,7 @@ public:
 private:
 	D3D12Device* Owner;
 	ComPtr<ID3D12GraphicsCommandList> CommandList;
-	ID3D12CommandAllocator* CommandAllocator;
+	ComPtr<ID3D12CommandAllocator> CommandAllocator;
 
 	bool bIsClosed;
 	bool bWaitForCompletion;

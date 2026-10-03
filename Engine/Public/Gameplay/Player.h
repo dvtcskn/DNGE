@@ -37,8 +37,8 @@ class sPlayer
 	sBaseClassBody(sClassConstructor, sPlayer)
 	friend sGameInstance;
 public:
-	sPlayer(sGameInstance* InOwner, std::size_t InPlayerIndex);
-	sPlayer(sGameInstance* InOwner, std::size_t InPlayerIndex, sPlayerController::SharedPtr PlayerController, sActor::SharedPtr PlayerFocusedActor);
+	sPlayer(sGameInstance* InOwner, std::uint32_t InPlayerIndex);
+	sPlayer(sGameInstance* InOwner, std::uint32_t InPlayerIndex, sPlayerController::SharedPtr PlayerController, sActor::SharedPtr PlayerFocusedActor);
 	sPlayer(sGameInstance* InOwner, sPlayerController::SharedPtr PlayerController, sActor::SharedPtr PlayerFocusedActor);
 	virtual ~sPlayer();
 
@@ -69,7 +69,7 @@ public:
 
 	sViewportInstance* GetViewportInstance() const;
 
-	std::int32_t GetPlayerIndex() const;
+	std::uint32_t GetPlayerIndex() const;
 	std::size_t GetPlayerCount() const;
 	ESplitScreenType GetSplitScreenType() const;
 
@@ -108,7 +108,7 @@ private:
 	virtual void OnTick(const double DeltaTime) {}
 	virtual void OnFixedUpdate(const double DeltaTime) {}
 
-	void SetPlayerIndex(std::size_t Index);
+	void SetPlayerIndex(std::uint32_t Index);
 
 	void OnChangeLevel();
 
@@ -121,7 +121,7 @@ private:
 
 private:
 	sGameInstance* Owner;
-	std::size_t PlayerIndex;
+	std::uint32_t PlayerIndex;
 	sPlayerController::SharedPtr Controller;
 	sActor::SharedPtr PlayerFocusedActor;
 	bool DeferredRemovePlayerActor;

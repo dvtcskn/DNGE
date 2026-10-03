@@ -56,22 +56,21 @@ private:
 
 		virtual std::string GetName() const override final { return Owner->GetName(); }
 
-		virtual std::size_t GetSecondaryConstantBufferCount() const { return Owner->AnimationCB != nullptr ? 1 : 0; }
-		virtual IConstantBuffer* GetSecondaryConstantBuffer(std::size_t Index) const { return Owner->AnimationCB.get(); }
-		virtual std::vector<IConstantBuffer*> GetSecondaryConstantBuffers() const { return std::vector<IConstantBuffer*>{ Owner->AnimationCB.get() }; }
-
 		virtual IConstantBuffer* GetMeshConstantBuffer() const override final { return Owner->GetMeshConstantBuffer(); }
 		virtual IVertexBuffer* GetVertexBuffer() const override final { return Owner->CurrentKeyFrame->Sprite->GetVertexBuffer(); }
 		virtual IIndexBuffer* GetIndexBuffer() const override final { return Owner->CurrentKeyFrame->Sprite->GetIndexBuffer(); };
+
+		virtual const MeshBindlessGeometryHandle* GetGeometryHandle() const override { return Owner->CurrentKeyFrame->Sprite->GetGeometryHandle(); }
+		virtual const MeshIndexBufferHandle* GetIndexHandle() const override { return Owner->CurrentKeyFrame->Sprite->GetIndexHandle(); }
 
 		virtual bool HasInstanceBuffer() const override final { return false; };
 		virtual IVertexBuffer* GetInstanceBuffer() const override final { return nullptr; };
 
 		virtual sObjectDrawParameters GetDrawParameters() const override final { return Owner->CurrentKeyFrame->Sprite->GetDrawParameters(); }
 
-		virtual std::vector<sMaterial::sMaterialInstance*> GetMaterialInstances() const override final { return std::vector<sMaterial::sMaterialInstance*>{Owner->CurrentKeyFrame->Sprite->GetMaterialInstance()}; }
+		virtual std::vector<sMaterialInstance*> GetMaterialInstances() const override final { return std::vector<sMaterialInstance*>{Owner->CurrentKeyFrame->Sprite->GetMaterialInstance()}; }
 		virtual std::int32_t GetNumMaterials() const override final { return 1; }
-		virtual sMaterial::sMaterialInstance* GetMaterialInstance(/*std::int32_t Index = 0*/) const override final { return Owner->CurrentKeyFrame->Sprite->GetMaterialInstance(); }
+		virtual sMaterialInstance* GetMaterialInstance(/*std::int32_t Index = 0*/) const override final { return Owner->CurrentKeyFrame->Sprite->GetMaterialInstance(); }
 		virtual std::string GetMaterialName(/*std::int32_t Index = 0*/) const override final { return Owner->CurrentKeyFrame->Sprite->GetMaterialInstance()->GetName(); }
 
 		virtual void Serialize(sArchive& archive) override {}
@@ -157,16 +156,6 @@ private:
 	std::function<void()> fAnimationStarted;
 	std::function<void()> fAnimationEnd;
 	std::function<void(std::size_t)> fFrameUpdated;
-
-	__declspec(align(256)) struct sAnimationFlip
-	{
-		//uint LayerIndex;
-		std::uint32_t Flip;
-		//float FlipMaxX = 0;
-		//float FlipMinX = 0;
-	};
-	sAnimationFlip AnimationFlip;
-	IConstantBuffer::SharedPtr AnimationCB;
 
 	//float ElapsedTime;
 	//float FrameTime;

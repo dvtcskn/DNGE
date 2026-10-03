@@ -33,7 +33,7 @@ public:
 	virtual std::wstring GetPath() const override final { return Path; }
 	virtual eShaderType Type() const override final { return ShaderType; }
 	virtual void* GetByteCode() const override final { return Blob->GetBufferPointer(); }
-	virtual std::uint32_t GetByteCodeSize() const override final { return Blob->GetBufferSize(); }
+	virtual std::size_t GetByteCodeSize() const override final { return Blob->GetBufferSize(); }
 
 	inline ComPtr<ID3D12ShaderReflection> GetShaderReflection() const { return ShaderReflection; }
 

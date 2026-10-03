@@ -28,6 +28,7 @@
 #include "GI/D3DShared/D3DShared.h"
 #include "D3D12Pipeline.h"
 #include "D3D12Viewport.h"
+#include "D3D12FrameBuffer.h"
 //#include "GI/Shared/Shader.h"
 
 D3D12Pipeline::D3D12Pipeline(D3D12Device* InOwner, const std::string& InName, const sPipelineDesc& InDesc)
@@ -35,6 +36,10 @@ D3D12Pipeline::D3D12Pipeline(D3D12Device* InOwner, const std::string& InName, co
     , Name(InName)
     , Desc(InDesc)
     , Compiled(false)
+    , PrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY::D3D_PRIMITIVE_TOPOLOGY_UNDEFINED)
+    , VertexAttribute(nullptr)
+    , RootSignature(nullptr)
+    , PSO(nullptr)
 {
     ZeroMemory(&PSODesc, sizeof(PSODesc));
     PSODesc.NodeMask = 1;
@@ -46,12 +51,19 @@ D3D12Pipeline::D3D12Pipeline(D3D12Device* InOwner, const std::string& InName, co
 
 D3D12Pipeline::~D3D12Pipeline()
 {
+    Compiled = false;
     Owner = nullptr;
 
     RootSignature = nullptr;
 
     ShaderAttachments.clear();
     VertexAttribute = nullptr;
+
+    for (auto& Sampler : Samplers)
+    {
+        Sampler = nullptr;
+    }
+	Samplers.clear();
 
     PSO = nullptr;
 }
@@ -78,7 +90,7 @@ bool D3D12Pipeline::Compile(IFrameBuffer* FrameBuffer)
     for (std::size_t i = 0; i < RTs.size(); i++)
         PSODesc.RTVFormats[i] = ConvertFormat_Format_To_DXGI(RTs[i]->GetFormat());
 
-    PSODesc.NumRenderTargets = RTs.size();
+    PSODesc.NumRenderTargets = (UINT)RTs.size();
   
     CompilePipeline();
 
@@ -125,18 +137,11 @@ bool D3D12Pipeline::Compile(std::vector<IRenderTarget*> RTs, IDepthTarget* Depth
     for (std::size_t i = 0; i < RTs.size(); i++)
         PSODesc.RTVFormats[i] = ConvertFormat_Format_To_DXGI(Cast<D3D12RenderTarget>(RTs[i])->GetFormat());
 
-    PSODesc.NumRenderTargets = RTs.size();
+    PSODesc.NumRenderTargets = (UINT)RTs.size();
 
     CompilePipeline();
 
     return true;
-}
-
-void D3D12Pipeline::ApplyPipeline(ID3D12GraphicsCommandList* CommandList) const
-{
-    CommandList->IASetPrimitiveTopology(PrimitiveTopologyType);
-    CommandList->SetGraphicsRootSignature(RootSignature->Get());
-    CommandList->SetPipelineState(PSO.Get());
 }
 
 void D3D12Pipeline::CompilePipeline()
@@ -157,7 +162,7 @@ void D3D12Pipeline::CompilePipeline()
 
     for (const auto& Attachment : ShaderAttachments)
     {
-        auto pShader = Owner->CompileShader(Attachment);
+        auto pShader = Owner->CompileD3D12Shader(Attachment);
         //Blobs.push_back(pShader);
 
         switch (Attachment.Type)
@@ -211,33 +216,44 @@ void D3D12Pipeline::CompilePipeline()
         {
             switch (Type)
             {
-            case EPrimitiveType::ePOINT_LIST: return D3D12_PRIMITIVE_TOPOLOGY_TYPE::D3D12_PRIMITIVE_TOPOLOGY_TYPE_POINT;
-            case EPrimitiveType::eTRIANGLE_LIST: return D3D12_PRIMITIVE_TOPOLOGY_TYPE::D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-            case EPrimitiveType::eTRIANGLE_STRIP: return D3D12_PRIMITIVE_TOPOLOGY_TYPE::D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-            case EPrimitiveType::eLINE_LIST: return D3D12_PRIMITIVE_TOPOLOGY_TYPE::D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE;
+            case EPrimitiveType::UNDEFINED: return D3D12_PRIMITIVE_TOPOLOGY_TYPE::D3D12_PRIMITIVE_TOPOLOGY_TYPE_UNDEFINED;
+            case EPrimitiveType::POINT_LIST: return D3D12_PRIMITIVE_TOPOLOGY_TYPE::D3D12_PRIMITIVE_TOPOLOGY_TYPE_POINT;
+            case EPrimitiveType::TRIANGLE_LIST: return D3D12_PRIMITIVE_TOPOLOGY_TYPE::D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+            case EPrimitiveType::TRIANGLE_STRIP: return D3D12_PRIMITIVE_TOPOLOGY_TYPE::D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+            case EPrimitiveType::LINE_LIST: return D3D12_PRIMITIVE_TOPOLOGY_TYPE::D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE;
                 /*case EPrimitiveType::ePATCH_1_CONTROL_POINT: return D3D12_PRIMITIVE_TOPOLOGY_TYPE:: D3D_PRIMITIVE_TOPOLOGY_1_CONTROL_POINT_PATCHLIST;
                 case EPrimitiveType::ePATCH_3_CONTROL_POINT: return D3D12_PRIMITIVE_TOPOLOGY_TYPE:: D3D_PRIMITIVE_TOPOLOGY_2_CONTROL_POINT_PATCHLIST;*/
             }
-            return D3D12_PRIMITIVE_TOPOLOGY_TYPE::D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+            return D3D12_PRIMITIVE_TOPOLOGY_TYPE::D3D12_PRIMITIVE_TOPOLOGY_TYPE_UNDEFINED;
         };
 
     auto PrimTopology = [&](EPrimitiveType Type) -> D3D12_PRIMITIVE_TOPOLOGY
         {
             switch (Type)
             {
-            case EPrimitiveType::ePOINT_LIST: return D3D12_PRIMITIVE_TOPOLOGY::D3D_PRIMITIVE_TOPOLOGY_POINTLIST;
-            case EPrimitiveType::eTRIANGLE_LIST: return D3D12_PRIMITIVE_TOPOLOGY::D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-            case EPrimitiveType::eTRIANGLE_STRIP: return D3D12_PRIMITIVE_TOPOLOGY::D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
-            case EPrimitiveType::eLINE_LIST: return D3D12_PRIMITIVE_TOPOLOGY::D3D_PRIMITIVE_TOPOLOGY_LINELIST;
+            case EPrimitiveType::UNDEFINED: return D3D12_PRIMITIVE_TOPOLOGY::D3D_PRIMITIVE_TOPOLOGY_UNDEFINED;
+            case EPrimitiveType::POINT_LIST: return D3D12_PRIMITIVE_TOPOLOGY::D3D_PRIMITIVE_TOPOLOGY_POINTLIST;
+            case EPrimitiveType::TRIANGLE_LIST: return D3D12_PRIMITIVE_TOPOLOGY::D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+            case EPrimitiveType::TRIANGLE_STRIP: return D3D12_PRIMITIVE_TOPOLOGY::D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
+            case EPrimitiveType::LINE_LIST: return D3D12_PRIMITIVE_TOPOLOGY::D3D_PRIMITIVE_TOPOLOGY_LINELIST;
                 /*case EPrimitiveType::ePATCH_1_CONTROL_POINT: return D3D12_PRIMITIVE_TOPOLOGY_TYPE:: D3D_PRIMITIVE_TOPOLOGY_1_CONTROL_POINT_PATCHLIST;
                 case EPrimitiveType::ePATCH_3_CONTROL_POINT: return D3D12_PRIMITIVE_TOPOLOGY_TYPE:: D3D_PRIMITIVE_TOPOLOGY_2_CONTROL_POINT_PATCHLIST;*/
             }
-            return D3D12_PRIMITIVE_TOPOLOGY::D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+            return D3D12_PRIMITIVE_TOPOLOGY::D3D_PRIMITIVE_TOPOLOGY_UNDEFINED;
         };
 
     PrimitiveTopologyType = PrimTopology(Desc.PrimitiveTopologyType);
 
-    RootSignature = std::make_shared<D3D12RootSignature>(Owner->GetDevice(), Desc.DescriptorSetLayout);
+	for (auto& Attachment : Desc.Bindings)
+	{
+		if (Attachment.DescriptorType == EDescriptorType::Sampler)
+		{
+			Samplers.push_back(D3D12SamplerState::Create(Owner, Attachment.SamplerDesc));
+		}
+	}
+
+    //RootSignature = std::make_shared<D3D12RootSignature>(Owner->GetDevice(), Desc.Bindings);
+    RootSignature = Owner->CreateRootSignature(Desc.Bindings, Desc.IndirectLayoutBindingDesc);
     PSODesc.pRootSignature = RootSignature->Get();
 
     VertexAttribute = std::make_shared<D3D12VertexAttribute>(Desc.VertexLayout);
@@ -282,7 +298,7 @@ bool D3D12Pipeline::Recompile()
 
     for (auto& Attachment : ShaderAttachments)
     {
-        auto pShader = Owner->CompileShader(Attachment);
+        auto pShader = Owner->CompileD3D12Shader(Attachment);
         //Blobs.push_back(Shader.GetBlob());
 
         switch (Attachment.Type)
@@ -356,11 +372,11 @@ D3D12ComputePipeline::D3D12ComputePipeline(D3D12Device* InOwner, const std::stri
 {
     ZeroMemory(&ComputePipelineDesc, sizeof(ComputePipelineDesc));
     
-    auto pShader = Owner->CompileShader(ShaderAttachment);
+    auto pShader = Owner->CompileD3D12Shader(ShaderAttachment);
     ComputePipelineDesc.CS.pShaderBytecode = pShader->GetByteCode();
     ComputePipelineDesc.CS.BytecodeLength = pShader->GetByteCodeSize();
 
-    RootSignature = std::make_shared<D3D12RootSignature>(Owner->GetDevice(), InDesc.DescriptorSetLayout);
+    RootSignature = std::make_shared<D3D12RootSignature>(Owner->GetDevice(), InDesc.Bindings, sIndirectLayoutBindingDesc());
     ComputePipelineDesc.pRootSignature = RootSignature->Get();
 
     auto Device = Owner->GetDevice();
@@ -382,11 +398,11 @@ void D3D12ComputePipeline::ApplyPipeline(ID3D12GraphicsCommandList* Context) con
 
 bool D3D12ComputePipeline::Recompile()
 {
-    auto pShader = Owner->CompileShader(ShaderAttachment);
+    auto pShader = Owner->CompileD3D12Shader(ShaderAttachment);
     ComputePipelineDesc.CS.pShaderBytecode = pShader->GetByteCode();
     ComputePipelineDesc.CS.BytecodeLength = pShader->GetByteCodeSize();
 
-    RootSignature = std::make_shared<D3D12RootSignature>(Owner->GetDevice(), Desc.DescriptorSetLayout);
+    RootSignature = std::make_shared<D3D12RootSignature>(Owner->GetDevice(), Desc.Bindings, sIndirectLayoutBindingDesc());
     ComputePipelineDesc.pRootSignature = RootSignature->Get();
 
     auto Device = Owner->GetDevice();

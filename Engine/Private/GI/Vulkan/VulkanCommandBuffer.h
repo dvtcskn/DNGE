@@ -38,14 +38,20 @@ public:
 	VulkanCommandBuffer(VulkanDevice* Device);
 	virtual ~VulkanCommandBuffer();
 
-	virtual void BeginRecordCommandList(const ERenderPass RenderPass = ERenderPass::eNONE) override final;
+	virtual bool BeginRecordCommandList(const ERenderPass RenderPass = ERenderPass::NONE) override final;
 	virtual void FinishRecordCommandList() override final;
-	virtual void ExecuteCommandList() override final;
+	virtual void ExecuteCommandList(ECommandContextExecuteType ExecuteType = ECommandContextExecuteType::Immediate, std::uint32_t Order = std::uint32_t(-1)) override final;
 	virtual void ClearState() override final;
 
 	void ExecuteWithWait();
 
-	const VkCommandBuffer& Get() const { return CommandBuffer; }
+	virtual bool IsRecorded() const override final { return false; }
+
+	VkCommandBuffer Get() const
+	{
+		VkCommandBuffer CMD = CommandBuffer;
+		return CMD;
+	}
 #ifdef VK_HPP
 	vk::CommandBuffer Get_hpp() const { return CommandBuffer; }
 #endif
@@ -54,7 +60,8 @@ public:
 	void Close();
 	bool IsClosed() const { return bIsClosed; }
 
-	void TransitionTo(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, VkAccessFlags2 srcAccessMask, VkAccessFlags2 dstAccessMask, VkPipelineStageFlags2 srcStage, VkPipelineStageFlags2 dstStage);
+	void TransitionTo(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, VkAccessFlags2 srcAccessMask = 0, VkAccessFlags2 dstAccessMask = 0, VkPipelineStageFlags2 srcStage = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, VkPipelineStageFlags2 dstStage = VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT, std::uint32_t Mips = 1);
+	void PipelineBarrier(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, VkAccessFlags srcAccessMask, VkAccessFlags dstAccessMask, VkPipelineStageFlags sourceStage, VkPipelineStageFlags destinationStage,  uint32_t mipLevels);
 	void CopyResource(VkImage pDstResource, VkImageLayout DestState, VkImage pSrcResource, VkImageLayout SrcState, sDimension2D Dimension);
 
 	virtual void* GetInternalCommandContext() override final { return nullptr; }
@@ -81,8 +88,8 @@ public:
 	virtual void CopyRenderTarget(IRenderTarget* Dest, IRenderTarget* Source) override final;
 	virtual void CopyDepthBuffer(IDepthTarget* Dest, IDepthTarget* Source) override final;
 
-	virtual void SetUnorderedAccessBufferAsResource(IUnorderedAccessBuffer* pUAV, std::uint32_t RootParameterIndex) override final;
-	virtual void SetUnorderedAccessBuffersAsResource(std::vector<IUnorderedAccessBuffer*> UAVs, std::uint32_t RootParameterIndex) override final;
+	virtual void SetUnorderedAccessBufferAsResource(IStructuredBuffer* pUAV, std::optional<std::uint32_t> RootParameterIndex = std::nullopt) override final;
+	virtual void SetUnorderedAccessBuffersAsResource(std::vector<IStructuredBuffer*> UAVs, std::optional<std::uint32_t> RootParameterIndex = std::nullopt) override final;
 
 	virtual void SetPipeline(IPipeline* Pipeline) override final;
 
@@ -96,6 +103,11 @@ public:
 	virtual void UpdateBufferSubresource(IVertexBuffer* Buffer, std::size_t Location, std::size_t Size, const void* pSrcData) override final;
 	virtual void UpdateBufferSubresource(IIndexBuffer* Buffer, BufferSubresource* Subresource) override final;
 	virtual void UpdateBufferSubresource(IIndexBuffer* Buffer, std::size_t Location, std::size_t Size, const void* pSrcData) override final;
+
+	virtual void Set32BitConstant(std::uint32_t RootParameterIndex, std::uint32_t SrcData, std::uint32_t DestOffsetIn32BitValues = 0) override final;
+	virtual void Set32BitConstants(std::uint32_t RootParameterIndex, const void* pSrcData, std::uint32_t Num32BitValuesToSet = 1, std::uint32_t DestOffsetIn32BitValues = 0) override final;
+
+	virtual void SetBindlessDescriptor(std::uint32_t RootParameterIndex, IBindlessSceneContainer* Desc) override final;
 
 	virtual void Draw(std::uint32_t VertexCount, std::uint32_t VertexStartOffset = 0) override final;
 	virtual void DrawInstanced(std::uint32_t VertexCountPerInstance, std::uint32_t InstanceCount, std::uint32_t StartVertexLocation, std::uint32_t StartInstanceLocation) override final;

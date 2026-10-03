@@ -31,6 +31,8 @@
 #include "D3D12Device.h"
 #include "Utilities/FileManager.h"
 #include <iostream>
+#include <locale>
+#include <codecvt>
 #include "D3D12ComputeCommandContext.h"
 
 static std::uint32_t BytesPerPixel(DXGI_FORMAT Format)
@@ -45,23 +47,17 @@ D3D12Texture::D3D12Texture(D3D12Device* InOwner, const std::wstring FilePath, co
     , RootParameterIndex(InRootParameterIndex)
     , Path(FilePath)
     , CurrentState(D3D12_RESOURCE_STATE_COMMON)
+    , CurrentBarrierLayout(D3D12_BARRIER_LAYOUT_UNDEFINED)
+    , CurrentSyncState(D3D12_BARRIER_SYNC_NONE)
+	, CurrentAccessState(D3D12_BARRIER_ACCESS_NO_ACCESS)
 {
-    auto WideStringToString = [](const std::wstring & s) -> std::string
-    {
-        int len;
-        int slength = (int)s.length() + 1;
-        len = WideCharToMultiByte(0, 0, s.c_str(), slength, 0, 0, 0, 0);
-        std::string r(len, '\0');
-        WideCharToMultiByte(0, 0, s.c_str(), slength, &r[0], len, 0, 0);
-        return r;
-    };
-
     std::unique_ptr<uint8_t[]> decodedData;
 
     auto Device = Owner->GetDevice();
+    const bool IsEnhancedBarriersSupported = InOwner->IsEnhancedBarriersSupported();
     auto IMCommandList = Owner->GetIMCommandList();
 
-    std::string str = WideStringToString(FilePath);
+    std::string str = FileManager::WideStringToString(FilePath);
     std::string Ext = std::string(str.end() - 4, str.end());
 
     bool DDS = false;
@@ -83,14 +79,32 @@ D3D12Texture::D3D12Texture(D3D12Device* InOwner, const std::wstring FilePath, co
 
         auto desc = CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize);
 
-        ThrowIfFailed(
-            Device->CreateCommittedResource(
-                &heapProps,
-                D3D12_HEAP_FLAG_NONE,
-                &desc,
-                D3D12_RESOURCE_STATE_COMMON, // D3D12_RESOURCE_STATE_GENERIC_READ
-                nullptr,
-                IID_PPV_ARGS(uploadRes.GetAddressOf())));
+        if (IsEnhancedBarriersSupported)
+        {
+            auto Desc1 = CD3DX12_RESOURCE_DESC1(desc);
+            ThrowIfFailed(
+                Device->CreateCommittedResource3(
+                    &heapProps,
+                    D3D12_HEAP_FLAG_NONE,
+                    &Desc1,
+                    D3D12_BARRIER_LAYOUT_UNDEFINED,
+                    nullptr,
+                    nullptr,
+                    0,
+                    nullptr,
+                    IID_PPV_ARGS(uploadRes.GetAddressOf())));
+        }
+        else
+        {
+            ThrowIfFailed(
+                Device->CreateCommittedResource(
+                    &heapProps,
+                    D3D12_HEAP_FLAG_NONE,
+                    &desc,
+                    D3D12_RESOURCE_STATE_COMMON, // D3D12_RESOURCE_STATE_GENERIC_READ
+                    nullptr,
+                    IID_PPV_ARGS(uploadRes.GetAddressOf())));
+        }
 
         IMCommandList->BeginRecordCommandList();
 
@@ -117,15 +131,33 @@ D3D12Texture::D3D12Texture(D3D12Device* InOwner, const std::wstring FilePath, co
 
         auto desc = CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize);
 
-        // Create the GPU upload buffer.
-        ThrowIfFailed(
-            Device->CreateCommittedResource(
-                &heapProps,
-                D3D12_HEAP_FLAG_NONE,
-                &desc,
-                D3D12_RESOURCE_STATE_COMMON, // D3D12_RESOURCE_STATE_GENERIC_READ
-                nullptr,
-                IID_PPV_ARGS(uploadRes.GetAddressOf())));
+        if (IsEnhancedBarriersSupported)
+        {
+            auto Desc1 = CD3DX12_RESOURCE_DESC1(desc);
+            ThrowIfFailed(
+                Device->CreateCommittedResource3(
+                    &heapProps,
+                    D3D12_HEAP_FLAG_NONE,
+                    &Desc1,
+                    D3D12_BARRIER_LAYOUT_UNDEFINED,
+                    nullptr,
+                    nullptr,
+                    0,
+                    nullptr,
+                    IID_PPV_ARGS(uploadRes.GetAddressOf())));
+        }
+        else
+        {
+            // Create the GPU upload buffer.
+            ThrowIfFailed(
+                Device->CreateCommittedResource(
+                    &heapProps,
+                    D3D12_HEAP_FLAG_NONE,
+                    &desc,
+                    D3D12_RESOURCE_STATE_COMMON, // D3D12_RESOURCE_STATE_GENERIC_READ
+                    nullptr,
+                    IID_PPV_ARGS(uploadRes.GetAddressOf())));
+        }
 
         IMCommandList->BeginRecordCommandList();
 
@@ -164,6 +196,9 @@ D3D12Texture::D3D12Texture(D3D12Device* InOwner, const std::string InName, void*
     , RootParameterIndex(InRootParameterIndex)
     , Path(L"")
     , CurrentState(D3D12_RESOURCE_STATE_COMMON)
+    , CurrentBarrierLayout(D3D12_BARRIER_LAYOUT_UNDEFINED)
+    , CurrentSyncState(D3D12_BARRIER_SYNC_NONE)
+    , CurrentAccessState(D3D12_BARRIER_ACCESS_NO_ACCESS)
 {
     auto Device = Owner->GetDevice();
     auto IMCommandList = Owner->GetIMCommandList();
@@ -194,13 +229,31 @@ D3D12Texture::D3D12Texture(D3D12Device* InOwner, const std::string InName, void*
     TextureHeap.MemoryPoolPreference = D3D12_MEMORY_POOL_L0;
     TextureHeap.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_WRITE_BACK;
 
-    ThrowIfFailed(Device->CreateCommittedResource(
-        &TextureHeap,
-        D3D12_HEAP_FLAG_NONE,
-        &textureDesc,
-        D3D12_RESOURCE_STATE_COMMON,
-        nullptr,
-        IID_PPV_ARGS(&Texture)));
+    const bool IsEnhancedBarriersSupported = InOwner->IsEnhancedBarriersSupported();
+    if (IsEnhancedBarriersSupported)
+    {
+        auto Desc1 = CD3DX12_RESOURCE_DESC1(textureDesc);
+        ThrowIfFailed(Device->CreateCommittedResource3(
+            &TextureHeap,
+            D3D12_HEAP_FLAG_NONE,
+            &Desc1,
+            D3D12_BARRIER_LAYOUT_UNDEFINED,
+            nullptr,
+            nullptr,
+            0,
+            nullptr,
+            IID_PPV_ARGS(&Texture)));
+    }
+    else
+    {
+        ThrowIfFailed(Device->CreateCommittedResource(
+            &TextureHeap,
+            D3D12_HEAP_FLAG_NONE,
+            &textureDesc,
+            D3D12_RESOURCE_STATE_COMMON,
+            nullptr,
+            IID_PPV_ARGS(&Texture)));
+    }
 
     const UINT64 uploadBufferSize = GetRequiredIntermediateSize(Texture.Get(), 0, 1);
 
@@ -208,24 +261,44 @@ D3D12Texture::D3D12Texture(D3D12Device* InOwner, const std::string InName, void*
 
     auto desc = CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize);
 
-    // Create the GPU upload buffer.
-    ThrowIfFailed(
-        Device->CreateCommittedResource(
+    if (IsEnhancedBarriersSupported)
+    {
+        auto Desc1 = CD3DX12_RESOURCE_DESC1(desc);
+        ThrowIfFailed(Device->CreateCommittedResource3(
+            &heapProps,
+            D3D12_HEAP_FLAG_NONE,
+            &Desc1,
+            D3D12_BARRIER_LAYOUT_UNDEFINED,
+            nullptr,
+            nullptr,
+            0,
+            nullptr,
+            IID_PPV_ARGS(&uploadRes)));
+    }
+    else
+    {
+        // Create the GPU upload buffer.
+        ThrowIfFailed(
+            Device->CreateCommittedResource(
             &heapProps,
             D3D12_HEAP_FLAG_NONE,
             &desc,
             D3D12_RESOURCE_STATE_COMMON, // D3D12_RESOURCE_STATE_GENERIC_READ
             nullptr,
             IID_PPV_ARGS(uploadRes.GetAddressOf())));
+    }
 
     IMCommandList->BeginRecordCommandList();
 
     UpdateSubresources(IMCommandList->Get(), Texture.Get(), uploadRes.Get(),
         0, 0, 1, &subresource);
 
-    auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(Texture.Get(),
-        D3D12_RESOURCE_STATE_COPY_DEST, CurrentState);
-    IMCommandList->ResourceBarrier(1, &barrier);
+    if (!IsEnhancedBarriersSupported)
+    {
+        auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(Texture.Get(),
+            D3D12_RESOURCE_STATE_COPY_DEST, CurrentState);
+        IMCommandList->ResourceBarrier(1, &barrier);
+    }
 
     IMCommandList->FinishRecordCommandList();
     IMCommandList->ExecuteCommandList();
@@ -254,6 +327,9 @@ D3D12Texture::D3D12Texture(D3D12Device* InOwner, const std::string InName, const
     , RootParameterIndex(DefaultRootParameterIndex)
     , Path(L"")
     , CurrentState(D3D12_RESOURCE_STATE_COMMON)
+    , CurrentBarrierLayout(D3D12_BARRIER_LAYOUT_UNDEFINED)
+    , CurrentSyncState(D3D12_BARRIER_SYNC_NONE)
+    , CurrentAccessState(D3D12_BARRIER_ACCESS_NO_ACCESS)
 {
     auto Device = Owner->GetDevice();
     auto IMCommandList = Owner->GetIMCommandList();
@@ -279,13 +355,31 @@ D3D12Texture::D3D12Texture(D3D12Device* InOwner, const std::string InName, const
     TextureHeap.MemoryPoolPreference = D3D12_MEMORY_POOL_L0;
     TextureHeap.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_WRITE_BACK;
 
-    ThrowIfFailed(Device->CreateCommittedResource(
-        &TextureHeap,
-        D3D12_HEAP_FLAG_NONE,
-        &textureDesc,
-        D3D12_RESOURCE_STATE_COMMON,
-        nullptr,
-        IID_PPV_ARGS(&Texture)));
+    const bool IsEnhancedBarriersSupported = InOwner->IsEnhancedBarriersSupported();
+    if (IsEnhancedBarriersSupported)
+    {
+        auto Desc1 = CD3DX12_RESOURCE_DESC1(textureDesc);
+        ThrowIfFailed(Device->CreateCommittedResource3(
+            &TextureHeap,
+            D3D12_HEAP_FLAG_NONE,
+            &Desc1,
+            D3D12_BARRIER_LAYOUT_UNDEFINED,
+            nullptr,
+            nullptr,
+            0,
+            nullptr,
+            IID_PPV_ARGS(&Texture)));
+    }
+    else
+    {
+        ThrowIfFailed(Device->CreateCommittedResource(
+            &TextureHeap,
+            D3D12_HEAP_FLAG_NONE,
+            &textureDesc,
+            D3D12_RESOURCE_STATE_COMMON,
+            nullptr,
+            IID_PPV_ARGS(&Texture)));
+    }
 
     const UINT64 uploadBufferSize = GetRequiredIntermediateSize(Texture.Get(), 0, 1);
 
@@ -293,15 +387,31 @@ D3D12Texture::D3D12Texture(D3D12Device* InOwner, const std::string InName, const
 
     auto desc = CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize);
 
-    // Create the GPU upload buffer.
-    ThrowIfFailed(
-        Device->CreateCommittedResource(
+    if (IsEnhancedBarriersSupported)
+    {
+        auto Desc1 = CD3DX12_RESOURCE_DESC1(desc);
+        ThrowIfFailed(Device->CreateCommittedResource3(
             &heapProps,
             D3D12_HEAP_FLAG_NONE,
-            &desc,
-            D3D12_RESOURCE_STATE_COMMON, // D3D12_RESOURCE_STATE_GENERIC_READ
+            &Desc1,
+            D3D12_BARRIER_LAYOUT_UNDEFINED,
+            nullptr,
+            nullptr,
+            0,
             nullptr,
             IID_PPV_ARGS(uploadRes.GetAddressOf())));
+    }
+    else
+    {
+        // Create the GPU upload buffer.
+        ThrowIfFailed(Device->CreateCommittedResource(
+             &heapProps,
+             D3D12_HEAP_FLAG_NONE,
+             &desc,
+             D3D12_RESOURCE_STATE_COMMON, // D3D12_RESOURCE_STATE_GENERIC_READ
+             nullptr,
+             IID_PPV_ARGS(uploadRes.GetAddressOf())));
+    }
 
     Owner->AllocateDescriptor(&SRV);
     CreateShaderResourceView(Device, Texture.Get(), SRV.GetCPU(), false);
@@ -357,6 +467,7 @@ void D3D12Texture::ApplyTexture(ID3D12GraphicsCommandList* CommandList, std::uin
 void D3D12Texture::UpdateTexture(ITexture2D* SourceTexture, std::size_t SourceArrayIndex, std::size_t ArrayIndex, const std::optional<IntVector2> Dest, const std::optional<FBounds2D> TargetBounds)
 {
     auto IMCommandList = Owner->GetIMCommandList();
+    const bool IsEnhancedBarriersSupported = Owner->IsEnhancedBarriersSupported();
 
     D3D12Texture* RawSrcTexture = static_cast<D3D12Texture*>(SourceTexture);
     ID3D12Resource* RawTexture = static_cast<D3D12Texture*>(SourceTexture)->Texture.Get();
@@ -389,10 +500,39 @@ void D3D12Texture::UpdateTexture(ITexture2D* SourceTexture, std::size_t SourceAr
 
     IMCommandList->BeginRecordCommandList();
 
-    std::vector<CD3DX12_RESOURCE_BARRIER> preCopyBarriers;
-    preCopyBarriers.push_back(CD3DX12_RESOURCE_BARRIER::Transition(Texture.Get(), CurrentState, D3D12_RESOURCE_STATE_COPY_DEST));
-    preCopyBarriers.push_back(CD3DX12_RESOURCE_BARRIER::Transition(RawTexture, RawSrcTexture->CurrentState, D3D12_RESOURCE_STATE_COPY_SOURCE));
-    IMCommandList->ResourceBarrier((UINT)preCopyBarriers.size(), preCopyBarriers.data());
+    if (IsEnhancedBarriersSupported)
+    {
+        {
+            D3D12_TEXTURE_BARRIER preCopyBarriers[] =
+            {
+                CD3DX12_TEXTURE_BARRIER(
+                    D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_SYNC_COPY,
+                    D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_ACCESS_COPY_DEST,
+                    D3D12_BARRIER_LAYOUT_UNDEFINED, D3D12_BARRIER_LAYOUT_COPY_DEST,
+                    Texture.Get(), CD3DX12_BARRIER_SUBRESOURCE_RANGE(0xffffffff), D3D12_TEXTURE_BARRIER_FLAG_NONE),
+
+                CD3DX12_TEXTURE_BARRIER(
+                    RawSrcTexture->CurrentSyncState, D3D12_BARRIER_SYNC_COPY,
+                    RawSrcTexture->CurrentAccessState, D3D12_BARRIER_ACCESS_COPY_SOURCE,
+                    RawSrcTexture->CurrentBarrierLayout, D3D12_BARRIER_LAYOUT_COPY_SOURCE,
+                    RawTexture, CD3DX12_BARRIER_SUBRESOURCE_RANGE(0xffffffff), D3D12_TEXTURE_BARRIER_FLAG_NONE)
+            };
+            D3D12_BARRIER_GROUP preCopyGroup = CD3DX12_BARRIER_GROUP(_countof(preCopyBarriers), preCopyBarriers);
+            auto CMD = IMCommandList->Get();
+            CMD->Barrier(1, &preCopyGroup);
+
+            //CurrentAccessState;
+            //CurrentSyncState;
+            //CurrentBarrierLayout;
+        }
+    }
+    else
+    {
+        std::vector<CD3DX12_RESOURCE_BARRIER> preCopyBarriers;
+        preCopyBarriers.push_back(CD3DX12_RESOURCE_BARRIER::Transition(Texture.Get(), CurrentState, D3D12_RESOURCE_STATE_COPY_DEST));
+        preCopyBarriers.push_back(CD3DX12_RESOURCE_BARRIER::Transition(RawTexture, RawSrcTexture->CurrentState, D3D12_RESOURCE_STATE_COPY_SOURCE));
+        IMCommandList->ResourceBarrier((UINT)preCopyBarriers.size(), preCopyBarriers.data());
+    }
 
     //CurrentState = D3D12_RESOURCE_STATE_COPY_DEST;
     //RawSrcTexture->CurrentState = D3D12_RESOURCE_STATE_COPY_SOURCE;
@@ -424,10 +564,33 @@ void D3D12Texture::UpdateTexture(ITexture2D* SourceTexture, std::size_t SourceAr
         }
     }
 
-    std::vector<CD3DX12_RESOURCE_BARRIER> postCopyBarriers;
-    postCopyBarriers.push_back(CD3DX12_RESOURCE_BARRIER::Transition(Texture.Get(), D3D12_RESOURCE_STATE_COPY_DEST, CurrentState));
-    postCopyBarriers.push_back(CD3DX12_RESOURCE_BARRIER::Transition(RawTexture, D3D12_RESOURCE_STATE_COPY_SOURCE, RawSrcTexture->CurrentState));
-    IMCommandList->ResourceBarrier((UINT)postCopyBarriers.size(), postCopyBarriers.data());
+    if (IsEnhancedBarriersSupported)
+    {
+        D3D12_TEXTURE_BARRIER postCopyBarriers[] =
+        {
+            CD3DX12_TEXTURE_BARRIER(
+                D3D12_BARRIER_SYNC_COPY, D3D12_BARRIER_SYNC_PIXEL_SHADING,
+                D3D12_BARRIER_ACCESS_COPY_DEST, D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
+                D3D12_BARRIER_LAYOUT_COPY_DEST, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE,
+                Texture.Get(), CD3DX12_BARRIER_SUBRESOURCE_RANGE(0xffffffff), D3D12_TEXTURE_BARRIER_FLAG_NONE),
+
+            CD3DX12_TEXTURE_BARRIER(
+                D3D12_BARRIER_SYNC_COPY, D3D12_BARRIER_SYNC_PIXEL_SHADING,
+                D3D12_BARRIER_ACCESS_COPY_SOURCE, D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
+                D3D12_BARRIER_LAYOUT_COPY_SOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE,
+                RawTexture, CD3DX12_BARRIER_SUBRESOURCE_RANGE(0xffffffff), D3D12_TEXTURE_BARRIER_FLAG_NONE)
+        };
+        D3D12_BARRIER_GROUP postCopyGroup = CD3DX12_BARRIER_GROUP(_countof(postCopyBarriers), postCopyBarriers);
+        auto CMD = IMCommandList->Get();
+        CMD->Barrier(1, &postCopyGroup);
+    }
+    else
+    {
+        std::vector<CD3DX12_RESOURCE_BARRIER> postCopyBarriers;
+        postCopyBarriers.push_back(CD3DX12_RESOURCE_BARRIER::Transition(Texture.Get(), D3D12_RESOURCE_STATE_COPY_DEST, CurrentState));
+        postCopyBarriers.push_back(CD3DX12_RESOURCE_BARRIER::Transition(RawTexture, D3D12_RESOURCE_STATE_COPY_SOURCE, RawSrcTexture->CurrentState));
+        IMCommandList->ResourceBarrier((UINT)postCopyBarriers.size(), postCopyBarriers.data());
+    }
 
     //CurrentState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
     //RawSrcTexture->CurrentState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
@@ -443,183 +606,182 @@ void D3D12Texture::UpdateTexture(ITexture2D* SourceTexture, std::size_t SourceAr
 
 void D3D12Texture::UpdateTexture(const std::wstring FilePath, std::size_t ArrayIndex, const std::optional<IntVector2> Dest, const std::optional<FBounds2D> TargetBounds)
 {
-    std::cout << "D3D12Texture::UpdateTexture_Unimplemented(FilePath, ArrayIndex, Dest, TargetBounds)" << std::endl;
+    auto Device = Owner->GetDevice();
+    auto IMCommandList = Owner->GetIMCommandList();
 
-    /*
-    ID3D11Device1* Direct3DDevice = Owner->GetDevice();
-	ID3D11DeviceContext1* Direct3DDeviceIMContext = Owner->GetDeviceIMContext();
+    std::unique_ptr<uint8_t[]> decodedData;
+    Microsoft::WRL::ComPtr<ID3D12Resource> newTexture;
+    D3D12_SUBRESOURCE_DATA subresource;
+    std::string str = FileManager::WideStringToString(FilePath);
+    std::string Ext = std::string(str.end() - 4, str.end());
 
-	std::wstring ws(FilePath);
-	std::string str = FileManager::WideStringToString(ws);
-	std::string Ext = std::string(str.end() - 4, str.end());
+    bool DDS = (Ext.find("DDS") != std::string::npos || Ext.find("dds") != std::string::npos);
 
-	ComPtr<ID3D11Texture2D> RawTexture;
-	D3D11_TEXTURE2D_DESC RawTextureDesc;
-	sTextureDesc SpriteDesc;
+    if (DDS)
+    {
+        std::vector<D3D12_SUBRESOURCE_DATA> subresources;
+        ThrowIfFailed(
+            DirectX::LoadDDSTextureFromFile(Device, FilePath.c_str(), newTexture.ReleaseAndGetAddressOf(),
+                decodedData, subresources));
 
-	{
-		ComPtr<ID3D11Resource> tempRes;
-		ComPtr<ID3D11ShaderResourceView> SRV;
-		UINT BindFlags = D3D11_BIND_SHADER_RESOURCE;
-		UINT MiscFlags = D3D11_RESOURCE_MISC_GENERATE_MIPS;
-		size_t MS = 0;
-		HRESULT HR;
+        const UINT64 uploadBufferSize = GetRequiredIntermediateSize(newTexture.Get(), 0,
+            static_cast<UINT>(subresources.size()));
 
-		bool DDS = false;
-		if (Ext.find("DDS") != std::string::npos || Ext.find("dds") != std::string::npos)
-			DDS = true;
+        CD3DX12_HEAP_PROPERTIES heapProps(D3D12_HEAP_TYPE_UPLOAD);
+        auto desc = CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize);
 
-		if (!DDS)
-		{
-			UINT LoadFlags = DirectX::WIC_LOADER_FLAGS_Internal::WIC_LOADER_DEFAULT;
-			HR = DirectX::CreateWICTextureFromFileEx_Internal(Direct3DDevice, Direct3DDeviceIMContext, FilePath.c_str(), MS, D3D11_USAGE_DEFAULT, BindFlags, 0, MiscFlags, LoadFlags, &tempRes, &SRV);
-		}
-		else
-		{
-			HR = DirectX::CreateDDSTextureFromFileEx_Internal(Direct3DDevice, Direct3DDeviceIMContext, FilePath.c_str(), MS, D3D11_USAGE_DEFAULT, BindFlags, D3D11_CPU_ACCESS_READ, MiscFlags, false, &tempRes, &SRV);
-		}
+        const bool IsEnhancedBarriersSupported = Owner->IsEnhancedBarriersSupported();
+        if (IsEnhancedBarriersSupported)
+        {
+            auto Desc1 = CD3DX12_RESOURCE_DESC1(desc);
+            ThrowIfFailed(Device->CreateCommittedResource3(
+                &heapProps,
+                D3D12_HEAP_FLAG_NONE,
+                &Desc1,
+                D3D12_BARRIER_LAYOUT_UNDEFINED,
+                nullptr,
+                nullptr,
+                0,
+                nullptr,
+                IID_PPV_ARGS(uploadRes.GetAddressOf())));
+        }
+        else
+        {
+            ThrowIfFailed(Device->CreateCommittedResource(
+                &heapProps,
+                D3D12_HEAP_FLAG_NONE,
+                &desc,
+                D3D12_RESOURCE_STATE_COMMON,
+                nullptr,
+                IID_PPV_ARGS(uploadRes.GetAddressOf())));
+        }
 
-		if (HR == S_OK) {
-			tempRes->QueryInterface(__uuidof (ID3D11Texture2D), (void**)&RawTexture);
-			RawTexture->GetDesc(&RawTextureDesc);
+        IMCommandList->BeginRecordCommandList();
 
-			SpriteDesc.Dimensions.X = RawTextureDesc.Width;
-			SpriteDesc.Dimensions.Y = RawTextureDesc.Height;
-			SpriteDesc.Format = (Desc.Format);
-			SpriteDesc.MipLevels = RawTextureDesc.MipLevels;
-		}
-		tempRes = nullptr;
-		SRV = nullptr;
-	}
+        UpdateSubresources(IMCommandList->Get(), newTexture.Get(), uploadRes.Get(),
+            0, 0, static_cast<UINT>(subresources.size()), subresources.data());
 
-	{
-		D3D11_BOX sourceRegion;
-		sourceRegion.left = TargetBounds.has_value() ? (UINT)TargetBounds->Min.X : 0;
-		sourceRegion.right = TargetBounds.has_value() ? (UINT)TargetBounds->Max.X : (UINT)SpriteDesc.Dimensions.X;
-		sourceRegion.top = TargetBounds.has_value() ? (UINT)TargetBounds->Min.Y : 0;
-		sourceRegion.bottom = TargetBounds.has_value() ? (UINT)TargetBounds->Max.Y : (UINT)SpriteDesc.Dimensions.Y;
-		sourceRegion.front = 0;
-		sourceRegion.back = 1;
+        auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(newTexture.Get(),
+            D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+        IMCommandList->ResourceBarrier(1, &barrier);
 
-		D3D11_BOX DSTRegion;
-		DSTRegion.left = 0;
-		DSTRegion.right = (UINT)Desc.Dimensions.X;
-		DSTRegion.top = 0;
-		DSTRegion.bottom = (UINT)Desc.Dimensions.Y;
-		DSTRegion.front = 0;
-		DSTRegion.back = 1;
+        IMCommandList->FinishRecordCommandList();
+        IMCommandList->ExecuteCommandList();
+    }
+    else
+    {
+        ThrowIfFailed(
+            DirectX::LoadWICTextureFromFile(Device, FilePath.c_str(), newTexture.ReleaseAndGetAddressOf(),
+                decodedData, subresource));
 
-		for (size_t i = 0; i < SpriteDesc.MipLevels; i++)
-		{
-			if (i >= Desc.MipLevels)
-				break;
+        const UINT64 uploadBufferSize = GetRequiredIntermediateSize(newTexture.Get(), 0, 1);
 
-			Direct3DDeviceIMContext->CopySubresourceRegion1(pTexture.Get(), D3D11CalcSubresource((UINT)i, (UINT)ArrayIndex, (UINT)Desc.MipLevels), Dest.has_value() ? (UINT)Dest->X : 0, Dest.has_value() ? (UINT)Dest->Y : 0, 0, RawTexture.Get(), D3D11CalcSubresource(0, 0, (UINT)SpriteDesc.MipLevels), &sourceRegion, D3D11_COPY_DISCARD);
+        CD3DX12_HEAP_PROPERTIES heapProps(D3D12_HEAP_TYPE_UPLOAD);
+        auto desc = CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize);
 
-			DSTRegion.left = DSTRegion.left / 2;
-			DSTRegion.top = DSTRegion.top / 2;
+        const bool IsEnhancedBarriersSupported = Owner->IsEnhancedBarriersSupported();
+        if (IsEnhancedBarriersSupported)
+        {
+            auto Desc1 = CD3DX12_RESOURCE_DESC1(desc);
+            ThrowIfFailed(Device->CreateCommittedResource3(
+                &heapProps,
+                D3D12_HEAP_FLAG_NONE,
+                &Desc1,
+                D3D12_BARRIER_LAYOUT_UNDEFINED,
+                nullptr,
+                nullptr,
+                0,
+                nullptr,
+                IID_PPV_ARGS(uploadRes.GetAddressOf())));
+        }
+        else
+        {
+            ThrowIfFailed(Device->CreateCommittedResource(
+                &heapProps,
+                D3D12_HEAP_FLAG_NONE,
+                &desc,
+                D3D12_RESOURCE_STATE_COMMON,
+                nullptr,
+                IID_PPV_ARGS(uploadRes.GetAddressOf())));
+        }
 
-			DSTRegion.right = DSTRegion.right / 2;
-			DSTRegion.bottom = DSTRegion.bottom / 2;
+        IMCommandList->BeginRecordCommandList();
 
-			sourceRegion.left = sourceRegion.left / 2;
-			sourceRegion.top = sourceRegion.top / 2;
+        UpdateSubresources(IMCommandList->Get(), newTexture.Get(), uploadRes.Get(),
+            0, 0, 1, &subresource);
 
-			sourceRegion.right = sourceRegion.right / 2;
-			sourceRegion.bottom = sourceRegion.bottom / 2;
+        auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(newTexture.Get(),
+            D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+        IMCommandList->ResourceBarrier(1, &barrier);
 
-			if ((sourceRegion.right - sourceRegion.left) > (DSTRegion.right - DSTRegion.left) || (sourceRegion.bottom - sourceRegion.top) > (DSTRegion.bottom - DSTRegion.top))
-			{
-				break;
-			}
-		}
+        IMCommandList->FinishRecordCommandList();
+        IMCommandList->ExecuteCommandList();
+    }
 
-		//HRESULT hr = DirectX::SaveWICTextureToFile(Direct3DDeviceIMContext, TiledTextureRes.Get(),
-		//	GUID_ContainerFormatJpeg, (L"..//Content//" + FileManager::StringToWstring("stagingTexture" + std::to_string(TiledTextureSize)) + L".jpg").c_str());
+    D3D12_BOX sourceRegion;
+    sourceRegion.left = TargetBounds.has_value() ? static_cast<UINT>(TargetBounds->Min.X) : 0;
+    sourceRegion.right = TargetBounds.has_value() ? static_cast<UINT>(TargetBounds->Max.X) : static_cast<UINT>(Desc.Dimensions.X);
+    sourceRegion.top = TargetBounds.has_value() ? static_cast<UINT>(TargetBounds->Min.Y) : 0;
+    sourceRegion.bottom = TargetBounds.has_value() ? static_cast<UINT>(TargetBounds->Max.Y) : static_cast<UINT>(Desc.Dimensions.Y);
+    sourceRegion.front = 0;
+    sourceRegion.back = 1;
 
-		RawTexture = nullptr;
-	}
-    */
+    CD3DX12_TEXTURE_COPY_LOCATION srcLocation(newTexture.Get(), 0);
+    CD3DX12_TEXTURE_COPY_LOCATION dstLocation(Texture.Get(), D3D12CalcSubresource(0, static_cast<UINT>(ArrayIndex), 0, Desc.MipLevels, Desc.ArraySize));
+
+    IMCommandList->BeginRecordCommandList();
+
+    std::vector<CD3DX12_RESOURCE_BARRIER> preCopyBarriers;
+    preCopyBarriers.push_back(CD3DX12_RESOURCE_BARRIER::Transition(Texture.Get(), CurrentState, D3D12_RESOURCE_STATE_COPY_DEST));
+    preCopyBarriers.push_back(CD3DX12_RESOURCE_BARRIER::Transition(newTexture.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_SOURCE));
+    IMCommandList->ResourceBarrier(static_cast<UINT>(preCopyBarriers.size()), preCopyBarriers.data());
+
+    IMCommandList->Get()->CopyTextureRegion(&dstLocation, Dest.has_value() ? static_cast<UINT>(Dest->X) : 0, Dest.has_value() ? static_cast<UINT>(Dest->Y) : 0, 0, &srcLocation, &sourceRegion);
+
+    std::vector<CD3DX12_RESOURCE_BARRIER> postCopyBarriers;
+    postCopyBarriers.push_back(CD3DX12_RESOURCE_BARRIER::Transition(Texture.Get(), D3D12_RESOURCE_STATE_COPY_DEST, CurrentState));
+    postCopyBarriers.push_back(CD3DX12_RESOURCE_BARRIER::Transition(newTexture.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
+    IMCommandList->ResourceBarrier(static_cast<UINT>(postCopyBarriers.size()), postCopyBarriers.data());
+
+    IMCommandList->FinishRecordCommandList();
+    IMCommandList->ExecuteCommandList();
+
 }
 
 void D3D12Texture::UpdateTexture(const void* pSrcData, const std::size_t InSize, const FDimension2D& Dimension, std::size_t ArrayIndex, const std::optional<IntVector2>  Dest, const std::optional<FBounds2D> TargetBounds)
 {
-    std::cout << "D3D12Texture::UpdateTexture_Unimplemented(pSrcData, InSize, Dimension, ArrayIndex, Dest, TargetBounds)" << std::endl;
+    auto Device = Owner->GetDevice();
+    auto IMCommandList = Owner->GetIMCommandList();
 
-    /*
-    ComPtr<ID3D11Texture2D> RawTexture;
+    D3D12_BOX sourceRegion;
+    sourceRegion.left = TargetBounds.has_value() ? static_cast<UINT>(TargetBounds->Min.X) : 0;
+    sourceRegion.right = TargetBounds.has_value() ? static_cast<UINT>(TargetBounds->Max.X) : static_cast<UINT>(Dimension.Width);
+    sourceRegion.top = TargetBounds.has_value() ? static_cast<UINT>(TargetBounds->Min.Y) : 0;
+    sourceRegion.bottom = TargetBounds.has_value() ? static_cast<UINT>(TargetBounds->Max.Y) : static_cast<UINT>(Dimension.Height);
+    sourceRegion.front = 0;
+    sourceRegion.back = 1;
 
-	D3D11_TEXTURE2D_DESC sTextureDesc;
-	ZeroMemory(&sTextureDesc, sizeof(sTextureDesc));
-	sTextureDesc.Width = Dimension.Width;
-	sTextureDesc.Height = Dimension.Height;
-	sTextureDesc.MipLevels = Desc.MipLevels;
-	sTextureDesc.ArraySize = 1;
-	sTextureDesc.Format = ConvertFormat_Format_To_DXGI(Desc.Format);
-	sTextureDesc.SampleDesc.Count = 1;
-	sTextureDesc.SampleDesc.Quality = 0;
-	sTextureDesc.BindFlags |= D3D11_BIND_SHADER_RESOURCE;
+    CD3DX12_TEXTURE_COPY_LOCATION dstLocation(Texture.Get(), D3D12CalcSubresource(0, static_cast<UINT>(ArrayIndex), 0, Desc.MipLevels, Desc.ArraySize));
 
-	D3D11_SUBRESOURCE_DATA Data;
-	Data.pSysMem = pSrcData;
-	Data.SysMemPitch = sTextureDesc.Width * D3D11_BytesPerPixel(ConvertFormat_Format_To_DXGI(Desc.Format));
-	Data.SysMemSlicePitch = Data.SysMemPitch * sTextureDesc.Height;
+    IMCommandList->BeginRecordCommandList();
 
-	Owner->GetDevice()->CreateTexture2D(&sTextureDesc, &Data, RawTexture.GetAddressOf());
-	{
-		RawTexture->GetDesc(&sTextureDesc);
+    std::vector<CD3DX12_RESOURCE_BARRIER> preCopyBarriers;
+    preCopyBarriers.push_back(CD3DX12_RESOURCE_BARRIER::Transition(Texture.Get(), CurrentState, D3D12_RESOURCE_STATE_COPY_DEST));
+    IMCommandList->ResourceBarrier(static_cast<UINT>(preCopyBarriers.size()), preCopyBarriers.data());
 
-		ID3D11DeviceContext1* Direct3DDeviceIMContext = Owner->GetDeviceIMContext();
+    D3D12_SUBRESOURCE_DATA subresourceData = {};
+    subresourceData.pData = pSrcData;
+    subresourceData.RowPitch = (LONG_PTR)Dimension.Width * BytesPerPixel(ConvertFormat_Format_To_DXGI(Desc.Format));
+    subresourceData.SlicePitch = subresourceData.RowPitch * (LONG_PTR)Dimension.Height;
 
-		std::size_t Slice = ArrayIndex;
+    UpdateSubresources(IMCommandList->Get(), Texture.Get(), uploadRes.Get(), 0, 0, 1, &subresourceData);
 
-		D3D11_BOX sourceRegion;
-		sourceRegion.left = TargetBounds.has_value() ? (UINT)TargetBounds->Min.X : 0;
-		sourceRegion.right = TargetBounds.has_value() ? (UINT)TargetBounds->Max.X : (UINT)sTextureDesc.Width;
-		sourceRegion.top = TargetBounds.has_value() ? (UINT)TargetBounds->Min.Y : 0;
-		sourceRegion.bottom = TargetBounds.has_value() ? (UINT)TargetBounds->Max.Y : (UINT)sTextureDesc.Height;
-		sourceRegion.front = 0;
-		sourceRegion.back = 1;
+    std::vector<CD3DX12_RESOURCE_BARRIER> postCopyBarriers;
+    postCopyBarriers.push_back(CD3DX12_RESOURCE_BARRIER::Transition(Texture.Get(), D3D12_RESOURCE_STATE_COPY_DEST, CurrentState));
+    IMCommandList->ResourceBarrier(static_cast<UINT>(postCopyBarriers.size()), postCopyBarriers.data());
 
-		D3D11_BOX DSTRegion;
-		DSTRegion.left = 0;
-		DSTRegion.right = (UINT)Desc.Dimensions.X;
-		DSTRegion.top = 0;
-		DSTRegion.bottom = (UINT)Desc.Dimensions.Y;
-		DSTRegion.front = 0;
-		DSTRegion.back = 1;
-
-		for (size_t i = 0; i < sTextureDesc.MipLevels; i++)
-		{
-			if (i >= Desc.MipLevels)
-				break;
-
-			Direct3DDeviceIMContext->CopySubresourceRegion1(pTexture.Get(), D3D11CalcSubresource((UINT)i, (UINT)Slice, (UINT)Desc.MipLevels), Dest.has_value() ? (UINT)Dest->X : 0, Dest.has_value() ? (UINT)Dest->Y : 0, 0, RawTexture.Get(), D3D11CalcSubresource(0, 0, (UINT)sTextureDesc.MipLevels), &sourceRegion, D3D11_COPY_NO_OVERWRITE);
-
-			DSTRegion.left = DSTRegion.left / 2;
-			DSTRegion.top = DSTRegion.top / 2;
-
-			DSTRegion.right = DSTRegion.right / 2;
-			DSTRegion.bottom = DSTRegion.bottom / 2;
-
-			sourceRegion.left = sourceRegion.left / 2;
-			sourceRegion.top = sourceRegion.top / 2;
-
-			sourceRegion.right = sourceRegion.right / 2;
-			sourceRegion.bottom = sourceRegion.bottom / 2;
-
-			if ((sourceRegion.right - sourceRegion.left) > (DSTRegion.right - DSTRegion.left) || (sourceRegion.bottom - sourceRegion.top) > (DSTRegion.bottom - DSTRegion.top))
-			{
-				break;
-			}
-		}
-
-		//HRESULT hr = DirectX::SaveWICTextureToFile(Direct3DDeviceIMContext, TiledTextureRes.Get(),
-		//	GUID_ContainerFormatJpeg, (L"..//Content//" + FileManager::StringToWstring("stagingTexture" + std::to_string(TiledTextureSize)) + L".jpg").c_str());
-
-		RawTexture = nullptr;
-	}
-    */
+    IMCommandList->FinishRecordCommandList();
+    IMCommandList->ExecuteCommandList();
 }
 
 void D3D12Texture::UpdateTexture(const void* pSrcData, std::size_t RowPitch, std::size_t MinX, std::size_t MinY, std::size_t MaxX, std::size_t MaxY, IGraphicsCommandContext* InCommandBuffer)

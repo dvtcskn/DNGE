@@ -33,6 +33,7 @@
 #include "GI/AbstractGI/AbstractGIDevice.h"
 #include "Engine/AbstractEngine.h"
 #include "AbstractGI/PostProcess.h"
+#include "AbstractGI/Mesh.h"
 #include "Engine/IPhysicalWorld.h"
 #include "Engine/World2D.h"
 #include "AbstractGI/MaterialManager.h"
@@ -44,7 +45,11 @@
 #include "Network.h"
 #include "RemoteProcedureCall.h"
 #include "Utilities/ConfigManager.h"
+#include <cbgui.h>
 
+#if Pix3_Enabled && _DEBUG
+#include <pix3.h>
+#endif
 #define Renderdoc_Enabled 0
 #if Renderdoc_Enabled && _DEBUG
 #include <renderdoc_app.h>
@@ -53,6 +58,7 @@
 namespace
 {
 	static std::unique_ptr<IAbstractGIDevice> Device = nullptr;
+	static std::vector<std::shared_ptr<IAbstractGIDevice>> SecondaryGPUs;
 	static std::unique_ptr<sRenderer> Renderer = nullptr;
 	static std::shared_ptr<IPhysicalWorld> PhysicalWorld = nullptr;
 	static std::unique_ptr<sInputController> InputController = nullptr;
@@ -67,15 +73,14 @@ namespace
 	static bool bPauseTick = false;
 
 #if Renderdoc_Enabled && _DEBUG
-	RENDERDOC_API_1_6_0* rdoc_api = nullptr;
+	RENDERDOC_API_1_7_0* rdoc_api = nullptr;
 
 	void InitializeRenderDoc()
 	{
 		// At init, on windows
 		if (HMODULE mod = LoadLibraryA("renderdoc.dll"))
 		{
-			pRENDERDOC_GetAPI RENDERDOC_GetAPI =
-				(pRENDERDOC_GetAPI)GetProcAddress(mod, "RENDERDOC_GetAPI");
+			pRENDERDOC_GetAPI RENDERDOC_GetAPI = (pRENDERDOC_GetAPI)GetProcAddress(mod, "RENDERDOC_GetAPI");
 			int ret = RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_6_0, (void**)&rdoc_api);
 			assert(ret == 1);
 		}
@@ -91,8 +96,47 @@ namespace
 #endif
 }
 
+sViewportInstance::~sViewportInstance()
+{
+	bIsEnabled = false;
+	GPU::RemoveViewportInstance(this);
+	pCamera = nullptr;
+	Canvases.clear();
+}
+
+std::vector<sVertexAttributeDesc> sVertexAttributeDesc::GetDefaultGUIVertexLayout(bool bInstanced)
+{
+	std::vector<sVertexAttributeDesc> VertexLayout;
+	if (bInstanced)
+	{
+		VertexLayout =
+		{
+			{ "POSITION",		EFormat::RGBA32_FLOAT,  0, offsetof(cbgui::cbGeometryVertexData, position),									false, sizeof(cbgui::cbGeometryVertexData) },
+			{ "TEXCOORD",		EFormat::RG32_FLOAT,    0, offsetof(cbgui::cbGeometryVertexData, texCoord),									false, sizeof(cbgui::cbGeometryVertexData) },
+			{ "COLOR",			EFormat::RGBA32_FLOAT,  0, offsetof(cbgui::cbGeometryVertexData, Color),									false, sizeof(cbgui::cbGeometryVertexData) },
+			{ "INSTANCEPOS",	EFormat::RGB32_FLOAT,	1, offsetof(cbgui::cbGeometryVertexData::cbGeometryVertexInstanceLayout, position),	true,  sizeof(cbgui::cbGeometryVertexData::cbGeometryVertexInstanceLayout) },
+			{ "INSTANCECOLOR",	EFormat::RGBA32_FLOAT,	1, offsetof(cbgui::cbGeometryVertexData::cbGeometryVertexInstanceLayout, Color),	true,  sizeof(cbgui::cbGeometryVertexData::cbGeometryVertexInstanceLayout) },
+		};
+	}
+	else
+	{
+		VertexLayout =
+		{
+			{ "POSITION",	EFormat::RGBA32_FLOAT, 0,	offsetof(cbgui::cbGeometryVertexData, position),   false, sizeof(cbgui::cbGeometryVertexData) },
+			{ "TEXCOORD",	EFormat::RG32_FLOAT,   0,	offsetof(cbgui::cbGeometryVertexData, texCoord),   false, sizeof(cbgui::cbGeometryVertexData) },
+			{ "COLOR",		EFormat::RGBA32_FLOAT, 0,	offsetof(cbgui::cbGeometryVertexData, Color),	   false, sizeof(cbgui::cbGeometryVertexData) },
+		};
+	}
+	return VertexLayout;
+}
+
 namespace GPU
 {
+	void* GetInternalDevice()
+	{
+		return Device->GetInternalDevice();
+	}
+
 	sGPUInfo GetGPUInfo()
 	{
 		return Device->GetGPUInfo();
@@ -123,29 +167,66 @@ namespace GPU
 		return EFormat::D32_FLOAT_S8X24_UINT; // EFormat::R32G8X24_Typeless; //EFormat::R32G8X24_Typeless; // EFormat::R32_Typeless
 	}
 
-	void SetGBufferClearMode(EGBufferClear Mode)
+	std::uint32_t GetBackBufferSize()
 	{
-		Renderer->SetGBufferClearMode(Mode);
+		return Device->GetBackBufferSize();
 	}
 
-	EGBufferClear GetGBufferClearMode()
+	std::uint32_t GetCurrentBackBufferIndex()
 	{
-		return Renderer->GetGBufferClearMode();
+		return Device->GetCurrentBackBufferIndex();
 	}
 
-	std::uint32_t GetGBufferTextureEntryPoint()
+	bool IsBindlessRendererSupported()
 	{
-		return 3;
+		return GetGIType() == EGITypes::D3D12 || GetGIType() == EGITypes::Vulkan;
 	}
 
-	std::uint32_t GetGBufferTextureSize()
+	bool IsBindlessRendererEnabled()
 	{
-		return 5;
+		if (!IsBindlessRendererSupported())
+			return false;
+		return true;
 	}
 
-	void* GetInternalDevice()
+	IRenderer* GetRenderer()
 	{
-		return Device->GetInternalDevice();
+		return Renderer.get();
+	}
+
+	void RegisterMaterial(sMaterial* Material)
+	{
+		return Renderer->RegisterMaterial(Material);
+	}
+
+	void CompileMaterial(sMaterial* Material, bool bRecompile)
+	{
+		return Renderer->CompileMaterial(Material, bRecompile);
+	}
+
+	void CompilePipeline(IPipeline* Pipeline, bool bRecompile)
+	{
+		return Renderer->CompilePipeline(Pipeline, bRecompile);
+	}
+
+	sIndirectLayoutBindingDesc GetRenderPassIndirectLayoutBindingDesc(ERenderPass RenderPass)
+	{
+		return Renderer->GetRenderPassIndirectLayoutBindingDesc(RenderPass);
+	}
+
+	IFrameBuffer* GetFrameBuffer(ERenderPass RenderPass)
+	{
+		return Renderer->GetFrameBuffer(RenderPass);
+	}
+
+	void SetRendererClearMode(ERendererClear Mode)
+	{
+		Renderer->SetRendererClearMode(Mode);
+	}
+
+	ERendererClear GetRendererClearMode()
+	{
+		return Renderer->GetRendererClearMode();
 	}
 
 	void SetTonemapper(const int Val)
@@ -213,13 +294,9 @@ namespace GPU
 		Renderer->RemoveViewportInstance(Index);
 	}
 
-	void GPU::SetViewportInstancePriority(sViewportInstance* ViewportInstance, std::size_t Priority)
+	void SetViewportInstancePriority(sViewportInstance* ViewportInstance, std::size_t Priority)
 	{
 		Renderer->SetViewportInstancePriority(ViewportInstance, Priority);
-	}
-	bool IsBindlessRendererEnabled()
-	{
-		return false;
 	}
 }
 
@@ -684,7 +761,7 @@ namespace Physics
 {
 	EPhysicsEngine GetActivePhysicsEngineType()
 	{
-		return PhysicalWorld ? PhysicalWorld->GetPhysicsEngineType() : EPhysicsEngine::eNone;
+		return PhysicalWorld ? PhysicalWorld->GetPhysicsEngineType() : EPhysicsEngine::None;
 	}
 
 	bool IsPhysicsPaused()
@@ -734,195 +811,215 @@ namespace Physics
 	}
 }
 
-IGraphicsCommandContext::SharedPtr IGraphicsCommandContext::Create()
+IGraphicsCommandContext::SharedPtr IGraphicsCommandContext::Create(std::uint32_t GPU)
 {
-	return Device->CreateGraphicsCommandContext();
+	return GPU == 0 || GPU > SecondaryGPUs.size() ? Device->CreateGraphicsCommandContext() : SecondaryGPUs[GPU - 1]->CreateGraphicsCommandContext();
 }
 
-IGraphicsCommandContext::UniquePtr IGraphicsCommandContext::CreateUnique()
+IGraphicsCommandContext::UniquePtr IGraphicsCommandContext::CreateUnique(std::uint32_t GPU)
 {
-	return Device->CreateUniqueGraphicsCommandContext();
+	return GPU == 0 || GPU > SecondaryGPUs.size() ? Device->CreateUniqueGraphicsCommandContext() : SecondaryGPUs[GPU - 1]->CreateUniqueGraphicsCommandContext();
 }
 
-IComputeCommandContext::SharedPtr IComputeCommandContext::Create()
+IComputeCommandContext::SharedPtr IComputeCommandContext::Create(std::uint32_t GPU)
 {
-	return Device->CreateComputeCommandContext();
+	return GPU == 0 || GPU > SecondaryGPUs.size() ? Device->CreateComputeCommandContext() : SecondaryGPUs[GPU - 1]->CreateComputeCommandContext();
 }
 
-IComputeCommandContext::UniquePtr IComputeCommandContext::CreateUnique()
+IComputeCommandContext::UniquePtr IComputeCommandContext::CreateUnique(std::uint32_t GPU)
 {
-	return Device->CreateUniqueComputeCommandContext();
+	return GPU == 0 || GPU > SecondaryGPUs.size() ? Device->CreateUniqueComputeCommandContext() : SecondaryGPUs[GPU - 1]->CreateUniqueComputeCommandContext();
 }
 
-ICopyCommandContext::SharedPtr ICopyCommandContext::Create()
+ICopyCommandContext::SharedPtr ICopyCommandContext::Create(std::uint32_t GPU)
 {
-	return Device->CreateCopyCommandContext();
+	return GPU == 0 || GPU > SecondaryGPUs.size() ? Device->CreateCopyCommandContext() : SecondaryGPUs[GPU - 1]->CreateCopyCommandContext();
 }
 
-ICopyCommandContext::UniquePtr ICopyCommandContext::CreateUnique()
+ICopyCommandContext::UniquePtr ICopyCommandContext::CreateUnique(std::uint32_t GPU)
 {
-	return Device->CreateUniqueCopyCommandContext();
+	return GPU == 0 || GPU > SecondaryGPUs.size() ? Device->CreateUniqueCopyCommandContext() : SecondaryGPUs[GPU - 1]->CreateUniqueCopyCommandContext();
 }
 
-IConstantBuffer::SharedPtr IConstantBuffer::Create(std::string InName, const BufferLayout& InDesc, std::uint32_t InRootParameterIndex)
+IConstantBuffer::SharedPtr IConstantBuffer::Create(std::string InName, const BufferLayout& InDesc, std::uint32_t InRootParameterIndex, std::uint32_t GPU)
 {
-	return Device->CreateConstantBuffer(InName, InDesc, InRootParameterIndex);
+	return GPU == 0 || GPU > SecondaryGPUs.size() ? Device->CreateConstantBuffer(InName, InDesc, InRootParameterIndex) : SecondaryGPUs[GPU - 1]->CreateConstantBuffer(InName, InDesc, InRootParameterIndex);
 }
 
-IConstantBuffer::UniquePtr IConstantBuffer::CreateUnique(std::string InName, const BufferLayout& InDesc, std::uint32_t InRootParameterIndex)
+IConstantBuffer::UniquePtr IConstantBuffer::CreateUnique(std::string InName, const BufferLayout& InDesc, std::uint32_t InRootParameterIndex, std::uint32_t GPU)
 {
-	return Device->CreateUniqueConstantBuffer(InName, InDesc, InRootParameterIndex);
+	return GPU == 0 || GPU > SecondaryGPUs.size() ? Device->CreateUniqueConstantBuffer(InName, InDesc, InRootParameterIndex) : SecondaryGPUs[GPU - 1]->CreateUniqueConstantBuffer(InName, InDesc, InRootParameterIndex);
 }
 
-IVertexBuffer::SharedPtr IVertexBuffer::Create(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource)
+IVertexBuffer::SharedPtr IVertexBuffer::Create(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource, std::uint32_t GPU)
 {
-	return Device->CreateVertexBuffer(InName, InDesc, InSubresource);
+	return GPU == 0 || GPU > SecondaryGPUs.size() ? Device->CreateVertexBuffer(InName, InDesc, InSubresource) : SecondaryGPUs[GPU - 1]->CreateVertexBuffer(InName, InDesc, InSubresource);
 }
 
-IVertexBuffer::UniquePtr IVertexBuffer::CreateUnique(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource)
+IVertexBuffer::UniquePtr IVertexBuffer::CreateUnique(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource, std::uint32_t GPU)
 {
-	return Device->CreateUniqueVertexBuffer(InName, InDesc, InSubresource);
+	return GPU == 0 || GPU > SecondaryGPUs.size() ? Device->CreateUniqueVertexBuffer(InName, InDesc, InSubresource) : SecondaryGPUs[GPU - 1]->CreateUniqueVertexBuffer(InName, InDesc, InSubresource);
 }
 
-IIndexBuffer::SharedPtr IIndexBuffer::Create(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource)
+IIndexBuffer::SharedPtr IIndexBuffer::Create(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource, std::uint32_t GPU)
 {
-	return Device->CreateIndexBuffer(InName, InDesc, InSubresource);
+	return GPU == 0 || GPU > SecondaryGPUs.size() ? Device->CreateIndexBuffer(InName, InDesc, InSubresource) : SecondaryGPUs[GPU - 1]->CreateIndexBuffer(InName, InDesc, InSubresource);
 }
 
-IIndexBuffer::UniquePtr IIndexBuffer::CreateUnique(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource)
+IIndexBuffer::UniquePtr IIndexBuffer::CreateUnique(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource, std::uint32_t GPU)
 {
-	return Device->CreateUniqueIndexBuffer(InName, InDesc, InSubresource);
+	return GPU == 0 || GPU > SecondaryGPUs.size() ? Device->CreateUniqueIndexBuffer(InName, InDesc, InSubresource) : SecondaryGPUs[GPU - 1]->CreateUniqueIndexBuffer(InName, InDesc, InSubresource);
 }
 
-IUnorderedAccessBuffer::SharedPtr IUnorderedAccessBuffer::Create(std::string InName, const BufferLayout& InDesc, bool bSRVAllowed)
+IByteAddressBuffer::SharedPtr IByteAddressBuffer::Create(std::string InName, std::uint64_t Size, bool bReadWriteAllowed, std::uint32_t GPU)
 {
-	return IUnorderedAccessBuffer::SharedPtr();
+	return GPU == 0 || GPU > SecondaryGPUs.size() ? Device->CreateByteAddressBuffer(InName, Size, bReadWriteAllowed) : SecondaryGPUs[GPU - 1]->CreateByteAddressBuffer(InName, Size, bReadWriteAllowed);
 }
 
-IUnorderedAccessBuffer::UniquePtr IUnorderedAccessBuffer::CreateUnique(std::string InName, const BufferLayout& InDesc, bool bSRVAllowed)
+IByteAddressBuffer::UniquePtr IByteAddressBuffer::CreateUnique(std::string InName, std::uint64_t Size, bool bReadWriteAllowed, std::uint32_t GPU)
 {
-	return IUnorderedAccessBuffer::UniquePtr();
+	return GPU == 0 || GPU > SecondaryGPUs.size() ? Device->CreateUniqueByteAddressBuffer(InName, Size, bReadWriteAllowed) : SecondaryGPUs[GPU - 1]->CreateUniqueByteAddressBuffer(InName, Size, bReadWriteAllowed);
 }
 
-IIndirectBuffer::SharedPtr IIndirectBuffer::Create(std::string InName)
+IStructuredBuffer::SharedPtr IStructuredBuffer::Create(std::string InName, const BufferLayout& InDesc, bool bSRVAllowed, std::uint32_t GPU)
 {
-	return IIndirectBuffer::UniquePtr();
+	return GPU == 0 || GPU > SecondaryGPUs.size() ? Device->CreateStructuredBuffer(InName, InDesc, bSRVAllowed) : SecondaryGPUs[GPU - 1]->CreateStructuredBuffer(InName, InDesc, bSRVAllowed);
 }
 
-IIndirectBuffer::UniquePtr IIndirectBuffer::CreateUnique(std::string InName)
+IStructuredBuffer::UniquePtr IStructuredBuffer::CreateUnique(std::string InName, const BufferLayout& InDesc, bool bSRVAllowed, std::uint32_t GPU)
 {
-	return IIndirectBuffer::UniquePtr();
+	return GPU == 0 || GPU > SecondaryGPUs.size() ? Device->CreateUniqueStructuredBuffer(InName, InDesc, bSRVAllowed) : SecondaryGPUs[GPU - 1]->CreateUniqueStructuredBuffer(InName, InDesc, bSRVAllowed);
 }
 
-IRenderTarget::SharedPtr IRenderTarget::Create(const std::string InName, const EFormat Format, const sFBODesc& Desc)
+IIndirectBuffer::SharedPtr IIndirectBuffer::Create(std::string InName, BufferLayout Layout, std::uint32_t GPU)
 {
-	return Device->CreateRenderTarget(InName, Format, Desc);
+	return GPU == 0 || GPU > SecondaryGPUs.size() ? Device->CreateIndirectBuffer(InName, Layout) : SecondaryGPUs[GPU - 1]->CreateIndirectBuffer(InName, Layout);
 }
 
-IRenderTarget::UniquePtr IRenderTarget::CreateUnique(const std::string InName, const EFormat Format, const sFBODesc& Desc)
+IIndirectBuffer::UniquePtr IIndirectBuffer::CreateUnique(std::string InName, BufferLayout Layout, std::uint32_t GPU)
 {
-	return Device->CreateUniqueRenderTarget(InName, Format, Desc);
+	return GPU == 0 || GPU > SecondaryGPUs.size() ? Device->CreateUniqueIndirectBuffer(InName, Layout) : SecondaryGPUs[GPU - 1]->CreateUniqueIndirectBuffer(InName, Layout);
 }
 
-IDepthTarget::SharedPtr IDepthTarget::Create(const std::string InName, const EFormat Format, const sFBODesc& Desc)
+IRenderTarget::SharedPtr IRenderTarget::Create(const std::string InName, const EFormat Format, const sFBODesc& Desc, std::uint32_t GPU)
 {
-	return Device->CreateDepthTarget(InName, Format, Desc);
+	return GPU == 0 || GPU > SecondaryGPUs.size() ? Device->CreateRenderTarget(InName, Format, Desc) : SecondaryGPUs[GPU - 1]->CreateRenderTarget(InName, Format, Desc);
 }
 
-IDepthTarget::UniquePtr IDepthTarget::CreateUnique(const std::string InName, const EFormat Format, const sFBODesc& Desc)
+IRenderTarget::UniquePtr IRenderTarget::CreateUnique(const std::string InName, const EFormat Format, const sFBODesc& Desc, std::uint32_t GPU)
 {
-	return Device->CreateUniqueDepthTarget(InName, Format, Desc);
+	return GPU == 0 || GPU > SecondaryGPUs.size() ? Device->CreateUniqueRenderTarget(InName, Format, Desc) : SecondaryGPUs[GPU - 1]->CreateUniqueRenderTarget(InName, Format, Desc);
 }
 
-IUnorderedAccessTarget::SharedPtr IUnorderedAccessTarget::Create(const std::string InName, const EFormat Format, const sFBODesc& Desc, bool InEnableSRV)
+IDepthTarget::SharedPtr IDepthTarget::Create(const std::string InName, const EFormat Format, const sFBODesc& Desc, std::uint32_t GPU)
 {
-	return Device->CreateUnorderedAccessTarget(InName, Format, Desc, InEnableSRV);
+	return GPU == 0 || GPU > SecondaryGPUs.size() ? Device->CreateDepthTarget(InName, Format, Desc) : SecondaryGPUs[GPU - 1]->CreateDepthTarget(InName, Format, Desc);
 }
 
-IUnorderedAccessTarget::UniquePtr IUnorderedAccessTarget::CreateUnique(const std::string InName, const EFormat Format, const sFBODesc& Desc, bool InEnableSRV)
+IDepthTarget::UniquePtr IDepthTarget::CreateUnique(const std::string InName, const EFormat Format, const sFBODesc& Desc, std::uint32_t GPU)
 {
-	return Device->CreateUniqueUnorderedAccessTarget(InName, Format, Desc, InEnableSRV);
+	return GPU == 0 || GPU > SecondaryGPUs.size() ? Device->CreateUniqueDepthTarget(InName, Format, Desc) : SecondaryGPUs[GPU - 1]->CreateUniqueDepthTarget(InName, Format, Desc);
 }
 
-IFrameBuffer::SharedPtr IFrameBuffer::Create(const std::string InName, const sFrameBufferAttachmentInfo& InAttachments)
+IUnorderedAccessTarget::SharedPtr IUnorderedAccessTarget::Create(const std::string InName, const EFormat Format, const sFBODesc& Desc, bool InEnableSRV, std::uint32_t GPU)
 {
-	return Device->CreateFrameBuffer(InName, InAttachments);
+	return GPU == 0 || GPU > SecondaryGPUs.size() ? Device->CreateUnorderedAccessTarget(InName, Format, Desc, InEnableSRV) : SecondaryGPUs[GPU - 1]->CreateUnorderedAccessTarget(InName, Format, Desc, InEnableSRV);
 }
 
-IFrameBuffer::UniquePtr IFrameBuffer::CreateUnique(const std::string InName, const sFrameBufferAttachmentInfo& InAttachments)
+IUnorderedAccessTarget::UniquePtr IUnorderedAccessTarget::CreateUnique(const std::string InName, const EFormat Format, const sFBODesc& Desc, bool InEnableSRV, std::uint32_t GPU)
 {
-	return Device->CreateUniqueFrameBuffer(InName, InAttachments);
+	return GPU == 0 || GPU > SecondaryGPUs.size() ? Device->CreateUniqueUnorderedAccessTarget(InName, Format, Desc, InEnableSRV) : SecondaryGPUs[GPU - 1]->CreateUniqueUnorderedAccessTarget(InName, Format, Desc, InEnableSRV);
 }
 
-IPipeline::SharedPtr IPipeline::Create(const std::string& InName, const sPipelineDesc& InDesc)
+IFrameBuffer::SharedPtr IFrameBuffer::Create(const std::string InName, const sFrameBufferAttachmentInfo& InAttachments, std::uint32_t GPU)
 {
-	return Device->CreatePipeline(InName, InDesc);
+	return GPU == 0 || GPU > SecondaryGPUs.size() ? Device->CreateFrameBuffer(InName, InAttachments) : SecondaryGPUs[GPU - 1]->CreateFrameBuffer(InName, InAttachments);
 }
 
-IPipeline::UniquePtr IPipeline::CreateUnique(const std::string& InName, const sPipelineDesc& InDesc)
+IFrameBuffer::UniquePtr IFrameBuffer::CreateUnique(const std::string InName, const sFrameBufferAttachmentInfo& InAttachments, std::uint32_t GPU)
 {
-	return Device->CreateUniquePipeline(InName, InDesc);
+	return GPU == 0 || GPU > SecondaryGPUs.size() ? Device->CreateUniqueFrameBuffer(InName, InAttachments) : SecondaryGPUs[GPU - 1]->CreateUniqueFrameBuffer(InName, InAttachments);
 }
 
-IShader::SharedPtr IShader::Create(const sShaderAttachment& Attachment)
+ISamplerState::SharedPtr ISamplerState::Create(const std::string InName, const sSamplerAttributeDesc& InDesc, std::uint32_t GPU)
 {
-	return nullptr;
+	return GPU == 0 || GPU > SecondaryGPUs.size() ? Device->CreateSamplerState(InName, InDesc) : SecondaryGPUs[GPU - 1]->CreateSamplerState(InName, InDesc);
 }
 
-IShader::SharedPtr IShader::Create(std::wstring InSrcFile, std::string InFunctionName, eShaderType InProfile, std::vector<sShaderDefines> InDefines)
+ISamplerState::UniquePtr ISamplerState::CreateUnique(const std::string InName, const sSamplerAttributeDesc& InDesc, std::uint32_t GPU)
 {
-	return nullptr;
+	return GPU == 0 || GPU > SecondaryGPUs.size() ? Device->CreateUniqueSamplerState(InName, InDesc) : SecondaryGPUs[GPU - 1]->CreateUniqueSamplerState(InName, InDesc);
 }
 
-IShader::SharedPtr IShader::Create(const void* InCode, std::size_t Size, std::string InFunctionName, eShaderType InProfile, std::vector<sShaderDefines> InDefines)
+IPipeline::SharedPtr IPipeline::Create(const std::string& InName, const sPipelineDesc& InDesc, std::uint32_t GPU)
 {
-	return nullptr;
+	return GPU == 0 || GPU > SecondaryGPUs.size() ? Device->CreatePipeline(InName, InDesc) : SecondaryGPUs[GPU - 1]->CreatePipeline(InName, InDesc);
 }
 
-IComputePipeline::SharedPtr IComputePipeline::Create(const std::string& InName, const sComputePipelineDesc& InDesc)
+IPipeline::UniquePtr IPipeline::CreateUnique(const std::string& InName, const sPipelineDesc& InDesc, std::uint32_t GPU)
 {
-	return Device->CreateComputePipeline(InName, InDesc);
+	return GPU == 0 || GPU > SecondaryGPUs.size() ? Device->CreateUniquePipeline(InName, InDesc) : SecondaryGPUs[GPU - 1]->CreateUniquePipeline(InName, InDesc);
 }
 
-IComputePipeline::UniquePtr IComputePipeline::CreateUnique(const std::string& InName, const sComputePipelineDesc& InDesc)
+IShader::SharedPtr IShader::Create(const sShaderAttachment& Attachment, std::uint32_t GPU)
 {
-	return Device->CreateUniqueComputePipeline(InName, InDesc);
+	return GPU == 0 || GPU > SecondaryGPUs.size() ? Device->CompileShader(Attachment) : SecondaryGPUs[GPU - 1]->CompileShader(Attachment);
 }
 
-ITexture2D::SharedPtr ITexture2D::Create(const std::wstring FilePath, const std::string InName, std::uint32_t DefaultRootParameterIndex)
+IShader::SharedPtr IShader::Create(std::wstring InSrcFile, std::string InFunctionName, eShaderType InProfile, std::vector<sShaderDefines> InDefines, std::uint32_t GPU)
+{
+	return GPU == 0 || GPU > SecondaryGPUs.size() ? Device->CompileShader(InSrcFile, InFunctionName, InProfile, InDefines) : SecondaryGPUs[GPU - 1]->CompileShader(InSrcFile, InFunctionName, InProfile, InDefines);
+}
+
+IShader::SharedPtr IShader::Create(const void* InCode, std::size_t Size, std::string InFunctionName, eShaderType InProfile, std::vector<sShaderDefines> InDefines, std::uint32_t GPU)
+{
+	return GPU == 0 || GPU > SecondaryGPUs.size() ? Device->CompileShader(InCode, Size, InFunctionName, InProfile, InDefines) : SecondaryGPUs[GPU - 1]->CompileShader(InCode, Size, InFunctionName, InProfile, InDefines);
+}
+
+IComputePipeline::SharedPtr IComputePipeline::Create(const std::string& InName, const sComputePipelineDesc& InDesc, std::uint32_t GPU)
+{
+	return GPU == 0 || GPU > SecondaryGPUs.size() ? Device->CreateComputePipeline(InName, InDesc) : SecondaryGPUs[GPU - 1]->CreateComputePipeline(InName, InDesc);
+}
+
+IComputePipeline::UniquePtr IComputePipeline::CreateUnique(const std::string& InName, const sComputePipelineDesc& InDesc, std::uint32_t GPU)
+{
+	return GPU == 0 || GPU > SecondaryGPUs.size() ? Device->CreateUniqueComputePipeline(InName, InDesc) : SecondaryGPUs[GPU - 1]->CreateUniqueComputePipeline(InName, InDesc);
+}
+
+ITexture2D::SharedPtr ITexture2D::Create(const std::wstring FilePath, const std::string InName, std::uint32_t DefaultRootParameterIndex, std::uint32_t GPU)
 {
 	if (!sTextureManager::Get().IsTextureExist(FilePath, InName))
 	{
-		auto Texture = Device->CreateTexture2D(FilePath, InName, DefaultRootParameterIndex);
+		auto Texture = GPU == 0 || GPU > SecondaryGPUs.size() ? Device->CreateTexture2D(FilePath, InName, DefaultRootParameterIndex) : SecondaryGPUs[GPU - 1]->CreateTexture2D(FilePath, InName, DefaultRootParameterIndex);
 		sTextureManager::Get().StoreTexture(Texture);
 		return Texture;
 	}
 	return sTextureManager::Get().GetTextureAsShared(FilePath, InName);
 }
 
-ITexture2D::UniquePtr ITexture2D::CreateUnique(const std::wstring FilePath, const std::string InName, std::uint32_t DefaultRootParameterIndex)
+ITexture2D::UniquePtr ITexture2D::CreateUnique(const std::wstring FilePath, const std::string InName, std::uint32_t DefaultRootParameterIndex, std::uint32_t GPU)
 {
-	return Device->CreateUniqueTexture2D(FilePath, InName, DefaultRootParameterIndex);
+	return GPU == 0 || GPU > SecondaryGPUs.size() ? Device->CreateUniqueTexture2D(FilePath, InName, DefaultRootParameterIndex) : SecondaryGPUs[GPU - 1]->CreateUniqueTexture2D(FilePath, InName, DefaultRootParameterIndex);
 }
 
-ITexture2D::SharedPtr ITexture2D::Create(const std::string InName, void* InBuffer, const std::size_t InSize, const sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex)
+ITexture2D::SharedPtr ITexture2D::Create(const std::string InName, void* InBuffer, const std::size_t InSize, const sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex, std::uint32_t GPU)
 {
-	return Device->CreateTexture2D(InName, InBuffer, InSize, InDesc, DefaultRootParameterIndex);
+	return GPU == 0 || GPU > SecondaryGPUs.size() ? Device->CreateTexture2D(InName, InBuffer, InSize, InDesc, DefaultRootParameterIndex) : SecondaryGPUs[GPU - 1]->CreateTexture2D(InName, InBuffer, InSize, InDesc, DefaultRootParameterIndex);
 }
 
-ITexture2D::UniquePtr ITexture2D::CreateUnique(const std::string InName, void* InBuffer, const std::size_t InSize, const sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex)
+ITexture2D::UniquePtr ITexture2D::CreateUnique(const std::string InName, void* InBuffer, const std::size_t InSize, const sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex, std::uint32_t GPU)
 {
-	return Device->CreateUniqueTexture2D(InName, InBuffer, InSize, InDesc, DefaultRootParameterIndex);
+	return GPU == 0 || GPU > SecondaryGPUs.size() ? Device->CreateUniqueTexture2D(InName, InBuffer, InSize, InDesc, DefaultRootParameterIndex) : SecondaryGPUs[GPU - 1]->CreateUniqueTexture2D(InName, InBuffer, InSize, InDesc, DefaultRootParameterIndex);
 }
 
-ITexture2D::SharedPtr ITexture2D::CreateEmpty(const std::string InName, const sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex)
+ITexture2D::SharedPtr ITexture2D::CreateEmpty(const std::string InName, const sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex, std::uint32_t GPU)
 {
-	return Device->CreateEmptyTexture2D(InName, InDesc, DefaultRootParameterIndex);
+	return GPU == 0 || GPU > SecondaryGPUs.size() ? Device->CreateEmptyTexture2D(InName, InDesc, DefaultRootParameterIndex) : SecondaryGPUs[GPU - 1]->CreateEmptyTexture2D(InName, InDesc, DefaultRootParameterIndex);
 }
 
-ITexture2D::UniquePtr ITexture2D::CreateUniqueEmpty(const std::string InName, const sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex)
+ITexture2D::UniquePtr ITexture2D::CreateUniqueEmpty(const std::string InName, const sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex, std::uint32_t GPU)
 {
-	return Device->CreateUniqueEmptyTexture2D(InName, InDesc, DefaultRootParameterIndex);
+	return GPU == 0 || GPU > SecondaryGPUs.size() ? Device->CreateUniqueEmptyTexture2D(InName, InDesc, DefaultRootParameterIndex) : SecondaryGPUs[GPU - 1]->CreateUniqueEmptyTexture2D(InName, InDesc, DefaultRootParameterIndex);
 }
 
 //ITiledTexture::SharedPtr ITiledTexture::Create(const std::string InName, const std::uint32_t InTileX, const std::uint32_t InTileY, const sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex)
@@ -994,10 +1091,11 @@ IRigidBody::SharedPtr IRigidBody::CreateTriangleMesh(sPhysicalComponent* Owner, 
 	return PhysicalWorld ? PhysicalWorld->CreateTriangleMesh(Owner, Desc, Origin, points, numPoints, indices, numIndices) : nullptr;
 }
 
-sEngine::sEngine(const GPUDeviceCreateInfo& CreateInfo, const IPhysicalWorld::SharedPtr& InPhysicalWorld)
+sEngine::sEngine(const GPUCreateInfo& CreateInfo, const IPhysicalWorld::SharedPtr& InPhysicalWorld)
 	: MetaWorld(nullptr)
 	, ScreenDimension(sScreenDimension())
 	, bWindowInitialized(false)
+	//, bIsRunningOnEngineThread(false)
 {
 #if Renderdoc_Enabled && _DEBUG
 	InitializeRenderDoc();
@@ -1005,28 +1103,50 @@ sEngine::sEngine(const GPUDeviceCreateInfo& CreateInfo, const IPhysicalWorld::Sh
 
 	AppStartTime = Engine::GetUTCTimeNow();
 
-	mThreadPool.Start();
 	pAudio = std::make_unique<XAudio>();
 
 	FixedStepTimer.SetFixedTimeStep(true);
 	FixedStepTimer.SetTargetElapsedSeconds(1.0 / 60.0);
 
-	switch (CreateInfo.Type)
+	switch (CreateInfo.PrimaryGPU.Type)
 	{
-	case EGITypes::eD3D11:
-		Device = D3D11Device::CreateUnique(CreateInfo);
+	case EGITypes::D3D11:
+		Device = D3D11Device::CreateUnique(CreateInfo, 0);
 		break;
-	case EGITypes::eD3D12:
-		Device = D3D12Device::CreateUnique(CreateInfo);
+	case EGITypes::D3D12:
+		Device = D3D12Device::CreateUnique(CreateInfo, 0);
 		break;
-	case EGITypes::eVulkan:
-		Device = VulkanDevice::CreateUnique(CreateInfo);
+	case EGITypes::Vulkan:
+		Device = VulkanDevice::CreateUnique(CreateInfo, 0);
 		break;
-		//case EGITypes::eOpenGL46:
+	//case EGITypes::eOpenGL46:
 		//	break;
-	default:
-		Device = D3D11Device::CreateUnique(CreateInfo);
+	case EGITypes::Undefined:
+		throw std::runtime_error("Undefined GPU Type");
 		break;
+	default:
+		Device = D3D12Device::CreateUnique(CreateInfo, 0);
+		break;
+	}
+
+	if (CreateInfo.SecondaryGPU.Type != CreateInfo.PrimaryGPU.Type || CreateInfo.SecondaryGPU.GPUIndex != CreateInfo.PrimaryGPU.GPUIndex)
+	{
+		switch (CreateInfo.SecondaryGPU.Type)
+		{
+		case EGITypes::D3D11:
+			SecondaryGPUs.push_back(D3D11Device::Create(CreateInfo, 1));
+			break;
+		case EGITypes::D3D12:
+			SecondaryGPUs.push_back(D3D12Device::Create(CreateInfo, 1));
+			break;
+		case EGITypes::Vulkan:
+			SecondaryGPUs.push_back(VulkanDevice::Create(CreateInfo, 1));
+			break;
+		//case EGITypes::eOpenGL46:
+			//	break;
+		default:
+			break;
+		}
 	}
 
 	PhysicalWorld = InPhysicalWorld;
@@ -1055,13 +1175,13 @@ sEngine::sEngine(const GPUDeviceCreateInfo& CreateInfo, const IPhysicalWorld::Sh
 //
 //	switch (GIType)
 //	{
-//	case EGITypes::eD3D11:
+//	case EGITypes::D3D11:
 //		Device = D3D11Device::CreateUnique(GPUIndex, InHWND);
 //		break;
-//	case EGITypes::eD3D12:
+//	case EGITypes::D3D12:
 //		Device = D3D12Device::CreateUnique(GPUIndex, InHWND);
 //		break;
-//	case EGITypes::eVulkan:
+//	case EGITypes::Vulkan:
 //		Device = VulkanDevice::CreateUnique(GPUIndex, InHWND);
 //		break;
 //		//case EGITypes::eOpenGL46:
@@ -1078,18 +1198,26 @@ sEngine::~sEngine()
 	if (Server)
 		Server->DestroySession();
 
+	Device->WaitForGPU();
+	Device->GPUFlush();
+
 	Client = nullptr;
 	Server = nullptr;
 	InputController = nullptr;
-	sMaterialManager::Get().Destroy();
-	sTextureManager::Get().Destroy();
-	sShaderManager::Get().Destroy();
 	DestroyWorld();
 	PhysicalWorld = nullptr;
 	Renderer = nullptr;
-	pAudio = nullptr;
 	mThreadPool.Stop();
+	sMaterialManager::Get().Destroy();
+	sTextureManager::Get().Destroy();
+	sShaderManager::Get().Destroy();
+	sMaterialInstanceContainerManager::Get().Release();
+	sMeshGeometryContainerManager::Get().Release();
+	pAudio = nullptr;
 	RemoteProcedureCallManager::Get().Destroy();
+	for (auto& GPU : SecondaryGPUs)
+		GPU = nullptr;
+	SecondaryGPUs.clear();
 	Device = nullptr;
 }
 
@@ -1133,11 +1261,13 @@ void sEngine::EngineInternalTick()
 	mStepTimer.Tick([&]()
 		{
 			Tick(mStepTimer.GetElapsedSeconds());
-			Render();
-			Present();
 		});
+
+	Render();
+	Present();
 }
 
+//WorkerThread RendererThread;
 void sEngine::BeginPlay()
 {
 	if (PhysicalWorld)
@@ -1150,7 +1280,34 @@ void sEngine::BeginPlay()
 		pAudio->BeginPlay();
 
 	Renderer->BeginPlay();
+
+	//RendererThread.BindOnStart([] {
+	//	Renderer->Render();
+	//	});
 }
+
+//void sEngine::RunOnEngineThread()
+//{
+//	if (bIsRunningOnEngineThread.load())
+//		return;
+//	mThreadPool.QueueJob([this]
+//	{
+//		bIsRunningOnEngineThread.store(true);
+//		bIsRunning.store(true);
+//		while (bIsRunningOnEngineThread.load())
+//		{
+//			EngineInternalTick();
+//			if (!bIsRunning.load())
+//				break;
+//		}
+//		bIsRunningOnEngineThread.store(false);
+//	});
+//}
+//
+//bool sEngine::IsRunningOnEngineThread() const
+//{
+//	return bIsRunningOnEngineThread.load();
+//}
 
 void sEngine::PhysicsTick(const double DeltaTime)
 {
@@ -1197,6 +1354,10 @@ void sEngine::BeginFrame()
 	}
 #endif
 
+#if Pix3_Enabled && _DEBUG
+	PIXBeginEvent(0, L"sEngine::BeginFrame()");
+#endif
+
 	Device->BeginFrame();
 	Renderer->BeginFrame();
 }
@@ -1210,6 +1371,9 @@ void sEngine::Present()
 {
 	Device->Present(Renderer->GetFinalRenderTarget());
 
+#if Pix3_Enabled && _DEBUG
+	PIXEndEvent();
+#endif
 #if Renderdoc_Enabled && _DEBUG
 	if (rdoc_api) {
 		rdoc_api->EndFrameCapture(nullptr, nullptr);
@@ -1305,16 +1469,6 @@ sScreenDimension sEngine::GetInternalBaseRenderResolution() const
 void sEngine::SetInternalBaseRenderResolution(std::size_t Width, std::size_t Height)
 {
 	Renderer->SetInternalBaseRenderResolution(Width, Height);
-}
-
-void sEngine::SetGBufferClearMode(EGBufferClear Mode)
-{
-	return Renderer->SetGBufferClearMode(Mode);
-}
-
-EGBufferClear sEngine::GetGBufferClearMode() const
-{
-	return Renderer->GetGBufferClearMode();
 }
 
 void sEngine::InputProcess(const GMouseInput& MouseInput, const GKeyboardChar& KeyboardChar)

@@ -59,7 +59,9 @@ void sPostProcessRenderer::Render(sPostProcess* PostProcess, IRenderTarget* Back
 			PostProcess->Compile(BackBuffer);
 	}
 
-	GraphicsCommandContext->BeginRecordCommandList(ERenderPass::ePostProcess);
+	GraphicsCommandContext->BeginRecordCommandList(ERenderPass::PostProcess);
+
+	GraphicsCommandContext->SetPipeline(PostProcess->GetPipeline());
 
 	if (PostProcess->HasFrameBuffer())
 		GraphicsCommandContext->ClearRenderTarget(PostProcess->GetFrameBuffer());
@@ -76,16 +78,12 @@ void sPostProcessRenderer::Render(sPostProcess* PostProcess, IRenderTarget* Back
 
 	GraphicsCommandContext->SetScissorRect(0, 0, (std::uint32_t)ScreenDimension.Height, (std::uint32_t)ScreenDimension.Width);
 
-	GraphicsCommandContext->SetPipeline(PostProcess->GetPipeline());
-	PostProcess->SetPostProcessResources(GraphicsCommandContext.get());
-
-	if (PostProcess->UseBackBufferAsResource())
-		GraphicsCommandContext->SetRenderTargetAsResource(BackBuffer, (std::uint32_t)PostProcess->GetBackBufferResourceRootParameterIndex());
+	PostProcess->SetPostProcessResources(GraphicsCommandContext.get(), PostProcess->HasFrameBuffer() ? BackBuffer : nullptr);
 
 	GraphicsCommandContext->DrawInstanced(3, 1, 0, 0);
 
 	GraphicsCommandContext->FinishRecordCommandList();
-	GraphicsCommandContext->ExecuteCommandList();
+	GraphicsCommandContext->ExecuteCommandList(ECommandContextExecuteType::Deferred, 3);
 }
 
 void sPostProcessRenderer::CopyToFrameBuffer(sPostProcess* PostProcess, IRenderTarget* FrameBuffer)
@@ -109,7 +107,7 @@ void sPostProcessRenderer::Render(IGraphicsCommandContext* CMD, sPostProcess* Po
 			PostProcess->Compile(BackBuffer);
 	}
 
-	CMD->BeginRecordCommandList(ERenderPass::ePostProcess);
+	CMD->BeginRecordCommandList(ERenderPass::PostProcess);
 
 	if (PostProcess->HasFrameBuffer())
 		CMD->ClearRenderTarget(PostProcess->GetFrameBuffer());
@@ -127,10 +125,7 @@ void sPostProcessRenderer::Render(IGraphicsCommandContext* CMD, sPostProcess* Po
 	CMD->SetScissorRect(0, 0, (std::uint32_t)ScreenDimension.Height, (std::uint32_t)ScreenDimension.Width);
 
 	CMD->SetPipeline(PostProcess->GetPipeline());
-	PostProcess->SetPostProcessResources(CMD);
-
-	if (PostProcess->UseBackBufferAsResource())
-		CMD->SetRenderTargetAsResource(BackBuffer, (std::uint32_t)PostProcess->GetBackBufferResourceRootParameterIndex());
+	PostProcess->SetPostProcessResources(CMD, PostProcess->HasFrameBuffer() ? BackBuffer : nullptr);
 
 	CMD->DrawInstanced(3, 1, 0, 0);
 

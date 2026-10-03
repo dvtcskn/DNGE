@@ -55,7 +55,7 @@ public:
 	void RequestTermination();
 
 	void WindowMode(const int value);
-	void ResizeWindow(std::size_t Width, std::size_t Height);
+	void ResizeWindow(std::uint32_t Width, std::uint32_t Height);
 	void Vsync(const bool value);
 	void VsyncInterval(const UINT value);
 

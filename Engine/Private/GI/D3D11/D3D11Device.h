@@ -43,7 +43,7 @@ class D3D11Device final : public IAbstractGIDevice
 {
 	sClassBody(sClassConstructor, D3D11Device, IAbstractGIDevice)
 public:
-	D3D11Device(const GPUDeviceCreateInfo& DeviceCreateInfo);
+	D3D11Device(const GPUCreateInfo& DeviceCreateInfo, std::uint32_t InDeviceIndex);
 	virtual ~D3D11Device();
 	virtual void InitWindow(void* HWND, std::uint32_t Width, std::uint32_t Height, bool Fullscreen) override final;
 	virtual void BeginFrame() override final;
@@ -62,18 +62,29 @@ public:
 	virtual bool IsVsyncEnabled() const override final;
 	virtual std::uint32_t GetVsyncInterval() const override final;
 
+	virtual void GPUFlush() override final;
+	virtual void WaitForGPU() override final;
+	virtual void WaitForCPU() override final;
+
 	virtual std::vector<sDisplayMode> GetAllSupportedResolutions() const override final;
 
-	virtual EGITypes GetGIType() const override final { return EGITypes::eD3D11; }
+	virtual EGITypes GetGIType() const override final { return EGITypes::D3D11; }
 	virtual sGPUInfo GetGPUInfo() const override final { return sGPUInfo(); }
 
 	virtual sScreenDimension GetBackBufferDimension() const override final;
 	virtual EFormat GetBackBufferFormat() const override final;
 	virtual sViewport GetViewport() const override final;
 
-	virtual IShader* CompileShader(const sShaderAttachment& Attachment, bool Spirv = false) override final;
-	virtual IShader* CompileShader(std::wstring InSrcFile, std::string InFunctionName, eShaderType InProfile, bool Spirv = false, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>()) override final;
-	virtual IShader* CompileShader(const void* InCode, std::size_t Size, std::string InFunctionName, eShaderType InProfile, bool Spirv = false, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>()) override final;
+	virtual std::uint32_t GetBackBufferSize() const override final;
+	virtual std::uint32_t GetCurrentBackBufferIndex() const override final;
+
+	IShader* CompileD3D11Shader(const sShaderAttachment& Attachment, bool Spirv = false);
+	IShader* CompileD3D11Shader(std::wstring InSrcFile, std::string InFunctionName, eShaderType InProfile, bool Spirv = false, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>());
+	IShader* CompileD3D11Shader(const void* InCode, std::size_t Size, std::string InFunctionName, eShaderType InProfile, bool Spirv = false, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>());
+
+	virtual IShader::SharedPtr CompileShader(const sShaderAttachment& Attachment) override final;
+	virtual IShader::SharedPtr CompileShader(std::wstring InSrcFile, std::string InFunctionName, eShaderType InProfile, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>()) override final;
+	virtual IShader::SharedPtr CompileShader(const void* InCode, std::size_t Size, std::string InFunctionName, eShaderType InProfile, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>()) override final;
 
 	virtual IGraphicsCommandContext::SharedPtr CreateGraphicsCommandContext() override final;
 	virtual IGraphicsCommandContext::UniquePtr CreateUniqueGraphicsCommandContext() override final;
@@ -93,8 +104,20 @@ public:
 	virtual IIndexBuffer::SharedPtr CreateIndexBuffer(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource = nullptr) override final;
 	virtual IIndexBuffer::UniquePtr CreateUniqueIndexBuffer(std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource = nullptr) override final;
 
+	virtual IByteAddressBuffer::SharedPtr CreateByteAddressBuffer(std::string InName, std::uint64_t Size, bool bReadWriteAllowed) override final;
+	virtual IByteAddressBuffer::UniquePtr CreateUniqueByteAddressBuffer(std::string InName, std::uint64_t Size, bool bReadWriteAllowed) override final;
+
+	virtual IStructuredBuffer::SharedPtr CreateStructuredBuffer(std::string InName, const BufferLayout& InDesc, bool bSRVAllowed = true) override final;
+	virtual IStructuredBuffer::UniquePtr CreateUniqueStructuredBuffer(std::string InName, const BufferLayout& InDesc, bool bSRVAllowed = true) override final;
+
+	virtual IIndirectBuffer::SharedPtr CreateIndirectBuffer(std::string InName, BufferLayout NewLayout) override final;
+	virtual IIndirectBuffer::UniquePtr CreateUniqueIndirectBuffer(std::string InName, BufferLayout NewLayout) override final;
+
 	virtual IFrameBuffer::SharedPtr CreateFrameBuffer(const std::string InName, const sFrameBufferAttachmentInfo& InAttachments) override final;
 	virtual IFrameBuffer::UniquePtr CreateUniqueFrameBuffer(const std::string InName, const sFrameBufferAttachmentInfo& InAttachments) override final;
+
+	virtual ISamplerState::SharedPtr CreateSamplerState(const std::string InName, const sSamplerAttributeDesc& InDesc) override final;
+	virtual ISamplerState::UniquePtr CreateUniqueSamplerState(const std::string InName, const sSamplerAttributeDesc& InDesc) override final;
 
 	virtual IRenderTarget::SharedPtr CreateRenderTarget(const std::string InName, const EFormat Format, const sFBODesc& Desc) override final;
 	virtual IRenderTarget::UniquePtr CreateUniqueRenderTarget(const std::string InName, const EFormat Format, const sFBODesc& Desc) override final;
@@ -121,7 +144,10 @@ public:
 	//virtual ITiledTexture::UniquePtr CreateUniqueTiledTexture(const std::string InName, const std::uint32_t InTileX, const std::uint32_t InTileY, const sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex = 0) override final;
 
 private:
-	std::optional<std::int32_t> GPUIndex;
+	std::optional<std::uint32_t> GPUIndex;
+	EGPUDeviceType DeviceType;
+	std::uint32_t DeviceIndex;
+
 	ComPtr<ID3D11Device1> Direct3DDevice;
 	ComPtr<ID3D11DeviceContext1> Direct3DDeviceIMContext;
 	ComPtr<IDXGIFactory4> DXGIFactory;
@@ -142,6 +168,16 @@ public:
 	FORCEINLINE ID3D11DeviceContext1* GetDeviceIMContext() const
 	{
 		return Direct3DDeviceIMContext.Get();
+	}
+
+	FORCEINLINE bool IsPrimaryGPU() const
+	{
+		return DeviceIndex == 0;
+	}
+
+	FORCEINLINE std::uint32_t GetDeviceIndex() const
+	{
+		return DeviceIndex;
 	}
 
 	FORCEINLINE bool IsNvDeviceID() const
@@ -168,6 +204,4 @@ public:
 	{
 		return DXGIFactory;
 	}
-
-	D3D11Viewport* GetViewportContext() const;
 };

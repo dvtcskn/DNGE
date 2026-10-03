@@ -26,14 +26,13 @@
 */
 #pragma once
 
-#include "IRenderer.h"
 #include "Core/Math/CoreMath.h"
 #include "Gameplay/CameraManager.h"
 #include "Gameplay/ParticleSystem.h"
 
-class ParticleRenderer : public IRenderer
+class ParticleRenderer : public IRenderPass
 {
-    sClassBody(sClassConstructor, ParticleRenderer, IRenderer)
+    sClassBody(sClassConstructor, ParticleRenderer, IRenderPass)
 public:
     ParticleRenderer(std::size_t Width, std::size_t Height, IGraphicsCommandContext::SharedPtr CMD = nullptr);
     virtual ~ParticleRenderer();
@@ -41,28 +40,24 @@ public:
 	virtual void BeginPlay() override final;
 	virtual void Tick(const double DeltaTime) override final;
 
-	void Render(const ILevel* Level, ICamera* pCamera, IRenderTarget* pRT, std::optional<sViewport> Viewport);
+	void Render(const ILevel* Level, std::uint32_t CameraBindlessIndex, IRenderTarget* pRT, std::optional<sViewport> Viewport);
 
 	virtual void SetRenderSize(std::size_t Width, std::size_t Height) override final;
 	virtual void OnInputProcess(const GMouseInput& MouseInput, const GKeyboardChar& KeyboardChar) override final;
 
-	void UpdateCameraBuffer(ICamera* pCamera, IGraphicsCommandContext* CMD = nullptr);
+	sIndirectLayoutBindingDesc GetIndirectLayoutBindingDesc() const
+	{
+		return IndirectLayoutBindingDesc;
+	}
 
 private:
 	sScreenDimension ScreenDimension;
 
+	sIndirectLayoutBindingDesc IndirectLayoutBindingDesc;
 	IGraphicsCommandContext::SharedPtr GraphicsCommandContext;
 	sMaterial::SharedPtr DefaultParticle_EngineMat;
-	sMaterial::sMaterialInstance::SharedPtr DefaultParticle_MatInstance;
-	IConstantBuffer::SharedPtr CameraCB;
+	sMaterialInstance::SharedPtr DefaultParticle_MatInstance;
 	IDepthTarget::SharedPtr Depth;
-
-	__declspec(align(256)) struct sParticleCameraBuffer
-	{
-		FMatrix ViewProjMatrix;
-		FMatrix PrevViewProjMatrix;
-	};
-	static_assert((sizeof(sParticleCameraBuffer) % 256) == 0, "Constant Buffer size must be 256-byte aligned");
-
-	sParticleCameraBuffer CameraBuffer;
+	IIndirectBuffer::SharedPtr IndirectBuffer;
+	bool bEnableExecuteIndirect;
 };

@@ -42,10 +42,10 @@ public:
 
 		switch (InDesc.FillMode)
 		{
-		case ERasterizerFillMode::eSolid:
+		case ERasterizerFillMode::Solid:
 			desc.FillMode = D3D11_FILL_SOLID;
 			break;
-		case  ERasterizerFillMode::eWireframe:
+		case  ERasterizerFillMode::Wireframe:
 			desc.FillMode = D3D11_FILL_WIREFRAME;
 			break;
 		default:
@@ -54,13 +54,13 @@ public:
 
 		switch (InDesc.CullMode)
 		{
-		case ERasterizerCullMode::eCCW:
+		case ERasterizerCullMode::CCW:
 			desc.CullMode = D3D11_CULL_BACK;
 			break;
-		case ERasterizerCullMode::eCW:
+		case ERasterizerCullMode::CW:
 			desc.CullMode = D3D11_CULL_FRONT;
 			break;
-		case ERasterizerCullMode::eNone:
+		case ERasterizerCullMode::None:
 			desc.CullMode = D3D11_CULL_NONE;
 			break;
 		}
@@ -112,37 +112,37 @@ public:
 	{
 		CD3D11_SAMPLER_DESC desc(D3D11_DEFAULT);
 
-		const bool bComparisonEnabled = false;// InDesc.SamplerComparisonFunction != ECompareFunction::eNever;
+		const bool bComparisonEnabled = false;// InDesc.SamplerComparisonFunction != ECompareFunction::Never;
 
 		auto Compare = [&](ECompareFunction Mode) -> D3D11_COMPARISON_FUNC
 		{
 			switch (Mode)
 			{
-			case ECompareFunction::eLess: return D3D11_COMPARISON_LESS;
-			case ECompareFunction::eLessEqual: return D3D11_COMPARISON_LESS_EQUAL;
-			case ECompareFunction::eGreater: return D3D11_COMPARISON_GREATER;
-			case ECompareFunction::eGreaterEqual: return D3D11_COMPARISON_GREATER_EQUAL;
-			case ECompareFunction::eEqual: return D3D11_COMPARISON_EQUAL;;
-			case ECompareFunction::eNotEqual: return D3D11_COMPARISON_NOT_EQUAL;
-			case ECompareFunction::eNever: return D3D11_COMPARISON_NEVER;
-			case ECompareFunction::eAlways: return D3D11_COMPARISON_ALWAYS;
+			case ECompareFunction::Less: return D3D11_COMPARISON_LESS;
+			case ECompareFunction::LessEqual: return D3D11_COMPARISON_LESS_EQUAL;
+			case ECompareFunction::Greater: return D3D11_COMPARISON_GREATER;
+			case ECompareFunction::GreaterEqual: return D3D11_COMPARISON_GREATER_EQUAL;
+			case ECompareFunction::Equal: return D3D11_COMPARISON_EQUAL;;
+			case ECompareFunction::NotEqual: return D3D11_COMPARISON_NOT_EQUAL;
+			case ECompareFunction::Never: return D3D11_COMPARISON_NEVER;
+			case ECompareFunction::Always: return D3D11_COMPARISON_ALWAYS;
 			default: return D3D11_COMPARISON_FUNC();
 			}
 		};
 
 		switch (InDesc.Filter)
 		{
-		case ESamplerFilter::ePoint:
+		case ESamplerFilter::Point:
 			desc.Filter = bComparisonEnabled ? D3D11_FILTER_COMPARISON_MIN_MAG_MIP_POINT : D3D11_FILTER_MIN_MAG_MIP_POINT;
 			break;
-		case ESamplerFilter::eBilinear:
+		case ESamplerFilter::Bilinear:
 			desc.Filter = bComparisonEnabled ? D3D11_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT : D3D11_FILTER_MIN_MAG_LINEAR_MIP_POINT;
 			break;
-		case ESamplerFilter::eTrilinear:
+		case ESamplerFilter::Trilinear:
 			desc.Filter = bComparisonEnabled ? D3D11_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR : D3D11_FILTER_MIN_MAG_MIP_LINEAR;
 			break;
-		case ESamplerFilter::eAnisotropicPoint:
-		case ESamplerFilter::eAnisotropicLinear:
+		case ESamplerFilter::AnisotropicPoint:
+		case ESamplerFilter::AnisotropicLinear:
 			if (InDesc.MaxAnisotropy == 1)
 			{
 				desc.Filter = bComparisonEnabled ? D3D11_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR : D3D11_FILTER_MIN_MAG_MIP_LINEAR;
@@ -159,11 +159,11 @@ public:
 		{
 			switch (Mode)
 			{
-			case ESamplerAddressMode::eWrap: return D3D11_TEXTURE_ADDRESS_WRAP;
-			case ESamplerAddressMode::eClamp: return D3D11_TEXTURE_ADDRESS_CLAMP;
-			case ESamplerAddressMode::eMirror: return D3D11_TEXTURE_ADDRESS_MIRROR;
-			case ESamplerAddressMode::eMirrorOnce: return D3D11_TEXTURE_ADDRESS_MODE::D3D11_TEXTURE_ADDRESS_MIRROR_ONCE;
-			case ESamplerAddressMode::eBorder: return D3D11_TEXTURE_ADDRESS_BORDER;
+			case ESamplerAddressMode::Wrap: return D3D11_TEXTURE_ADDRESS_WRAP;
+			case ESamplerAddressMode::Clamp: return D3D11_TEXTURE_ADDRESS_CLAMP;
+			case ESamplerAddressMode::Mirror: return D3D11_TEXTURE_ADDRESS_MIRROR;
+			case ESamplerAddressMode::MirrorOnce: return D3D11_TEXTURE_ADDRESS_MODE::D3D11_TEXTURE_ADDRESS_MIRROR_ONCE;
+			case ESamplerAddressMode::Border: return D3D11_TEXTURE_ADDRESS_BORDER;
 			default: return D3D11_TEXTURE_ADDRESS_MODE();
 			}
 		};
@@ -201,11 +201,41 @@ public:
 	}
 
 	FORCEINLINE ComPtr<ID3D11SamplerState> Get() const { return pSamplerState; }
+	virtual sSamplerAttributeDesc GetSamplerDesc() const { return SamplerDesc; }
 
 private:
 	D3D11Device* Owner;
 	sSamplerAttributeDesc SamplerDesc;
 	ComPtr<ID3D11SamplerState> pSamplerState;
+};
+
+class D3DX11SamplerState : public ISamplerState
+{
+	sClassBody(sClassConstructor, D3DX11SamplerState, ISamplerState)
+public:
+	D3DX11SamplerState(D3D11Device* InOwner, std::string InName, sSamplerAttributeDesc InDesc)
+		: Super()
+		, Owner(InOwner)
+		, Name(InName)
+		, SamplerState(D3D11SamplerState(InOwner, InDesc))
+	{
+
+	}
+
+	virtual ~D3DX11SamplerState()
+	{
+		Owner = nullptr;
+	}
+
+	virtual std::string GetName() const override { return Name; }
+	virtual sSamplerAttributeDesc GetSamplerDesc() const override { return SamplerState.GetSamplerDesc(); }
+	virtual std::uint32_t GetBindlessIndex() const override { return std::uint32_t(-1); }
+	D3D11SamplerState Get() const {	return SamplerState; }
+
+private:
+	D3D11Device* Owner;
+	std::string Name;
+	D3D11SamplerState SamplerState;
 };
 
 class D3D11DepthStencilState
@@ -220,14 +250,14 @@ public:
 		{
 			switch (Mode)
 			{
-			case ECompareFunction::eLess: return D3D11_COMPARISON_LESS;
-			case ECompareFunction::eLessEqual: return D3D11_COMPARISON_LESS_EQUAL;
-			case ECompareFunction::eGreater: return D3D11_COMPARISON_GREATER;
-			case ECompareFunction::eGreaterEqual: return D3D11_COMPARISON_GREATER_EQUAL;
-			case ECompareFunction::eEqual: return D3D11_COMPARISON_EQUAL;
-			case ECompareFunction::eNotEqual: return D3D11_COMPARISON_NOT_EQUAL;
-			case ECompareFunction::eNever: return D3D11_COMPARISON_NEVER;
-			case ECompareFunction::eAlways:	return D3D11_COMPARISON_ALWAYS;
+			case ECompareFunction::Less: return D3D11_COMPARISON_LESS;
+			case ECompareFunction::LessEqual: return D3D11_COMPARISON_LESS_EQUAL;
+			case ECompareFunction::Greater: return D3D11_COMPARISON_GREATER;
+			case ECompareFunction::GreaterEqual: return D3D11_COMPARISON_GREATER_EQUAL;
+			case ECompareFunction::Equal: return D3D11_COMPARISON_EQUAL;
+			case ECompareFunction::NotEqual: return D3D11_COMPARISON_NOT_EQUAL;
+			case ECompareFunction::Never: return D3D11_COMPARISON_NEVER;
+			case ECompareFunction::Always:	return D3D11_COMPARISON_ALWAYS;
 			default: return D3D11_COMPARISON_FUNC();
 			}
 		};
@@ -236,21 +266,21 @@ public:
 		{
 			switch (Mode)
 			{
-			case EStencilOp::eKeep:	return D3D11_STENCIL_OP_KEEP;
-			case EStencilOp::eZero:	return D3D11_STENCIL_OP_ZERO;
-			case EStencilOp::eReplace: return D3D11_STENCIL_OP_REPLACE;
-			case EStencilOp::eSaturatedIncrement: return D3D11_STENCIL_OP_INCR_SAT;
-			case EStencilOp::eSaturatedDecrement: return D3D11_STENCIL_OP_DECR_SAT;
-			case EStencilOp::eInvert: return D3D11_STENCIL_OP_INVERT;
-			case EStencilOp::eIncrement: return D3D11_STENCIL_OP_INCR;
-			case EStencilOp::eDecrement: return D3D11_STENCIL_OP_DECR;
+			case EStencilOp::Keep:	return D3D11_STENCIL_OP_KEEP;
+			case EStencilOp::Zero:	return D3D11_STENCIL_OP_ZERO;
+			case EStencilOp::Replace: return D3D11_STENCIL_OP_REPLACE;
+			case EStencilOp::SaturatedIncrement: return D3D11_STENCIL_OP_INCR_SAT;
+			case EStencilOp::SaturatedDecrement: return D3D11_STENCIL_OP_DECR_SAT;
+			case EStencilOp::Invert: return D3D11_STENCIL_OP_INVERT;
+			case EStencilOp::Increment: return D3D11_STENCIL_OP_INCR;
+			case EStencilOp::Decrement: return D3D11_STENCIL_OP_DECR;
 			default: return D3D11_STENCIL_OP();
 			}
 		};
 
 		CD3D11_DEPTH_STENCIL_DESC desc(D3D11_DEFAULT);
 		desc.DepthFunc = Compare(InDesc.DepthTest);
-		desc.DepthEnable = InDesc.DepthTest != ECompareFunction::eAlways || InDesc.bEnableDepthWrite;
+		desc.DepthEnable = InDesc.DepthTest != ECompareFunction::Always || InDesc.bEnableDepthWrite;
 		desc.StencilEnable = InDesc.bStencilEnable;
 
 		desc.DepthWriteMask = InDesc.bDepthWriteMask ? D3D11_DEPTH_WRITE_MASK_ALL : D3D11_DEPTH_WRITE_MASK_ZERO;
@@ -308,19 +338,19 @@ public:
 		{
 			switch (var)
 			{
-			case EBlendOperation::eAdd:
+			case EBlendOperation::Add:
 				return D3D11_BLEND_OP_ADD;
 				break;
-			case EBlendOperation::eSubtract:
+			case EBlendOperation::Subtract:
 				return D3D11_BLEND_OP_SUBTRACT;
 				break;
-			case EBlendOperation::eMin:
+			case EBlendOperation::Min:
 				return D3D11_BLEND_OP_MIN;
 				break;
-			case EBlendOperation::eMax:
+			case EBlendOperation::Max:
 				return D3D11_BLEND_OP_MAX;
 				break;
-			case EBlendOperation::eReverseSubtract:
+			case EBlendOperation::ReverseSubtract:
 				return D3D11_BLEND_OP_REV_SUBTRACT;
 				break;
 			default:
@@ -333,40 +363,40 @@ public:
 		{
 			switch (var)
 			{
-			case EBlendFactor::eZero:
+			case EBlendFactor::Zero:
 				return D3D11_BLEND_ZERO;
 				break;
-			case EBlendFactor::eOne:
+			case EBlendFactor::One:
 				return D3D11_BLEND_ONE;
 				break;
-			case EBlendFactor::eSourceColor:
+			case EBlendFactor::SourceColor:
 				return D3D11_BLEND_SRC_COLOR;
 				break;
-			case EBlendFactor::eInverseSourceColor:
+			case EBlendFactor::InverseSourceColor:
 				return D3D11_BLEND_INV_SRC_COLOR;
 				break;
-			case EBlendFactor::eSourceAlpha:
+			case EBlendFactor::SourceAlpha:
 				return D3D11_BLEND_SRC_ALPHA;
 				break;
-			case EBlendFactor::eInverseSourceAlpha:
+			case EBlendFactor::InverseSourceAlpha:
 				return D3D11_BLEND_INV_SRC_ALPHA;
 				break;
-			case EBlendFactor::eDestAlpha:
+			case EBlendFactor::DestAlpha:
 				return D3D11_BLEND_DEST_ALPHA;
 				break;
-			case EBlendFactor::eInverseDestAlpha:
+			case EBlendFactor::InverseDestAlpha:
 				return D3D11_BLEND_INV_DEST_ALPHA;
 				break;
-			case EBlendFactor::eDestColor:
+			case EBlendFactor::DestColor:
 				return D3D11_BLEND_DEST_COLOR;
 				break;
-			case EBlendFactor::eInverseDestColor:
+			case EBlendFactor::InverseDestColor:
 				return D3D11_BLEND_INV_DEST_COLOR;
 				break;
-			case EBlendFactor::eBlendFactor:
+			case EBlendFactor::BlendFactor:
 				return D3D11_BLEND_BLEND_FACTOR;
 				break;
-			case EBlendFactor::eInverseBlendFactor:
+			case EBlendFactor::InverseBlendFactor:
 				return D3D11_BLEND_INV_BLEND_FACTOR;
 				break;
 			default:
@@ -379,31 +409,31 @@ public:
 		{
 			switch (var)
 			{
-			case EColorWriteMask::eNONE:
+			case EColorWriteMask::NONE:
 				return 0;
 				break;
-			case EColorWriteMask::eRED:
+			case EColorWriteMask::RED:
 				return D3D11_COLOR_WRITE_ENABLE_RED;
 				break;
-			case EColorWriteMask::eGREEN:
+			case EColorWriteMask::GREEN:
 				return D3D11_COLOR_WRITE_ENABLE_GREEN;
 				break;
-			case EColorWriteMask::eBLUE:
+			case EColorWriteMask::BLUE:
 				return D3D11_COLOR_WRITE_ENABLE_BLUE;
 				break;
-			case EColorWriteMask::eALPHA:
+			case EColorWriteMask::ALPHA:
 				return D3D11_COLOR_WRITE_ENABLE_ALPHA;
 				break;
-			case EColorWriteMask::eRGB:
+			case EColorWriteMask::RGB:
 				return D3D11_COLOR_WRITE_ENABLE_RED | D3D11_COLOR_WRITE_ENABLE_GREEN | D3D11_COLOR_WRITE_ENABLE_BLUE;
 				break;
-			case EColorWriteMask::eRGBA:
+			case EColorWriteMask::RGBA:
 				return D3D11_COLOR_WRITE_ENABLE_RED | D3D11_COLOR_WRITE_ENABLE_GREEN | D3D11_COLOR_WRITE_ENABLE_BLUE | D3D11_COLOR_WRITE_ENABLE_ALPHA;
 				break;
-			case EColorWriteMask::eRG:
+			case EColorWriteMask::RG:
 				return D3D11_COLOR_WRITE_ENABLE_RED | D3D11_COLOR_WRITE_ENABLE_GREEN;
 				break;
-			case EColorWriteMask::eBA:
+			case EColorWriteMask::BA:
 				return D3D11_COLOR_WRITE_ENABLE_BLUE | D3D11_COLOR_WRITE_ENABLE_ALPHA;
 				break;
 			default:

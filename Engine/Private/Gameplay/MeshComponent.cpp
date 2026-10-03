@@ -69,7 +69,7 @@ sMeshComponent::~sMeshComponent()
 	Mesh = nullptr;
 }
 
-void sMeshComponent::SetMaterial(sMaterial::sMaterialInstance* Material)
+void sMeshComponent::SetMaterial(sMaterialInstance* Material)
 {
 	Mesh->SetMaterial(Material);
 }

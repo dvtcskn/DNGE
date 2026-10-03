@@ -69,10 +69,11 @@ D3D11CommandBuffer::~D3D11CommandBuffer()
 	ActivePipeline = nullptr;
 }
 
-void D3D11CommandBuffer::BeginRecordCommandList(const ERenderPass RenderPass)
+bool D3D11CommandBuffer::BeginRecordCommandList(const ERenderPass RenderPass)
 {
 	ClearCMDStates();
-	ClearState(); 
+	ClearState();
+	return true;
 }
 
 void D3D11CommandBuffer::FinishRecordCommandList()
@@ -89,7 +90,7 @@ void D3D11CommandBuffer::FinishRecordCommandList()
 	}
 }
 
-void D3D11CommandBuffer::ExecuteCommandList()
+void D3D11CommandBuffer::ExecuteCommandList(ECommandContextExecuteType ExecuteType, std::uint32_t Order)
 {
 	if (!bIsSingleThreaded)
 	{
@@ -111,6 +112,19 @@ void D3D11CommandBuffer::ClearState()
 {
 	DeferredCTX->ClearState();
 	StencilRef = 0;
+}
+
+void D3D11CommandBuffer::Set32BitConstant(std::uint32_t RootParameterIndex, std::uint32_t SrcData, std::uint32_t DestOffsetIn32BitValues)
+{
+}
+
+void D3D11CommandBuffer::Set32BitConstants(std::uint32_t RootParameterIndex, const void* pSrcData, std::uint32_t Num32BitValuesToSet, std::uint32_t DestOffsetIn32BitValues)
+{
+}
+
+void D3D11CommandBuffer::SetBindlessDescriptor(std::uint32_t RootParameterIndex, IBindlessSceneContainer* Container)
+{
+
 }
 
 void D3D11CommandBuffer::Draw(std::uint32_t VertexCount, std::uint32_t VertexStartOffset)
@@ -324,7 +338,7 @@ void D3D11CommandBuffer::SetFrameBufferAsResource(IFrameBuffer* pFB, std::uint32
 		const auto& Binding = ActivePipeline->GetDescriptorSetLayoutBinding(RootParameterIndex);
 
 #if _DEBUG
-		if (Binding.GetDescriptorType() != EDescriptorType::eTexture)
+		if (Binding.GetDescriptorType() != EDescriptorType::Texture)
 			throw std::runtime_error("Wrong Root Parameter Index.");
 #endif
 
@@ -352,7 +366,7 @@ void D3D11CommandBuffer::SetFrameBufferAsResource(IFrameBuffer* pFB, std::uint32
 		const auto& Binding = ActivePipeline->GetDescriptorSetLayoutBinding(RootParameterIndex);
 
 #if _DEBUG
-		if (Binding.GetDescriptorType() != EDescriptorType::eTexture)
+		if (Binding.GetDescriptorType() != EDescriptorType::Texture)
 			throw std::runtime_error("Wrong Root Parameter Index.");
 #endif
 
@@ -379,7 +393,7 @@ void D3D11CommandBuffer::SetRenderTargetAsResource(IRenderTarget* pRT, std::uint
 		const auto& Binding = ActivePipeline->GetDescriptorSetLayoutBinding(RootParameterIndex);
 
 #if _DEBUG
-		if (Binding.GetDescriptorType() != EDescriptorType::eTexture)
+		if (Binding.GetDescriptorType() != EDescriptorType::Texture)
 			throw std::runtime_error("Wrong Root Parameter Index.");
 #endif
 		const int i = Binding.Location;
@@ -432,7 +446,7 @@ void D3D11CommandBuffer::SetRenderTargetsAsResource(std::vector<IRenderTarget*> 
 		const auto& Binding = ActivePipeline->GetDescriptorSetLayoutBinding(RootParameterIndex);
 
 #if _DEBUG
-		if (Binding.GetDescriptorType() != EDescriptorType::eTexture)
+		if (Binding.GetDescriptorType() != EDescriptorType::Texture)
 			throw std::runtime_error("Wrong Root Parameter Index.");
 #endif
 
@@ -519,11 +533,11 @@ void D3D11CommandBuffer::CopyDepthBuffer(IDepthTarget* Dest, IDepthTarget* Sourc
 	DeferredCTX->CopyResource(DestFB->GetD3D11Texture(), SourceFB->GetD3D11Texture());
 }
 
-void D3D11CommandBuffer::SetUnorderedAccessBufferAsResource(IUnorderedAccessBuffer* pUAV, std::uint32_t RootParameterIndex)
+void D3D11CommandBuffer::SetUnorderedAccessBufferAsResource(IStructuredBuffer* pUAV, std::optional<std::uint32_t> RootParameterIndex)
 {
 }
 
-void D3D11CommandBuffer::SetUnorderedAccessBuffersAsResource(std::vector<IUnorderedAccessBuffer*> UAVs, std::uint32_t RootParameterIndex)
+void D3D11CommandBuffer::SetUnorderedAccessBuffersAsResource(std::vector<IStructuredBuffer*> UAVs, std::optional<std::uint32_t> RootParameterIndex)
 {
 }
 
@@ -550,7 +564,7 @@ void D3D11CommandBuffer::SetConstantBuffer(IConstantBuffer* CB, std::optional<st
 		const auto& Binding = ActivePipeline->GetDescriptorSetLayoutBinding(RootParameterIndex);
 
 #if _DEBUG
-		if (Binding.GetDescriptorType() != EDescriptorType::eUniformBuffer)
+		if (Binding.GetDescriptorType() != EDescriptorType::UniformBuffer)
 			throw std::runtime_error("Wrong Root Parameter Index.");
 #endif
 
@@ -575,7 +589,7 @@ void D3D11CommandBuffer::SetTexture2D(ITexture2D* Texture2D, std::optional<std::
 		const auto& Binding = ActivePipeline->GetDescriptorSetLayoutBinding(RootParameterIndex);
 
 #if _DEBUG
-		if (Binding.GetDescriptorType() != EDescriptorType::eTexture)
+		if (Binding.GetDescriptorType() != EDescriptorType::Texture)
 			throw std::runtime_error("Wrong Root Parameter Index.");
 #endif
 
