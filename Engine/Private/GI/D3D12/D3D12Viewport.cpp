@@ -122,6 +122,7 @@ D3D12Viewport::D3D12Viewport(D3D12Device* InOwner, ComPtr<IDXGIFactory7> InFacto
 	, SyncInterval(1)
 	, bIsFullScreen(IsFullscreen)
 	, bIsVSYNCEnabled(false)
+	, FrameIndex(0)
 {
 	// Query all connected outputs
 	EnumerateOutputs();
@@ -315,6 +316,8 @@ void D3D12Viewport::Present()
 
 	//if (Owner->IsSoftwareDevice())
 	//	Owner->CpuWait(D3D12_COMMAND_LIST_TYPE_DIRECT);
+
+	++FrameIndex;
 }
 
 void D3D12Viewport::ResizeSwapChain(std::size_t Width, std::size_t Height)

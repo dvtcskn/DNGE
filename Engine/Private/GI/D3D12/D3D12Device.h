@@ -49,7 +49,7 @@ using namespace Microsoft::WRL;
 #define Pix3_Enabled 0
 #endif
 #ifndef AGS_Enable
-#define AGS_Enable 1
+#define AGS_Enable 0
 #endif
 
 #if AGS_Enable
@@ -111,6 +111,7 @@ public:
 	virtual void* GetInternalDevice() override final { return Direct3DDevice.Get(); }
 	virtual void* GetInternalSwapChain() override final;
 
+	virtual std::uint64_t GetFrameIndex() const override final;
 	virtual void ResizeWindow(std::size_t Width, std::size_t Height) override final;
 	virtual void FullScreen(const bool value) override final;
 	virtual void Vsync(const bool value) override final;

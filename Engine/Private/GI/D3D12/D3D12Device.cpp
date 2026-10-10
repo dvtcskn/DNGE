@@ -818,6 +818,11 @@ void* D3D12Device::GetInternalSwapChain()
 	return (void*)Viewport->GetSwapChain().Get();
 }
 
+std::uint64_t D3D12Device::GetFrameIndex() const
+{
+	return Viewport->GetFrameIndex();
+}
+
 void D3D12Device::ResizeWindow(std::size_t Width, std::size_t Height)
 {
 	GPUFlush();

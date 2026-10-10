@@ -265,6 +265,11 @@ namespace GPU
 		return Device->GetCurrentBackBufferIndex();
 	}
 
+	std::uint64_t GetFrameIndex()
+	{
+		return Device->GetFrameIndex();
+	}
+
 	bool IsBindlessRendererSupported()
 	{
 		return GetGIType() == EGITypes::D3D12 || GetGIType() == EGITypes::Vulkan;

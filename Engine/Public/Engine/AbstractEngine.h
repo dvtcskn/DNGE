@@ -34,6 +34,8 @@
 #include <stdarg.h>
 #include <map>
 #include <mutex>
+#include <type_traits>
+#include <wrl/client.h>
 #include "Core/Math/CoreMath.h"
 #include "Engine/ClassBody.h"
 #include "AbstractEngineUtilities.h"
@@ -2993,6 +2995,7 @@ namespace GPU
 	void RecreateSwapChain();
 	std::uint32_t GetBackBufferSize();
 	std::uint32_t GetCurrentBackBufferIndex();
+	std::uint64_t GetFrameIndex();
 
 	bool IsBindlessRendererSupported();
 	bool IsBindlessRendererEnabled();
@@ -3193,3 +3196,66 @@ namespace Engine
 }
 
 #define ASSERT(condition)  Engine::Assert(AssertLevel::ASSERT_CRITICAL, condition, L"Assertion Failed %ls - line %d", __FILE__, __LINE__)
+
+template <typename T>
+inline constexpr bool IsComInterfaceV = std::is_base_of_v<IUnknown, T>;
+
+// to do : Use Fence
+template<typename T, bool bUseFence = false>
+struct TDoubleBuffer
+{
+	TDoubleBuffer() = default;
+	~TDoubleBuffer()
+	{
+		Release();
+	}
+
+	void Release()
+	{
+		if constexpr (IsComInterfaceV<T>)
+		{
+			First.Reset();
+			Second.Reset();
+		}
+		else
+		{
+			First = nullptr;
+			Second = nullptr;
+		}
+	}
+
+	using Type = std::conditional_t<IsComInterfaceV<T>, Microsoft::WRL::ComPtr<T>, std::shared_ptr<T>>;
+
+	Type First = nullptr;
+	Type Second = nullptr;
+	std::uint64_t FenceValue = 0;
+
+	T* Get() const
+	{
+		/*if (bUseFence)
+		{
+
+		}
+		else*/
+		{
+			//std::uint32_t FrameIndex = GPU::GetFrameIndex();
+			//std::uint32_t BackBufferSize = GPU::GetBackBufferSize();
+			//std::uint32_t Index = FrameIndex % BackBufferSize;
+
+			std::uint32_t Index = GPU::GetCurrentBackBufferIndex();
+
+			if constexpr (IsComInterfaceV<T>)
+			{
+				if (Index > 0)
+					return First.Get();
+				return Second.Get();
+			}
+			else
+			{
+				if (Index > 0)
+					return First.get();
+				return Second.get();
+			}
+		}
+	}
+};

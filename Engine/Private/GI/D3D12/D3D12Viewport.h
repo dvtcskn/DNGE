@@ -94,6 +94,7 @@ public:
 	FORCEINLINE EFormat GetBackBufferFormat() const { return BackBufferFormat; }
 	FORCEINLINE sScreenDimension GetScreenDimension() const { return sScreenDimension(SizeX, SizeY); }
 	FORCEINLINE DisplayMode GetDisplayMode() const { return CurrentDisplayMode; }
+	FORCEINLINE std::uint64_t GetFrameIndex() const { return FrameIndex; }
 
 	FORCEINLINE std::uint32_t GetBackBufferCount() const { return 2; }
 	FORCEINLINE std::uint32_t GetCurrentBackBufferIndex() const { return CurrentBackBuffer; }
@@ -151,4 +152,6 @@ private:
 	UINT SyncInterval;
 	bool bIsFullScreen;
 	bool bIsVSYNCEnabled;
+
+	std::uint64_t FrameIndex;
 };

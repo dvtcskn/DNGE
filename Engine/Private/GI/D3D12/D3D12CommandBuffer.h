@@ -136,6 +136,13 @@ private:
 
 	std::map<D3D12_RESOURCE_STATES, std::vector<D3D12RenderTarget*>> RT_ToTransition;
 	std::map<D3D12_RESOURCE_STATES, std::vector<D3D12DepthTarget*>> Depth_ToTransition;
+
+	// Profile
+	ComPtr<ID3D12QueryHeap> queryHeap;
+	TDoubleBuffer<ID3D12Resource> readbackBuffer;
+	UINT64 timestampFrequency = 0;
+	bool bProfile;
+	void ReadGpuTimers(/*ID3D12Resource* readbackBuffer, UINT64 timestampFrequency*/);
 };
 
 class D3D12CopyCommandBuffer : public ICopyCommandContext

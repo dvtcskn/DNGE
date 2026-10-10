@@ -42,6 +42,7 @@ public:
 	virtual void RecreateSwapChain() = 0;
 	virtual void Present(IRenderTarget* pRT) = 0;
 
+	virtual std::uint64_t GetFrameIndex() const = 0;
 	virtual std::uint32_t GetBackBufferSize() const = 0;
 	virtual std::uint32_t GetCurrentBackBufferIndex() const = 0;
 
@@ -70,7 +71,6 @@ public:
 	virtual IShader::SharedPtr CompileShader(const sShaderAttachment& Attachment) = 0;
 	virtual IShader::SharedPtr CompileShader(std::wstring InSrcFile, std::string InFunctionName, eShaderType InProfile, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>()) = 0;
 	virtual IShader::SharedPtr CompileShader(const void* InCode, std::size_t Size, std::string InFunctionName, eShaderType InProfile, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>()) = 0;
-
 
 	virtual IGraphicsCommandContext::SharedPtr CreateGraphicsCommandContext() = 0;
 	virtual IGraphicsCommandContext::UniquePtr CreateUniqueGraphicsCommandContext() = 0;

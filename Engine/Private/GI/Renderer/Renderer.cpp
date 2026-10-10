@@ -32,6 +32,7 @@
 #include "Gameplay/MeshComponent.h"
 #include "Utilities/FileManager.h"
 #include "AbstractGI/MaterialManager.h"
+#include "Utilities/TimerProfiler.h"
 
 struct GeometrySceneDescriptor : public IBindlessSceneDescriptor
 {
@@ -161,8 +162,8 @@ public:
 		DefaultEngineMat = nullptr;
 		DefaultMatInstance = nullptr;
 		GraphicsCommandContext = nullptr;
-		//for (auto& CameraCB : CameraCBs)
-		//	CameraCB = nullptr;
+		for (auto& CameraCB : CameraCBs)
+			CameraCB.Release();
 		CameraCBs.clear();
 		GBuffer = nullptr;
 
@@ -410,6 +411,7 @@ public:
 
 	IRenderTarget* Render(ILevel* Level, std::size_t index, ICamera* pCamera, std::optional<sViewport> Viewport)
 	{
+		//TimerProfiler
 		if (!Level || !pCamera)
 			return nullptr;
 
@@ -654,7 +656,7 @@ public:
 	{
 		for (std::size_t i = 0; i < Count; i++)
 		{
-			DoubleBufferConstantBuffer DoubleBuffer;
+			TDoubleBuffer<IConstantBuffer> DoubleBuffer;
 			{
 				BufferLayout BufferDesc;
 				BufferDesc.Size = sizeof(sCameraBuffer);
@@ -727,28 +729,7 @@ private:
 	sMaterial::SharedPtr DefaultEngineMat;
 	sMaterialInstance::SharedPtr DefaultMatInstance;
 
-	// to do : Use Fence
-	struct DoubleBufferConstantBuffer
-	{
-		DoubleBufferConstantBuffer() = default;
-		~DoubleBufferConstantBuffer()
-		{
-			First = nullptr;
-			Second = nullptr;
-		}
-
-		IConstantBuffer::SharedPtr First = nullptr;
-		IConstantBuffer::SharedPtr Second = nullptr;
-
-		IConstantBuffer* Get() const
-		{
-			std::uint32_t Index = GPU::GetCurrentBackBufferIndex();
-			if (Index > 0)
-				return First.get();
-			return Second.get();
-		}
-	};
-	std::vector<DoubleBufferConstantBuffer> CameraCBs;
+	std::vector<TDoubleBuffer<IConstantBuffer>> CameraCBs;
 
 	bool bForceRecompileMaterials;
 	std::vector<sMaterialInstance*> MaterialsToRecompile;
@@ -1050,6 +1031,7 @@ void sRenderer::Render()
 			pParticleRenderer->Render(World->GetActiveLevel(), GBuffer->GetCameraConstantBuffer(i)->GetBindlessIndex(), FinalRenderTarget, ViewportInstance->Viewport);
 			if (UpscalerType == ERendererUpscalerType::FSR && FSR && (GPU::GetDeviceType() != EGPUDeviceType::Software || bSoftwareDeviceUpscallerSupport))
 			{
+				//TimerProfiler
 				FSR->Render(FinalRenderTarget, GBuffer->GetGBuffer()->GetRenderTarget(4), GBuffer->GetGBuffer()->GetRenderTarget(5), GBuffer->GetDepth(), ViewportInstance->pCamera.get());
 				FinalRenderTarget = FSR->GetOutputRenderTarget();
 			}
@@ -1190,9 +1172,9 @@ void sRenderer::OnInputProcess(const GMouseInput& MouseInput, const GKeyboardCha
 
 	if (KeyboardChar.KeyCode == 32 && KeyboardChar.bIsPressed /*&& KeyboardChar.bIsChar*/)
 	{
-		GPU::WaitForGPU();
-		GBuffer->ForceRecompileMaterials();
-		Engine::WriteToConsole("ForceRecompileMaterials");
+		//GPU::WaitForGPU();
+		//GBuffer->ForceRecompileMaterials();
+		//Engine::WriteToConsole("ForceRecompileMaterials");
 	}
 	else if (KeyboardChar.KeyCode == 8 && KeyboardChar.bIsPressed /*&& KeyboardChar.bIsChar*/)
 	{

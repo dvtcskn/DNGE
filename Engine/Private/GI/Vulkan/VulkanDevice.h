@@ -120,6 +120,7 @@ public:
 
 	uint32_t GetMemoryType(uint32_t type_filter, VkMemoryPropertyFlags properties);
 
+	virtual std::uint64_t GetFrameIndex() const override final { return 0; }
 	virtual void ResizeWindow(std::size_t Width, std::size_t Height) override final;
 	virtual void FullScreen(const bool value) override final;
 	virtual void Vsync(const bool value) override final;

@@ -56,6 +56,7 @@ public:
 	virtual void* GetInternalDevice() override final { return Direct3DDevice.Get(); }
 	virtual void* GetInternalSwapChain() override final { return nullptr; }
 
+	virtual std::uint64_t GetFrameIndex() const override final { return 0; }
 	virtual void ResizeWindow(std::size_t Width, std::size_t Height) override final;
 	virtual void FullScreen(const bool value) override final;
 	virtual void Vsync(const bool value) override final;

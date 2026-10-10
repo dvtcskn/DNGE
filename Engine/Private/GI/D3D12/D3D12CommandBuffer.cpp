@@ -44,6 +44,8 @@ D3D12CommandBuffer::D3D12CommandBuffer(D3D12Device* InOwner)
 	, CurrentRootSignature(nullptr)
 	, bWaitForCompletion(false)
 	, State(ECommandContextState::Waiting)
+	, bProfile(false)
+	, timestampFrequency(0)
 {
 	auto Device = Owner->GetDevice();
 	CommandAllocator = Owner->RequestCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT);
@@ -52,11 +54,49 @@ D3D12CommandBuffer::D3D12CommandBuffer(D3D12Device* InOwner)
 #if _DEBUG
 	CommandList->SetName(L"D3D12CommandBuffer");
 #endif
+
+	// Profile
+	const UINT MaxQueries = 64;
+	D3D12_QUERY_HEAP_DESC heapDesc = {};
+	heapDesc.Type = D3D12_QUERY_HEAP_TYPE_TIMESTAMP;
+	heapDesc.Count = MaxQueries;
+	Device->CreateQueryHeap(&heapDesc, IID_PPV_ARGS(&queryHeap));
+
+	{
+		CD3DX12_HEAP_PROPERTIES readbackHeapProps(D3D12_HEAP_TYPE_READBACK);
+		CD3DX12_RESOURCE_DESC readbackBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(MaxQueries * sizeof(UINT64));
+		Device->CreateCommittedResource(
+			&readbackHeapProps,
+			D3D12_HEAP_FLAG_NONE,
+			&readbackBufferDesc,
+			D3D12_RESOURCE_STATE_COPY_DEST,
+			nullptr,
+			IID_PPV_ARGS(&readbackBuffer.First)
+		);
+	}
+	{
+		CD3DX12_HEAP_PROPERTIES readbackHeapProps(D3D12_HEAP_TYPE_READBACK);
+		CD3DX12_RESOURCE_DESC readbackBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(MaxQueries * sizeof(UINT64));
+		Device->CreateCommittedResource(
+			&readbackHeapProps,
+			D3D12_HEAP_FLAG_NONE,
+			&readbackBufferDesc,
+			D3D12_RESOURCE_STATE_COPY_DEST,
+			nullptr,
+			IID_PPV_ARGS(&readbackBuffer.Second)
+		);
+	}
+
+	Owner->GetGraphicsQueue()->GetTimestampFrequency(&timestampFrequency);
 }
 
 D3D12CommandBuffer::~D3D12CommandBuffer()
 {
 	WaitForGPU();
+	queryHeap = nullptr;
+	readbackBuffer.Release();
+	//readbackBuffer = nullptr;
+
 	Owner->OnCommandBufferDestroyed(this);
 	RT_ToTransition.clear();
 	Depth_ToTransition.clear();
@@ -93,6 +133,12 @@ ECommandContextBeginResult D3D12CommandBuffer::BeginRecordCommandList(const ECom
 	if (Begin == ECommandContextBeginState::Render)
 	{
 		Owner->SetHeaps(CommandList.Get());
+	}
+	else if (Begin == ECommandContextBeginState::ApiRender)
+	{
+		bProfile = true;
+		UINT startQueryIndex = 0;
+		CommandList->EndQuery(queryHeap.Get(), D3D12_QUERY_TYPE_TIMESTAMP, startQueryIndex);
 	}
 	else
 	{
@@ -150,6 +196,27 @@ bool D3D12CommandBuffer::FinishRecordCommandList()
 	Barriers.clear();
 	RT_ToTransition.clear();
 	Depth_ToTransition.clear();
+
+	if (bProfile)
+	{
+		UINT endQueryIndex = 1;
+		CommandList->EndQuery(queryHeap.Get(), D3D12_QUERY_TYPE_TIMESTAMP, endQueryIndex);
+
+		if (bProfile)
+		{
+			CommandList->ResolveQueryData(
+				queryHeap.Get(),
+				D3D12_QUERY_TYPE_TIMESTAMP,
+				0,
+				2, // Number of queries (start and end)
+				readbackBuffer.Get(),
+				0 * sizeof(UINT64) // offset
+			);
+
+			//ReadGpuTimers();
+			bProfile = false;
+		}
+	}
 
 	Close();
 
@@ -1132,6 +1199,24 @@ void D3D12CommandBuffer::ClearState()
 
 	State = ECommandContextState::Waiting;
 	bWaitForCompletion = false;
+}
+
+void D3D12CommandBuffer::ReadGpuTimers(/*ID3D12Resource* readbackBuffer, UINT64 timestampFrequency*/) 
+{
+	UINT64* mappedData = nullptr;
+
+	CD3DX12_RANGE readRange(0, sizeof(UINT64) * 2);
+	readbackBuffer.Get()->Map(0, &readRange, reinterpret_cast<void**>(&mappedData));
+
+	UINT64 startTime = mappedData[0];
+	UINT64 endTime = mappedData[1];
+
+	readbackBuffer.Get()->Unmap(0, nullptr);
+
+	UINT64 deltaTicks = endTime - startTime;
+	double milliseconds = (static_cast<double>(deltaTicks) * 1000.0) / static_cast<double>(timestampFrequency);
+
+	Engine::Print("FSR Pass Time: %.3f ms", milliseconds);
 }
 
 D3D12CopyCommandBuffer::D3D12CopyCommandBuffer(D3D12Device* InDevice)
