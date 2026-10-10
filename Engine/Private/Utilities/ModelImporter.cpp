@@ -2,6 +2,7 @@
 #include "pch.h"
 #include "Utilities/ModelImporter.h"
 
+#if assimp_Enabled
 #include <assimp/material.h>
 #include <assimp/cimport.h>
 #include <assimp/postprocess.h>
@@ -435,3 +436,4 @@ std::vector<ModelImporter::ModelImportAttributes> ModelImporter::InitMesh(EImpor
 
 	return MAs;
 }
+#endif

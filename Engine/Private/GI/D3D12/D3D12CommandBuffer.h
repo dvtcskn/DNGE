@@ -25,6 +25,7 @@
 */
 #pragma once
 
+#include <chrono>
 #include "D3D12Device.h"
 #include "D3D12FrameBuffer.h"
 #include "Engine/AbstractEngine.h"
@@ -53,6 +54,10 @@ public:
 	virtual bool FinishRecordCommandList() override final;
 	virtual bool ExecuteCommandList(ECommandContextExecuteType ExecuteType = ECommandContextExecuteType::Immediate, std::uint32_t Order = std::uint32_t(-1)) override final;
 	void OnExecuteCommandList();
+
+	virtual void BeginProfile(ERenderPass RenderPass, bool bProfileCPU = false) override final;
+	virtual void EndProfile() override final;
+	virtual ProfileResult GetProfileResult() const override final;
 
 	virtual ECommandContextState GetState() const override final { return State; }
 
@@ -138,11 +143,33 @@ private:
 	std::map<D3D12_RESOURCE_STATES, std::vector<D3D12DepthTarget*>> Depth_ToTransition;
 
 	// Profile
+	struct CPUProfiler
+	{
+		std::chrono::time_point<std::chrono::steady_clock> StartTimer, EndTimer;
+		std::chrono::duration<double> Duration;
+		bool bStarted = false;
+
+		void Start()
+		{
+			bStarted = true;
+			StartTimer = std::chrono::high_resolution_clock::now();
+		}
+		double Stop()
+		{
+			bStarted = false;
+			EndTimer = std::chrono::high_resolution_clock::now();
+			Duration = EndTimer - StartTimer;
+
+			return Duration.count() * 1000.0;
+		}
+	};
+
+	CPUProfiler CpuProfiler;
 	ComPtr<ID3D12QueryHeap> queryHeap;
 	TDoubleBuffer<ID3D12Resource> readbackBuffer;
 	UINT64 timestampFrequency = 0;
 	bool bProfile;
-	void ReadGpuTimers(/*ID3D12Resource* readbackBuffer, UINT64 timestampFrequency*/);
+	ProfileResult Result;
 };
 
 class D3D12CopyCommandBuffer : public ICopyCommandContext

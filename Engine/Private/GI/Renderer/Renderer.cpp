@@ -1,7 +1,7 @@
 /* ---------------------------------------------------------------------------------------
 * MIT License
 *
-* Copyright (c) 2023 Davut CoÃ¾kun.
+* Copyright (c) 2023 Davut Coþkun.
 * All rights reserved.
 *
 * Permission is hereby granted, free of charge, to any person obtaining
@@ -180,6 +180,8 @@ public:
 			MaterialsToRecompile.clear();
 		}
 		GraphicsCommandContext->BeginRecordCommandList(ECommandContextBeginState::Render);
+
+		GraphicsCommandContext->BeginProfile(ERenderPass::GBuffer, true);
 
 		GraphicsCommandContext->ClearFrameBuffer(GBuffer.get());
 
@@ -411,7 +413,6 @@ public:
 
 	IRenderTarget* Render(ILevel* Level, std::size_t index, ICamera* pCamera, std::optional<sViewport> Viewport)
 	{
-		//TimerProfiler
 		if (!Level || !pCamera)
 			return nullptr;
 
@@ -573,6 +574,7 @@ public:
 			};
 
 		GraphicsCommandContext->BeginRecordCommandList(ECommandContextBeginState::Render);
+		GraphicsCommandContext->BeginProfile(ERenderPass::GBuffer, true);
 
 		UpdateCameraBuffer(pCamera, index, GraphicsCommandContext.get());
 		GraphicsCommandContext->SetFrameBuffer(GBuffer.get());
@@ -622,8 +624,13 @@ public:
 			DrawQueuedMeshes(BlendedMeshes, EMaterialBlendMode::Masked,	GraphicsCommandContext.get());
 		}
 
+		GraphicsCommandContext->EndProfile();
 		GraphicsCommandContext->FinishRecordCommandList();
 		GraphicsCommandContext->ExecuteCommandList(ECommandContextExecuteType::Deferred, 0);
+
+		auto Result = GraphicsCommandContext->GetProfileResult();
+		if (Result.IsValid())
+			Engine::GetActiveCanvas()->AddRendererProfileResult(Result);
 
 		bForceRecompileMaterials = false;
 
@@ -990,6 +997,10 @@ void sRenderer::BeginFrame()
 {
 }
 
+/*
+* To Do:
+* fix Command Context for multiple call
+*/
 void sRenderer::Render()
 {
 	if (!World)
@@ -1031,7 +1042,6 @@ void sRenderer::Render()
 			pParticleRenderer->Render(World->GetActiveLevel(), GBuffer->GetCameraConstantBuffer(i)->GetBindlessIndex(), FinalRenderTarget, ViewportInstance->Viewport);
 			if (UpscalerType == ERendererUpscalerType::FSR && FSR && (GPU::GetDeviceType() != EGPUDeviceType::Software || bSoftwareDeviceUpscallerSupport))
 			{
-				//TimerProfiler
 				FSR->Render(FinalRenderTarget, GBuffer->GetGBuffer()->GetRenderTarget(4), GBuffer->GetGBuffer()->GetRenderTarget(5), GBuffer->GetDepth(), ViewportInstance->pCamera.get());
 				FinalRenderTarget = FSR->GetOutputRenderTarget();
 			}
@@ -1071,10 +1081,6 @@ void sRenderer::Render()
 		FinalRenderTarget = PP->GetFrameBuffer();
 	}
 
-	/*
-	* To Do:
-	* Use 1 Command Context for all GUI
-	*/
 	if (PlayerCount > 0)
 	{
 		for (std::size_t i = 0; i < PlayerCount; i++)
@@ -1126,6 +1132,17 @@ void sRenderer::Render()
 		}
 	}
 	CanvasRenderer->Render(World->GetCanvases(), FinalRenderTarget, std::nullopt);
+	{
+		auto CommandContext = CanvasRenderer->GetCommandContext();
+		CommandContext->EndProfile();
+
+		CommandContext->FinishRecordCommandList();
+		CommandContext->ExecuteCommandList(ECommandContextExecuteType::Deferred, 40);
+
+		auto Result = CommandContext->GetProfileResult();
+		if (Result.IsValid())
+			Engine::GetActiveCanvas()->AddRendererProfileResult(Result);
+	}
 
 	for (const auto& PP : PostProcess[EPostProcessRenderOrder::AfterUI])
 	{

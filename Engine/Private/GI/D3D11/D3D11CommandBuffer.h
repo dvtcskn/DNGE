@@ -51,6 +51,10 @@ public:
 	virtual bool ExecuteCommandList(ECommandContextExecuteType ExecuteType = ECommandContextExecuteType::Immediate, std::uint32_t Order = std::uint32_t(-1)) override final;
 	virtual void ClearState() override final;
 
+	virtual void BeginProfile(ERenderPass RenderPass, bool bProfileCPU = false) override final {}
+	virtual void EndProfile() override final {}
+	virtual ProfileResult GetProfileResult() const override final { return ProfileResult(); }
+
 	virtual ECommandContextState GetState() const override final { return State; }
 
 	virtual void* GetInternalCommandContext() override final { return DeferredCTX.Get(); }

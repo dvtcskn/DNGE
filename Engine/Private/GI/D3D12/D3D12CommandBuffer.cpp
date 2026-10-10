@@ -37,6 +37,10 @@
 #include <pix3.h>
 #endif
 
+#ifndef PROFILE
+#define PROFILE 0
+#endif
+
 D3D12CommandBuffer::D3D12CommandBuffer(D3D12Device* InOwner)
 	: Owner(InOwner)
 	, StencilRef(0)
@@ -136,9 +140,6 @@ ECommandContextBeginResult D3D12CommandBuffer::BeginRecordCommandList(const ECom
 	}
 	else if (Begin == ECommandContextBeginState::ApiRender)
 	{
-		bProfile = true;
-		UINT startQueryIndex = 0;
-		CommandList->EndQuery(queryHeap.Get(), D3D12_QUERY_TYPE_TIMESTAMP, startQueryIndex);
 	}
 	else
 	{
@@ -197,27 +198,6 @@ bool D3D12CommandBuffer::FinishRecordCommandList()
 	RT_ToTransition.clear();
 	Depth_ToTransition.clear();
 
-	if (bProfile)
-	{
-		UINT endQueryIndex = 1;
-		CommandList->EndQuery(queryHeap.Get(), D3D12_QUERY_TYPE_TIMESTAMP, endQueryIndex);
-
-		if (bProfile)
-		{
-			CommandList->ResolveQueryData(
-				queryHeap.Get(),
-				D3D12_QUERY_TYPE_TIMESTAMP,
-				0,
-				2, // Number of queries (start and end)
-				readbackBuffer.Get(),
-				0 * sizeof(UINT64) // offset
-			);
-
-			//ReadGpuTimers();
-			bProfile = false;
-		}
-	}
-
 	Close();
 
 	return true;
@@ -258,6 +238,66 @@ bool D3D12CommandBuffer::ExecuteCommandList(ECommandContextExecuteType ExecuteTy
 void D3D12CommandBuffer::OnExecuteCommandList()
 {
 	State = ECommandContextState::Waiting;
+	Result = ProfileResult();
+}
+
+void D3D12CommandBuffer::BeginProfile(ERenderPass RenderPass, bool bProfileCPU)
+{
+#if PROFILE
+	if (bProfile)
+		return;
+
+	if (bProfileCPU)
+		CpuProfiler.Start();
+	Result = ProfileResult();
+	Result.RenderPass = RenderPass;
+	bProfile = true;
+	UINT startQueryIndex = 0;
+	CommandList->EndQuery(queryHeap.Get(), D3D12_QUERY_TYPE_TIMESTAMP, startQueryIndex);
+#endif
+}
+
+void D3D12CommandBuffer::EndProfile()
+{
+	if (bProfile)
+	{
+		UINT endQueryIndex = 1;
+		CommandList->EndQuery(queryHeap.Get(), D3D12_QUERY_TYPE_TIMESTAMP, endQueryIndex);
+
+		CommandList->ResolveQueryData(
+			queryHeap.Get(),
+			D3D12_QUERY_TYPE_TIMESTAMP,
+			0,
+			2, // Number of queries (start and end)
+			readbackBuffer.Get(),
+			0 * sizeof(UINT64) // offset
+		);
+
+		UINT64* mappedData = nullptr;
+
+		CD3DX12_RANGE readRange(0, sizeof(UINT64) * 2);
+		readbackBuffer.Get()->Map(0, &readRange, reinterpret_cast<void**>(&mappedData));
+
+		UINT64 startTime = mappedData[0];
+		UINT64 endTime = mappedData[1];
+
+		readbackBuffer.Get()->Unmap(0, nullptr);
+
+		UINT64 deltaTicks = endTime - startTime;
+		double milliseconds = (static_cast<double>(deltaTicks) * 1000.0) / static_cast<double>(timestampFrequency);
+
+		//Engine::Print("Time: %.3f ms", milliseconds);
+		if (CpuProfiler.bStarted)
+			Result.CPU = CpuProfiler.Stop();
+		Result.GPU = milliseconds;
+
+		bProfile = false;
+	}
+}
+
+ProfileResult D3D12CommandBuffer::GetProfileResult() const
+{
+	return Result;
 }
 
 void D3D12CommandBuffer::ResourceBarrier(UINT NumBarriers, const D3D12_RESOURCE_BARRIER* pBarriers)
@@ -1199,24 +1239,6 @@ void D3D12CommandBuffer::ClearState()
 
 	State = ECommandContextState::Waiting;
 	bWaitForCompletion = false;
-}
-
-void D3D12CommandBuffer::ReadGpuTimers(/*ID3D12Resource* readbackBuffer, UINT64 timestampFrequency*/) 
-{
-	UINT64* mappedData = nullptr;
-
-	CD3DX12_RANGE readRange(0, sizeof(UINT64) * 2);
-	readbackBuffer.Get()->Map(0, &readRange, reinterpret_cast<void**>(&mappedData));
-
-	UINT64 startTime = mappedData[0];
-	UINT64 endTime = mappedData[1];
-
-	readbackBuffer.Get()->Unmap(0, nullptr);
-
-	UINT64 deltaTicks = endTime - startTime;
-	double milliseconds = (static_cast<double>(deltaTicks) * 1000.0) / static_cast<double>(timestampFrequency);
-
-	Engine::Print("FSR Pass Time: %.3f ms", milliseconds);
 }
 
 D3D12CopyCommandBuffer::D3D12CopyCommandBuffer(D3D12Device* InDevice)

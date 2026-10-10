@@ -29,6 +29,7 @@
 #include "Gameplay/GameInstance.h"
 #include "Gameplay/StaticMesh.h"
 #include "Gameplay/MeshComponent.h"
+#include "Gameplay/ICanvas.h"
 
 #include "Utilities/FileManager.h"
 
@@ -193,6 +194,8 @@ void ParticleRenderer::Render(const ILevel* Level, std::uint32_t CameraBindlessI
 	{
 		GraphicsCommandContext->BeginRecordCommandList(ECommandContextBeginState::Render);
 
+		GraphicsCommandContext->BeginProfile(ERenderPass::Particle, true);
+
 		GraphicsCommandContext->SetRenderTarget(pRT, Depth.get());
 
 		if (Viewport.has_value())
@@ -332,8 +335,14 @@ void ParticleRenderer::Render(const ILevel* Level, std::uint32_t CameraBindlessI
 		}
 
 		FlushIndirectCommands(GraphicsCommandContext.get());
+
+		GraphicsCommandContext->EndProfile();
 		GraphicsCommandContext->FinishRecordCommandList();
 		GraphicsCommandContext->ExecuteCommandList(ECommandContextExecuteType::Deferred, 2);
+
+		auto Result = GraphicsCommandContext->GetProfileResult();
+		if (Result.IsValid())
+			Engine::GetActiveCanvas()->AddRendererProfileResult(Result);
 	}
 }
 

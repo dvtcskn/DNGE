@@ -61,6 +61,8 @@ void sPostProcessRenderer::Render(sPostProcess* PostProcess, IRenderTarget* Back
 
 	GraphicsCommandContext->BeginRecordCommandList(ECommandContextBeginState::Render);
 
+	GraphicsCommandContext->BeginProfile(ERenderPass::PostProcess, true);
+
 	GraphicsCommandContext->SetPipeline(PostProcess->GetPipeline());
 
 	if (PostProcess->HasFrameBuffer())
@@ -82,8 +84,14 @@ void sPostProcessRenderer::Render(sPostProcess* PostProcess, IRenderTarget* Back
 
 	GraphicsCommandContext->DrawInstanced(3, 1, 0, 0);
 
+	GraphicsCommandContext->EndProfile();
+
 	GraphicsCommandContext->FinishRecordCommandList();
 	GraphicsCommandContext->ExecuteCommandList(ECommandContextExecuteType::Deferred, 30);
+
+	auto Result = GraphicsCommandContext->GetProfileResult();
+	if (Result.IsValid())
+		Engine::GetActiveCanvas()->AddRendererProfileResult(Result);
 }
 
 void sPostProcessRenderer::CopyToFrameBuffer(sPostProcess* PostProcess, IRenderTarget* FrameBuffer)
@@ -109,6 +117,8 @@ void sPostProcessRenderer::Render(IGraphicsCommandContext* CMD, sPostProcess* Po
 
 	CMD->BeginRecordCommandList(ECommandContextBeginState::Render);
 
+	//CMD->BeginProfile(ERenderPass::GBuffer, true);
+
 	CMD->SetPipeline(PostProcess->GetPipeline());
 
 	if (PostProcess->HasFrameBuffer())
@@ -129,6 +139,9 @@ void sPostProcessRenderer::Render(IGraphicsCommandContext* CMD, sPostProcess* Po
 	PostProcess->SetPostProcessResources(CMD, PostProcess->HasFrameBuffer() ? BackBuffer : nullptr);
 
 	CMD->DrawInstanced(3, 1, 0, 0);
+
+	//CMD->EndProfile();
+	//Engine::GetActiveCanvas()->AddRendererProfileResult(CMD->GetProfileResult());
 
 	//CMD->FinishRecordCommandList();
 }

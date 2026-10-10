@@ -758,6 +758,20 @@ namespace Network
 
 namespace Engine
 {
+	IMetaWorld* GetMetaWorld()
+	{
+		if (Renderer)
+			return Renderer->GetMetaWorld();
+		return nullptr;
+	}
+
+	ICanvas* GetActiveCanvas()
+	{
+		if (auto MetaWorld = GetMetaWorld())
+			return MetaWorld->GetActiveCanvas();
+		return nullptr;
+	}
+
 	void WriteToConsole(const std::string& STR)
 	{
 		if (Server)

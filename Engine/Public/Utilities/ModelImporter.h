@@ -1,5 +1,10 @@
 #pragma once
 
+#ifndef assimp_Enabled
+#define assimp_Enabled 0
+#endif
+
+#if assimp_Enabled
 #include <assimp/scene.h>
 
 #include "Engine/AbstractEngine.h"
@@ -55,11 +60,6 @@ public:
 	ModelImporter() = default;
 	~ModelImporter();
 
-	/*
-	* TO DO :
-	* array veya tek olmak üzere ayrý ayrý import ettiðimiz fonksiyonlar yap
-	*/
-
 	std::vector<ModelImporter::ModelImportAttributes> ImportOBJ(const char* Path, const char* FileName, EImportType InImportType = EImportType::Single,
 		bool MakeLeftHanded = true, std::uint32_t flags = 0);
 	std::vector<ModelImporter::ModelImportAttributes> ImportGLTF(const char* Path, const char* FileName, EImportType InImportType = EImportType::Single,
@@ -82,3 +82,4 @@ private:
 	std::string	m_ScenePath;
 	std::string	m_SceneName;
 };
+#endif

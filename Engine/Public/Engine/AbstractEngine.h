@@ -50,8 +50,20 @@ enum class ERenderPass
 	GBuffer,
 	Line,
 	Particle,
+	FSR,
+	Tonemapper,
 	PostProcess,
 	UI,
+	Custom1,
+	Custom2,
+	Custom3,
+	Custom4,
+	Custom5,
+	Custom6,
+	Custom7,
+	Custom8,
+	Custom9,
+	Custom10,
 };
 
 enum class EGPUDeviceType
@@ -2387,6 +2399,18 @@ enum class ECommandContextBeginState
 	ApiRender,
 };
 
+struct ProfileResult
+{
+	ERenderPass RenderPass = ERenderPass::NONE;
+	double GPU = 0.0;
+	double CPU = 0.0;
+
+	bool IsValid() const
+	{
+		return RenderPass != ERenderPass::NONE && (GPU != 0.0 || CPU != 0.0);
+	}
+};
+
 class ICommandContext
 {
 	sBaseClassBody(sClassDefaultProtectedConstructor, ICommandContext)
@@ -2413,6 +2437,10 @@ public:
 	virtual bool FinishRecordCommandList() = 0;
 	virtual bool ExecuteCommandList(ECommandContextExecuteType ExecuteType = ECommandContextExecuteType::Immediate, std::uint32_t Order = std::uint32_t(-1)) = 0;
 	virtual void ClearState() = 0;
+
+	virtual void BeginProfile(ERenderPass RenderPass, bool bProfileCPU = false) = 0;
+	virtual void EndProfile() = 0;
+	virtual ProfileResult GetProfileResult() const = 0;
 
 	virtual void SetViewport(const sViewport& Viewport) = 0;
 
@@ -3146,8 +3174,12 @@ enum class AssertLevel
 };
 
 class sInputController;
+class IMetaWorld;
 namespace Engine
 {
+	IMetaWorld* GetMetaWorld();
+	ICanvas* GetActiveCanvas();
+
 	void WriteToConsole(const std::string& STR);
 	void WriteToConsole(const std::wstring& STR);
 	void WriteToConsole(const wchar_t* STR);

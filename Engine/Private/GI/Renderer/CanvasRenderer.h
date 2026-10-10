@@ -49,6 +49,11 @@ public:
 
 	virtual void OnInputProcess(const GMouseInput& MouseInput, const GKeyboardChar& KeyboardChar) override final;
 
+	inline IGraphicsCommandContext* GetCommandContext() const
+	{
+		return CMD.get();
+	}
+
 private:
 	//IFrameBuffer::SharedPtr CanvasFBO;
 	sScreenDimension ScreenDimension;

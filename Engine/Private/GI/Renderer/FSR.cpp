@@ -804,6 +804,8 @@ void sFSR::Render(IRenderTarget* Color, IRenderTarget* MotionVectors, IRenderTar
 
     GraphicsCommandContext->BeginRecordCommandList(ECommandContextBeginState::ApiRender);
 
+    GraphicsCommandContext->BeginProfile(ERenderPass::FSR, true);
+
     Color->AsResource(EResourceState::NonPixelShaderResource, GraphicsCommandContext.get());
     MotionVectors->AsResource(EResourceState::NonPixelShaderResource, GraphicsCommandContext.get());
     //Depth->AsResource(EResourceState::NonPixelShaderResource, GraphicsCommandContext.get());
@@ -858,9 +860,14 @@ void sFSR::Render(IRenderTarget* Color, IRenderTarget* MotionVectors, IRenderTar
     //MotionVectors->AsRenderTarget(GraphicsCommandContext.get());
     //Depth->AsDepthTarget(GraphicsCommandContext.get());
 
+    GraphicsCommandContext->EndProfile();
+
     GraphicsCommandContext->FinishRecordCommandList();
     GraphicsCommandContext->ExecuteCommandList(ECommandContextExecuteType::Deferred, 6);
 
+    auto Result = GraphicsCommandContext->GetProfileResult();
+    if (Result.IsValid())
+        Engine::GetActiveCanvas()->AddRendererProfileResult(Result);
     //CopyToFrameBuffer(Color);
 }
 

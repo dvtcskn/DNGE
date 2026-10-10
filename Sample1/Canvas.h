@@ -26,6 +26,7 @@
 #pragma once
 
 #include "CanvasBase.h"
+#include "cbString.h"
 
 namespace cbgui
 {
@@ -43,11 +44,48 @@ namespace cbgui
 
 		virtual void ResizeWindow(std::size_t Width, std::size_t Height) override final;
 
+		virtual void AddRendererProfileResult(const ProfileResult& Result) override final;
+		virtual void RemoveRendererProfileResult(const ERenderPass RenderPass) override final;
+
 	private:
 		virtual void Add(const std::shared_ptr<cbWidget>& Object) override;
 		virtual void RemoveFromCanvas(cbWidget* Object) override;
 
 	private:
 		cbWidget* Focus;
+
+	private:
+		cbVerticalBox::SharedPtr RendererProfile_VB;
+		struct ProfileContainer
+		{
+			cbHorizontalBox::SharedPtr Main;
+			cbHorizontalBox::SharedPtr GPU_ProfileElement;
+			cbString::SharedPtr GPUValueString;
+			cbHorizontalBox::SharedPtr CPU_ProfileElement;
+			cbString::SharedPtr CPUValueString;
+			ProfileContainer() = default;
+			ProfileContainer(cbHorizontalBox::SharedPtr NewMain, cbHorizontalBox::SharedPtr NewGPU_ProfileElement, cbString::SharedPtr NewGPUResult, cbHorizontalBox::SharedPtr NewCPUValueString, cbString::SharedPtr NewCPUResult)
+				: Main(NewMain)
+				, GPU_ProfileElement(NewGPU_ProfileElement)
+				, GPUValueString(NewGPUResult)
+				, CPU_ProfileElement(NewCPUValueString)
+				, CPUValueString(NewCPUResult)
+			{}
+
+			~ProfileContainer()
+			{
+				Release();
+			}
+
+			void Release()
+			{
+				Main = nullptr;
+				GPU_ProfileElement = nullptr;
+				GPUValueString = nullptr;
+				CPU_ProfileElement = nullptr;
+				CPUValueString = nullptr;
+			}
+		};
+		std::map<ERenderPass, ProfileContainer> ProfileElements;
 	};
 }

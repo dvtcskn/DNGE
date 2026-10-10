@@ -111,4 +111,7 @@ public:
 
 	virtual IVertexBuffer* GetVertexBuffer() const = 0;
 	virtual IIndexBuffer* GetIndexBuffer() const = 0;
+
+	virtual void AddRendererProfileResult(const ProfileResult& Result) {}
+	virtual void RemoveRendererProfileResult(const ERenderPass RenderPass) {}
 };

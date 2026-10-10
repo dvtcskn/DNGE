@@ -329,7 +329,11 @@ void sCanvasRenderer::Render(ICanvas* Canvas, IRenderTarget* pFB, std::optional<
 		};
 
 	{
-		CMD->BeginRecordCommandList(ECommandContextBeginState::Render);
+		auto State = CMD->BeginRecordCommandList(ECommandContextBeginState::Render);
+		if (State == ECommandContextBeginResult::Failed_WaitingForExecute)
+			return;
+
+		CMD->BeginProfile(ERenderPass::UI, true);
 
 		sViewport CanvasViewport = Viewport.has_value() ? *Viewport : sViewport(ScreenDimension);
 
@@ -396,8 +400,14 @@ void sCanvasRenderer::Render(ICanvas* Canvas, IRenderTarget* pFB, std::optional<
 			}
 		};
 
+		CMD->EndProfile();
+
 		CMD->FinishRecordCommandList();
-		CMD->ExecuteCommandList();
+		CMD->ExecuteCommandList(ECommandContextExecuteType::Deferred, 35);
+
+		auto Result = CMD->GetProfileResult();
+		if (Result.IsValid())
+			Engine::GetActiveCanvas()->AddRendererProfileResult(Result);
 	}
 	LastMaterial = nullptr;
 }
@@ -441,8 +451,10 @@ void sCanvasRenderer::Render(const std::vector<ICanvas*>& Canvases, IRenderTarge
 
 	{
 		auto State = CMD->BeginRecordCommandList(ECommandContextBeginState::Render);
-		if (State != ECommandContextBeginResult::Failed_WaitingForExecute)
+		if (State == ECommandContextBeginResult::Failed_WaitingForExecute)
 			return;
+
+		CMD->BeginProfile(ERenderPass::UI, true);
 
 		sViewport CanvasViewport = Viewport.has_value() ? *Viewport : sViewport(ScreenDimension);
 
@@ -510,8 +522,12 @@ void sCanvasRenderer::Render(const std::vector<ICanvas*>& Canvases, IRenderTarge
 			}
 		};
 
-		CMD->FinishRecordCommandList();
-		CMD->ExecuteCommandList(ECommandContextExecuteType::Deferred, 40);
+		//CMD->EndProfile();
+
+		//CMD->FinishRecordCommandList();
+		//CMD->ExecuteCommandList(ECommandContextExecuteType::Deferred, 40);
+
+		//Engine::GetActiveCanvas()->AddRendererProfileResult(CMD->GetProfileResult());
 	}
 	LastMaterial = nullptr;
 }

@@ -249,6 +249,8 @@ void sLineRenderer::Render(IRenderTarget* BackBuffer, std::uint32_t CameraBindle
 
 	GraphicsCommandContext->BeginRecordCommandList(ECommandContextBeginState::Render);
 
+	GraphicsCommandContext->BeginProfile(ERenderPass::Line, true);
+
 	GraphicsCommandContext->SetRenderTarget(BackBuffer);
 
 	if (Viewport.has_value())
@@ -277,8 +279,14 @@ void sLineRenderer::Render(IRenderTarget* BackBuffer, std::uint32_t CameraBindle
 	//GraphicsCommandContext->DrawIndexedInstanced(LineDrawParams);
 	GraphicsCommandContext->Draw((std::uint32_t)Lines.GetDrawCount());
 
+	GraphicsCommandContext->EndProfile();
+
 	GraphicsCommandContext->FinishRecordCommandList();
 	GraphicsCommandContext->ExecuteCommandList(ECommandContextExecuteType::Deferred, 1);
+
+	auto Result = GraphicsCommandContext->GetProfileResult();
+	if (Result.IsValid())
+		Engine::GetActiveCanvas()->AddRendererProfileResult(Result);
 }
 
 void sLineRenderer::Render(IGraphicsCommandContext* CMD, bool Exec, IRenderTarget* BackBuffer, std::uint32_t CameraBindlessIndex, std::optional<sViewport> Viewport)
