@@ -1,7 +1,7 @@
 /* ---------------------------------------------------------------------------------------
 * MIT License
 *
-* Copyright (c) 2023 Davut Coþkun.
+* Copyright (c) 2023 Davut CoÃ¾kun.
 * All rights reserved.
 *
 * Permission is hereby granted, free of charge, to any person obtaining
@@ -1190,9 +1190,9 @@ void sRenderer::OnInputProcess(const GMouseInput& MouseInput, const GKeyboardCha
 
 	if (KeyboardChar.KeyCode == 32 && KeyboardChar.bIsPressed /*&& KeyboardChar.bIsChar*/)
 	{
-		GPU::WaitForGPU();
-		GBuffer->ForceRecompileMaterials();
-		Engine::WriteToConsole("ForceRecompileMaterials");
+		//GPU::WaitForGPU();
+		//GBuffer->ForceRecompileMaterials();
+		//Engine::WriteToConsole("ForceRecompileMaterials");
 	}
 	else if (KeyboardChar.KeyCode == 8 && KeyboardChar.bIsPressed /*&& KeyboardChar.bIsChar*/)
 	{
