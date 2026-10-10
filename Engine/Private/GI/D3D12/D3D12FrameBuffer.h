@@ -38,9 +38,10 @@ class D3D12RenderTarget final : public IRenderTarget
 {
 	sClassBody(sClassConstructor, D3D12RenderTarget, IRenderTarget)
 public:
-	D3D12RenderTarget(D3D12Device* InOwner, const std::string InName, const EFormat Format, const sFBODesc& Desc, bool InIsSRVAllowed = true, bool InIsUnorderedAccessAllowed = false);
+	D3D12RenderTarget(D3D12Device* InOwner, const std::string InName, const sFrameBuffer& InDesc, const sFBODesc& FBODesc);
 	virtual ~D3D12RenderTarget();
 
+	virtual void AsResource(EResourceState ResourceState, IGraphicsCommandContext* GraphicsCommandContext = nullptr) override final;
 	virtual void SetDefaultRootParameterIndex(std::uint32_t RootParameterIndex) override final {}
 	virtual std::uint32_t GetDefaultRootParameterIndex() const override final { return 0; }
 
@@ -59,7 +60,7 @@ public:
 	inline D3D12_CPU_DESCRIPTOR_HANDLE GetUAVCPU() const { return UAV.GetCPU(); }
 	inline D3D12_GPU_DESCRIPTOR_HANDLE GetUAVGPU() const { return UAV.GetGPU(); }
 
-	EFormat GetFormat() const { return Format; }
+	EFormat GetFormat() const { return Desc.Format; }
 
 	virtual bool IsSRV_Allowed() const override final { return bIsSRVSupported; }
 	virtual bool IsUAV_Allowed() const override final { return bIsUAVSupported; }
@@ -69,15 +70,16 @@ public:
 
 	D3D12_RESOURCE_STATES CurrentState;
 	// Enhanced Barrier States
-	D3D12_BARRIER_ACCESS AccessState;
-	D3D12_BARRIER_SYNC SyncState;
+	D3D12_BARRIER_ACCESS CurrentAccessState;
+	D3D12_BARRIER_SYNC CurrentSyncState;
+	D3D12_BARRIER_LAYOUT CurrentBarrierLayout;
 
 	virtual ResourceSharedHandle* GetSharedHandle() const override final { return nullptr; }
 	virtual bool CopyFrom(IRenderTarget* RenderTarget) override final { return false; }
 
 private:
 	std::string Name;
-	EFormat Format;
+	sFrameBuffer Desc;
 
 	ComPtr<ID3D12Resource> Texture;
 	D3D12DescriptorHandle RTV;
@@ -95,6 +97,7 @@ public:
 	D3D12DepthTarget(D3D12Device* InOwner, const std::string InName, const EFormat Format, const sFBODesc& Desc);
 	virtual ~D3D12DepthTarget();
 
+	virtual void AsResource(EResourceState ResourceState, IGraphicsCommandContext* GraphicsCommandContext = nullptr) override final;
 	virtual void SetDefaultRootParameterIndex(std::uint32_t RootParameterIndex) override final {}
 	virtual std::uint32_t GetDefaultRootParameterIndex() const override final { return 0; }
 
@@ -118,8 +121,9 @@ public:
 
 	D3D12_RESOURCE_STATES CurrentState;
 	// Enhanced Barrier States
-	D3D12_BARRIER_ACCESS AccessState;
-	D3D12_BARRIER_SYNC SyncState;
+	D3D12_BARRIER_ACCESS CurrentAccessState;
+	D3D12_BARRIER_SYNC CurrentSyncState;
+	D3D12_BARRIER_LAYOUT CurrentBarrierLayout;
 
 	virtual ResourceSharedHandle* GetSharedHandle() const override final { return nullptr; }
 	virtual bool CopyFrom(IDepthTarget* DepthTarget) override final { return false; }
@@ -167,8 +171,9 @@ public:
 
 	D3D12_RESOURCE_STATES CurrentState;
 	// Enhanced Barrier States
-	D3D12_BARRIER_ACCESS AccessState;
-	D3D12_BARRIER_SYNC SyncState;
+	D3D12_BARRIER_ACCESS CurrentAccessState;
+	D3D12_BARRIER_SYNC CurrentSyncState;
+	D3D12_BARRIER_LAYOUT CurrentBarrierLayout;
 
 	virtual ResourceSharedHandle* GetSharedHandle() const override final { return nullptr; }
 	virtual bool CopyFrom(IUnorderedAccessTarget* UnorderedAccessTarget) override final { return false; }

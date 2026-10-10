@@ -177,9 +177,7 @@ void D3D12Fence::CpuWait()
 	CpuWaitForFence(LastSignaled.load(std::memory_order_acquire));
 }
 
-void D3D12Fence::GpuWaitForFence(
-	ID3D12CommandQueue* queue,
-	std::uint64_t fenceValue)
+void D3D12Fence::GpuWaitForFence(ID3D12CommandQueue* queue,	std::uint64_t fenceValue)
 {
 	if (!queue)
 		throw std::invalid_argument("Cannot wait on a null command queue.");

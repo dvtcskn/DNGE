@@ -29,6 +29,7 @@
 #include "D3D12Pipeline.h"
 #include "D3D12Viewport.h"
 #include "D3D12FrameBuffer.h"
+#include "AbstractGI/ShaderManager.h"
 //#include "GI/Shared/Shader.h"
 
 D3D12Pipeline::D3D12Pipeline(D3D12Device* InOwner, const std::string& InName, const sPipelineDesc& InDesc)
@@ -262,7 +263,8 @@ void D3D12Pipeline::CompilePipeline()
     PSODesc.InputLayout.NumElements = (UINT)VertexAttribute->GetSize();
     PSODesc.InputLayout.pInputElementDescs = InputLayout.data();
 
-    PSODesc.NodeMask = 0; auto BlendState = D3D12BlendState(Desc.BlendAttribute);
+    PSODesc.NodeMask = 0; 
+    auto BlendState = D3D12BlendState(Desc.BlendAttribute);
     PSODesc.BlendState = BlendState.Get();
     auto RasterState = D3D12Rasterizer(Desc.RasterizerAttribute/*, !Owner->IsSoftwareDevice() && PrimitiveTopologyType == D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST*/);
     PSODesc.RasterizerState = RasterState.Get();
@@ -298,6 +300,9 @@ bool D3D12Pipeline::Recompile()
 
     for (auto& Attachment : ShaderAttachments)
     {
+        if (sShaderManager::Get().IsShaderExist(Attachment.GetLocation(), Attachment.FunctionName))
+            sShaderManager::Get().DestroyShader(Attachment.GetLocation(), Attachment.FunctionName);
+
         auto pShader = Owner->CompileD3D12Shader(Attachment);
         //Blobs.push_back(Shader.GetBlob());
 

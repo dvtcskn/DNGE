@@ -152,26 +152,29 @@ std::vector<FBO_Depth*> GetSupportedDepths(ID3D11Device* Device, const sFBODesc&
 	return Depths;
 };*/
 
-D3D11RenderTarget::D3D11RenderTarget(D3D11Device* InDevice, const std::string InName, const EFormat InFormat, const sFBODesc& Desc, bool InIsSRVAllowed, bool InIsUnorderedAccessAllowed)
+D3D11RenderTarget::D3D11RenderTarget(D3D11Device* InDevice, const std::string InName, const sFrameBuffer& InDesc, const sFBODesc& FBODesc)
 	: Super()
 	, Name(InName)
-	, Format(InFormat)
+	, Desc(InDesc)
 	, Texture(nullptr)
 	, RenderTarget(nullptr)
 	, ShaderResource(nullptr)
 	, UnorderedAccessView(nullptr)
 {
-	const DXGI_FORMAT DXGIFormat = (ConvertFormat_Format_To_DXGI(Format));
+	const DXGI_FORMAT DXGIFormat = (ConvertFormat_Format_To_DXGI(InDesc.Format));
+
+	bool InIsSRVAllowed = InDesc.AttachmentType == EFrameBufferAttachmentType::RT_SRV || InDesc.AttachmentType == EFrameBufferAttachmentType::RT_SRV_UAV;
+	bool InIsUnorderedAccessAllowed = InDesc.AttachmentType == EFrameBufferAttachmentType::RT_UAV || InDesc.AttachmentType == EFrameBufferAttachmentType::RT_SRV_UAV;
 
 	D3D11_TEXTURE2D_DESC sTextureDesc;
 	ZeroMemory(&sTextureDesc, sizeof(sTextureDesc));
-	sTextureDesc.Width = Desc.Dimensions.X;
-	sTextureDesc.Height = Desc.Dimensions.Y;
+	sTextureDesc.Width = FBODesc.Dimensions.X;
+	sTextureDesc.Height = FBODesc.Dimensions.Y;
 	sTextureDesc.MipLevels = 1;
 	sTextureDesc.ArraySize = 1;
 	sTextureDesc.Format = DXGIFormat;
-	sTextureDesc.SampleDesc.Count = Desc.MSLevel.Count;
-	sTextureDesc.SampleDesc.Quality = Desc.MSLevel.Quality;
+	sTextureDesc.SampleDesc.Count = FBODesc.MSLevel.Count;
+	sTextureDesc.SampleDesc.Quality = FBODesc.MSLevel.Quality;
 	sTextureDesc.Usage = D3D11_USAGE::D3D11_USAGE_DEFAULT;
 	sTextureDesc.BindFlags = D3D11_BIND_RENDER_TARGET;
 	if (InIsSRVAllowed)
@@ -363,19 +366,19 @@ D3D11FrameBuffer::D3D11FrameBuffer(D3D11Device* InDevice, const std::string InNa
 		}
 		else if (FB.AttachmentType == EFrameBufferAttachmentType::RT)
 		{
-			RenderTargets.push_back(D3D11RenderTarget::Create(InDevice, Name + "_RenderTarget_" + std::to_string(RenderTargets.size()), FB.Format, FDesc, false, false));
+			RenderTargets.push_back(D3D11RenderTarget::Create(InDevice, Name + "_RenderTarget_" + std::to_string(RenderTargets.size()), sFrameBuffer(FB.Format, FB.AttachmentType), FDesc));
 		}
 		else if (FB.AttachmentType == EFrameBufferAttachmentType::RT_SRV)
 		{
-			RenderTargets.push_back(D3D11RenderTarget::Create(InDevice, Name + "_RenderTarget_" + std::to_string(RenderTargets.size()), FB.Format, FDesc, true, false));
+			RenderTargets.push_back(D3D11RenderTarget::Create(InDevice, Name + "_RenderTarget_" + std::to_string(RenderTargets.size()), sFrameBuffer(FB.Format, FB.AttachmentType), FDesc));
 		}
 		else if (FB.AttachmentType == EFrameBufferAttachmentType::RT_UAV)
 		{
-			RenderTargets.push_back(D3D11RenderTarget::Create(InDevice, Name + "_RenderTarget_" + std::to_string(RenderTargets.size()), FB.Format, FDesc, false, true));
+			RenderTargets.push_back(D3D11RenderTarget::Create(InDevice, Name + "_RenderTarget_" + std::to_string(RenderTargets.size()), sFrameBuffer(FB.Format, FB.AttachmentType), FDesc));
 		}
 		else if (FB.AttachmentType == EFrameBufferAttachmentType::RT_SRV_UAV)
 		{
-			RenderTargets.push_back(D3D11RenderTarget::Create(InDevice, Name + "_RenderTarget_" + std::to_string(RenderTargets.size()), FB.Format, FDesc, true, true));
+			RenderTargets.push_back(D3D11RenderTarget::Create(InDevice, Name + "_RenderTarget_" + std::to_string(RenderTargets.size()), sFrameBuffer(FB.Format, FB.AttachmentType), FDesc));
 		}
 		else if (FB.AttachmentType == EFrameBufferAttachmentType::Depth)
 		{
@@ -429,7 +432,7 @@ void D3D11FrameBuffer::AttachRenderTarget(const IRenderTarget::SharedPtr& Render
 			RenderTargets.push_back(RT);
 
 		if (Index.has_value())
-			AttachmentInfo.FrameBuffer.insert(AttachmentInfo.FrameBuffer.begin() + Index.value(), sFrameBufferAttachmentInfo::sFrameBuffer(RT->GetFormat(), AttachmentType));
+			AttachmentInfo.FrameBuffer.insert(AttachmentInfo.FrameBuffer.begin() + Index.value(), sFrameBuffer(RT->GetFormat(), AttachmentType));
 		else
 			AttachmentInfo.AddFrameBuffer(RT->GetFormat(), AttachmentType);
 	}
@@ -455,7 +458,7 @@ void D3D11FrameBuffer::AttachUnorderedAccessTarget(const IUnorderedAccessTarget:
 			UAVs.push_back(ST);
 
 		if (Index.has_value())
-			AttachmentInfo.FrameBuffer.insert(AttachmentInfo.FrameBuffer.begin() + Index.value(), sFrameBufferAttachmentInfo::sFrameBuffer(ST->GetFormat(), AttachmentType));
+			AttachmentInfo.FrameBuffer.insert(AttachmentInfo.FrameBuffer.begin() + Index.value(), sFrameBuffer(ST->GetFormat(), AttachmentType));
 		else
 			AttachmentInfo.AddFrameBuffer(ST->GetFormat(), AttachmentType);
 	}

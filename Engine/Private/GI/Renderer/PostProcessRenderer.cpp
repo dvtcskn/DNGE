@@ -59,7 +59,7 @@ void sPostProcessRenderer::Render(sPostProcess* PostProcess, IRenderTarget* Back
 			PostProcess->Compile(BackBuffer);
 	}
 
-	GraphicsCommandContext->BeginRecordCommandList(ERenderPass::PostProcess);
+	GraphicsCommandContext->BeginRecordCommandList(ECommandContextBeginState::Render);
 
 	GraphicsCommandContext->SetPipeline(PostProcess->GetPipeline());
 
@@ -83,7 +83,7 @@ void sPostProcessRenderer::Render(sPostProcess* PostProcess, IRenderTarget* Back
 	GraphicsCommandContext->DrawInstanced(3, 1, 0, 0);
 
 	GraphicsCommandContext->FinishRecordCommandList();
-	GraphicsCommandContext->ExecuteCommandList(ECommandContextExecuteType::Deferred, 3);
+	GraphicsCommandContext->ExecuteCommandList(ECommandContextExecuteType::Deferred, 30);
 }
 
 void sPostProcessRenderer::CopyToFrameBuffer(sPostProcess* PostProcess, IRenderTarget* FrameBuffer)
@@ -107,7 +107,9 @@ void sPostProcessRenderer::Render(IGraphicsCommandContext* CMD, sPostProcess* Po
 			PostProcess->Compile(BackBuffer);
 	}
 
-	CMD->BeginRecordCommandList(ERenderPass::PostProcess);
+	CMD->BeginRecordCommandList(ECommandContextBeginState::Render);
+
+	CMD->SetPipeline(PostProcess->GetPipeline());
 
 	if (PostProcess->HasFrameBuffer())
 		CMD->ClearRenderTarget(PostProcess->GetFrameBuffer());
@@ -124,13 +126,11 @@ void sPostProcessRenderer::Render(IGraphicsCommandContext* CMD, sPostProcess* Po
 
 	CMD->SetScissorRect(0, 0, (std::uint32_t)ScreenDimension.Height, (std::uint32_t)ScreenDimension.Width);
 
-	CMD->SetPipeline(PostProcess->GetPipeline());
 	PostProcess->SetPostProcessResources(CMD, PostProcess->HasFrameBuffer() ? BackBuffer : nullptr);
 
 	CMD->DrawInstanced(3, 1, 0, 0);
 
-	CMD->FinishRecordCommandList();
-	CMD->ExecuteCommandList();
+	//CMD->FinishRecordCommandList();
 }
 
 void sPostProcessRenderer::CopyToFrameBuffer(IGraphicsCommandContext* CMD, sPostProcess* PostProcess, IRenderTarget* FrameBuffer)

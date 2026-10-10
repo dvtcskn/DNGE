@@ -50,9 +50,12 @@
 
 #if Pix3_Enabled && _DEBUG
 #include <pix3.h>
+#pragma comment(lib, "WinPixEventRuntime.lib")
 #endif
 
-//#pragma comment(lib, "WinPixEventRuntime.lib")
+#if AGS_Enable
+#pragma comment(lib, "amd_ags_x64.lib")
+#endif
 
 #define DEBUG_D3DDEVICE 1
 
@@ -228,6 +231,7 @@ D3D12Device::D3D12Device(const GPUCreateInfo& DeviceCreateInfo, std::uint32_t In
 	, VendorId(0)
 	, DeviceIndex(InDeviceIndex)
 	, bIsEnhancedBarriersSupported(false)
+	, FeatureLevel(D3D_FEATURE_LEVEL_1_0_GENERIC)
 {
 	HRESULT HR = E_FAIL;
 	bool useDebugLayers = false;
@@ -260,57 +264,137 @@ D3D12Device::D3D12Device(const GPUCreateInfo& DeviceCreateInfo, std::uint32_t In
 	}
 #endif
 
-	Microsoft::WRL::ComPtr<ID3D12Device> pDevice;
 	CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(DxgiFactory.GetAddressOf()));
 
-	//D3D12EnableExperimentalFeatures();
-
-	ComPtr<IDXGIAdapter1> adapter = GetAdapter(DeviceType == EGPUDeviceType::Software ? -1 : GPUIndex);
+	Adapter = FindAndGetAdapter(DeviceType == EGPUDeviceType::Software ? -1 : GPUIndex);
 
 	DXGI_ADAPTER_DESC1 AdapterDesc;
-	adapter->GetDesc1(&AdapterDesc);
+	Adapter->GetDesc1(&AdapterDesc);
 
-	D3D_FEATURE_LEVEL featureLevels[] =
+#if AGS_Enable
+	if (AdapterDesc.VendorId == 0x1002)
 	{
-		D3D_FEATURE_LEVEL_12_2,
-		D3D_FEATURE_LEVEL_12_1,
-		D3D_FEATURE_LEVEL_12_0,
-		D3D_FEATURE_LEVEL_11_1,
-		D3D_FEATURE_LEVEL_11_0,
-		D3D_FEATURE_LEVEL_10_1,
-		D3D_FEATURE_LEVEL_10_0,
-		D3D_FEATURE_LEVEL_9_3,
-		D3D_FEATURE_LEVEL_9_2,
-		D3D_FEATURE_LEVEL_9_1,
-		D3D_FEATURE_LEVEL_1_0_CORE,
-	};
+		Engine::WriteToConsole("AMD GPU detected");
 
-	UINT FeatureIndex = 0;
-	D3D_FEATURE_LEVEL ReqFeatureLevel = featureLevels[FeatureIndex];
-
-	HRESULT hr;
-
-	while (FeatureIndex < 5)
-	{
-		hr = D3D12CreateDevice(
-			adapter.Get(),
-			ReqFeatureLevel,
-			IID_PPV_ARGS(Direct3DDevice.ReleaseAndGetAddressOf())
-		);
-		if (hr == S_OK)
+		AGSReturnCode result = agsInitialize(AGS_CURRENT_VERSION, nullptr, &m_agsContext, &m_agsGPUInfo);
+		if (result == AGS_SUCCESS)
 		{
-			break;
+			//Engine::Print("AGS initialized successfully, version %d.%d.%d\n", AMD_AGS_VERSION_MAJOR, AMD_AGS_VERSION_MINOR, AMD_AGS_VERSION_PATCH);
+			Engine::WriteToConsole("AGS initialized successfully, version : " + std::to_string(AMD_AGS_VERSION_MAJOR) + "." + std::to_string(AMD_AGS_VERSION_MINOR) + "." + std::to_string(AMD_AGS_VERSION_PATCH));
+
+			AGSDX12DeviceCreationParams creationParams = {};
+			creationParams.pAdapter = Adapter.Get();
+			creationParams.iid = __uuidof(Direct3DDevice);
+			creationParams.FeatureLevel = D3D_FEATURE_LEVEL_12_1;
+
+			AGSDX12ExtensionParams extensionParams = {};
+			AGSDX12ReturnedParams returnedParams = {};
+
+			// Example use of the AGS app registration API
+			extensionParams.pAppName = L"DNGE DX12";
+			extensionParams.appVersion = AGS_MAKE_VERSION(1, 0, 0);
+			extensionParams.pEngineName = L"DNGE";
+			extensionParams.engineVersion = AGS_MAKE_VERSION(1, 0, 0);
+
+			// Create AGS Device
+			//
+			AGSReturnCode rc = agsDriverExtensionsDX12_CreateDevice(m_agsContext, &creationParams, &extensionParams, &returnedParams);
+			if (rc == AGS_SUCCESS)
+			{
+				Direct3DDevice = returnedParams.pDevice;
+				FeatureLevel = D3D_FEATURE_LEVEL_12_1;
+				m_agsDeviceExtensions = returnedParams.extensionsSupported;
+
+				Engine::WriteToConsole("AGS created the extended D3D12 device");
+				if (m_agsDeviceExtensions.intrinsics16 && m_agsDeviceExtensions.intrinsics17 && m_agsDeviceExtensions.intrinsics19 && m_agsDeviceExtensions.readLaneAt)
+				{
+					Engine::WriteToConsole("\tShader intrinsics available");
+				}
+				if (m_agsDeviceExtensions.rayHitToken)
+				{
+					Engine::WriteToConsole("\tRay hit token available");
+				}
+				if (m_agsDeviceExtensions.shaderClock)
+				{
+					Engine::WriteToConsole("\tShader clock intrinsics available");
+				}
+
+				// {d5a2a91b-7003-4f12-89de-209beb51fb94}
+				static const GUID IID_AGSContextData = { 0xd5a2a91b, 0x7003, 0x4f12, {0x89, 0xde, 0x20, 0x9b, 0xeb, 0x51, 0xfb, 0x94} };
+
+				AGSContext* retrievedContext = nullptr;
+				UINT contextPointerSize = sizeof(retrievedContext);
+				if (Direct3DDevice->GetPrivateData(IID_AGSContextData, &contextPointerSize, &retrievedContext) == S_OK)
+				{
+					if (contextPointerSize == sizeof(m_agsContext) && m_agsContext == retrievedContext)
+					{
+						Engine::WriteToConsole("Retrieved the correct AGS context from the D3D device");
+					}
+				}
+			}
+			else
+			{
+				Engine::WriteToConsole("AGS failed to create the D3D12 device");
+			}
 		}
 		else
 		{
-			FeatureIndex++;
-			ReqFeatureLevel = featureLevels[FeatureIndex];
+			Engine::WriteToConsole("AGS failed to initialize");
 		}
 	}
-	ThrowIfFailed(hr);
+	else
+	{
+		Engine::WriteToConsole("non AMD GPU detected - AGS will not initialize");
+	}
+#endif
 
-	VendorId = AdapterDesc.VendorId;
-	FeatureLevel = ReqFeatureLevel;
+	//D3D12EnableExperimentalFeatures();
+
+	if (!Direct3DDevice)
+	{
+		D3D_FEATURE_LEVEL featureLevels[] =
+		{
+			D3D_FEATURE_LEVEL_12_2,
+			D3D_FEATURE_LEVEL_12_1,
+			D3D_FEATURE_LEVEL_12_0,
+			D3D_FEATURE_LEVEL_11_1,
+			D3D_FEATURE_LEVEL_11_0,
+			D3D_FEATURE_LEVEL_10_1,
+			D3D_FEATURE_LEVEL_10_0,
+			D3D_FEATURE_LEVEL_9_3,
+			D3D_FEATURE_LEVEL_9_2,
+			D3D_FEATURE_LEVEL_9_1,
+			D3D_FEATURE_LEVEL_1_0_CORE,
+		};
+
+		UINT FeatureIndex = 0;
+		D3D_FEATURE_LEVEL ReqFeatureLevel = featureLevels[FeatureIndex];
+
+		HRESULT hr;
+
+		while (FeatureIndex < 5)
+		{
+			hr = D3D12CreateDevice(
+				Adapter.Get(),
+				ReqFeatureLevel,
+				IID_PPV_ARGS(Direct3DDevice.ReleaseAndGetAddressOf())
+			);
+			if (hr == S_OK)
+			{
+				break;
+			}
+			else
+			{
+				FeatureIndex++;
+				ReqFeatureLevel = featureLevels[FeatureIndex];
+			}
+		}
+		ThrowIfFailed(hr);
+
+		VendorId = AdapterDesc.VendorId;
+		FeatureLevel = ReqFeatureLevel;
+	}
+
 #if _DEBUG
 	Direct3DDevice->SetName(AdapterDesc.Description);
 #endif
@@ -494,12 +578,12 @@ D3D12Device::D3D12Device(const GPUCreateInfo& DeviceCreateInfo, std::uint32_t In
 		std::cout << "DedicatedSystemMemory : " << AdapterDesc.DedicatedSystemMemory << std::endl;
 		std::cout << "SharedSystemMemory : " << AdapterDesc.SharedSystemMemory << std::endl;
 
-		std::string FeatureLevelSTR = ReqFeatureLevel == D3D_FEATURE_LEVEL::D3D_FEATURE_LEVEL_12_2 ? "D3D_FEATURE_LEVEL_12_2" : ReqFeatureLevel == D3D_FEATURE_LEVEL::D3D_FEATURE_LEVEL_12_1 ? "D3D_FEATURE_LEVEL_12_1"
-			: ReqFeatureLevel == D3D_FEATURE_LEVEL::D3D_FEATURE_LEVEL_12_0 ? "D3D_FEATURE_LEVEL_12_0" : ReqFeatureLevel == D3D_FEATURE_LEVEL::D3D_FEATURE_LEVEL_11_1 ? "D3D_FEATURE_LEVEL_11_1"
-			: ReqFeatureLevel == D3D_FEATURE_LEVEL::D3D_FEATURE_LEVEL_11_0 ? "D3D_FEATURE_LEVEL_11_0" : ReqFeatureLevel == D3D_FEATURE_LEVEL::D3D_FEATURE_LEVEL_10_1 ? "D3D_FEATURE_LEVEL_10_1"
-			: ReqFeatureLevel == D3D_FEATURE_LEVEL::D3D_FEATURE_LEVEL_10_0 ? "D3D_FEATURE_LEVEL_10_0" : ReqFeatureLevel == D3D_FEATURE_LEVEL::D3D_FEATURE_LEVEL_9_3 ? "D3D_FEATURE_LEVEL_9_3"
-			: ReqFeatureLevel == D3D_FEATURE_LEVEL::D3D_FEATURE_LEVEL_9_2 ? "D3D_FEATURE_LEVEL_9_2" : ReqFeatureLevel == D3D_FEATURE_LEVEL::D3D_FEATURE_LEVEL_9_1 ? "D3D_FEATURE_LEVEL_9_1"
-			: ReqFeatureLevel == D3D_FEATURE_LEVEL::D3D_FEATURE_LEVEL_1_0_CORE ? "D3D_FEATURE_LEVEL_1_0_CORE" : "D3D_FEATURE_LEVEL_Unknown";
+		std::string FeatureLevelSTR = FeatureLevel == D3D_FEATURE_LEVEL::D3D_FEATURE_LEVEL_12_2 ? "D3D_FEATURE_LEVEL_12_2" : FeatureLevel == D3D_FEATURE_LEVEL::D3D_FEATURE_LEVEL_12_1 ? "D3D_FEATURE_LEVEL_12_1"
+			: FeatureLevel == D3D_FEATURE_LEVEL::D3D_FEATURE_LEVEL_12_0 ? "D3D_FEATURE_LEVEL_12_0" : FeatureLevel == D3D_FEATURE_LEVEL::D3D_FEATURE_LEVEL_11_1 ? "D3D_FEATURE_LEVEL_11_1"
+			: FeatureLevel == D3D_FEATURE_LEVEL::D3D_FEATURE_LEVEL_11_0 ? "D3D_FEATURE_LEVEL_11_0" : FeatureLevel == D3D_FEATURE_LEVEL::D3D_FEATURE_LEVEL_10_1 ? "D3D_FEATURE_LEVEL_10_1"
+			: FeatureLevel == D3D_FEATURE_LEVEL::D3D_FEATURE_LEVEL_10_0 ? "D3D_FEATURE_LEVEL_10_0" : FeatureLevel == D3D_FEATURE_LEVEL::D3D_FEATURE_LEVEL_9_3 ? "D3D_FEATURE_LEVEL_9_3"
+			: FeatureLevel == D3D_FEATURE_LEVEL::D3D_FEATURE_LEVEL_9_2 ? "D3D_FEATURE_LEVEL_9_2" : FeatureLevel == D3D_FEATURE_LEVEL::D3D_FEATURE_LEVEL_9_1 ? "D3D_FEATURE_LEVEL_9_1"
+			: FeatureLevel == D3D_FEATURE_LEVEL::D3D_FEATURE_LEVEL_1_0_CORE ? "D3D_FEATURE_LEVEL_1_0_CORE" : FeatureLevel == D3D_FEATURE_LEVEL::D3D_FEATURE_LEVEL_1_0_GENERIC ? "D3D_FEATURE_LEVEL_1_0_GENERIC" : " D3D_Feature_level_unknown";
 		std::cout << FeatureLevelSTR << std::endl;
 	};
 
@@ -548,6 +632,15 @@ D3D12Device::~D3D12Device()
 		GPUSignal();
 		CpuWait(D3D12_COMMAND_LIST_TYPE_DIRECT);
 	}
+
+#if AGS_Enable
+	if (m_agsContext)
+	{
+		agsDriverExtensionsDX12_DestroyDevice(m_agsContext, Direct3DDevice.Get(), nullptr);
+		agsDeInitialize(m_agsContext);
+	}
+#endif
+
 	for (auto& RootSignature : RootSignatureCache)
 	{
 		RootSignature.second = nullptr;
@@ -570,8 +663,6 @@ D3D12Device::~D3D12Device()
 	ShaderCompiler = nullptr;
 	//pD3D12ShaderCompiler = nullptr;
 
-	Viewport = nullptr;
-
 	DescriptorHeapManager = nullptr;
 	DxgiFactory = nullptr;
 	IMCommandList = nullptr;
@@ -590,6 +681,8 @@ D3D12Device::~D3D12Device()
 	//}
 	//DeferredCommandLists.clear();
 
+	Viewport = nullptr;
+
 	GraphicsQueue = nullptr;
 	ComputeQueue = nullptr;
 	CopyQueue = nullptr;
@@ -604,6 +697,7 @@ D3D12Device::~D3D12Device()
 	if (debugDev)
 		debugDev->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_ALL);
 #endif
+	Adapter = nullptr;
 	Direct3DDevice14 = nullptr;
 
 	//Direct3DDevice->Release();
@@ -623,6 +717,12 @@ void D3D12Device::BeginFrame()
 {
 	if (IsPrimaryGPU())
 		Viewport->BeginFrame();
+}
+
+void D3D12Device::RecreateSwapChain()
+{
+	if (Viewport)
+		Viewport->RecreateSwapChain();
 }
 
 void D3D12Device::Present(IRenderTarget* pRT)
@@ -683,7 +783,14 @@ void D3D12Device::Present(IRenderTarget* pRT)
 			const auto fenceValue = GPUSignal(DeferredCommandList.first);
 
 			for (const auto& submission : PendingList)
+			{
 				DiscardCommandAllocator(submission.Type, submission.Allocator, fenceValue);
+				if (submission.CommandBuffer)
+				{
+					if (submission.Type == D3D12_COMMAND_LIST_TYPE_DIRECT)
+						static_cast<D3D12CommandBuffer*>(submission.CommandBuffer)->OnExecuteCommandList();
+				}
+			}
 
 			PendingList.clear();
 		}
@@ -704,6 +811,11 @@ void D3D12Device::Present(IRenderTarget* pRT)
 	// If we are doing GPU Validation, flush every frame
 	if (useGPUBasedValidation)
 		GPUFlush();
+}
+
+void* D3D12Device::GetInternalSwapChain()
+{
+	return (void*)Viewport->GetSwapChain().Get();
 }
 
 void D3D12Device::ResizeWindow(std::size_t Width, std::size_t Height)
@@ -731,6 +843,13 @@ void D3D12Device::VsyncInterval(const std::uint32_t value)
 		Viewport->VsyncInterval(value);
 }
 
+DisplayMode D3D12Device::GetDisplayMode() const
+{
+	if (IsPrimaryGPU())
+		return Viewport->GetDisplayMode();
+	return DisplayMode();
+}
+
 bool D3D12Device::IsFullScreen() const
 {
 	if (IsPrimaryGPU())
@@ -752,37 +871,11 @@ std::uint32_t D3D12Device::GetVsyncInterval() const
 	return -1;
 }
 
-void D3D12Device::GPUFlush()
-{
-	GPUFlush(D3D12_COMMAND_LIST_TYPE_DIRECT);
-	GPUFlush(D3D12_COMMAND_LIST_TYPE_COMPUTE);
-	GPUFlush(D3D12_COMMAND_LIST_TYPE_COPY);
-}
-
-void D3D12Device::WaitForGPU()
-{
-	GPUSignal(D3D12_COMMAND_LIST_TYPE_DIRECT);
-	CpuWait(D3D12_COMMAND_LIST_TYPE_DIRECT);
-
-	GPUSignal(D3D12_COMMAND_LIST_TYPE_COMPUTE);
-	CpuWait(D3D12_COMMAND_LIST_TYPE_COMPUTE);
-
-	GPUSignal(D3D12_COMMAND_LIST_TYPE_COPY);
-	CpuWait(D3D12_COMMAND_LIST_TYPE_COPY);
-}
-
-void D3D12Device::WaitForCPU()
-{
-	CpuWait(D3D12_COMMAND_LIST_TYPE_DIRECT);
-	CpuWait(D3D12_COMMAND_LIST_TYPE_COMPUTE);
-	CpuWait(D3D12_COMMAND_LIST_TYPE_COPY);
-}
-
-std::vector<sDisplayMode> D3D12Device::GetAllSupportedResolutions() const
+std::vector<sDisplayDesc> D3D12Device::GetAllSupportedResolutions() const
 {
 	if (IsPrimaryGPU())
 		return Viewport->GetAllSupportedResolutions();
-	return std::vector<sDisplayMode>();
+	return std::vector<sDisplayDesc>();
 }
 
 sScreenDimension D3D12Device::GetBackBufferDimension() const
@@ -904,6 +997,42 @@ IShader::SharedPtr D3D12Device::CompileShader(const void* InCode, std::size_t Si
 	return pShader;
 }
 
+void D3D12Device::GPUFlush()
+{
+	GPUFlush(D3D12_COMMAND_LIST_TYPE_DIRECT);
+	GPUFlush(D3D12_COMMAND_LIST_TYPE_COMPUTE);
+	GPUFlush(D3D12_COMMAND_LIST_TYPE_COPY);
+}
+
+void D3D12Device::WaitForGPU()
+{
+	GPUSignal(D3D12_COMMAND_LIST_TYPE_DIRECT);
+	CpuWait(D3D12_COMMAND_LIST_TYPE_DIRECT);
+
+	GPUSignal(D3D12_COMMAND_LIST_TYPE_COMPUTE);
+	CpuWait(D3D12_COMMAND_LIST_TYPE_COMPUTE);
+
+	GPUSignal(D3D12_COMMAND_LIST_TYPE_COPY);
+	CpuWait(D3D12_COMMAND_LIST_TYPE_COPY);
+}
+
+void D3D12Device::WaitForCPU()
+{
+	CpuWait(D3D12_COMMAND_LIST_TYPE_DIRECT);
+	CpuWait(D3D12_COMMAND_LIST_TYPE_COMPUTE);
+	CpuWait(D3D12_COMMAND_LIST_TYPE_COPY);
+}
+
+void D3D12Device::WaitForCPUFence(std::uint64_t Value)
+{
+	Fences.at(D3D12_COMMAND_LIST_TYPE_DIRECT)->CpuWaitForFence(Value);
+}
+
+std::uint64_t D3D12Device::GPUFenceSignal()
+{
+	return Fences.at(D3D12_COMMAND_LIST_TYPE_DIRECT)->Signal(GraphicsQueue.Get());
+}
+
 bool D3D12Device::IsCommandBufferPendingForExecute(ICommandContext* CommandContext) const
 {
 	if (!CommandContext)
@@ -1004,7 +1133,7 @@ std::uint64_t D3D12Device::ExecuteDirectCommandLists(ECommandContextExecuteType 
 		const auto fenceValue = GPUSignal(D3D12_COMMAND_LIST_TYPE_DIRECT);
 
 		if (WaitForCompletion)
-			CpuWaitForFence(D3D12_COMMAND_LIST_TYPE_DIRECT, fenceValue);
+			WaitForFence(D3D12_COMMAND_LIST_TYPE_DIRECT, fenceValue);
 
 #if Pix3_Enabled && _DEBUG
 		PIXEndEvent(GraphicsQueue.Get());
@@ -1047,7 +1176,7 @@ std::uint64_t D3D12Device::ExecuteComputeCommandLists(ECommandContextExecuteType
 		const auto fenceValue = GPUSignal(D3D12_COMMAND_LIST_TYPE_COMPUTE);
 
 		if (WaitForCompletion)
-			CpuWaitForFence(D3D12_COMMAND_LIST_TYPE_COMPUTE, fenceValue);
+			WaitForFence(D3D12_COMMAND_LIST_TYPE_COMPUTE, fenceValue);
 
 #if Pix3_Enabled && _DEBUG
 		PIXEndEvent(ComputeQueue.Get());
@@ -1088,7 +1217,7 @@ std::uint64_t D3D12Device::ExecuteCopyCommandLists(ECommandContextExecuteType Ex
 		const auto fenceValue = GPUSignal(D3D12_COMMAND_LIST_TYPE_COPY);
 
 		if (WaitForCompletion)
-			CpuWaitForFence(D3D12_COMMAND_LIST_TYPE_COPY, fenceValue);
+			WaitForFence(D3D12_COMMAND_LIST_TYPE_COPY, fenceValue);
 
 #if Pix3_Enabled && _DEBUG
 		PIXEndEvent(CopyQueue.Get());
@@ -1142,7 +1271,7 @@ std::uint64_t D3D12Device::GPUSignal(D3D12_COMMAND_LIST_TYPE Type)
 	return std::uint64_t(-1);
 }
 
-void D3D12Device::CpuWaitForFence(D3D12_COMMAND_LIST_TYPE Type, std::uint64_t FenceValue)
+void D3D12Device::WaitForFence(D3D12_COMMAND_LIST_TYPE Type, std::uint64_t FenceValue)
 {
 	Fences.at(Type == D3D12_COMMAND_LIST_TYPE_BUNDLE ? D3D12_COMMAND_LIST_TYPE_DIRECT : Type)->CpuWaitForFence(FenceValue);
 }
@@ -1275,7 +1404,7 @@ IDXGIAdapter* D3D12Device::FindAdapter(const WCHAR* InTargetName) const
 	return targetAdapter;
 }
 
-IDXGIAdapter1* D3D12Device::GetAdapter(std::optional<short> Index) const
+IDXGIAdapter1* D3D12Device::FindAndGetAdapter(std::optional<short> Index) const
 {
 	IDXGIAdapter1* pAdapter;
 	std::vector<IDXGIAdapter1*> vAdapters;
@@ -1467,14 +1596,14 @@ ISamplerState::UniquePtr D3D12Device::CreateUniqueSamplerState(const std::string
 	return D3D12SamplerState::CreateUnique(this, InName, InDesc);
 }
 
-IRenderTarget::SharedPtr D3D12Device::CreateRenderTarget(const std::string InName, const EFormat Format, const sFBODesc& Desc)
+IRenderTarget::SharedPtr D3D12Device::CreateRenderTarget(const std::string InName, const sFrameBuffer& InDesc, const sFBODesc& FBODesc)
 {
-	return D3D12RenderTarget::Create(this, InName, Format, Desc);
+	return D3D12RenderTarget::Create(this, InName, InDesc, FBODesc);
 }
 
-IRenderTarget::UniquePtr D3D12Device::CreateUniqueRenderTarget(const std::string InName, const EFormat Format, const sFBODesc& Desc)
+IRenderTarget::UniquePtr D3D12Device::CreateUniqueRenderTarget(const std::string InName, const sFrameBuffer& InDesc, const sFBODesc& FBODesc)
 {
-	return D3D12RenderTarget::CreateUnique(this, InName, Format, Desc);
+	return D3D12RenderTarget::CreateUnique(this, InName, InDesc, FBODesc);
 }
 
 IDepthTarget::SharedPtr D3D12Device::CreateDepthTarget(const std::string InName, const EFormat Format, const sFBODesc& Desc)

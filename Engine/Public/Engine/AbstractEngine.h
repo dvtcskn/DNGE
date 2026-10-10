@@ -31,6 +31,8 @@
 #include <vector>
 #include <string>
 #include <optional>
+#include <stdarg.h>
+#include <map>
 #include <mutex>
 #include "Core/Math/CoreMath.h"
 #include "Engine/ClassBody.h"
@@ -72,6 +74,15 @@ enum class EGITypes
 	//eOpenGL46,
 };
 
+enum class DisplayMode
+{
+	DISPLAYMODE_LDR,
+	DISPLAYMODE_HDR10_2084,
+	DISPLAYMODE_HDR10_SCRGB,
+	DISPLAYMODE_FSHDR_2084,
+	DISPLAYMODE_FSHDR_SCRGB
+};
+
 enum class EFormat
 {
 	UNKNOWN,
@@ -83,20 +94,20 @@ enum class EFormat
 	R16_UINT,
 	R16_UNORM,
 	R16_FLOAT,
-	//R16_Typeless,
+	R16_Typeless,
 	RGBA8_UNORM,
 	BGRA8_UNORM,
 	//BGRA8_TYPELESS,
 	BGRA8_UNORM_SRGB,
 	SRGBA8_UNORM,
-	R10G10B10A2_UNORM,
+	RGB10A2_UNORM,
 	R11G11B10_FLOAT,
 	RG16_UINT,
 	RG16_FLOAT,
 	R32_UINT,
 	R32_SINT,
 	R32_FLOAT,
-	//R32_Typeless,
+	R32_Typeless,
 	RGBA8_UINT,
 	RGBA16_FLOAT,
 	RGBA16_UINT,
@@ -126,21 +137,55 @@ enum class EFormat
 	BC3_UNORM_SRGB,*/
 };
 
+struct HDRMetadata
+{
+	float RedPrimary[2];                ///< HDR red primaries.
+	float GreenPrimary[2];              ///< HDR green primaries.
+	float BluePrimary[2];               ///< HDR blue primaries.
+	float WhitePoint[2];                ///< HDR white points.
+	float MinLuminance;                 ///< HDR minimum luminance value.
+	float MaxLuminance;                 ///< HDR maximum luminance value.
+	float MaxContentLightLevel;         ///< HDR maximum content light level.
+	float MaxFrameAverageLightLevel;    ///< HDR maximum average light level.
+};
+
 namespace
 {
+	inline EFormat GetDisplayFormat(DisplayMode displayMode)
+	{
+		switch (displayMode)
+		{
+		case DisplayMode::DISPLAYMODE_LDR:
+			return EFormat::RGBA8_UNORM;
+		case DisplayMode::DISPLAYMODE_FSHDR_2084:
+		case DisplayMode::DISPLAYMODE_HDR10_2084:
+			return EFormat::RGB10A2_UNORM;
+		case DisplayMode::DISPLAYMODE_FSHDR_SCRGB:
+		case DisplayMode::DISPLAYMODE_HDR10_SCRGB:
+			return EFormat::RGBA16_FLOAT;
+		default:
+			return EFormat::UNKNOWN;
+		}
+	}
+
 	inline void hash_combine(std::size_t& seed, std::size_t h)
 	{
 		seed ^= h + 0x9e3779b97f4a7c15ULL + (seed << 6) + (seed >> 2);
 	}
 
+	inline std::uint32_t ComputeIntersectionArea(int ax1, int ay1, int ax2, int ay2, int bx1, int by1, int bx2, int by2)
+	{
+		return (std::max)(0, (std::min)(ax2, bx2) - (std::max)(ax1, bx1)) * (std::max)(0, (std::min)(ay2, by2) - (std::max)(ay1, by1));
+	}
+
 	inline bool IsValidDepthOnlyFormat(const EFormat Format)
 	{
-		return Format == EFormat::D32_FLOAT || Format == EFormat::D16_UNORM;
+		return Format == EFormat::D32_FLOAT || Format == EFormat::D16_UNORM || Format == EFormat::R32_Typeless;
 	};
 
 	inline bool IsValidDepthStencilFormat(const EFormat Format)
 	{
-		return Format == EFormat::D24_UNORM_S8_UINT || Format == EFormat::D32_FLOAT_S8X24_UINT;
+		return Format == EFormat::D24_UNORM_S8_UINT || Format == EFormat::D32_FLOAT_S8X24_UINT || Format == EFormat::D32_FLOAT || Format == EFormat::D16_UNORM;
 	};
 
 	inline bool IsValidDepthFormat(const EFormat Format)
@@ -150,8 +195,59 @@ namespace
 
 	inline bool IsDepthSRVSupported(const EFormat Format)
 	{
-		return Format == EFormat::R16_FLOAT || Format == EFormat::R32_FLOAT /*|| Format == EFormat::R24UX8_Typeless*/;
+		return Format == EFormat::R16_FLOAT || Format == EFormat::R32_FLOAT || Format == EFormat::R32_Typeless /*|| Format == EFormat::R24UX8_Typeless*/;
 	};
+
+	inline float CalculateMipBias(float upscalerRatio)
+	{
+		return std::log2f(1.f / upscalerRatio) - 1.f + std::numeric_limits<float>::epsilon();
+	}
+
+	std::uint32_t GetFormatSize(EFormat format)
+	{
+		std::uint32_t Size = 0;
+		switch (format)
+		{
+		case EFormat::RGBA8_UINT: Size += sizeof(TVector4<std::uint8_t>); break;
+		case EFormat::RGBA16_UINT: Size += sizeof(TVector4<std::uint16_t>); break;
+		case EFormat::BGRA8_UNORM: Size += sizeof(TVector4<std::uint8_t>); break;
+		case EFormat::BGRA8_UNORM_SRGB: Size += sizeof(TVector4<std::uint8_t>); break;
+		case EFormat::R8_UINT: Size += sizeof(std::uint8_t); break;
+		case EFormat::R8_UNORM: Size += sizeof(std::uint8_t); break;
+		case EFormat::R8_SNORM: Size += sizeof(std::int8_t); break;
+		case EFormat::RG8_UINT: Size += sizeof(TVector2<std::uint8_t>); break;
+		case EFormat::RG8_UNORM: Size += sizeof(TVector2<std::uint8_t>); break;
+		case EFormat::R16_UINT: Size += sizeof(std::uint16_t); break;
+		case EFormat::R16_UNORM: Size += sizeof(std::uint16_t); break;
+		case EFormat::R16_FLOAT: Size += sizeof(float); break;
+		case EFormat::RGBA8_UNORM: Size += sizeof(TVector4<std::uint8_t>); break;
+		case EFormat::SRGBA8_UNORM: Size += sizeof(TVector4<std::uint8_t>); break;
+		case EFormat::RGB10A2_UNORM: Size += sizeof(TVector4<std::uint8_t>); break;
+		case EFormat::R11G11B10_FLOAT: Size += sizeof(TVector3<float>); break;
+		case EFormat::RG16_UINT: Size += sizeof(TVector2<std::uint16_t>); break;
+		case EFormat::RG16_FLOAT: Size += sizeof(TVector2<float>); break;
+		case EFormat::R32_UINT: Size += sizeof(std::uint32_t); break;
+		case EFormat::R32_SINT: Size += sizeof(std::int32_t); break;
+		case EFormat::R32_FLOAT: Size += sizeof(float); break;
+		case EFormat::RGBA16_FLOAT:	Size += sizeof(TVector4<float>); break;
+		case EFormat::RGBA16_UNORM:	Size += sizeof(TVector4<std::uint16_t>); break;
+		case EFormat::RGBA16_SNORM:	Size += sizeof(TVector4<std::int16_t>); break;
+		case EFormat::RG32_UINT: Size += sizeof(TVector2<std::uint32_t>); break;
+		case EFormat::RG32_SINT: Size += sizeof(TVector2<std::int32_t>); break;
+		case EFormat::RG32_FLOAT: Size += sizeof(TVector2<float>); break;
+		case EFormat::RGB32_UINT: Size += sizeof(TVector3<std::uint32_t>); break;
+		case EFormat::RGB32_SINT: Size += sizeof(TVector3<std::int32_t>); break;
+		case EFormat::RGB32_FLOAT: Size += sizeof(TVector3<float>); break;
+		case EFormat::RGBA32_UINT: Size += sizeof(TVector4<std::uint32_t>); break;
+		case EFormat::RGBA32_SINT: Size += sizeof(TVector4<std::int32_t>); break;
+		case EFormat::RGBA32_FLOAT: Size += sizeof(TVector4<float>); break;
+		case EFormat::D16_UNORM: Size += sizeof(std::uint16_t); break;
+		case EFormat::D32_FLOAT: Size += sizeof(std::uint32_t); break;
+		case EFormat::D24_UNORM_S8_UINT: Size += sizeof(std::uint32_t); break;
+		case EFormat::D32_FLOAT_S8X24_UINT: Size += sizeof(std::uint32_t); break;
+		}
+		return Size;
+	}
 }
 
 enum class eShaderType : std::uint8_t
@@ -472,6 +568,25 @@ public:
 	}
 };
 
+struct GPUCreateInfo
+{
+	struct DeviceCreateInfo
+	{
+		EGITypes Type = EGITypes::Default;
+		std::uint32_t GPUIndex = 0;
+		EGPUDeviceType DeviceType;
+	};
+	DeviceCreateInfo PrimaryGPU;
+	/*
+	* WIP
+	*/
+	DeviceCreateInfo SecondaryGPU;
+	void* pHWND = nullptr;
+	std::uint32_t Width = 0;
+	std::uint32_t Height = 0;
+	bool Fullscreen = false;
+};
+
 struct sScreenDimension
 {
 	std::size_t Width = 0;
@@ -481,6 +596,11 @@ struct sScreenDimension
 		: Width(InWidth)
 		, Height(InHeight)
 	{}
+
+	bool IsValid() const 
+	{
+		return Width != 0 && Width != std::size_t(-1) && Height != 0 && Height != std::size_t(-1); 
+	}
 
 #if _MSVC_LANG >= 202002L
 	constexpr auto operator<=>(const sScreenDimension&) const = default;
@@ -499,23 +619,57 @@ FORCEINLINE bool constexpr operator !=(const sScreenDimension& value1, const sSc
 };
 #endif
 
-struct GPUCreateInfo
+struct sRenderDimension
 {
-	struct DeviceCreateInfo
+	std::uint32_t RenderWidth = 0;
+	std::uint32_t RenderHeight = 0;
+	std::uint32_t UpscaleWidth = 0;
+	std::uint32_t UpscaleHeight = 0;
+	std::uint32_t DisplayWidth = 0;
+	std::uint32_t DisplayHeight = 0;
+	sRenderDimension() = default;
+	sRenderDimension(sScreenDimension InRenderDimension, sScreenDimension InUpscaleDimension, sScreenDimension InDisplayDimension)
+		: RenderWidth((std::uint32_t)InRenderDimension.Width)
+		, RenderHeight((std::uint32_t)InRenderDimension.Height)
+		, UpscaleWidth((std::uint32_t)InUpscaleDimension.Width)
+		, UpscaleHeight((std::uint32_t)InUpscaleDimension.Height)
+		, DisplayWidth((std::uint32_t)InDisplayDimension.Width)
+		, DisplayHeight((std::uint32_t)InDisplayDimension.Height)
+	{}
+	sRenderDimension(std::uint32_t InRenderWidth, std::uint32_t InRenderHeight, std::uint32_t InUpscaleWidth, std::uint32_t InUpscaleHeight, std::uint32_t InDisplayWidth, std::uint32_t InDisplayHeight)
+		: RenderWidth(InRenderWidth)
+		, RenderHeight(InRenderHeight)
+		, UpscaleWidth(InUpscaleWidth)
+		, UpscaleHeight(InUpscaleHeight)
+		, DisplayWidth(InDisplayWidth)
+		, DisplayHeight(InDisplayHeight)
+	{}
+
+#if _MSVC_LANG >= 202002L
+	constexpr auto operator<=>(const sRenderDimension&) const = default;
+#endif
+
+public:
+	inline float fRenderWidth() const { return static_cast<float>(RenderWidth); }
+	inline float fRenderHeight() const { return static_cast<float>(RenderHeight); }
+	inline float fDisplayWidth() const { return static_cast<float>(DisplayWidth); }
+	inline float fDisplayHeight() const { return static_cast<float>(DisplayHeight); }
+	inline float GetRenderWidthScaleRatio() const { return fRenderWidth() / fDisplayWidth(); }
+	inline float GetRenderHeightScaleRatio() const { return fRenderHeight() / fDisplayHeight(); }
+	inline float GetRenderAspectRatio() const { return fRenderWidth() / fDisplayHeight(); }
+	inline float GetDisplayWidthScaleRatio() const { return fDisplayWidth() / fRenderWidth(); }
+	inline float GetDisplayHeightScaleRatio() const { return fDisplayHeight() / fRenderHeight(); }
+	inline float GetDisplayAspectRatio() const { return fDisplayWidth() / fDisplayHeight(); }
+	inline sScreenDimension GetDisplayDimension() const { return sScreenDimension(DisplayWidth, DisplayHeight); }
+	inline sScreenDimension GetRenderDimension() const { return sScreenDimension(RenderWidth, RenderHeight);	}
+	inline sScreenDimension GetUpscaleDimension() const { return sScreenDimension(UpscaleWidth, DisplayHeight); }
+
+	bool IsValid() const
 	{
-		EGITypes Type = EGITypes::Default;
-		std::uint32_t GPUIndex = 0;
-		EGPUDeviceType DeviceType;
-	};
-	DeviceCreateInfo PrimaryGPU;
-	/*
-	* WIP
-	*/
-	DeviceCreateInfo SecondaryGPU;
-	void* pHWND = nullptr;
-	std::uint32_t Width = 0; 
-	std::uint32_t Height = 0;
-	bool Fullscreen = false;
+		return RenderWidth != 0 && RenderWidth != std::uint32_t(-1) && RenderHeight != 0 && RenderHeight != std::uint32_t(-1)
+			&& UpscaleWidth != 0 && UpscaleWidth != std::uint32_t(-1) && UpscaleHeight != 0 && UpscaleHeight != std::uint32_t(-1)
+			&& DisplayWidth != 0 && DisplayWidth != std::uint32_t(-1) && DisplayHeight != 0 && DisplayHeight != std::uint32_t(-1);
+	}
 };
 
 struct sViewport
@@ -563,7 +717,7 @@ struct sViewportInstance
 	std::vector<ICanvas*> Canvases;
 };
 
-struct sDisplayMode
+struct sDisplayDesc
 {
 	struct sRefreshRate
 	{
@@ -1073,18 +1227,18 @@ enum class EFrameBufferAttachmentType
 	UAV_SRV
 };
 
+struct sFrameBuffer
+{
+	EFormat Format;
+	EFrameBufferAttachmentType AttachmentType;
+	sFrameBuffer(const EFormat& InFormat, const EFrameBufferAttachmentType InAttachmentType = EFrameBufferAttachmentType::RT_SRV)
+		: Format(InFormat)
+		, AttachmentType(InAttachmentType)
+	{}
+};
+
 struct sFrameBufferAttachmentInfo
 {
-	struct sFrameBuffer
-	{
-		EFormat Format;
-		EFrameBufferAttachmentType AttachmentType;
-		sFrameBuffer(const EFormat& InFormat, const EFrameBufferAttachmentType InAttachmentType = EFrameBufferAttachmentType::RT_SRV)
-			: Format(InFormat)
-			, AttachmentType(InAttachmentType)
-		{}
-	};
-
 	std::vector<sFrameBuffer> FrameBuffer;
 	EFormat DepthFormat;
 	sFBODesc Desc;
@@ -1111,15 +1265,27 @@ struct sFrameBufferAttachmentInfo
 	}
 };
 
+enum class EResourceState
+{
+	Common,
+	RenderTarget,
+	Depth,
+	ShaderResource,
+	NonPixelShaderResource,
+	UAV,
+};
+
 class IUnorderedAccessTarget;
 class IRenderTarget
 {
 	sBaseClassBody(sClassDefaultProtectedConstructor, IRenderTarget)
 public:
-	static IRenderTarget::SharedPtr Create(const std::string InName, const EFormat Format, const sFBODesc& Desc, std::uint32_t GPUIndex = 0);
-	static IRenderTarget::UniquePtr CreateUnique(const std::string InName, const EFormat Format, const sFBODesc& Desc, std::uint32_t GPUIndex = 0);
+	static IRenderTarget::SharedPtr Create(const std::string InName, const sFrameBuffer& Desc, const sFBODesc& FBODesc, std::uint32_t GPUIndex = 0);
+	static IRenderTarget::UniquePtr CreateUnique(const std::string InName, const sFrameBuffer& Desc, const sFBODesc& FBODesc, std::uint32_t GPUIndex = 0);
 
 public:
+	virtual void AsResource(EResourceState ResourceState, IGraphicsCommandContext* GraphicsCommandContext) = 0;
+
 	virtual bool IsSRV_Allowed() const = 0;
 	virtual bool IsUAV_Allowed() const = 0;
 	virtual std::uint32_t GetSRVBindlessIndex() const = 0;
@@ -1142,6 +1308,8 @@ public:
 	static IDepthTarget::UniquePtr CreateUnique(const std::string InName, const EFormat Format, const sFBODesc& Desc, std::uint32_t GPUIndex = 0);
 
 public:
+	virtual void AsResource(EResourceState ResourceState, IGraphicsCommandContext* GraphicsCommandContext) = 0;
+
 	virtual bool IsSRV_Allowed() const = 0;
 	virtual bool IsUAV_Allowed() const = 0;
 
@@ -1162,6 +1330,8 @@ public:
 	static IUnorderedAccessTarget::UniquePtr CreateUnique(const std::string InName, const EFormat Format, const sFBODesc& Desc, bool InEnableSRV = true, std::uint32_t GPUIndex = 0);
 
 public:
+	//virtual void AsResource(EResourceState ResourceState, IGraphicsCommandContext* GraphicsCommandContext) = 0;
+
 	virtual bool IsSRV_Allowed() const = 0;
 	virtual std::uint32_t GetSRVBindlessIndex() const = 0;
 	virtual std::uint32_t GetUAVBindlessIndex() const = 0;
@@ -2191,12 +2361,37 @@ enum class ECommandContextExecuteType
 	Deferred,
 };
 
+enum class ECommandContextState
+{
+	Waiting,
+	Begin,
+	End,
+	WaitingForExecute,
+};
+
+enum class ECommandContextBeginResult
+{
+	Started,
+	AlreadyStarted,
+	Failed_WaitingForExecute,
+	Restarted,
+};
+
+enum class ECommandContextBeginState
+{
+	Default,
+	NonRender = Default,
+	Render,
+	ApiRender,
+};
+
 class ICommandContext
 {
 	sBaseClassBody(sClassDefaultProtectedConstructor, ICommandContext)
 public:
 	virtual void* GetInternalCommandContext() = 0;
 	virtual ECommandContextType GetCommandContextType() const = 0;
+	virtual ECommandContextState GetState() const = 0;
 };
 
 class IGraphicsCommandContext : public ICommandContext
@@ -2212,12 +2407,10 @@ public:
 		return ECommandContextType::Graphics;
 	}
 
-	virtual bool BeginRecordCommandList(const ERenderPass RenderPass = ERenderPass::NONE) = 0;
-	virtual void FinishRecordCommandList() = 0;
-	virtual void ExecuteCommandList(ECommandContextExecuteType ExecuteType = ECommandContextExecuteType::Immediate, std::uint32_t Order = std::uint32_t(-1)) = 0;
+	virtual ECommandContextBeginResult BeginRecordCommandList(const ECommandContextBeginState Begin = ECommandContextBeginState::Default) = 0;
+	virtual bool FinishRecordCommandList() = 0;
+	virtual bool ExecuteCommandList(ECommandContextExecuteType ExecuteType = ECommandContextExecuteType::Immediate, std::uint32_t Order = std::uint32_t(-1)) = 0;
 	virtual void ClearState() = 0;
-
-	virtual bool IsRecorded() const = 0;
 
 	virtual void SetViewport(const sViewport& Viewport) = 0;
 
@@ -2432,6 +2625,35 @@ FORCEINLINE constexpr sDateTime operator -(const sDateTime& value1, const sDateT
 	return sDateTime(value1.Year - value2.Year, value1.Month - value2.Month, value1.Day - value2.Day, value1.DayOfWeek - value2.DayOfWeek, value1.Hour - value2.Hour, value1.Minute - value2.Minute, value1.Second - value2.Second, value1.Millisecond - value2.Millisecond);
 };
 
+struct Version
+{
+	uint32_t major;
+	uint32_t minor;
+	uint32_t patch;
+
+	operator std::string() const
+	{
+		return std::to_string(major) + "." + std::to_string(minor) + "." + std::to_string(patch);
+	}
+
+	Version& operator=(const std::string& str)
+	{
+		return from_string(str.c_str());
+	}
+
+	Version& operator=(const char* str)
+	{
+		return from_string(str);
+	}
+
+private:
+	Version& from_string(const char* str)
+	{
+		sscanf_s(str, "%u.%u.%u", &major, &minor, &patch);
+		return *this;
+	}
+};
+
 struct sGPUInfo
 {
 	sBaseClassBody(sClassConstructor, sGPUInfo)
@@ -2518,9 +2740,9 @@ enum class EParticleType
 enum class EPhysicsEngine
 {
 	None,
-	//eBulletPhysics,
+	eBulletPhysics,
 	Box2D,
-	//PhysX,
+	PhysX,
 };
 
 enum class EPostProcessRenderOrder
@@ -2535,7 +2757,27 @@ enum class ERendererClear
 {
 	Disabled,
 	Driver,
-	//Sky,
+	Sky,
+};
+
+enum class ERendererUpscaleMode : std::uint32_t
+{
+	NativeAA = 0,           // 1.0f
+	Quality = 1,            // 1.5f
+	Balanced = 2,           // 1.7f
+	Performance = 3,        // 2.f
+	UltraPerformance = 4,   // 3.f
+	Custom = 5,             // 1.f - 3.f range
+	DynamicResolution = 6,
+};
+
+enum class ERendererUpscalerType : std::uint32_t
+{
+	None,
+	//TAA,
+	FSR,
+	//DLSS,
+	//XESS,
 };
 
 enum class ESplitScreenType
@@ -2717,10 +2959,19 @@ private:
 
 class sPostProcess;
 class sPhysicalComponent;
+class IAbstractGIDevice;
 
 namespace GPU
 {
+	EGPUDeviceType GetDeviceType();
+	IAbstractGIDevice* GetDevice();
 	void* GetInternalDevice();
+	void* GetInternalSwapChain();
+
+	void WaitForGPU();
+	void WaitForCPU();
+	void WaitForCPUFence(std::uint64_t Value);
+	std::uint64_t GPUFenceSignal();
 
 	sGPUInfo GetGPUInfo();
 	EGITypes GetGIType();
@@ -2729,6 +2980,17 @@ namespace GPU
 	EFormat GetBackBufferFormat();
 	EFormat GetDefaultDepthFormat();
 
+	void ResizeWindow(std::size_t Width, std::size_t Height);
+	void FullScreen(const bool value);
+	bool IsFullScreen();
+	void Vsync(const bool value);
+	bool IsVsyncEnabled();
+	void VsyncInterval(const std::uint32_t value);
+	std::uint32_t GetVsyncInterval();
+	std::vector<sDisplayDesc> GetAllSupportedResolutions();
+	DisplayMode GetDisplayMode();
+
+	void RecreateSwapChain();
 	std::uint32_t GetBackBufferSize();
 	std::uint32_t GetCurrentBackBufferIndex();
 
@@ -2743,6 +3005,10 @@ namespace GPU
 	IFrameBuffer* GetFrameBuffer(ERenderPass RenderPass);
 	void SetRendererClearMode(ERendererClear Mode);
 	ERendererClear GetRendererClearMode();
+	void SetUpscalerType(ERendererUpscalerType UpscalerType);
+	void SetUpscaleMode(ERendererUpscaleMode UpscaleMode);
+	void SetFSRSharpness(float Sharpness);
+	void SetEnableFrameGen(bool bEnable, std::uint32_t Multiplier = 2);
 
 	void SetTonemapper(const int Val);
 	int GetTonemapperIndex();
@@ -2869,10 +3135,27 @@ namespace Network
 	void UnregisterRPC(std::string Address, std::string ClassName, const std::string& rpcName);
 }
 
+enum class AssertLevel
+{
+	ASSERT_WARNING = 0,
+	ASSERT_ERROR,
+	ASSERT_CRITICAL,
+};
+
 class sInputController;
 namespace Engine
 {
 	void WriteToConsole(const std::string& STR);
+	void WriteToConsole(const std::wstring& STR);
+	void WriteToConsole(const wchar_t* STR);
+	void WriteToConsole(const char*STR);
+	void Print(const char* message, ...);
+	void Print(const wchar_t* message, ...);
+	void ShowDialogWindow(AssertLevel Level, const char* message, ...);
+	void ShowDialogWindow(AssertLevel Level, const wchar_t* message, ...);
+
+	void Assert(AssertLevel severity, bool condition, const char* message, ...);
+	void Assert(AssertLevel severity, bool condition, const wchar_t* message, ...);
 
 	void LocalUTCTimeNow(std::int32_t& Year, int32_t& Month, int32_t& DayOfWeek, int32_t& Day, int32_t& Hour, int32_t& Min, int32_t& Sec, int32_t& MSec);
 	void UTCTimeNow(std::int32_t& Year, std::int32_t& Month, std::int32_t& DayOfWeek, std::int32_t& Day, std::int32_t& Hour, std::int32_t& Min, std::int32_t& Sec, std::int32_t& MSec);
@@ -2908,3 +3191,5 @@ namespace Engine
 		return static_cast<T>(dist(gen));
 	}
 }
+
+#define ASSERT(condition)  Engine::Assert(AssertLevel::ASSERT_CRITICAL, condition, L"Assertion Failed %ls - line %d", __FILE__, __LINE__)

@@ -40,6 +40,7 @@ D3D11CommandBuffer::D3D11CommandBuffer(D3D11Device* InDevice)
 	, StencilRef(0)
 	, bIsSingleThreaded(false)
 	, ActivePipeline(nullptr)
+	, State(ECommandContextState::Waiting)
 {
 	bIsSingleThreaded = !Owner->IsNvDeviceID();
 
@@ -69,14 +70,14 @@ D3D11CommandBuffer::~D3D11CommandBuffer()
 	ActivePipeline = nullptr;
 }
 
-bool D3D11CommandBuffer::BeginRecordCommandList(const ERenderPass RenderPass)
+ECommandContextBeginResult D3D11CommandBuffer::BeginRecordCommandList(const ECommandContextBeginState Begin)
 {
 	ClearCMDStates();
 	ClearState();
-	return true;
+	return ECommandContextBeginResult::Started;
 }
 
-void D3D11CommandBuffer::FinishRecordCommandList()
+bool D3D11CommandBuffer::FinishRecordCommandList()
 {
 	if (!bIsSingleThreaded)
 	{
@@ -88,14 +89,16 @@ void D3D11CommandBuffer::FinishRecordCommandList()
 #endif
 		CommandList.GetAddressOf());
 	}
+
+	return true;
 }
 
-void D3D11CommandBuffer::ExecuteCommandList(ECommandContextExecuteType ExecuteType, std::uint32_t Order)
+bool D3D11CommandBuffer::ExecuteCommandList(ECommandContextExecuteType ExecuteType, std::uint32_t Order)
 {
 	if (!bIsSingleThreaded)
 	{
 		if (!CommandList)
-			return;
+			return false;
 		Owner->GetDeviceIMContext()->ExecuteCommandList(CommandList.Get(), 
 #if _DEBUG
 			false
@@ -106,6 +109,8 @@ void D3D11CommandBuffer::ExecuteCommandList(ECommandContextExecuteType ExecuteTy
 		CommandList = nullptr;
 	}
 	ActivePipeline = nullptr;
+
+	return true;
 }
 
 void D3D11CommandBuffer::ClearState()

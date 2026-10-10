@@ -48,6 +48,13 @@ using namespace Microsoft::WRL;
 #ifndef Pix3_Enabled
 #define Pix3_Enabled 0
 #endif
+#ifndef AGS_Enable
+#define AGS_Enable 1
+#endif
+
+#if AGS_Enable
+#include "amd_ags.h"
+#endif
 
 class D3D12Viewport;
 class D3D12Texture;
@@ -70,10 +77,11 @@ public:
 	virtual ~D3D12Device();
 	virtual void InitWindow(void* HWND, std::uint32_t Width, std::uint32_t Height, bool Fullscreen) override final;
 	virtual void BeginFrame() override final;
+	virtual void RecreateSwapChain() override final;
 	virtual void Present(IRenderTarget* pRT) override final;
 	bool GetDeviceIdentification(std::wstring& InVendorID, std::wstring& InDeviceID) const;
 	IDXGIAdapter* FindAdapter(const WCHAR* InTargetName) const;
-	IDXGIAdapter1* GetAdapter(std::optional<short> Index = std::nullopt) const;
+	IDXGIAdapter1* FindAndGetAdapter(std::optional<short> Index = std::nullopt) const;
 
 	bool IsCommandBufferPendingForExecute(ICommandContext* CommandContext) const;
 	void OnCommandBufferDestroyed(ICommandContext* CommandContext);
@@ -83,7 +91,7 @@ public:
 	std::uint64_t ExecuteCopyCommandLists(ECommandContextExecuteType ExecuteType, std::uint32_t Order, D3D12CopyCommandBuffer* pCommandList, bool WaitForCompletion = false);
 
 	std::uint64_t GPUSignal(D3D12_COMMAND_LIST_TYPE Type = D3D12_COMMAND_LIST_TYPE::D3D12_COMMAND_LIST_TYPE_DIRECT);
-	void CpuWaitForFence(D3D12_COMMAND_LIST_TYPE Type, std::uint64_t FenceValue);
+	void WaitForFence(D3D12_COMMAND_LIST_TYPE Type, std::uint64_t FenceValue);
 	void CpuWait(D3D12_COMMAND_LIST_TYPE Type);
 
 	ComPtr<ID3D12CommandAllocator> RequestCommandAllocator(D3D12_COMMAND_LIST_TYPE Type);
@@ -99,22 +107,26 @@ public:
 
 	inline D3D_FEATURE_LEVEL GetFeatureLevel() const { return FeatureLevel; }
 
+	virtual EGPUDeviceType GetDeviceType() override final { return DeviceType; }
 	virtual void* GetInternalDevice() override final { return Direct3DDevice.Get(); }
+	virtual void* GetInternalSwapChain() override final;
 
 	virtual void ResizeWindow(std::size_t Width, std::size_t Height) override final;
 	virtual void FullScreen(const bool value) override final;
 	virtual void Vsync(const bool value) override final;
 	virtual void VsyncInterval(const std::uint32_t value) override final;
+	virtual std::vector<sDisplayDesc> GetAllSupportedResolutions() const override final;
+	virtual DisplayMode GetDisplayMode() const override final;
 
-	virtual void GPUFlush() override final;
+	virtual void GPUFlush();
 	virtual void WaitForGPU() override final;
 	virtual void WaitForCPU() override final;
+	virtual void WaitForCPUFence(std::uint64_t Value) override final;
+	virtual std::uint64_t GPUFenceSignal() override final;
 
 	virtual bool IsFullScreen() const override final;
 	virtual bool IsVsyncEnabled() const override final;
 	virtual std::uint32_t GetVsyncInterval() const override final;
-
-	virtual std::vector<sDisplayMode> GetAllSupportedResolutions() const override final;
 
 	virtual EGITypes GetGIType() const override final { return EGITypes::D3D12; }
 	virtual sGPUInfo GetGPUInfo() const override final { return sGPUInfo(); }
@@ -169,8 +181,8 @@ public:
 	virtual ISamplerState::SharedPtr CreateSamplerState(const std::string InName, const sSamplerAttributeDesc& InDesc) override final;
 	virtual ISamplerState::UniquePtr CreateUniqueSamplerState(const std::string InName, const sSamplerAttributeDesc& InDesc) override final;
 
-	virtual IRenderTarget::SharedPtr CreateRenderTarget(const std::string InName, const EFormat Format, const sFBODesc& Desc) override final;
-	virtual IRenderTarget::UniquePtr CreateUniqueRenderTarget(const std::string InName, const EFormat Format, const sFBODesc& Desc) override final;
+	virtual IRenderTarget::SharedPtr CreateRenderTarget(const std::string InName, const sFrameBuffer& InDesc, const sFBODesc& FBODesc) override final;
+	virtual IRenderTarget::UniquePtr CreateUniqueRenderTarget(const std::string InName, const sFrameBuffer& InDesc, const sFBODesc& FBODesc) override final;
 	virtual IDepthTarget::SharedPtr CreateDepthTarget(const std::string InName, const EFormat Format, const sFBODesc& Desc) override final;
 	virtual IDepthTarget::UniquePtr CreateUniqueDepthTarget(const std::string InName, const EFormat Format, const sFBODesc& Desc) override final;
 	virtual IUnorderedAccessTarget::SharedPtr CreateUnorderedAccessTarget(const std::string InName, const EFormat Format, const sFBODesc& Desc, bool InEnableSRV) override final;
@@ -199,7 +211,8 @@ private:
 	std::uint32_t DeviceIndex;
 
 	ComPtr<ID3D12Device> Direct3DDevice;
-	ComPtr<IDXGIFactory4> DxgiFactory;
+	ComPtr<IDXGIFactory7> DxgiFactory;
+	ComPtr<IDXGIAdapter1> Adapter;
 	ComPtr<ID3D12CommandQueue> GraphicsQueue;
 	ComPtr<ID3D12CommandQueue> ComputeQueue;
 	ComPtr<ID3D12CommandQueue> CopyQueue;
@@ -243,6 +256,21 @@ private:
 	std::map<std::size_t, std::shared_ptr<D3D12RootSignature>> RootSignatureCache;
 	//std::map<std::string, std::shared_ptr<D3D12Pipeline>> PipelineCache;
 
+#if AGS_Enable
+	AGSContext*					m_agsContext = nullptr;
+	AGSGPUInfo                  m_agsGPUInfo = {};
+	AGSDX12ExtensionsSupported	m_agsDeviceExtensions = {};
+public:
+	FORCEINLINE AGSContext* GetAGSContext() const
+	{
+		return m_agsContext;
+	}
+	FORCEINLINE AGSGPUInfo GetAGSGpuInfo() const
+	{
+		return m_agsGPUInfo;
+	}
+#endif
+
 public:
 	FORCEINLINE ID3D12Device* Get() const
 	{
@@ -251,6 +279,26 @@ public:
 	FORCEINLINE ID3D12Device14* GetDevice() const
 	{
 		return Direct3DDevice14.Get();
+	}
+	FORCEINLINE IDXGIAdapter1* GetAdapter() const
+	{
+		return Adapter.Get();
+	}
+
+	FORCEINLINE std::wstring GetDeviceName() const
+	{
+		if (Adapter)
+		{
+			DXGI_ADAPTER_DESC1 AdapterDesc;
+			Adapter->GetDesc1(&AdapterDesc);
+			return AdapterDesc.Description;
+		}
+		return std::wstring();
+	}
+
+	FORCEINLINE D3D12Viewport* GetD3D12Viewport() const
+	{
+		return Viewport.get();
 	}
 
 	FORCEINLINE bool IsPrimaryGPU() const
@@ -302,7 +350,7 @@ public:
 		return bTypedUAVLoadSupport_R16G16B16A16_FLOAT;
 	}
 
-	FORCEINLINE ComPtr<IDXGIFactory4> GetFactory() const
+	FORCEINLINE ComPtr<IDXGIFactory7> GetFactory() const
 	{
 		return DxgiFactory;
 	}

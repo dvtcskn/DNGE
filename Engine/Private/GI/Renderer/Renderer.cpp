@@ -31,6 +31,7 @@
 #include "Gameplay/StaticMesh.h"
 #include "Gameplay/MeshComponent.h"
 #include "Utilities/FileManager.h"
+#include "AbstractGI/MaterialManager.h"
 
 struct GeometrySceneDescriptor : public IBindlessSceneDescriptor
 {
@@ -111,6 +112,9 @@ public:
 		, TimeBuffer(sTimeBuffer())
 		, IndirectBuffer(nullptr)
 		, bEnableExecuteIndirect(true)
+		, CustomScreenDimension(sScreenDimension(0, 0))
+		, MipBias(-1.0f)
+		, bForceRecompileMaterials(false)
 	{
 		BufferLayout BufferDesc;
 		BufferDesc.Size = sizeof(sTimeBuffer);
@@ -157,8 +161,8 @@ public:
 		DefaultEngineMat = nullptr;
 		DefaultMatInstance = nullptr;
 		GraphicsCommandContext = nullptr;
-		for (auto& CameraCB : CameraCBs)
-			CameraCB = nullptr;
+		//for (auto& CameraCB : CameraCBs)
+		//	CameraCB = nullptr;
 		CameraCBs.clear();
 		GBuffer = nullptr;
 
@@ -167,12 +171,19 @@ public:
 
 	void ClearGBuffer()
 	{
-		GraphicsCommandContext->BeginRecordCommandList();
+		if (MaterialsToRecompile.size() > 0)
+		{
+			GPU::WaitForGPU();
+			for (auto& Mat : MaterialsToRecompile)
+				Mat->Recompile();
+			MaterialsToRecompile.clear();
+		}
+		GraphicsCommandContext->BeginRecordCommandList(ECommandContextBeginState::Render);
 
 		GraphicsCommandContext->ClearFrameBuffer(GBuffer.get());
 
-		GraphicsCommandContext->FinishRecordCommandList();
-		GraphicsCommandContext->ExecuteCommandList();
+		//GraphicsCommandContext->FinishRecordCommandList();
+		//GraphicsCommandContext->ExecuteCommandList();
 	}
 
 	void Tick(double DeltaTime)
@@ -443,6 +454,9 @@ public:
 					if (!MaterialInstance->IsCompiled())
 						MaterialInstance->Compile(GBuffer.get());
 
+					if (bForceRecompileMaterials)
+						MaterialsToRecompile.push_back(MaterialInstance);
+
 					Material = MaterialInstance->GetParent();
 
 					if (BlendMode == EMaterialBlendMode::Opaque && Material && Material->BlendMode == EMaterialBlendMode::Masked)
@@ -510,7 +524,7 @@ public:
 
 				Descriptor.StructureIndex = MaterialInstance ? MaterialInstance->GetStructureId() : DefaultMatInstance->GetStructureId();
 				Descriptor.MaterialIndex = MaterialInstance	? MaterialInstance->GetId()	: DefaultMatInstance->GetId();
-				Descriptor.CameraConstantBuffer = CameraCBs[index]->GetBindlessIndex();
+				Descriptor.CameraConstantBuffer = CameraCBs[index].Get()->GetBindlessIndex();
 				Descriptor.ObjectConstantBuffer = Mesh->GetMeshConstantBuffer()->GetBindlessIndex();
 				Descriptor.TimeConstantBuffer = TimeCB->GetBindlessIndex();
 
@@ -556,17 +570,24 @@ public:
 				FlushIndirectCommands(CMD);
 			};
 
-		GraphicsCommandContext->BeginRecordCommandList(ERenderPass::GBuffer);
+		GraphicsCommandContext->BeginRecordCommandList(ECommandContextBeginState::Render);
 
 		UpdateCameraBuffer(pCamera, index, GraphicsCommandContext.get());
 		GraphicsCommandContext->SetFrameBuffer(GBuffer.get());
 
-		if (Viewport.has_value())
-			GraphicsCommandContext->SetViewport(*Viewport);
+		if (CustomScreenDimension.IsValid())
+		{
+			GraphicsCommandContext->SetViewport(sViewport(CustomScreenDimension));
+			GraphicsCommandContext->SetScissorRect(0, 0, static_cast<std::uint32_t>(CustomScreenDimension.Height), static_cast<std::uint32_t>(CustomScreenDimension.Width));
+		}
 		else
-			GraphicsCommandContext->SetViewport(sViewport(ScreenDimension));
-
-		GraphicsCommandContext->SetScissorRect(0, 0, static_cast<std::uint32_t>(ScreenDimension.Height), static_cast<std::uint32_t>(ScreenDimension.Width));
+		{
+			if (Viewport.has_value())
+				GraphicsCommandContext->SetViewport(*Viewport);
+			else
+				GraphicsCommandContext->SetViewport(sViewport(ScreenDimension));
+			GraphicsCommandContext->SetScissorRect(0, 0, static_cast<std::uint32_t>(ScreenDimension.Height), static_cast<std::uint32_t>(ScreenDimension.Width));
+		}
 
 		auto IndexBuffer = sMeshGeometryContainerManager::Get().GetIndexBuffer();
 		GraphicsCommandContext->SetIndexBuffer(IndexBuffer);
@@ -602,6 +623,8 @@ public:
 		GraphicsCommandContext->FinishRecordCommandList();
 		GraphicsCommandContext->ExecuteCommandList(ECommandContextExecuteType::Deferred, 0);
 
+		bForceRecompileMaterials = false;
+
 		return GBuffer->GetRenderTarget(0);
 	}
 
@@ -617,30 +640,47 @@ public:
 	{
 		CameraBuffer.PrevViewProjMatrix = CameraBuffer.ViewProjMatrix;
 		CameraBuffer.ViewProjMatrix = pCamera->GetViewProjMatrix();
-		CameraCBs[index]->Map(&CameraBuffer, CMD);
+
+		CameraBuffer.PrevJitter = CameraBuffer.CurrJitter;
+		const FVector4& Vector = pCamera->GetJitteredProjMatrix().r[2];
+		CameraBuffer.CurrJitter = FVector2(Vector.X, Vector.Y);
+		//Engine::WriteToConsole("Prev : " + CameraBuffer.PrevJitter.ToString() + " | Current : " + CameraBuffer.CurrJitter.ToString());
+
+		CameraBuffer.MipBias = MipBias;
+		CameraCBs[index].Get()->Map(&CameraBuffer, CMD);
 	}
 	
 	void AddCameraConstantBuffer(std::size_t Count = 1)
 	{
 		for (std::size_t i = 0; i < Count; i++)
 		{
-			BufferLayout BufferDesc;
-			BufferDesc.Size = sizeof(sCameraBuffer);
-			IConstantBuffer::SharedPtr CameraCB = IConstantBuffer::Create("CameraCB_" + std::to_string(CameraCBs.size()), BufferDesc, 0); // 0
-			CameraCBs.push_back(CameraCB);
+			DoubleBufferConstantBuffer DoubleBuffer;
+			{
+				BufferLayout BufferDesc;
+				BufferDesc.Size = sizeof(sCameraBuffer);
+				IConstantBuffer::SharedPtr CameraCB = IConstantBuffer::Create("CameraCB_" + std::to_string(CameraCBs.size()), BufferDesc, 0); // 0
+				DoubleBuffer.First = CameraCB;
+			}
+			{
+				BufferLayout BufferDesc;
+				BufferDesc.Size = sizeof(sCameraBuffer);
+				IConstantBuffer::SharedPtr CameraCB = IConstantBuffer::Create("CameraCB_" + std::to_string(CameraCBs.size() + 1), BufferDesc, 0); // 0
+				DoubleBuffer.Second = CameraCB;
+			}
+			CameraCBs.push_back(DoubleBuffer);
 		}
 	}
 
 	void RemoveLastCameraConstantBuffer()
 	{
-		CameraCBs[CameraCBs.size() - 1] = nullptr;
+		//CameraCBs[CameraCBs.size() - 1] = nullptr;
 		CameraCBs.pop_back();
 	}
 
 	void DestroyAllCameraConstantBuffers()
 	{
-		for (auto& CameraCB : CameraCBs)
-			CameraCB = nullptr;
+		//for (auto& CameraCB : CameraCBs)
+		//	CameraCB = nullptr;
 		CameraCBs.clear();
 	}
 
@@ -657,12 +697,24 @@ public:
 		GBuffer = IFrameBuffer::Create("GBuffer", AttachmentInfo);
 	}
 
+	void OnUpdateUpscalerPreset(sScreenDimension NewCustomScreenDimension, float NewMipBias)
+	{
+		CustomScreenDimension = NewCustomScreenDimension;
+		MipBias = NewMipBias;
+	}
+
+	IGraphicsCommandContext* GetCommandContext() const { return GraphicsCommandContext.get(); };
 	IFrameBuffer* GetGBuffer() const { return GBuffer.get(); };
 	IRenderTarget* GetMotionVector() const { return GBuffer->GetRenderTarget(4); };
 	IDepthTarget* GetDepth() const { return GBuffer->GetDepthTarget(); };
-	IConstantBuffer* GetCameraConstantBuffer(std::size_t index) const { return CameraCBs[index].get(); }
+	IConstantBuffer* GetCameraConstantBuffer(std::size_t index) const { return CameraCBs[index].Get(); }
 	std::size_t GetCameraConstantBufferSize() const { return CameraCBs.size(); }
 	sScreenDimension GetScreenDimension() const { return ScreenDimension; }
+
+	void ForceRecompileMaterials()
+	{
+		bForceRecompileMaterials = true;
+	}
 
 private:
 	IFrameBuffer::SharedPtr GBuffer;
@@ -674,12 +726,40 @@ private:
 	bool bEnableExecuteIndirect;
 	sMaterial::SharedPtr DefaultEngineMat;
 	sMaterialInstance::SharedPtr DefaultMatInstance;
-	std::vector<IConstantBuffer::SharedPtr> CameraCBs;
+
+	// to do : Use Fence
+	struct DoubleBufferConstantBuffer
+	{
+		DoubleBufferConstantBuffer() = default;
+		~DoubleBufferConstantBuffer()
+		{
+			First = nullptr;
+			Second = nullptr;
+		}
+
+		IConstantBuffer::SharedPtr First = nullptr;
+		IConstantBuffer::SharedPtr Second = nullptr;
+
+		IConstantBuffer* Get() const
+		{
+			std::uint32_t Index = GPU::GetCurrentBackBufferIndex();
+			if (Index > 0)
+				return First.get();
+			return Second.get();
+		}
+	};
+	std::vector<DoubleBufferConstantBuffer> CameraCBs;
+
+	bool bForceRecompileMaterials;
+	std::vector<sMaterialInstance*> MaterialsToRecompile;
 
 	__declspec(align(256)) struct sCameraBuffer
 	{
 		FMatrix ViewProjMatrix;
 		FMatrix PrevViewProjMatrix;
+		FVector2 CurrJitter;
+		FVector2 PrevJitter;
+		float MipBias;
 	};
 	static_assert((sizeof(sCameraBuffer) % 256) == 0, "Constant Buffer size must be 256-byte aligned");
 
@@ -692,6 +772,8 @@ private:
 	sTimeBuffer TimeBuffer;
 	IConstantBuffer::SharedPtr TimeCB;
 	//static_assert((sizeof(sTimeBuffer) % 256) == 0, "Constant Buffer size must be 256-byte aligned");
+	sScreenDimension CustomScreenDimension;
+	float MipBias;
 };
 
 sRenderer::sRenderer(std::size_t Width, std::size_t Height)
@@ -708,6 +790,9 @@ sRenderer::sRenderer(std::size_t Width, std::size_t Height)
 	, ToneMapping(sToneMapping::CreateUnique(Width, Height))
 	, bIsTonmapperEnabled(true)
 	, pParticleRenderer(ParticleRenderer::Create(Width, Height))
+	, FSR(sFSR::CreateUnique(Width, Height))
+	, UpscalerType(ERendererUpscalerType::None)
+	, bSoftwareDeviceUpscallerSupport(false)
 {
 }
 
@@ -732,6 +817,7 @@ sRenderer::~sRenderer()
 	PostProcessRenderer = nullptr;
 	LineRenderer = nullptr;
 	pParticleRenderer = nullptr;
+	FSR = nullptr;
 }
 
 void sRenderer::BeginPlay()
@@ -740,6 +826,15 @@ void sRenderer::BeginPlay()
 	CanvasRenderer->BeginPlay();
 	PostProcessRenderer->BeginPlay();
 	pParticleRenderer->BeginPlay();
+	if (FSR)
+	{
+		if (UpscalerType == ERendererUpscalerType::FSR && (GPU::GetDeviceType() != EGPUDeviceType::Software || bSoftwareDeviceUpscallerSupport))
+		{
+			FSR->OnEnabled(true, false);
+			FSR->OnUpdatePreset = std::bind(&sGBuffer::OnUpdateUpscalerPreset, GBuffer.get(), std::placeholders::_1, std::placeholders::_2);
+		}
+		FSR->BeginPlay();
+	}
 }
 
 void sRenderer::Tick(const double DeltaTime)
@@ -750,6 +845,10 @@ void sRenderer::Tick(const double DeltaTime)
 	GBuffer->Tick(DeltaTime);
 	LineRenderer->Tick(DeltaTime);
 	pParticleRenderer->Tick(DeltaTime);
+	if (FSR)
+	{
+		FSR->Tick(DeltaTime);
+	}
 }
 
 void sRenderer::RegisterMaterial(sMaterial* Material)
@@ -915,7 +1014,7 @@ void sRenderer::Render()
 	if (!World)
 		return;
 
-	if (GBufferClearMode == ERendererClear::Driver/* || GBufferClearMode == ERendererClear::Sky*/)
+	if (GBufferClearMode == ERendererClear::Driver  /*|| GBufferClearMode == ERendererClear::Sky*/)
 	{
 		GBuffer->ClearGBuffer();
 	}
@@ -949,6 +1048,11 @@ void sRenderer::Render()
 			FinalRenderTarget = GBuffer->Render(World->GetActiveLevel(), i, ViewportInstance->pCamera.get(), ViewportInstance->Viewport);
 			LineRenderer->Render(FinalRenderTarget, GBuffer->GetCameraConstantBuffer(i)->GetBindlessIndex(), ViewportInstance->Viewport);
 			pParticleRenderer->Render(World->GetActiveLevel(), GBuffer->GetCameraConstantBuffer(i)->GetBindlessIndex(), FinalRenderTarget, ViewportInstance->Viewport);
+			if (UpscalerType == ERendererUpscalerType::FSR && FSR && (GPU::GetDeviceType() != EGPUDeviceType::Software || bSoftwareDeviceUpscallerSupport))
+			{
+				FSR->Render(FinalRenderTarget, GBuffer->GetGBuffer()->GetRenderTarget(4), GBuffer->GetGBuffer()->GetRenderTarget(5), GBuffer->GetDepth(), ViewportInstance->pCamera.get());
+				FinalRenderTarget = FSR->GetOutputRenderTarget();
+			}
 		}
 	}
 
@@ -1039,7 +1143,7 @@ void sRenderer::Render()
 			}
 		}
 	}
-	//CanvasRenderer->Render(World->GetCanvases(), FinalRenderTarget, std::nullopt);
+	CanvasRenderer->Render(World->GetCanvases(), FinalRenderTarget, std::nullopt);
 
 	for (const auto& PP : PostProcess[EPostProcessRenderOrder::AfterUI])
 	{
@@ -1068,6 +1172,10 @@ void sRenderer::OnResizeWindow(std::size_t InWidth, std::size_t InHeight)
 	PostProcessRenderer->SetRenderSize(ScreenDimension.Width, ScreenDimension.Height);
 	CanvasRenderer->SetRenderSize(ScreenDimension.Width, ScreenDimension.Height);
 	ToneMapping->SetFrameBufferSize(ScreenDimension.Width, ScreenDimension.Height);
+	if (FSR)
+	{
+		FSR->SetRenderSize(ScreenDimension.Width, ScreenDimension.Height);
+	}
 }
 
 void sRenderer::OnInputProcess(const GMouseInput& MouseInput, const GKeyboardChar& KeyboardChar)
@@ -1075,6 +1183,29 @@ void sRenderer::OnInputProcess(const GMouseInput& MouseInput, const GKeyboardCha
 	LineRenderer->OnInputProcess(MouseInput, KeyboardChar);
 	CanvasRenderer->OnInputProcess(MouseInput, KeyboardChar);
 	PostProcessRenderer->OnInputProcess(MouseInput, KeyboardChar);
+	if (UpscalerType == ERendererUpscalerType::FSR && FSR && (GPU::GetDeviceType() != EGPUDeviceType::Software || bSoftwareDeviceUpscallerSupport))
+	{
+		FSR->OnInputProcess(MouseInput, KeyboardChar);
+	}
+
+	if (KeyboardChar.KeyCode == 32 && KeyboardChar.bIsPressed /*&& KeyboardChar.bIsChar*/)
+	{
+		GPU::WaitForGPU();
+		GBuffer->ForceRecompileMaterials();
+		Engine::WriteToConsole("ForceRecompileMaterials");
+	}
+	else if (KeyboardChar.KeyCode == 8 && KeyboardChar.bIsPressed /*&& KeyboardChar.bIsChar*/)
+	{
+		GPU::WaitForGPU();
+		SetUpscalerType(ERendererUpscalerType::None);
+		Engine::WriteToConsole("SetUpscalerType::NONE");
+	}
+	else if (KeyboardChar.KeyCode == 13 && KeyboardChar.bIsPressed /*&& KeyboardChar.bIsChar*/)
+	{
+		GPU::WaitForGPU();
+		SetUpscalerType(ERendererUpscalerType::FSR);
+		Engine::WriteToConsole("SetUpscalerType::FSR");
+	}
 }
 
 void sRenderer::DrawLine(const FVector& Start, const FVector& End, const FColor& Color, std::optional<float> Time)
@@ -1094,6 +1225,42 @@ void sRenderer::SetInternalBaseRenderResolution(std::size_t Width, std::size_t H
 	InternalBaseRenderResolution = sScreenDimension(Width, Height);
 	GBuffer->SetRenderSize(InternalBaseRenderResolution.Width, InternalBaseRenderResolution.Height);
 	LineRenderer->SetRenderSize(InternalBaseRenderResolution.Width, InternalBaseRenderResolution.Height);
+	if (UpscalerType == ERendererUpscalerType::FSR && FSR && (GPU::GetDeviceType() != EGPUDeviceType::Software || bSoftwareDeviceUpscallerSupport))
+		FSR->SetRenderSize(InternalBaseRenderResolution.Width, InternalBaseRenderResolution.Height);
+}
+
+void sRenderer::SetUpscalerType(ERendererUpscalerType NewUpscalerType)
+{
+	UpscalerType = NewUpscalerType;
+
+	if (UpscalerType == ERendererUpscalerType::FSR && FSR && (GPU::GetDeviceType() != EGPUDeviceType::Software || bSoftwareDeviceUpscallerSupport))
+	{
+		FSR->OnEnabled(true, false);
+		FSR->OnUpdatePreset = std::bind(&sGBuffer::OnUpdateUpscalerPreset, GBuffer.get(), std::placeholders::_1, std::placeholders::_2);
+	}
+	else
+	{
+		FSR->OnDisabled();
+		FSR->OnUpdatePreset = nullptr;
+	}
+}
+
+void sRenderer::SetUpscaleMode(ERendererUpscaleMode UpscaleMode)
+{
+	if (UpscalerType == ERendererUpscalerType::FSR && FSR && (GPU::GetDeviceType() != EGPUDeviceType::Software || bSoftwareDeviceUpscallerSupport))
+		FSR->SetUpscaleMode(UpscaleMode);
+}
+
+void sRenderer::SetFSRSharpness(float Sharpness)
+{
+	if (UpscalerType == ERendererUpscalerType::FSR && FSR && (GPU::GetDeviceType() != EGPUDeviceType::Software || bSoftwareDeviceUpscallerSupport))
+		FSR->SetUpscaleSharpness(Sharpness);
+}
+
+void sRenderer::SetEnableFrameGen(bool bEnable, std::uint32_t Multiplier)
+{
+	if (UpscalerType == ERendererUpscalerType::FSR && FSR && (GPU::GetDeviceType() != EGPUDeviceType::Software || bSoftwareDeviceUpscallerSupport))
+		FSR->SetFrameGenerationEnabled(bEnable);
 }
 
 void sRenderer::SetTonemapper(int Val)

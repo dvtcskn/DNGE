@@ -38,14 +38,14 @@ public:
 	VulkanCommandBuffer(VulkanDevice* Device);
 	virtual ~VulkanCommandBuffer();
 
-	virtual bool BeginRecordCommandList(const ERenderPass RenderPass = ERenderPass::NONE) override final;
-	virtual void FinishRecordCommandList() override final;
-	virtual void ExecuteCommandList(ECommandContextExecuteType ExecuteType = ECommandContextExecuteType::Immediate, std::uint32_t Order = std::uint32_t(-1)) override final;
+	virtual ECommandContextBeginResult BeginRecordCommandList(const ECommandContextBeginState Begin = ECommandContextBeginState::Render) override final;
+	virtual bool FinishRecordCommandList() override final;
+	virtual bool ExecuteCommandList(ECommandContextExecuteType ExecuteType = ECommandContextExecuteType::Immediate, std::uint32_t Order = std::uint32_t(-1)) override final;
 	virtual void ClearState() override final;
 
 	void ExecuteWithWait();
 
-	virtual bool IsRecorded() const override final { return false; }
+	virtual ECommandContextState GetState() const override final { return State; }
 
 	VkCommandBuffer Get() const
 	{
@@ -126,6 +126,7 @@ private:
 	vk::CommandBuffer CommandBuffer;
 	bool bIsSingleThreaded;
 	std::uint32_t StencilRef;
+	ECommandContextState State;
 
 	VulkanPipeline* Pipeline;
 
@@ -168,6 +169,8 @@ public:
 	virtual void UpdateBufferSubresource(IIndexBuffer* Buffer, std::size_t Location, std::size_t Size, const void* pSrcData) override final;
 
 	virtual void ClearState() override final;
+
+	virtual ECommandContextState GetState() const override final { return ECommandContextState(); }
 
 private:
 	bool bIsClosed;

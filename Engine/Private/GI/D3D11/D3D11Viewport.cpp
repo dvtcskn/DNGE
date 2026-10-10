@@ -219,9 +219,9 @@ void D3D11Viewport::ResizeSwapChain(std::size_t Width, std::size_t Height)
 	}
 }
 
-std::vector<sDisplayMode> D3D11Viewport::GetAllSupportedResolutions() const
+std::vector<sDisplayDesc> D3D11Viewport::GetAllSupportedResolutions() const
 {
-	std::vector<sDisplayMode> Result;
+	std::vector<sDisplayDesc> Result;
 	HRESULT HResult = S_OK;
 	IDXGIAdapter1* Adapter = Owner->GetAdapter();
 	IDXGIOutput* Output;
@@ -261,7 +261,7 @@ std::vector<sDisplayMode> D3D11Viewport::GetAllSupportedResolutions() const
 
 		for (std::uint32_t m = 0; m < NumModes; m++)
 		{
-			sDisplayMode Mode;
+			sDisplayDesc Mode;
 			std::wstring ID = dispDev.DeviceID;
 			ID.insert(0, L" (");
 			ID.append(L")");

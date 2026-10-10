@@ -472,6 +472,16 @@ void sCameraManager::DisableVelocity()
 	DragTimer = 0.0f;
 }
 
+FVector2 sCameraManager::ConvertScreenToWorld(const float WorldWidth, const float WorldHeight, const FVector2& Screen) const
+{
+	return pCamera->ConvertScreenToWorld(WorldWidth, WorldHeight, Screen);
+}
+
+FVector2 sCameraManager::ConvertWorldToScreen(const float ScreenWidth, const float ScreenHeight, const FVector2& World) const
+{
+	return pCamera->ConvertWorldToScreen(ScreenWidth, ScreenHeight, World);
+}
+
 void sCameraManager::WindowResized(const std::size_t Width, const std::size_t Height)
 {
 	if (pCamera->IsOrthographic())

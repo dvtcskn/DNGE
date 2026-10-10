@@ -85,6 +85,8 @@ public:
 
 	virtual void ClearState() override final;
 
+	virtual ECommandContextState GetState() const override final { return ECommandContextState(); }
+
 private:
 	D3D12Device* Owner;
 	ComPtr<ID3D12GraphicsCommandList> CommandList;

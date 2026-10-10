@@ -37,6 +37,7 @@ VulkanCommandBuffer::VulkanCommandBuffer(VulkanDevice* InOwner)
 	, bIsClosed(false)
 	, bWaitForCompletion(false)
 	, bIsRenderPassActive(false)
+	, State(ECommandContextState::Waiting)
 {
 	auto Device = Owner->Get();
 
@@ -86,20 +87,20 @@ VulkanCommandBuffer::~VulkanCommandBuffer()
 	vkCmdPushDescriptorSetKHR = nullptr;
 }
 
-bool VulkanCommandBuffer::BeginRecordCommandList(const ERenderPass RenderPass)
+ECommandContextBeginResult VulkanCommandBuffer::BeginRecordCommandList(const ECommandContextBeginState Begin)
 {
 	Open();
 
-	if (RenderPass != ERenderPass::NONE)
+	//if (RenderPass != ERenderPass::NONE)
 	{
 		//Owner->SetHeaps(CommandList.Get());
 	}
-	else
+	//else
 	{
 		//Owner->CPUWait();
 	}
 
-	return true;
+	return ECommandContextBeginResult::Started;
 }
 
 void VulkanCommandBuffer::Open()
@@ -132,10 +133,11 @@ void VulkanCommandBuffer::Open()
 	//ClearState(); 
 }
 
-void VulkanCommandBuffer::FinishRecordCommandList()
+bool VulkanCommandBuffer::FinishRecordCommandList()
 {
 	//ClearCMDStates();
 	Close();
+	return true;
 }
 
 void VulkanCommandBuffer::Close()
@@ -153,13 +155,15 @@ void VulkanCommandBuffer::Close()
 	Sets.clear();
 }
 
-void VulkanCommandBuffer::ExecuteCommandList(ECommandContextExecuteType ExecuteType, std::uint32_t Order)
+bool VulkanCommandBuffer::ExecuteCommandList(ECommandContextExecuteType ExecuteType, std::uint32_t Order)
 {
 	Owner->ExecuteGraphicsCommandBuffer(&CommandBuffer, bWaitForCompletion);
 
 	//Owner->ReturnCommandPool(CommandPool);
 	//CommandPool = VK_NULL_HANDLE;
 	bWaitForCompletion = false;
+
+	return true;
 }
 
 void VulkanCommandBuffer::ClearState()

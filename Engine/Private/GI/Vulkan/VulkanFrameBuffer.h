@@ -37,20 +37,21 @@ class VulkanRenderTarget final : public IRenderTarget
 {
 	sClassBody(sClassConstructor, VulkanRenderTarget, IRenderTarget)
 public:
-	VulkanRenderTarget(VulkanDevice* InOwner, const std::string InName, const EFormat Format, const sFBODesc& Desc, bool InIsSRVAllowed = true, bool InIsUnorderedAccessAllowed = false);
+	VulkanRenderTarget(VulkanDevice* InOwner, const std::string InName, const sFrameBuffer& InDesc, const sFBODesc& FBODesc);
 	virtual ~VulkanRenderTarget();
 
+	virtual void AsResource(EResourceState ResourceState, IGraphicsCommandContext* GraphicsCommandContext = nullptr) override final {}
 	virtual void SetDefaultRootParameterIndex(std::uint32_t RootParameterIndex) override final {}
 	virtual std::uint32_t GetDefaultRootParameterIndex() const override final { return 0; }
 
-	inline sFBODesc GetDesc() const { return Desc; }
+	inline sFBODesc GetDesc() const { return FBODesc; }
 	const VkImage& GetImage() const { return Image; }
 	const VkImageView& GetView() const { return View; }
 	const VkImageView& GetUAV_View() const { return View; }
 	virtual void* GetNativeTexture() const override final { return Image; }
 
-	EFormat GetFormat() const { return Format; }
-	VkFormat GetVkFormat() const { return ConvertFormat_Format_To_VkFormat(Format); }
+	EFormat GetFormat() const { return Desc.Format; }
+	VkFormat GetVkFormat() const { return ConvertFormat_Format_To_VkFormat(Desc.Format); }
 
 	virtual bool IsSRV_Allowed() const override final { return bIsSRVSupported; }
 	virtual bool IsUAV_Allowed() const override final { return bIsUAVSupported; }
@@ -67,9 +68,9 @@ public:
 	virtual bool CopyFrom(IRenderTarget* RenderTarget) override final { return false; }
 
 private:
-	std::string Name;
-	EFormat Format;
-	sFBODesc Desc;
+	std::string Name; 
+	sFrameBuffer Desc;
+	sFBODesc FBODesc;
 
 	VkDeviceMemory Memory;
 	VkImageView    View;
@@ -86,6 +87,7 @@ public:
 	VulkanDepthTarget(VulkanDevice* InOwner, const std::string InName, const EFormat Format, const sFBODesc& Desc);
 	virtual ~VulkanDepthTarget();
 
+	virtual void AsResource(EResourceState ResourceState, IGraphicsCommandContext* GraphicsCommandContext = nullptr) override final {}
 	virtual void SetDefaultRootParameterIndex(std::uint32_t RootParameterIndex) override final {}
 	virtual std::uint32_t GetDefaultRootParameterIndex() const override final { return 0; }
 

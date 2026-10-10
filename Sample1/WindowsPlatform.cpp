@@ -32,7 +32,23 @@
 #include <Utilities/FileManager.h>
 #include "AssetManager.h"
 
-#include <Engine/World2D.h>
+#ifndef BulletPhysics
+#define BulletPhysics 0
+#endif
+#ifndef PhysXEngine
+#define PhysXEngine 0
+#endif
+#ifndef Box2DPhysics
+	//#define Box2DPhysics 0
+#endif
+
+#if BulletPhysics
+	#include <Engine/BulletWorld.h>
+#elif PhysXEngine
+	#include <Engine/PhysXWorld.h>
+#else
+	#include <Engine/World2D.h>
+#endif
 #include "Materials.h"
 
 #pragma comment(lib, "Engine.lib")
@@ -40,13 +56,6 @@
 #pragma comment(lib, "freetype.lib")
 #pragma comment(lib, "Pdh.lib")
 //#pragma comment(lib, "DirectXTK.lib")
-
-#pragma comment(lib, "dxcompiler.lib")
-
-//#pragma comment(lib, "WinPixEventRuntime.lib")
-
-#pragma comment(lib, "box2d.lib")
-
 
 #define WINDOW_STYLE_NORMAL					(WS_VISIBLE | WS_OVERLAPPEDWINDOW | WS_CAPTION)
 #define WINDOW_STYLE_BORDERLESS				(WS_VISIBLE | WS_POPUP | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_POPUP)
@@ -191,11 +200,6 @@ WindowsPlatform::WindowsPlatform()
 
 WindowsPlatform::~WindowsPlatform()
 {
-	if (m_hWnd)
-	{
-		DestroyWindow(m_hWnd);
-		m_hWnd = NULL;
-	}
 	pMetaWorld = nullptr;
 	if (Network::IsConnected())
 		Network::Disconnect();
@@ -203,6 +207,11 @@ WindowsPlatform::~WindowsPlatform()
 		Network::DestroySession();
 	AssetManager::Get().Destroy();
 	Engine = nullptr;
+	if (m_hWnd)
+	{
+		DestroyWindow(m_hWnd);
+		m_hWnd = NULL;
+	}
 }
 
 bool WindowsPlatform::CreateViewport(std::wstring title, RECT rect, bool bfullscreen)

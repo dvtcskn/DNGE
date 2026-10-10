@@ -46,6 +46,9 @@
 #include "RemoteProcedureCall.h"
 #include "Utilities/ConfigManager.h"
 #include <cbgui.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <stdarg.h>
 
 #if Pix3_Enabled && _DEBUG
 #include <pix3.h>
@@ -132,9 +135,44 @@ std::vector<sVertexAttributeDesc> sVertexAttributeDesc::GetDefaultGUIVertexLayou
 
 namespace GPU
 {
+	EGPUDeviceType GetDeviceType()
+	{
+		return Device->GetDeviceType();
+	}
+
+	IAbstractGIDevice* GetDevice()
+	{
+		return Device.get();
+	}
+
 	void* GetInternalDevice()
 	{
 		return Device->GetInternalDevice();
+	}
+
+	void* GetInternalSwapChain()
+	{
+		return Device->GetInternalSwapChain();
+	}
+
+	void WaitForGPU()
+	{
+		Device->WaitForGPU();
+	}
+
+	void WaitForCPU()
+	{
+		Device->WaitForCPU();
+	}
+
+	void WaitForCPUFence(std::uint64_t Value)
+	{
+		Device->WaitForCPUFence(Value);
+	}
+
+	std::uint64_t GPUFenceSignal()
+	{
+		return Device->GPUFenceSignal();
 	}
 
 	sGPUInfo GetGPUInfo()
@@ -164,7 +202,57 @@ namespace GPU
 
 	EFormat GetDefaultDepthFormat()
 	{
-		return EFormat::D32_FLOAT_S8X24_UINT; // EFormat::R32G8X24_Typeless; //EFormat::R32G8X24_Typeless; // EFormat::R32_Typeless
+		return EFormat::R32_Typeless; // EFormat::R32G8X24_Typeless; //EFormat::R32G8X24_Typeless; // EFormat::R32_Typeless // D32_FLOAT_S8X24_UINT
+	}
+
+	void ResizeWindow(std::size_t Width, std::size_t Height)
+	{
+		Device->ResizeWindow(Width, Height);
+	}
+
+	void FullScreen(const bool value)
+	{
+		Device->FullScreen(value);
+	}
+
+	bool IsFullScreen()
+	{
+		return Device->IsFullScreen();
+	}
+
+	void Vsync(const bool value)
+	{
+		Device->Vsync(value);
+	}
+
+	bool IsVsyncEnabled()
+	{
+		return Device->IsVsyncEnabled();
+	}
+
+	void VsyncInterval(const std::uint32_t value)
+	{
+		Device->VsyncInterval(value);
+	}
+
+	std::uint32_t GetVsyncInterval()
+	{
+		return Device->GetVsyncInterval();
+	}
+
+	std::vector<sDisplayDesc> GetAllSupportedResolutions()
+	{
+		return Device->GetAllSupportedResolutions();
+	}
+
+	DisplayMode GetDisplayMode()
+	{
+		return Device->GetDisplayMode();
+	}
+		
+	void RecreateSwapChain()
+	{
+		Device->RecreateSwapChain();
 	}
 
 	std::uint32_t GetBackBufferSize()
@@ -227,6 +315,26 @@ namespace GPU
 	ERendererClear GetRendererClearMode()
 	{
 		return Renderer->GetRendererClearMode();
+	}
+
+	void SetUpscalerType(ERendererUpscalerType UpscalerType)
+	{
+		Renderer->SetUpscalerType(UpscalerType);
+	}
+
+	void SetUpscaleMode(ERendererUpscaleMode UpscaleMode)
+	{
+		Renderer->SetUpscaleMode(UpscaleMode);
+	}
+
+	void SetFSRSharpness(float Sharpness)
+	{
+		Renderer->SetFSRSharpness(Sharpness);
+	}
+
+	void SetEnableFrameGen(bool bEnable, std::uint32_t Multiplier)
+	{
+		Renderer->SetEnableFrameGen(bEnable, Multiplier);
 	}
 
 	void SetTonemapper(const int Val)
@@ -655,6 +763,115 @@ namespace Engine
 			std::cout << STR << std::endl;
 	}
 
+	void WriteToConsole(const std::wstring& STR)
+	{
+		if (Server)
+			std::wcout << "Server : " << STR << std::endl;
+		else if (Client)
+			std::wcout << "Client : " << STR << std::endl;
+		else
+			std::wcout << STR << std::endl;
+	}
+
+	void WriteToConsole(const wchar_t* STR)
+	{
+		if (Server)
+			std::wcout << "Server : " << STR << std::endl;
+		else if (Client)
+			std::wcout << "Client : " << STR << std::endl;
+		else
+			std::wcout << STR << std::endl;
+	}
+
+	void WriteToConsole(const char* STR)
+	{
+		if (Server)
+			std::cout << "Server : " << STR << std::endl;
+		else if (Client)
+			std::cout << "Client : " << STR << std::endl;
+		else
+			std::cout << STR << std::endl;
+	}
+
+	void Print(const char* message, ...)
+	{
+		char buffer[1024] = {};
+		va_list args;
+		va_start(args, message);
+		vsnprintf_s(buffer, _countof(buffer), _countof(buffer), message, args);
+		va_end(args);
+		WriteToConsole(buffer);
+		//OutputDebugStringA(buffer);
+	}
+
+	void Print(const wchar_t* message, ...)
+	{
+		wchar_t buffer[1024] = {};
+		va_list args;
+		va_start(args, message);
+		_vsnwprintf_s(buffer, _countof(buffer), _TRUNCATE, message, args);
+		WriteToConsole(buffer); 
+		va_end(args);
+	}
+
+	void ShowDialogWindow(AssertLevel Level, const char* message, ...)
+	{
+		char buffer[1024] = {};
+		va_list args;
+		va_start(args, message);
+		vsnprintf_s(buffer, _countof(buffer), _countof(buffer), message, args);
+		va_end(args);
+		switch (Level)
+		{
+		case AssertLevel::ASSERT_WARNING:
+			MessageBoxA(NULL, buffer, "Warning", MB_OK);
+			break;
+		case AssertLevel::ASSERT_ERROR:
+			MessageBoxA(NULL, buffer, "Error", MB_OK);
+			break;
+		case AssertLevel::ASSERT_CRITICAL:
+			MessageBoxA(NULL, buffer, "Critical Error", MB_OK);
+			break;
+		}
+	}
+
+	void ShowDialogWindow(AssertLevel Level, const wchar_t* message, ...)
+	{
+		wchar_t buffer[1024] = {};
+		va_list args;
+		va_start(args, message);
+		_vsnwprintf_s(buffer, _countof(buffer), _TRUNCATE, message, args);
+		va_end(args);
+		switch (Level)
+		{
+		case AssertLevel::ASSERT_WARNING:
+			MessageBoxW(NULL, buffer, L"Warning", MB_OK);
+			break;
+		case AssertLevel::ASSERT_ERROR:
+			MessageBoxW(NULL, buffer, L"Error", MB_OK);
+			break;
+		case AssertLevel::ASSERT_CRITICAL:
+			MessageBoxW(NULL, buffer, L"Critical Error", MB_OK);
+			break;
+		}
+	}
+
+	void Assert(AssertLevel severity, bool condition, const char* message, ...)
+	{
+		if (!condition)
+		{
+			ShowDialogWindow(severity, message);
+		}
+	}
+
+	void Assert(AssertLevel severity, bool condition, const wchar_t* message, ...)
+	{
+		if (!condition)
+		{
+			ShowDialogWindow(severity, message);
+		}
+	}
+
 	void LocalUTCTimeNow(std::int32_t& Year, int32_t& Month, int32_t& DayOfWeek, int32_t& Day, int32_t& Hour, int32_t& Min, int32_t& Sec, int32_t& MSec)
 	{
 		SYSTEMTIME st;
@@ -901,14 +1118,14 @@ IIndirectBuffer::UniquePtr IIndirectBuffer::CreateUnique(std::string InName, Buf
 	return GPU == 0 || GPU > SecondaryGPUs.size() ? Device->CreateUniqueIndirectBuffer(InName, Layout) : SecondaryGPUs[GPU - 1]->CreateUniqueIndirectBuffer(InName, Layout);
 }
 
-IRenderTarget::SharedPtr IRenderTarget::Create(const std::string InName, const EFormat Format, const sFBODesc& Desc, std::uint32_t GPU)
+IRenderTarget::SharedPtr IRenderTarget::Create(const std::string InName, const sFrameBuffer& Desc, const sFBODesc& FBODesc, std::uint32_t GPU)
 {
-	return GPU == 0 || GPU > SecondaryGPUs.size() ? Device->CreateRenderTarget(InName, Format, Desc) : SecondaryGPUs[GPU - 1]->CreateRenderTarget(InName, Format, Desc);
+	return GPU == 0 || GPU > SecondaryGPUs.size() ? Device->CreateRenderTarget(InName, Desc, FBODesc) : SecondaryGPUs[GPU - 1]->CreateRenderTarget(InName, Desc, FBODesc);
 }
 
-IRenderTarget::UniquePtr IRenderTarget::CreateUnique(const std::string InName, const EFormat Format, const sFBODesc& Desc, std::uint32_t GPU)
+IRenderTarget::UniquePtr IRenderTarget::CreateUnique(const std::string InName, const sFrameBuffer& Desc, const sFBODesc& FBODesc, std::uint32_t GPU)
 {
-	return GPU == 0 || GPU > SecondaryGPUs.size() ? Device->CreateUniqueRenderTarget(InName, Format, Desc) : SecondaryGPUs[GPU - 1]->CreateUniqueRenderTarget(InName, Format, Desc);
+	return GPU == 0 || GPU > SecondaryGPUs.size() ? Device->CreateUniqueRenderTarget(InName, Desc, FBODesc) : SecondaryGPUs[GPU - 1]->CreateUniqueRenderTarget(InName, Desc, FBODesc);
 }
 
 IDepthTarget::SharedPtr IDepthTarget::Create(const std::string InName, const EFormat Format, const sFBODesc& Desc, std::uint32_t GPU)
@@ -1199,7 +1416,6 @@ sEngine::~sEngine()
 		Server->DestroySession();
 
 	Device->WaitForGPU();
-	Device->GPUFlush();
 
 	Client = nullptr;
 	Server = nullptr;
@@ -1255,13 +1471,14 @@ void sEngine::EngineInternalTick()
 
 	FixedStepTimer.Tick([&]()
 		{
-			PhysicsTick(FixedStepTimer.GetElapsedSeconds());
-			FixedTick(FixedStepTimer.GetElapsedSeconds());
 		});
+	PhysicsTick(FixedStepTimer.GetElapsedSeconds());
+	FixedTick(FixedStepTimer.GetElapsedSeconds());
+
 	mStepTimer.Tick([&]()
 		{
-			Tick(mStepTimer.GetElapsedSeconds());
 		});
+	Tick(mStepTimer.GetElapsedSeconds());
 
 	Render();
 	Present();
@@ -1441,7 +1658,7 @@ sGPUInfo sEngine::GetGPUInfo() const
 	return Device->GetGPUInfo();
 }
 
-std::vector<sDisplayMode> sEngine::GetAllSupportedResolutions() const
+std::vector<sDisplayDesc> sEngine::GetAllSupportedResolutions() const
 {
 	return Device->GetAllSupportedResolutions();
 }

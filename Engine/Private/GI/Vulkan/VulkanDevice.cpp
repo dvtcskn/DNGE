@@ -1360,6 +1360,11 @@ bool VulkanDevice::GetAdapter(std::optional<short> Index, VkPhysicalDevice& GPU,
 	return false;
 }
 
+void VulkanDevice::RecreateSwapChain()
+{
+
+}
+
 void VulkanDevice::Present(IRenderTarget* pRT)
 {
 	if (IsPrimaryGPU())
@@ -1387,6 +1392,11 @@ std::uint32_t VulkanDevice::GetVsyncInterval() const
 	return -1;
 }
 
+DisplayMode VulkanDevice::GetDisplayMode() const
+{
+	return DisplayMode();
+}
+
 void VulkanDevice::GPUFlush()
 {
 
@@ -1400,6 +1410,16 @@ void VulkanDevice::WaitForGPU()
 void VulkanDevice::WaitForCPU()
 {
 
+}
+
+void VulkanDevice::WaitForCPUFence(std::uint64_t Value)
+{
+
+}
+
+std::uint64_t VulkanDevice::GPUFenceSignal()
+{
+	return 0;
 }
 
 uint32_t VulkanDevice::GetMemoryType(uint32_t type_filter, VkMemoryPropertyFlags properties)
@@ -1453,9 +1473,9 @@ void VulkanDevice::VsyncInterval(const std::uint32_t value)
 		Viewport->VsyncInterval(value);
 }
 
-std::vector<sDisplayMode> VulkanDevice::GetAllSupportedResolutions() const
+std::vector<sDisplayDesc> VulkanDevice::GetAllSupportedResolutions() const
 {
-	std::vector<sDisplayMode> SupportedResolutions;
+	std::vector<sDisplayDesc> SupportedResolutions;
 
 	uint32_t planeCount = 0;
 	vkGetPhysicalDeviceDisplayPlanePropertiesKHR(PhysicalDevice, &planeCount, nullptr);
@@ -1473,7 +1493,7 @@ std::vector<sDisplayMode> VulkanDevice::GetAllSupportedResolutions() const
 
 		for (VkDisplayKHR display : displays) 
 		{
-			sDisplayMode DisplayMode;
+			sDisplayDesc DisplayMode;
 			VkDisplayPropertiesKHR displayProperties;
 			vkGetPhysicalDeviceDisplayPropertiesKHR(PhysicalDevice, &displayCount, &displayProperties);
 
@@ -1964,14 +1984,14 @@ ISamplerState::UniquePtr VulkanDevice::CreateUniqueSamplerState(const std::strin
 	return VulkanSamplerState::CreateUnique(this, InName, InDesc);
 }
 
-IRenderTarget::SharedPtr VulkanDevice::CreateRenderTarget(const std::string InName, const EFormat Format, const sFBODesc& Desc)
+IRenderTarget::SharedPtr VulkanDevice::CreateRenderTarget(const std::string InName, const sFrameBuffer& InDesc, const sFBODesc& FBODesc)
 {
-	return VulkanRenderTarget::Create(this, InName, Format, Desc);
+	return VulkanRenderTarget::Create(this, InName, InDesc, FBODesc);
 }
 
-IRenderTarget::UniquePtr VulkanDevice::CreateUniqueRenderTarget(const std::string InName, const EFormat Format, const sFBODesc& Desc)
+IRenderTarget::UniquePtr VulkanDevice::CreateUniqueRenderTarget(const std::string InName, const sFrameBuffer& InDesc, const sFBODesc& FBODesc)
 {
-	return VulkanRenderTarget::CreateUnique(this, InName, Format, Desc);
+	return VulkanRenderTarget::CreateUnique(this, InName, InDesc, FBODesc);
 }
 
 IDepthTarget::SharedPtr VulkanDevice::CreateDepthTarget(const std::string InName, const EFormat Format, const sFBODesc& Desc)

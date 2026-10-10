@@ -34,10 +34,16 @@ class IAbstractGIDevice
 public:
 	virtual void InitWindow(void* HWND, std::uint32_t Width, std::uint32_t Height, bool Fullscreen) = 0;
 
+	virtual void BeginFrame() = 0;
+
+	virtual EGPUDeviceType GetDeviceType() = 0;
 	virtual void* GetInternalDevice() = 0;
+	virtual void* GetInternalSwapChain() = 0;
+	virtual void RecreateSwapChain() = 0;
 	virtual void Present(IRenderTarget* pRT) = 0;
 
-	virtual void BeginFrame() = 0;
+	virtual std::uint32_t GetBackBufferSize() const = 0;
+	virtual std::uint32_t GetCurrentBackBufferIndex() const = 0;
 
 	virtual void ResizeWindow(std::size_t Width, std::size_t Height) = 0;
 	virtual void FullScreen(const bool value) = 0;
@@ -46,10 +52,13 @@ public:
 	virtual bool IsVsyncEnabled() const = 0;
 	virtual void VsyncInterval(const std::uint32_t value) = 0;
 	virtual std::uint32_t GetVsyncInterval() const = 0;
+	virtual std::vector<sDisplayDesc> GetAllSupportedResolutions() const = 0;
+	virtual DisplayMode GetDisplayMode() const = 0;
 
-	virtual void GPUFlush() = 0;
 	virtual void WaitForGPU() = 0;
 	virtual void WaitForCPU() = 0;
+	virtual void WaitForCPUFence(std::uint64_t Value) = 0;
+	virtual std::uint64_t GPUFenceSignal() = 0;
 
 	virtual EGITypes GetGIType() const = 0;
 	virtual sGPUInfo GetGPUInfo() const = 0;
@@ -58,14 +67,10 @@ public:
 	virtual EFormat GetBackBufferFormat() const = 0;
 	virtual sViewport GetViewport() const = 0;
 
-	virtual std::uint32_t GetBackBufferSize() const = 0;
-	virtual std::uint32_t GetCurrentBackBufferIndex() const = 0;
-
 	virtual IShader::SharedPtr CompileShader(const sShaderAttachment& Attachment) = 0;
 	virtual IShader::SharedPtr CompileShader(std::wstring InSrcFile, std::string InFunctionName, eShaderType InProfile, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>()) = 0;
 	virtual IShader::SharedPtr CompileShader(const void* InCode, std::size_t Size, std::string InFunctionName, eShaderType InProfile, std::vector<sShaderDefines> InDefines = std::vector<sShaderDefines>()) = 0;
 
-	virtual std::vector<sDisplayMode> GetAllSupportedResolutions() const = 0;
 
 	virtual IGraphicsCommandContext::SharedPtr CreateGraphicsCommandContext() = 0;
 	virtual IGraphicsCommandContext::UniquePtr CreateUniqueGraphicsCommandContext() = 0;
@@ -100,8 +105,8 @@ public:
 	virtual ISamplerState::SharedPtr CreateSamplerState(const std::string InName, const sSamplerAttributeDesc& InDesc) = 0;
 	virtual ISamplerState::UniquePtr CreateUniqueSamplerState(const std::string InName, const sSamplerAttributeDesc& InDesc) = 0;
 
-	virtual IRenderTarget::SharedPtr CreateRenderTarget(const std::string InName, const EFormat Format, const sFBODesc& Desc) = 0;
-	virtual IRenderTarget::UniquePtr CreateUniqueRenderTarget(const std::string InName, const EFormat Format, const sFBODesc& Desc) = 0;
+	virtual IRenderTarget::SharedPtr CreateRenderTarget(const std::string InName, const sFrameBuffer& Desc, const sFBODesc& FBODesc) = 0;
+	virtual IRenderTarget::UniquePtr CreateUniqueRenderTarget(const std::string InName, const sFrameBuffer& Desc, const sFBODesc& FBODesc) = 0;
 	virtual IDepthTarget::SharedPtr CreateDepthTarget(const std::string InName, const EFormat Format, const sFBODesc& Desc) = 0;
 	virtual IDepthTarget::UniquePtr CreateUniqueDepthTarget(const std::string InName, const EFormat Format, const sFBODesc& Desc) = 0;
 	virtual IUnorderedAccessTarget::SharedPtr CreateUnorderedAccessTarget(const std::string InName, const EFormat Format, const sFBODesc& Desc, bool InEnableSRV) = 0;

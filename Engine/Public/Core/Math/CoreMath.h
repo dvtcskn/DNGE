@@ -58,6 +58,7 @@
 class FQuaternion;
 class FRotationMatrix;
 class FAngles;
+class FVector4;
 class FVector4A;
 class FBounds2D;
 
@@ -1112,11 +1113,11 @@ public:
 		, W(value)
 	{}
 
-	FORCEINLINE constexpr TVector4(const TVector3<T>& value) noexcept
+	FORCEINLINE constexpr TVector4(const TVector3<T>& value, const float InW = 1.0f) noexcept
 		: X(value.X)
 		, Y(value.Y)
 		, Z(value.Z)
-		, W(1.0f)
+		, W(InW)
 	{}
 
 	explicit FORCEINLINE constexpr TVector4(const TVector2<T>& XY, const TVector2<T>& ZW) noexcept
@@ -1234,6 +1235,8 @@ public:
 
 	FORCEINLINE constexpr operator FVector4A() const;
 	FORCEINLINE constexpr operator FVector4A();
+	FORCEINLINE constexpr operator FVector4() const;
+	FORCEINLINE constexpr operator FVector4();
 
 #if Enable_DirectX_Math
 	FORCEINLINE constexpr operator DirectX::XMFLOAT4() const
@@ -1777,11 +1780,11 @@ public:
 		, W(value)
 	{}
 
-	FORCEINLINE constexpr FVector4(const FVector& value) noexcept
+	FORCEINLINE constexpr FVector4(const FVector& value, const float InW = 1.0f) noexcept
 		: X(value.X)
 		, Y(value.Y)
 		, Z(value.Z)
-		, W(1.0f)
+		, W(InW)
 	{}
 
 	explicit FORCEINLINE constexpr FVector4(const FVector2& XY, const FVector2& ZW) noexcept
@@ -1992,6 +1995,17 @@ FORCEINLINE constexpr bool operator !=(const FVector4& value1, const FVector4& v
 	return !((value1.X == value2.X) && (value1.Y == value2.Y) && (value1.Z == value2.Z) && (value1.W == value2.W));
 };
 #endif
+
+template<typename T>
+FORCEINLINE constexpr TVector4<T>::operator FVector4() const
+{
+	return TVector4<T>(X, Y, Z, W);
+}
+template<typename T>
+FORCEINLINE constexpr TVector4<T>::operator FVector4()
+{
+	return TVector4<T>(X, Y, Z, W);
+}
 
 FORCEINLINE constexpr FVector4 operator +(const FVector4& value1, const FVector4& value2)
 {
@@ -2671,6 +2685,27 @@ public:
 			0.0f, 0.0f, 0.0f, 1.0f);
 	}
 
+	FORCEINLINE static FMatrix Identity3x3()
+	{
+		TMatrix3x3<float> Matrix3x3 = TMatrix3x3<float>::Identity();
+		FMatrix Matrix;
+		Matrix.r[0] = FVector4(Matrix3x3.r[0], 0.0f);
+		Matrix.r[1] = FVector4(Matrix3x3.r[1], 0.0f);
+		Matrix.r[2] = FVector4(Matrix3x3.r[2], 0.0f);
+
+		return Matrix;
+	}
+
+	FORCEINLINE static constexpr FMatrix CreateFrom3x3(const TMatrix3x3<float>& Matrix3x3, const FVector& Vec)
+	{
+		FMatrix Matrix;
+		Matrix.r[0] = FVector4(Matrix3x3.r[0], 0.0f);
+		Matrix.r[1] = FVector4(Matrix3x3.r[1], 0.0f);
+		Matrix.r[2] = FVector4(Matrix3x3.r[2], 0.0f);
+		Matrix.r[3] = FVector4(Vec, 1.0f);
+		return Matrix;
+	}
+
 	FORCEINLINE static constexpr FMatrix MatrixScaling(float ScaleX, float ScaleY, float ScaleZ) noexcept
 	{
 		FMatrix M;
@@ -2995,6 +3030,20 @@ public:
 		r[2] = Matrix.r[2];
 		r[3] = Matrix.r[3];
 	}
+	FORCEINLINE constexpr FMatrix(const TMatrix3x3<float>& Matrix)
+	{
+		r[0] = FVector4(Matrix.r[0], 0.0f);
+		r[1] = FVector4(Matrix.r[1], 0.0f);
+		r[2] = FVector4(Matrix.r[2], 0.0f);
+		r[3] = FVector4::Zero();
+	}
+	FORCEINLINE constexpr FMatrix(const TMatrix3x3<float>& Matrix, const FVector& Vec)
+	{
+		r[0] = FVector4(Matrix.r[0], 0.0f);
+		r[1] = FVector4(Matrix.r[1], 0.0f);
+		r[2] = FVector4(Matrix.r[2], 0.0f);
+		r[3] = FVector4(Vec, 1.0f);
+	}
 #endif
 	~FMatrix() = default;
 
@@ -3025,6 +3074,16 @@ public:
 	constexpr operator const float* () const
 	{
 		return (const float*)&_11;
+	}
+
+	constexpr void SetFromFVector(std::size_t Col, FVector Vec, float W = 1.0f)
+	{
+		r[Col] = FVector4(Vec.X, Vec.Y, Vec.Z, W);
+	}
+
+	constexpr void SetFromFVector4(std::size_t Col, FVector4 Vec)
+	{
+		r[Col] = Vec;
 	}
 
 #if Enable_DirectX_Math

@@ -83,7 +83,7 @@ public:
 
 	sGPUInfo GetGPUInfo() const;
 
-	std::vector<sDisplayMode> GetAllSupportedResolutions() const;
+	std::vector<sDisplayDesc> GetAllSupportedResolutions() const;
 
 	sScreenDimension GetScreenDimension() const;
 	void ResizeWindow(std::size_t Width, std::size_t Height);

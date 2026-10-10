@@ -79,9 +79,7 @@ public:
 	void CpuWait();
 
 	// Prefer the overload with an explicit, already-signaled value.
-	void GpuWaitForFence(
-		ID3D12CommandQueue* queue,
-		std::uint64_t fenceValue);
+	void GpuWaitForFence(ID3D12CommandQueue* queue,	std::uint64_t fenceValue);
 	void GpuWaitForFence(ID3D12CommandQueue* queue);
 
 	std::uint64_t GetFenceCounter() const noexcept

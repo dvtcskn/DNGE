@@ -199,9 +199,9 @@ public:
 		/*
 		* clear container slot
 		*/
-		std::vector<std::uint8_t> ZeroData;
+		/*std::vector<std::uint8_t> ZeroData;
 		ZeroData.resize(Descriptor.GetSize());
-		Container->Map(ZeroData.data(), Descriptor.Location, Descriptor.GetSize());
+		Container->Map(ZeroData.data(), Descriptor.Location, Descriptor.GetSize());*/
 	}
 
 	inline IByteAddressBuffer* GetContainer() const { return Container.get(); }

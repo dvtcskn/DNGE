@@ -60,7 +60,7 @@ public:
 	bool IsVsyncEnabled() const { return bIsVSYNCEnabled; }
 	UINT GetVsyncInterval() const { return SyncInterval; }
 
-	std::vector<sDisplayMode> GetAllSupportedResolutions() const;
+	std::vector<sDisplayDesc> GetAllSupportedResolutions() const;
 
 	FORCEINLINE ID3D11RenderTargetView* GetCurrentBackBufferRT() const { return RenderTargets[0].Get(); }
 	FORCEINLINE std::uint32_t GetBackBufferCount() const { return BackBufferCount; }

@@ -49,15 +49,16 @@ public:
 
 	virtual void* GetInternalCommandContext() override final { return CommandList.Get(); }
 
-	virtual bool BeginRecordCommandList(const ERenderPass RenderPass = ERenderPass::NONE) override final;
-	virtual void FinishRecordCommandList() override final;
-	virtual void ExecuteCommandList(ECommandContextExecuteType ExecuteType = ECommandContextExecuteType::Immediate, std::uint32_t Order = std::uint32_t(-1)) override final;
+	virtual ECommandContextBeginResult BeginRecordCommandList(const ECommandContextBeginState Begin = ECommandContextBeginState::Default) override final;
+	virtual bool FinishRecordCommandList() override final;
+	virtual bool ExecuteCommandList(ECommandContextExecuteType ExecuteType = ECommandContextExecuteType::Immediate, std::uint32_t Order = std::uint32_t(-1)) override final;
+	void OnExecuteCommandList();
 
-	virtual bool IsRecorded() const override final { return false; }
+	virtual ECommandContextState GetState() const override final { return State; }
 
 	void Open();
 	void Close();
-	bool IsClosed() const { return bIsClosed; }
+	bool IsClosed() const { return State == ECommandContextState::End; }
 
 	void ResourceBarrier(UINT NumBarriers, const D3D12_RESOURCE_BARRIER* pBarriers);
 	void TransitionTo(D3D12RenderTarget* RT, D3D12_RESOURCE_STATES State);
@@ -130,11 +131,8 @@ private:
 	D3D12Pipeline* CurrentPipeline;
 	D3D12RootSignature* CurrentRootSignature;
 
-	bool bIsClosed;
+	ECommandContextState State;
 	bool bWaitForCompletion;
-
-	bool bIsRenderPassEnabled;
-	bool bIsRenderPassActive;
 
 	std::map<D3D12_RESOURCE_STATES, std::vector<D3D12RenderTarget*>> RT_ToTransition;
 	std::map<D3D12_RESOURCE_STATES, std::vector<D3D12DepthTarget*>> Depth_ToTransition;
@@ -157,6 +155,8 @@ public:
 	virtual void BeginRecordCommandList() override final;
 	virtual void FinishRecordCommandList() override final;
 	virtual void ExecuteCommandList() override final;
+
+	virtual ECommandContextState GetState() const override final { return ECommandContextState(); }
 
 	void Open();
 	void Close();

@@ -46,12 +46,12 @@ public:
 
 	FORCEINLINE ID3D11DeviceContext1* Get() const { return DeferredCTX.Get(); }
 
-	virtual bool BeginRecordCommandList(const ERenderPass RenderPass = ERenderPass::NONE) override final;
-	virtual void FinishRecordCommandList() override final;
-	virtual void ExecuteCommandList(ECommandContextExecuteType ExecuteType = ECommandContextExecuteType::Immediate, std::uint32_t Order = std::uint32_t(-1)) override final;
+	virtual ECommandContextBeginResult BeginRecordCommandList(const ECommandContextBeginState Begin = ECommandContextBeginState::Default) override final;
+	virtual bool FinishRecordCommandList() override final;
+	virtual bool ExecuteCommandList(ECommandContextExecuteType ExecuteType = ECommandContextExecuteType::Immediate, std::uint32_t Order = std::uint32_t(-1)) override final;
 	virtual void ClearState() override final;
 
-	virtual bool IsRecorded() const override final { return false; }
+	virtual ECommandContextState GetState() const override final { return State; }
 
 	virtual void* GetInternalCommandContext() override final { return DeferredCTX.Get(); }
 
@@ -111,6 +111,7 @@ private:
 	D3D11Device* Owner;
 	ComPtr<ID3D11CommandList> CommandList;
 	ComPtr<ID3D11DeviceContext1> DeferredCTX;
+	ECommandContextState State;
 
 	D3D11Pipeline* ActivePipeline;
 
@@ -141,6 +142,8 @@ public:
 	virtual void UpdateBufferSubresource(IVertexBuffer* Buffer, std::size_t Location, std::size_t Size, const void* pSrcData) override final;
 	virtual void UpdateBufferSubresource(IIndexBuffer* Buffer, BufferSubresource* Subresource) override final;
 	virtual void UpdateBufferSubresource(IIndexBuffer* Buffer, std::size_t Location, std::size_t Size, const void* pSrcData) override final;
+
+	virtual ECommandContextState GetState() const override final { return ECommandContextState(); }
 
 private:
 	D3D11Device* Owner;

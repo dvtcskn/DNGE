@@ -29,25 +29,30 @@
 #include "GI/D3DShared/D3DShared.h"
 #include "D3D12Device.h"
 #include "Utilities/FileManager.h"
+#include "D3D12CommandBuffer.h"
 
-D3D12RenderTarget::D3D12RenderTarget(D3D12Device* InOwner, const std::string InName, const EFormat InFormat, const sFBODesc& Desc, bool InIsSRVAllowed, bool InIsUnorderedAccessAllowed)
+D3D12RenderTarget::D3D12RenderTarget(D3D12Device* InOwner, const std::string InName, const sFrameBuffer& InDesc, const sFBODesc& FBODesc)
 	: Super()
 	, Name(InName)
-	, Format(InFormat)
+	, Desc(InDesc)
 	, RTV(D3D12DescriptorHandle(D3D12_DESCRIPTOR_HEAP_TYPE_RTV))
 	, SRV(D3D12DescriptorHandle(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV))
 	, UAV(D3D12DescriptorHandle(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV))
+	, bIsSRVSupported(false)
+	, bIsUAVSupported(false)
 	, CurrentState(D3D12_RESOURCE_STATES::D3D12_RESOURCE_STATE_RENDER_TARGET)
-	, bIsSRVSupported(InIsSRVAllowed)
-	, bIsUAVSupported(InIsUnorderedAccessAllowed)
+	, CurrentBarrierLayout(D3D12_BARRIER_LAYOUT_UNDEFINED)
+	, CurrentSyncState(D3D12_BARRIER_SYNC_NONE)
+	, CurrentAccessState(D3D12_BARRIER_ACCESS_NO_ACCESS)
 {
-	const DXGI_FORMAT DXGIFormat = ConvertFormat_Format_To_DXGI(Format);
+	bIsSRVSupported = InDesc.AttachmentType == EFrameBufferAttachmentType::RT_SRV || InDesc.AttachmentType == EFrameBufferAttachmentType::RT_SRV_UAV;
+	bIsUAVSupported = InDesc.AttachmentType == EFrameBufferAttachmentType::RT_UAV || InDesc.AttachmentType == EFrameBufferAttachmentType::RT_SRV_UAV;
+
+	const DXGI_FORMAT DXGIFormat = ConvertFormat_Format_To_DXGI(Desc.Format);
 	D3D12_RESOURCE_FLAGS Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-	//if (!bIsSRVSupported)
-	//	Flags |= D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE;
 	if (bIsUAVSupported)
 		Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-	CD3DX12_RESOURCE_DESC resourceDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGIFormat, Desc.Dimensions.X, Desc.Dimensions.Y, 1, 1, 1, 0, Flags);
+	CD3DX12_RESOURCE_DESC resourceDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGIFormat, FBODesc.Dimensions.X, FBODesc.Dimensions.Y, 1, 1, 1, 0, Flags);
 
 	const std::uint32_t mipLevel = -1;
 	const std::uint32_t arraySize = -1;
@@ -55,7 +60,6 @@ D3D12RenderTarget::D3D12RenderTarget(D3D12Device* InOwner, const std::string InN
 
 	{
 		D3D12_CLEAR_VALUE clearValue = {};
-		D3D12_RESOURCE_STATES states = D3D12_RESOURCE_STATE_COMMON;
 
 		clearValue.Format = DXGIFormat;
 		clearValue.Color[0] = 0.0f;
@@ -72,13 +76,14 @@ D3D12RenderTarget::D3D12RenderTarget(D3D12Device* InOwner, const std::string InN
 			clearValue.Color[3] = clearColor[3];
 		}
 
-		states |= D3D12_RESOURCE_STATE_RENDER_TARGET;
-
-		if (!bIsSRVSupported)
-			states |= D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-
-		//if (!bIsUAVSupported)
-		//	states |= D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+		if (bIsUAVSupported && bIsSRVSupported)
+			CurrentState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE |	D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+		else if (bIsSRVSupported)
+			CurrentState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+		else if (bIsUAVSupported)
+			CurrentState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+		else
+			CurrentState = D3D12_RESOURCE_STATE_RENDER_TARGET;
 
 		auto HeapDesc = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 
@@ -103,7 +108,7 @@ D3D12RenderTarget::D3D12RenderTarget(D3D12Device* InOwner, const std::string InN
 				&HeapDesc,
 				D3D12_HEAP_FLAG_NONE,
 				&resourceDesc,
-				states,
+				CurrentState,
 				&clearValue,
 				IID_PPV_ARGS(&Texture));
 			assert(hr == S_OK);
@@ -211,6 +216,54 @@ D3D12RenderTarget::~D3D12RenderTarget()
 	Texture = nullptr;
 }
 
+void D3D12RenderTarget::AsResource(EResourceState ResourceState, IGraphicsCommandContext* GraphicsCommandContext)
+{
+	/*D3D12CommandBuffer* CommandContext = Owner->GetIMCommandList();
+	CommandContext->BeginRecordCommandList();
+	CommandContext->TransitionTo(this, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+	CommandContext->FinishRecordCommandList();
+	CommandContext->ExecuteCommandList(); */
+
+	switch (ResourceState)
+	{
+	case EResourceState::Common:
+	{
+		D3D12CommandBuffer* CommandContext = static_cast<D3D12CommandBuffer*>(GraphicsCommandContext);
+		CommandContext->TransitionTo(this, D3D12_RESOURCE_STATE_COMMON);
+	}
+		break;
+	case EResourceState::RenderTarget:
+	{
+		D3D12CommandBuffer* CommandContext = static_cast<D3D12CommandBuffer*>(GraphicsCommandContext);
+		CommandContext->TransitionTo(this, D3D12_RESOURCE_STATE_RENDER_TARGET);
+	}
+		break;
+	case EResourceState::Depth:
+	{
+
+	}
+		break;
+	case EResourceState::ShaderResource:
+	{
+		D3D12CommandBuffer* CommandContext = static_cast<D3D12CommandBuffer*>(GraphicsCommandContext);
+		CommandContext->TransitionTo(this, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+	}
+		break;
+	case EResourceState::NonPixelShaderResource:
+	{
+		D3D12CommandBuffer* CommandContext = static_cast<D3D12CommandBuffer*>(GraphicsCommandContext);
+		CommandContext->TransitionTo(this, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+	}
+		break;
+	case EResourceState::UAV:
+	{
+		D3D12CommandBuffer* CommandContext = static_cast<D3D12CommandBuffer*>(GraphicsCommandContext);
+		CommandContext->TransitionTo(this, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+	}
+		break;
+	}
+}
+
 D3D12DepthTarget::D3D12DepthTarget(D3D12Device* InOwner, const std::string InName, const EFormat InFormat, const sFBODesc& Desc)
 	: Super()
 	, Name(InName)
@@ -218,10 +271,14 @@ D3D12DepthTarget::D3D12DepthTarget(D3D12Device* InOwner, const std::string InNam
 	, DSV(D3D12DescriptorHandle(D3D12_DESCRIPTOR_HEAP_TYPE_DSV))
 	, SRV(D3D12DescriptorHandle(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV))
 	, CurrentState(D3D12_RESOURCE_STATES::D3D12_RESOURCE_STATE_DEPTH_WRITE)
+	, CurrentBarrierLayout(D3D12_BARRIER_LAYOUT_UNDEFINED)
+	, CurrentSyncState(D3D12_BARRIER_SYNC_NONE)
+	, CurrentAccessState(D3D12_BARRIER_ACCESS_NO_ACCESS)
 {
 	bIsSRVSupported = IsDepthSRVSupported(Format);
 	const DXGI_FORMAT DXGIFormat = ConvertFormat_Format_To_DXGI(Format);
-	CD3DX12_RESOURCE_DESC resourceDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGIFormat, Desc.Dimensions.X, Desc.Dimensions.Y, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
+	D3D12_RESOURCE_FLAGS Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+	CD3DX12_RESOURCE_DESC resourceDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGIFormat, Desc.Dimensions.X, Desc.Dimensions.Y, 1, 1, 1, 0, Flags);
 	//resourceDesc.Flags |= D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE;
 
 	const std::uint32_t mipLevel = -1;
@@ -357,9 +414,9 @@ D3D12DepthTarget::D3D12DepthTarget(D3D12Device* InOwner, const std::string InNam
 				InOwner->Get()->CreateShaderResourceView(Texture.Get(), &srvDesc, SRV.GetCPU());
 			}
 		}
-		else
+		//else
 		{
-			throw std::runtime_error("Invalid Depth Format");
+			//throw std::runtime_error("Invalid Depth Format");
 		}
 	}
 }
@@ -367,6 +424,46 @@ D3D12DepthTarget::D3D12DepthTarget(D3D12Device* InOwner, const std::string InNam
 D3D12DepthTarget::~D3D12DepthTarget()
 {
 	Texture = nullptr;
+}
+
+void D3D12DepthTarget::AsResource(EResourceState ResourceState, IGraphicsCommandContext* GraphicsCommandContext)
+{
+	/*D3D12CommandBuffer* CommandContext = Owner->GetIMCommandList();
+	CommandContext->BeginRecordCommandList();
+	CommandContext->TransitionTo(this, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+	CommandContext->FinishRecordCommandList();
+	CommandContext->ExecuteCommandList(); */
+
+	switch (ResourceState)
+	{
+	case EResourceState::Common:
+	{
+		D3D12CommandBuffer* CommandContext = static_cast<D3D12CommandBuffer*>(GraphicsCommandContext);
+		CommandContext->TransitionTo(this, D3D12_RESOURCE_STATE_COMMON);
+	}
+		break;
+	case EResourceState::RenderTarget:
+	{
+
+	}
+		break;
+	case EResourceState::Depth:
+	{
+		D3D12CommandBuffer* CommandContext = static_cast<D3D12CommandBuffer*>(GraphicsCommandContext);
+		CommandContext->TransitionTo(this, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+	}
+		break;
+	case EResourceState::ShaderResource:
+	{
+		D3D12CommandBuffer* CommandContext = static_cast<D3D12CommandBuffer*>(GraphicsCommandContext);
+		CommandContext->TransitionTo(this, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+	}
+		break;
+	case EResourceState::NonPixelShaderResource:
+		break;
+	case EResourceState::UAV:
+		break;
+	}
 }
 
 D3D12UnorderedAccessTarget::D3D12UnorderedAccessTarget(D3D12Device* InOwner, const std::string InName, const EFormat InFormat, const sFBODesc& Desc, bool InEnableSRV)
@@ -377,6 +474,9 @@ D3D12UnorderedAccessTarget::D3D12UnorderedAccessTarget(D3D12Device* InOwner, con
 	, SRV(D3D12DescriptorHandle(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV))
 	, CurrentState(D3D12_RESOURCE_STATES::D3D12_RESOURCE_STATE_COMMON)
 	, bIsSRVSupported(InEnableSRV)
+	, CurrentBarrierLayout(D3D12_BARRIER_LAYOUT_UNDEFINED)
+	, CurrentSyncState(D3D12_BARRIER_SYNC_NONE)
+	, CurrentAccessState(D3D12_BARRIER_ACCESS_NO_ACCESS)
 {
 	const DXGI_FORMAT DXGIFormat = ConvertFormat_Format_To_DXGI(Format);
 	CD3DX12_RESOURCE_DESC resourceDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGIFormat, Desc.Dimensions.X, Desc.Dimensions.Y, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
@@ -512,19 +612,19 @@ D3D12FrameBuffer::D3D12FrameBuffer(D3D12Device* InOwner, std::string InName, con
 		}
 		else if (FB.AttachmentType == EFrameBufferAttachmentType::RT)
 		{
-			RenderTargets.push_back(D3D12RenderTarget::Create(Owner, Name + "_RenderTarget_" + std::to_string(RenderTargets.size()), FB.Format, FDesc, false, false));
+			RenderTargets.push_back(D3D12RenderTarget::Create(Owner, Name + "_RenderTarget_" + std::to_string(RenderTargets.size()), sFrameBuffer(FB.Format, FB.AttachmentType), FDesc));
 		}
 		else if (FB.AttachmentType == EFrameBufferAttachmentType::RT_SRV)
 		{
-			RenderTargets.push_back(D3D12RenderTarget::Create(Owner, Name + "_RenderTarget_" + std::to_string(RenderTargets.size()), FB.Format, FDesc, true, false));
+			RenderTargets.push_back(D3D12RenderTarget::Create(Owner, Name + "_RenderTarget_" + std::to_string(RenderTargets.size()), sFrameBuffer(FB.Format, FB.AttachmentType), FDesc));
 		}
 		else if (FB.AttachmentType == EFrameBufferAttachmentType::RT_UAV)
 		{
-			RenderTargets.push_back(D3D12RenderTarget::Create(Owner, Name + "_RenderTarget_" + std::to_string(RenderTargets.size()), FB.Format, FDesc, false, true));
+			RenderTargets.push_back(D3D12RenderTarget::Create(Owner, Name + "_RenderTarget_" + std::to_string(RenderTargets.size()), sFrameBuffer(FB.Format, FB.AttachmentType), FDesc));
 		}
 		else if (FB.AttachmentType == EFrameBufferAttachmentType::RT_SRV_UAV)
 		{
-			RenderTargets.push_back(D3D12RenderTarget::Create(Owner, Name + "_RenderTarget_" + std::to_string(RenderTargets.size()), FB.Format, FDesc, true, true));
+			RenderTargets.push_back(D3D12RenderTarget::Create(Owner, Name + "_RenderTarget_" + std::to_string(RenderTargets.size()), sFrameBuffer(FB.Format, FB.AttachmentType), FDesc));
 		}
 		else if (FB.AttachmentType == EFrameBufferAttachmentType::Depth)
 		{
@@ -544,7 +644,7 @@ D3D12FrameBuffer::D3D12FrameBuffer(D3D12Device* InOwner, std::string InName, con
 		}
 	}
 
-	if (IsValidDepthFormat(AttachmentInfo.DepthFormat))
+	//if (IsValidDepthFormat(AttachmentInfo.DepthFormat))
 	{
 		DepthTarget = D3D12DepthTarget::Create(Owner, Name + "_DepthTarget", AttachmentInfo.DepthFormat, FDesc);
 	}
@@ -578,7 +678,7 @@ void D3D12FrameBuffer::AttachRenderTarget(const IRenderTarget::SharedPtr& Render
 			RenderTargets.push_back(RT);
 
 		if (Index.has_value())
-			AttachmentInfo.FrameBuffer.insert(AttachmentInfo.FrameBuffer.begin() + Index.value(), sFrameBufferAttachmentInfo::sFrameBuffer(RT->GetFormat(), AttachmentType));
+			AttachmentInfo.FrameBuffer.insert(AttachmentInfo.FrameBuffer.begin() + Index.value(), sFrameBuffer(RT->GetFormat(), AttachmentType));
 		else
 			AttachmentInfo.AddFrameBuffer(RT->GetFormat(), AttachmentType);
 	}
@@ -604,7 +704,7 @@ void D3D12FrameBuffer::AttachUnorderedAccessTarget(const IUnorderedAccessTarget:
 			UnorderedAccessTargets.push_back(ST);
 
 		if (Index.has_value())
-			AttachmentInfo.FrameBuffer.insert(AttachmentInfo.FrameBuffer.begin() + Index.value(), sFrameBufferAttachmentInfo::sFrameBuffer(ST->GetFormat(), AttachmentType));
+			AttachmentInfo.FrameBuffer.insert(AttachmentInfo.FrameBuffer.begin() + Index.value(), sFrameBuffer(ST->GetFormat(), AttachmentType));
 		else
 			AttachmentInfo.AddFrameBuffer(ST->GetFormat(), AttachmentType);
 	}

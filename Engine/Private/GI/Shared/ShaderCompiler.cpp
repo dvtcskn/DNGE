@@ -5,6 +5,8 @@
 #include <ranges>
 #include <unordered_set>
 
+#pragma comment(lib, "dxcompiler.lib")
+
 // Include handler library to collect all included files for tracking
 class FileTrackingIncludeHandler : public IDxcIncludeHandler
 {

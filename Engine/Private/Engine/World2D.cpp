@@ -33,6 +33,8 @@
 #define DOWNSCALE PhysicalWorldScale
 #define UPSCALE 1.0f / PhysicalWorldScale
 
+#pragma comment(lib, "box2d.lib")
+
 std::vector<IRigidBody*> RigidBodys;
 
 void sWorld2D::DestructionListener::SayGoodbye(b2Fixture* fixture)

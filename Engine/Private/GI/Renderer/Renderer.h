@@ -30,6 +30,7 @@
 #include "CanvasRenderer.h"
 #include "PostProcessRenderer.h"
 #include "AbstractGI/ToneMapping.h"
+#include "FSR.h"
 #include "LineRenderer.h"
 #include "ParticleRenderer.h"
 
@@ -80,6 +81,11 @@ public:
 	inline sScreenDimension GetInternalBaseRenderResolution() const { return InternalBaseRenderResolution; }
 	void SetInternalBaseRenderResolution(std::size_t Width, std::size_t Height);
 
+	void SetUpscalerType(ERendererUpscalerType UpscalerType);
+	void SetUpscaleMode(ERendererUpscaleMode UpscaleMode);
+	void SetFSRSharpness(float Sharpness);
+	void SetEnableFrameGen(bool bEnable, std::uint32_t Multiplier = 2);
+
 	void SetRendererClearMode(ERendererClear Mode);
 	ERendererClear GetRendererClearMode() { return GBufferClearMode; }
 
@@ -102,8 +108,13 @@ private:
 	sLineRenderer::SharedPtr LineRenderer;
 	ERendererClear GBufferClearMode;
 	ParticleRenderer::SharedPtr pParticleRenderer;
+	sFSR::SharedPtr FSR;
 
 	bool bIsTonmapperEnabled;
 
 	std::map<EPostProcessRenderOrder, std::vector<std::shared_ptr<sPostProcess>>> PostProcess;
+
+	ERendererUpscalerType UpscalerType;
+
+	bool bSoftwareDeviceUpscallerSupport;
 };

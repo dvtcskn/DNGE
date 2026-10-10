@@ -247,7 +247,7 @@ void sLineRenderer::Render(IRenderTarget* BackBuffer, std::uint32_t CameraBindle
 	if (Lines.GetDrawCount() == 0)
 		return;
 
-	GraphicsCommandContext->BeginRecordCommandList(ERenderPass::GBuffer);
+	GraphicsCommandContext->BeginRecordCommandList(ECommandContextBeginState::Render);
 
 	GraphicsCommandContext->SetRenderTarget(BackBuffer);
 
@@ -286,7 +286,7 @@ void sLineRenderer::Render(IGraphicsCommandContext* CMD, bool Exec, IRenderTarge
 	if (Lines.GetDrawCount() == 0)
 		return;
 
-	CMD->BeginRecordCommandList(ERenderPass::GBuffer);
+	CMD->BeginRecordCommandList(ECommandContextBeginState::Render);
 
 	CMD->SetRenderTarget(BackBuffer);
 

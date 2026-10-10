@@ -30,28 +30,31 @@
 #include "VulkanCommandBuffer.h"
 #include "VulkanFormat.h"
 
-VulkanRenderTarget::VulkanRenderTarget(VulkanDevice* InOwner, const std::string InName, const EFormat InFormat, const sFBODesc& InDesc, bool InIsSRVAllowed, bool InIsUnorderedAccessAllowed)
+VulkanRenderTarget::VulkanRenderTarget(VulkanDevice* InOwner, const std::string InName, const sFrameBuffer& InDesc, const sFBODesc& InFBODesc)
 	: Super()
 	, Name(InName)
-	, Format(InFormat)
 	, Desc(InDesc)
-	, bIsSRVSupported(InIsSRVAllowed)
-	, bIsUAVSupported(InIsUnorderedAccessAllowed)
+	, FBODesc(InFBODesc)
+	, bIsSRVSupported(false)
+	, bIsUAVSupported(false)
 	, CurrentLayout(VkImageLayout::VK_IMAGE_LAYOUT_UNDEFINED)
 {
-	VkFormat VulkanFormat = ConvertFormat_Format_To_VkFormat(Format);
+	bIsSRVSupported = InDesc.AttachmentType == EFrameBufferAttachmentType::RT_SRV || InDesc.AttachmentType == EFrameBufferAttachmentType::RT_SRV_UAV;
+	bIsUAVSupported = InDesc.AttachmentType == EFrameBufferAttachmentType::RT_UAV || InDesc.AttachmentType == EFrameBufferAttachmentType::RT_SRV_UAV;
+
+	VkFormat VulkanFormat = ConvertFormat_Format_To_VkFormat(Desc.Format);
 
 	// Create VkImage
 	VkImageCreateInfo imageInfo{};
 	imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 	imageInfo.imageType = VK_IMAGE_TYPE_2D;
-	imageInfo.extent = { Desc.Dimensions.X, Desc.Dimensions.Y, 1 };
+	imageInfo.extent = { InFBODesc.Dimensions.X, InFBODesc.Dimensions.Y, 1 };
 	imageInfo.mipLevels = 1;
 	imageInfo.arrayLayers = 1;
 	imageInfo.format = VulkanFormat;
 	imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL; // Optimal tiling for GPU access
 	imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED; // Will transition later
-	imageInfo.usage = InIsSRVAllowed ? VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT
+	imageInfo.usage = bIsSRVSupported ? VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT
 		: VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT; // As render target and texture
 	imageInfo.samples = VK_SAMPLE_COUNT_1_BIT; // No MSAA
 	imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
@@ -298,19 +301,19 @@ VulkanFrameBuffer::VulkanFrameBuffer(VulkanDevice* InOwner, const std::string In
 		}
 		else if (FB.AttachmentType == EFrameBufferAttachmentType::RT)
 		{
-			RenderTargets.push_back(VulkanRenderTarget::Create(Owner, Name + "_RenderTarget_" + std::to_string(RenderTargets.size()), FB.Format, FDesc, false, false));
+			RenderTargets.push_back(VulkanRenderTarget::Create(Owner, Name + "_RenderTarget_" + std::to_string(RenderTargets.size()), sFrameBuffer(FB.Format, FB.AttachmentType), FDesc));
 		}
 		else if (FB.AttachmentType == EFrameBufferAttachmentType::RT_SRV)
 		{
-			RenderTargets.push_back(VulkanRenderTarget::Create(Owner, Name + "_RenderTarget_" + std::to_string(RenderTargets.size()), FB.Format, FDesc, true, false));
+			RenderTargets.push_back(VulkanRenderTarget::Create(Owner, Name + "_RenderTarget_" + std::to_string(RenderTargets.size()), sFrameBuffer(FB.Format, FB.AttachmentType), FDesc));
 		}
 		else if (FB.AttachmentType == EFrameBufferAttachmentType::RT_UAV)
 		{
-			RenderTargets.push_back(VulkanRenderTarget::Create(Owner, Name + "_RenderTarget_" + std::to_string(RenderTargets.size()), FB.Format, FDesc, false, true));
+			RenderTargets.push_back(VulkanRenderTarget::Create(Owner, Name + "_RenderTarget_" + std::to_string(RenderTargets.size()), sFrameBuffer(FB.Format, FB.AttachmentType), FDesc));
 		}
 		else if (FB.AttachmentType == EFrameBufferAttachmentType::RT_SRV_UAV)
 		{
-			RenderTargets.push_back(VulkanRenderTarget::Create(Owner, Name + "_RenderTarget_" + std::to_string(RenderTargets.size()), FB.Format, FDesc, true, true));
+			RenderTargets.push_back(VulkanRenderTarget::Create(Owner, Name + "_RenderTarget_" + std::to_string(RenderTargets.size()), sFrameBuffer(FB.Format, FB.AttachmentType), FDesc));
 		}
 		else if (FB.AttachmentType == EFrameBufferAttachmentType::Depth)
 		{
@@ -392,7 +395,7 @@ void VulkanFrameBuffer::AttachRenderTarget(const IRenderTarget::SharedPtr& Rende
 			RenderTargets.push_back(RT);
 
 		if (Index.has_value())
-			AttachmentInfo.FrameBuffer.insert(AttachmentInfo.FrameBuffer.begin() + Index.value(), sFrameBufferAttachmentInfo::sFrameBuffer(RT->GetFormat(), AttachmentType));
+			AttachmentInfo.FrameBuffer.insert(AttachmentInfo.FrameBuffer.begin() + Index.value(), sFrameBuffer(RT->GetFormat(), AttachmentType));
 		else
 			AttachmentInfo.AddFrameBuffer(RT->GetFormat(), AttachmentType);
 	}
@@ -418,7 +421,7 @@ void VulkanFrameBuffer::AttachUnorderedAccessTarget(const IUnorderedAccessTarget
 			UnorderedAccessTargets.push_back(ST);
 
 		if (Index.has_value())
-			AttachmentInfo.FrameBuffer.insert(AttachmentInfo.FrameBuffer.begin() + Index.value(), sFrameBufferAttachmentInfo::sFrameBuffer(ST->GetFormat(), AttachmentType));
+			AttachmentInfo.FrameBuffer.insert(AttachmentInfo.FrameBuffer.begin() + Index.value(), sFrameBuffer(ST->GetFormat(), AttachmentType));
 		else
 			AttachmentInfo.AddFrameBuffer(ST->GetFormat(), AttachmentType);
 	}

@@ -66,4 +66,6 @@ public:
 
 	virtual void Dispatch(std::uint32_t ThreadGroupCountX, std::uint32_t ThreadGroupCountY, std::uint32_t ThreadGroupCountZ) override final;
 	virtual void ExecuteIndirect(IIndirectBuffer* IndirectBuffer) override final;
+
+	virtual ECommandContextState GetState() const override final { return ECommandContextState(); }
 };

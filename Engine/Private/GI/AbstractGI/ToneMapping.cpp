@@ -97,7 +97,7 @@ struct sTonemappingSceneDescriptor : public IBindlessSceneContainer
 sToneMapping::sToneMapping(std::size_t Width, std::size_t Height)
     : TonemapperIndex(4)
 {
-    PostProcessFB = IRenderTarget::Create("sToneMapping", GPU::GetBackBufferFormat(), sFBODesc(sFBODesc::sFBODimension((std::uint32_t)Width, (std::uint32_t)Height)));
+    PostProcessFB = IRenderTarget::Create("sToneMapping", sFrameBuffer(GPU::GetBackBufferFormat(), EFrameBufferAttachmentType::RT_SRV), sFBODesc(sFBODesc::sFBODimension((std::uint32_t)Width, (std::uint32_t)Height)));
 
     const sShaderAttachment PostProcessShader = sShaderAttachment(FileManager::GetShaderFolderW() + L"Tonemapping.hlsl", "mainPS", eShaderType::Pixel);
     std::vector<sShaderBinding> DescriptorSetLayout;

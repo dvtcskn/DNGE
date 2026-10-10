@@ -329,7 +329,7 @@ void sCanvasRenderer::Render(ICanvas* Canvas, IRenderTarget* pFB, std::optional<
 		};
 
 	{
-		CMD->BeginRecordCommandList(ERenderPass::UI);
+		CMD->BeginRecordCommandList(ECommandContextBeginState::Render);
 
 		sViewport CanvasViewport = Viewport.has_value() ? *Viewport : sViewport(ScreenDimension);
 
@@ -440,8 +440,9 @@ void sCanvasRenderer::Render(const std::vector<ICanvas*>& Canvases, IRenderTarge
 		};
 
 	{
-		bool bDraw = false;
-		CMD->BeginRecordCommandList(ERenderPass::UI);
+		auto State = CMD->BeginRecordCommandList(ECommandContextBeginState::Render);
+		if (State != ECommandContextBeginResult::Failed_WaitingForExecute)
+			return;
 
 		sViewport CanvasViewport = Viewport.has_value() ? *Viewport : sViewport(ScreenDimension);
 
@@ -479,7 +480,6 @@ void sCanvasRenderer::Render(const std::vector<ICanvas*>& Canvases, IRenderTarge
 						continue;
 					}
 					fDraw(pFB, VertexBuffer, IndexBuffer, Widget, std::nullopt, CanvasViewport, eZOrderMode::InOrder);
-					bDraw = true;
 
 					if (LastInTheHierarchy.size() > 0)
 					{
@@ -511,8 +511,7 @@ void sCanvasRenderer::Render(const std::vector<ICanvas*>& Canvases, IRenderTarge
 		};
 
 		CMD->FinishRecordCommandList();
-		if (bDraw)
-			CMD->ExecuteCommandList(ECommandContextExecuteType::Deferred, 4);
+		CMD->ExecuteCommandList(ECommandContextExecuteType::Deferred, 40);
 	}
 	LastMaterial = nullptr;
 }

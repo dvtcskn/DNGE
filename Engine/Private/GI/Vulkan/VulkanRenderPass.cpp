@@ -8,7 +8,7 @@ VulkanRenderpass::VulkanRenderpass(VulkanDevice* InDevice, std::string InName, c
 	, Device(InDevice)
 	, Info(InInfos)
 {
-	auto GetAttachmentInfos = [](std::vector<sFrameBufferAttachmentInfo::sFrameBuffer> FrameBuffer) -> std::vector<VkAttachmentDescription>
+	auto GetAttachmentInfos = [](std::vector<sFrameBuffer> FrameBuffer) -> std::vector<VkAttachmentDescription>
 	{
 		std::vector<VkAttachmentDescription> attachmentDescs;
 		for (uint32_t i = 0; i < FrameBuffer.size(); i++)

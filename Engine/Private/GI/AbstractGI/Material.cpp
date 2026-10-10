@@ -86,6 +86,11 @@ bool sMaterialInstance::Compile(std::vector<IRenderTarget*> RTs, IDepthTarget* D
 	return Parent->Compile(RTs, Depth);
 }
 
+bool sMaterialInstance::Recompile()
+{
+	return Parent->Recompile();
+}
+
 void sMaterialInstance::ApplyMaterialInstance(IGraphicsCommandContext* InCMDBuffer) const
 {
 	//if (GPU::IsBindlessRendererEnabled())

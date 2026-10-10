@@ -29,6 +29,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include "D3D12Device.h"
 #include "dx12.h"
 #include <DXGIDebug.h>
 
@@ -47,10 +48,14 @@ class D3D12Viewport final
 {
 	sBaseClassBody(sClassConstructor, D3D12Viewport)
 public:
-	static SharedPtr Create(D3D12Device* InOwner, ComPtr<IDXGIFactory4> InFactory, std::uint32_t InSizeX, std::uint32_t InSizeY, bool IsFullscreen, HWND InHandle);
+	static SharedPtr Create(D3D12Device* InOwner, ComPtr<IDXGIFactory7> InFactory, std::uint32_t InSizeX, std::uint32_t InSizeY, bool IsFullscreen, HWND InHandle);
 
-	D3D12Viewport(class D3D12Device* InOwner, ComPtr<IDXGIFactory4> InFactory, std::uint32_t InSizeX, std::uint32_t InSizeY, bool IsFullscreen, HWND InHandle);
+	D3D12Viewport(class D3D12Device* InOwner, ComPtr<IDXGIFactory7> InFactory, std::uint32_t InSizeX, std::uint32_t InSizeY, bool IsFullscreen, HWND InHandle);
 	~D3D12Viewport();
+
+	void CreateSwapChain(IDXGIFactory7* InFactory);
+	void RecreateSwapChain();
+	void SetSwapChain(ComPtr<IDXGISwapChain4> InSwapChain);
 
 	void BeginFrame();
 	void OnPresent(IRenderTarget* pRT);
@@ -65,9 +70,22 @@ public:
 	bool IsVsyncEnabled() const { return bIsVSYNCEnabled; }
 	UINT GetVsyncInterval() const { return SyncInterval; }
 
-	std::vector<sDisplayMode> GetAllSupportedResolutions() const;
+	std::vector<sDisplayDesc> GetAllSupportedResolutions() const;
 
-	FORCEINLINE ComPtr<IDXGISwapChain3> GetSwapChain() const { return SwapChain; }
+	DisplayMode CheckAndGetDisplayModeRequested(DisplayMode DispMode);
+	void PopulateHDRMetadataBasedOnDisplayMode();
+	void EnumerateOutputs();
+	void FindCurrentOutput();
+	void EnumerateHDRModes();
+#if AGS_Enable
+	void CheckFSHDRSupport();
+#endif
+	void SetHDRMetadataAndColorspace();
+	bool IntersectWindowAndOutput(const RECT& windowRect, const RECT& outputRect, float& bestIntersectArea);
+	void GetRefreshRate(double* outRefreshRate);
+
+	FORCEINLINE ComPtr<IDXGISwapChain4> GetSwapChain() const { return SwapChain; }
+	FORCEINLINE IDXGISwapChain4* GetSwapChainPtr() const { return SwapChain.Get(); }
 	FORCEINLINE HWND GetHandle() const { return WindowHandle; }
 	FORCEINLINE const D3D12_VIEWPORT& GetD3D12Viewport() { return viewport; }
 	FORCEINLINE std::uint32_t GetViewportWidth() const { return SizeX; }
@@ -75,9 +93,12 @@ public:
 	FORCEINLINE sViewport GetViewport() { return sViewport((std::uint32_t)viewport.Width, (std::uint32_t)viewport.Height, (std::uint32_t)viewport.TopLeftX, (std::uint32_t)viewport.TopLeftY, viewport.MinDepth, viewport.MaxDepth); }
 	FORCEINLINE EFormat GetBackBufferFormat() const { return BackBufferFormat; }
 	FORCEINLINE sScreenDimension GetScreenDimension() const { return sScreenDimension(SizeX, SizeY); }
+	FORCEINLINE DisplayMode GetDisplayMode() const { return CurrentDisplayMode; }
 
 	FORCEINLINE std::uint32_t GetBackBufferCount() const { return 2; }
 	FORCEINLINE std::uint32_t GetCurrentBackBufferIndex() const { return CurrentBackBuffer; }
+
+	DXGI_FORMAT GetDXGIFormat() const;
 
 private:
 	void CreateRenderTargets();
@@ -92,7 +113,15 @@ private:
 	std::uint32_t SizeX;
 	std::uint32_t SizeY;
 
-	ComPtr<IDXGISwapChain3> SwapChain;
+	DisplayMode CurrentDisplayMode;
+	std::vector<DisplayMode> SupportedDisplayModes;
+
+	DXGI_SWAP_CHAIN_DESC1 SwapChainDesc;
+	DXGI_SWAP_CHAIN_FULLSCREEN_DESC SwapChainFullscreenDesc;
+	ComPtr<IDXGISwapChain4> SwapChain;
+	ComPtr<IDXGIOutput6> CurrentOutput;
+	std::vector<ComPtr<IDXGIOutput6>> AttachedOutputs;
+	HDRMetadata HDR;
 
 	struct BackBufferRTV
 	{
@@ -106,10 +135,7 @@ private:
 			Release();
 		};
 
-		void Release()
-		{
-			renderTarget = nullptr;
-		}
+		void Release();
 
 		ComPtr<ID3D12Resource> renderTarget;
 		D3D12DescriptorHandle Handle;

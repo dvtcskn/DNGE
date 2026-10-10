@@ -47,26 +47,31 @@ public:
 	virtual ~D3D11Device();
 	virtual void InitWindow(void* HWND, std::uint32_t Width, std::uint32_t Height, bool Fullscreen) override final;
 	virtual void BeginFrame() override final;
+	virtual void RecreateSwapChain() override final;
 	virtual void Present(IRenderTarget* pRT) override final;
 	bool GetDeviceIdentification(std::wstring& InVendorID, std::wstring& InDeviceID);
 	IDXGIAdapter1* GetAdapter(std::optional<short> Index = std::nullopt);
 
+	virtual EGPUDeviceType GetDeviceType() override final { return DeviceType; }
 	virtual void* GetInternalDevice() override final { return Direct3DDevice.Get(); }
+	virtual void* GetInternalSwapChain() override final { return nullptr; }
 
 	virtual void ResizeWindow(std::size_t Width, std::size_t Height) override final;
 	virtual void FullScreen(const bool value) override final;
 	virtual void Vsync(const bool value) override final;
 	virtual void VsyncInterval(const std::uint32_t value) override final;
+	virtual std::vector<sDisplayDesc> GetAllSupportedResolutions() const override final;
+	virtual DisplayMode GetDisplayMode() const override final;
 
 	virtual bool IsFullScreen() const override final;
 	virtual bool IsVsyncEnabled() const override final;
 	virtual std::uint32_t GetVsyncInterval() const override final;
 
-	virtual void GPUFlush() override final;
+	virtual void GPUFlush();
 	virtual void WaitForGPU() override final;
 	virtual void WaitForCPU() override final;
-
-	virtual std::vector<sDisplayMode> GetAllSupportedResolutions() const override final;
+	virtual void WaitForCPUFence(std::uint64_t Value) override final;
+	virtual std::uint64_t GPUFenceSignal() override final;
 
 	virtual EGITypes GetGIType() const override final { return EGITypes::D3D11; }
 	virtual sGPUInfo GetGPUInfo() const override final { return sGPUInfo(); }
@@ -119,8 +124,8 @@ public:
 	virtual ISamplerState::SharedPtr CreateSamplerState(const std::string InName, const sSamplerAttributeDesc& InDesc) override final;
 	virtual ISamplerState::UniquePtr CreateUniqueSamplerState(const std::string InName, const sSamplerAttributeDesc& InDesc) override final;
 
-	virtual IRenderTarget::SharedPtr CreateRenderTarget(const std::string InName, const EFormat Format, const sFBODesc& Desc) override final;
-	virtual IRenderTarget::UniquePtr CreateUniqueRenderTarget(const std::string InName, const EFormat Format, const sFBODesc& Desc) override final;
+	virtual IRenderTarget::SharedPtr CreateRenderTarget(const std::string InName, const sFrameBuffer& Desc, const sFBODesc& FBODesc) override final;
+	virtual IRenderTarget::UniquePtr CreateUniqueRenderTarget(const std::string InName, const sFrameBuffer& Desc, const sFBODesc& FBODesc) override final;
 	virtual IDepthTarget::SharedPtr CreateDepthTarget(const std::string InName, const EFormat Format, const sFBODesc& Desc) override final;
 	virtual IDepthTarget::UniquePtr CreateUniqueDepthTarget(const std::string InName, const EFormat Format, const sFBODesc& Desc) override final;
 	virtual IUnorderedAccessTarget::SharedPtr CreateUnorderedAccessTarget(const std::string InName, const EFormat Format, const sFBODesc& Desc, bool InEnableSRV) override final;

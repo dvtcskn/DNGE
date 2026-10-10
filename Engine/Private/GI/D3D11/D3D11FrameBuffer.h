@@ -36,9 +36,10 @@ class D3D11RenderTarget final : public IRenderTarget
 {
 	sClassBody(sClassConstructor, D3D11RenderTarget, IRenderTarget)
 public:
-	D3D11RenderTarget(D3D11Device* InDevice, const std::string InName, const EFormat Format, const sFBODesc& Desc, bool InIsSRVAllowed = true, bool InIsUnorderedAccessAllowed = false);
+	D3D11RenderTarget(D3D11Device* InDevice, const std::string InName, const sFrameBuffer& InDesc, const sFBODesc& FBODesc);
 	virtual ~D3D11RenderTarget();
 
+	virtual void AsResource(EResourceState ResourceState, IGraphicsCommandContext* GraphicsCommandContext = nullptr) override final {}
 	virtual void* GetNativeTexture() const override final { return Texture.Get(); }
 
 	virtual void SetDefaultRootParameterIndex(std::uint32_t RootParameterIndex) override final {}
@@ -55,14 +56,14 @@ public:
 	virtual std::uint32_t GetSRVBindlessIndex() const override final { return std::uint32_t(-1); }
 	virtual std::uint32_t GetUAVBindlessIndex() const override final { return std::uint32_t(-1); }
 
-	EFormat GetFormat() const { return Format; }
+	EFormat GetFormat() const { return Desc.Format; }
 
 	virtual ResourceSharedHandle* GetSharedHandle() const override final { return nullptr; }
 	virtual bool CopyFrom(IRenderTarget* RenderTarget) override final { return false; }
 
 private:
 	std::string Name;
-	EFormat Format;
+	sFrameBuffer Desc;
 
 	ComPtr<ID3D11Texture2D> Texture;
 	ComPtr<ID3D11RenderTargetView> RenderTarget;
@@ -77,6 +78,7 @@ public:
 	D3D11DepthTarget(D3D11Device* InDevice, const std::string InName, const EFormat Format, const sFBODesc& Desc);
 	virtual ~D3D11DepthTarget();
 
+	virtual void AsResource(EResourceState ResourceState, IGraphicsCommandContext* GraphicsCommandContext = nullptr) override final {}
 	virtual void* GetNativeTexture() const override final { return Texture.Get(); }
 
 	virtual void SetDefaultRootParameterIndex(std::uint32_t RootParameterIndex) override final {}

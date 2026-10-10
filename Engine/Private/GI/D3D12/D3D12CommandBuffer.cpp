@@ -42,16 +42,13 @@ D3D12CommandBuffer::D3D12CommandBuffer(D3D12Device* InOwner)
 	, StencilRef(0)
 	, CurrentPipeline(nullptr)
 	, CurrentRootSignature(nullptr)
-	, bIsClosed(false)
 	, bWaitForCompletion(false)
-	, bIsRenderPassEnabled(false)
-	, bIsRenderPassActive(false)
+	, State(ECommandContextState::Waiting)
 {
 	auto Device = Owner->GetDevice();
 	CommandAllocator = Owner->RequestCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT);
 	ThrowIfFailed(Device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, CommandAllocator.Get(), nullptr, IID_PPV_ARGS(&CommandList)));
 	CommandList->Close();
-	bIsClosed = true;
 #if _DEBUG
 	CommandList->SetName(L"D3D12CommandBuffer");
 #endif
@@ -72,32 +69,42 @@ D3D12CommandBuffer::~D3D12CommandBuffer()
 	Owner = nullptr;
 }
 
-bool D3D12CommandBuffer::BeginRecordCommandList(const ERenderPass RenderPass)
+ECommandContextBeginResult D3D12CommandBuffer::BeginRecordCommandList(const ECommandContextBeginState Begin)
 {
 	if (Owner->IsCommandBufferPendingForExecute(this))
-		return false;
+		return ECommandContextBeginResult::Failed_WaitingForExecute;
+
+	bool bRestarted = false;
+	if (State == ECommandContextState::End)
+	{
+		Engine::WriteToConsole("WARNING : D3D12CommandBuffer is recording again. Previous records will be deleted!");
+		bRestarted = true;
+	}
+	if (State == ECommandContextState::Begin)
+		return ECommandContextBeginResult::AlreadyStarted;
+	if (State == ECommandContextState::WaitingForExecute)
+		return ECommandContextBeginResult::Failed_WaitingForExecute;
 
 	RT_ToTransition.clear();
 	Depth_ToTransition.clear();
 
 	Open();
 
-	if (RenderPass != ERenderPass::NONE)
+	if (Begin == ECommandContextBeginState::Render)
 	{
 		Owner->SetHeaps(CommandList.Get());
-		if (bIsRenderPassEnabled && RenderPass != ERenderPass::UI)
-			bIsRenderPassActive = true;
 	}
 	else
 	{
 		//Owner->CPUWait();
 	}
 
-	return true;
+	return bRestarted ? ECommandContextBeginResult::Restarted : ECommandContextBeginResult::Started;
 }
 
 void D3D12CommandBuffer::Open()
 {
+	State = ECommandContextState::Begin;
 	if (!CommandAllocator)
 	{
 		CommandAllocator = Owner->RequestCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT);
@@ -105,12 +112,14 @@ void D3D12CommandBuffer::Open()
 	ThrowIfFailed(CommandList->Reset(CommandAllocator.Get(), nullptr));
 	CurrentPipeline = nullptr;
 	CurrentRootSignature = nullptr;
-	bIsClosed = false;
 	bWaitForCompletion = false;
 }
 
-void D3D12CommandBuffer::FinishRecordCommandList()
+bool D3D12CommandBuffer::FinishRecordCommandList()
 {
+	if (State != ECommandContextState::Begin)
+		return false;
+
 	std::vector<D3D12_RESOURCE_BARRIER> Barriers;
 	for (const auto& State : RT_ToTransition)
 	{
@@ -142,37 +151,46 @@ void D3D12CommandBuffer::FinishRecordCommandList()
 	RT_ToTransition.clear();
 	Depth_ToTransition.clear();
 
-	if (bIsRenderPassActive)
-		CommandList->EndRenderPass();
-
 	Close();
+
+	return true;
 }
 
 void D3D12CommandBuffer::Close()
 {
 	CommandList->Close();
-	bIsClosed = true;
+	State = ECommandContextState::End;
 
 	CurrentPipeline = nullptr;
 	CurrentRootSignature = nullptr;
 }
 
-void D3D12CommandBuffer::ExecuteCommandList(ECommandContextExecuteType ExecuteType, std::uint32_t Order)
+bool D3D12CommandBuffer::ExecuteCommandList(ECommandContextExecuteType ExecuteType, std::uint32_t Order)
 {
+	if (State != ECommandContextState::End)
+		return false;
+
 	const auto fenceValue = Owner->ExecuteDirectCommandLists(ExecuteType, Order, this /*CommandList.Get()*//*, bWaitForCompletion*/);
 
 	if (ExecuteType == ECommandContextExecuteType::Immediate)
 	{
+		State = ECommandContextState::Waiting;
 		Owner->DiscardCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, CommandAllocator, fenceValue);
 	}
 	else if (ExecuteType == ECommandContextExecuteType::Deferred)
 	{
-
+		State = ECommandContextState::WaitingForExecute;
 	}
 
 	CommandAllocator = nullptr;
 	bWaitForCompletion = false;
-	bIsRenderPassActive = false;
+
+	return true;
+}
+
+void D3D12CommandBuffer::OnExecuteCommandList()
+{
+	State = ECommandContextState::Waiting;
 }
 
 void D3D12CommandBuffer::ResourceBarrier(UINT NumBarriers, const D3D12_RESOURCE_BARRIER* pBarriers)
@@ -192,6 +210,7 @@ void D3D12CommandBuffer::TransitionTo(D3D12RenderTarget* RT, D3D12_RESOURCE_STAT
 	{
 		D3D12_RESOURCE_BARRIER Barriers[1];
 		Barriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(RT->GetD3D12Texture(), RT->CurrentState, State);
+		//RT_ToTransition[State].push_back(RT);
 		CommandList->ResourceBarrier(ARRAYSIZE(Barriers), Barriers);
 		RT->CurrentState = State;
 	}
@@ -448,29 +467,6 @@ void D3D12CommandBuffer::SetFrameBuffer(IFrameBuffer* pFB, std::optional<std::si
 			}
 		}
 
-		if (bIsRenderPassEnabled && bIsRenderPassActive)
-		{
-			D3D12_RENDER_PASS_BEGINNING_ACCESS renderPassBeginningAccessClear{ D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_PRESERVE, { } };
-			D3D12_RENDER_PASS_ENDING_ACCESS renderPassEndingAccessPreserve{ D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_PRESERVE, {} };
-			std::vector<D3D12_RENDER_PASS_RENDER_TARGET_DESC> renderPassRenderTargetDesc;
-			for (auto RT : RTs)
-				renderPassRenderTargetDesc.push_back(D3D12_RENDER_PASS_RENDER_TARGET_DESC(RT, renderPassBeginningAccessClear, renderPassEndingAccessPreserve));
-
-			D3D12_RENDER_PASS_BEGINNING_ACCESS renderPassBeginningAccessNoAccess{ D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_NO_ACCESS, {} };
-			D3D12_RENDER_PASS_ENDING_ACCESS renderPassEndingAccessNoAccess{ D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_NO_ACCESS, {} };
-			
-			const auto& DepthBuffer = FrameBuffer->DepthTarget;
-			if (DepthBuffer)
-			{
-				D3D12_RENDER_PASS_DEPTH_STENCIL_DESC renderPassDepthStencilDesc{ DepthBuffer->GetDSVCPU(), renderPassBeginningAccessNoAccess, renderPassBeginningAccessNoAccess, renderPassEndingAccessNoAccess, renderPassEndingAccessNoAccess };
-				CommandList->BeginRenderPass(1, renderPassRenderTargetDesc.data(), &renderPassDepthStencilDesc, D3D12_RENDER_PASS_FLAG_NONE);
-			}
-			else
-			{
-				CommandList->BeginRenderPass(1, renderPassRenderTargetDesc.data(), nullptr, D3D12_RENDER_PASS_FLAG_NONE);
-			}
-		}
-		else
 		{
 			const auto& DepthBuffer = FrameBuffer->DepthTarget;
 			if (DepthBuffer)
@@ -520,28 +516,6 @@ void D3D12CommandBuffer::SetRenderTarget(IRenderTarget* pRT, IDepthTarget* Depth
 
 		CD3DX12_CPU_DESCRIPTOR_HANDLE RT(CD3DX12_CPU_DESCRIPTOR_HANDLE(FBuffer->GetRTVCPU(), 0, Owner->GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV)));
 
-		if (bIsRenderPassEnabled && bIsRenderPassActive)
-		{
-			D3D12_RENDER_PASS_BEGINNING_ACCESS renderPassBeginningAccessClear{ D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_PRESERVE, { } };
-			D3D12_RENDER_PASS_ENDING_ACCESS renderPassEndingAccessPreserve{ D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_PRESERVE, {} };
-			std::vector<D3D12_RENDER_PASS_RENDER_TARGET_DESC> renderPassRenderTargetDesc;
-			renderPassRenderTargetDesc.push_back(D3D12_RENDER_PASS_RENDER_TARGET_DESC(RT, renderPassBeginningAccessClear, renderPassEndingAccessPreserve));
-
-			D3D12_RENDER_PASS_BEGINNING_ACCESS renderPassBeginningAccessNoAccess{ D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_NO_ACCESS, {} };
-			D3D12_RENDER_PASS_ENDING_ACCESS renderPassEndingAccessNoAccess{ D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_NO_ACCESS, {} };
-
-			if (DepthTarget)
-			{
-				CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(static_cast<D3D12DepthTarget*>(DepthTarget)->GetDSVCPU());
-				D3D12_RENDER_PASS_DEPTH_STENCIL_DESC renderPassDepthStencilDesc{ dsvHandle, renderPassBeginningAccessNoAccess, renderPassBeginningAccessNoAccess, renderPassEndingAccessNoAccess, renderPassEndingAccessNoAccess };
-				CommandList->BeginRenderPass(1, renderPassRenderTargetDesc.data(), &renderPassDepthStencilDesc, D3D12_RENDER_PASS_FLAG_NONE);
-			}
-			else
-			{
-				CommandList->BeginRenderPass(1, renderPassRenderTargetDesc.data(), nullptr, D3D12_RENDER_PASS_FLAG_NONE);
-			}
-		}
-		else
 		{
 			if (DepthTarget)
 			{
@@ -584,29 +558,6 @@ void D3D12CommandBuffer::SetRenderTargets(std::vector<IRenderTarget*> pRTs, IDep
 			RTs.push_back(CD3DX12_CPU_DESCRIPTOR_HANDLE(FBuffer->GetRTV()->GetCPU(), 0, Owner->GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV)));
 		}
 
-		if (bIsRenderPassEnabled && bIsRenderPassActive)
-		{
-			D3D12_RENDER_PASS_BEGINNING_ACCESS renderPassBeginningAccessClear{ D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_PRESERVE, { } };
-			D3D12_RENDER_PASS_ENDING_ACCESS renderPassEndingAccessPreserve{ D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_PRESERVE, {} };
-			std::vector<D3D12_RENDER_PASS_RENDER_TARGET_DESC> renderPassRenderTargetDesc;
-			for (auto RT : RTs)
-				renderPassRenderTargetDesc.push_back(D3D12_RENDER_PASS_RENDER_TARGET_DESC(RT, renderPassBeginningAccessClear, renderPassEndingAccessPreserve));
-
-			D3D12_RENDER_PASS_BEGINNING_ACCESS renderPassBeginningAccessNoAccess{ D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_NO_ACCESS, {} };
-			D3D12_RENDER_PASS_ENDING_ACCESS renderPassEndingAccessNoAccess{ D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_NO_ACCESS, {} };
-
-			if (DepthTarget)
-			{
-				CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(static_cast<D3D12DepthTarget*>(DepthTarget)->GetDSVCPU());
-				D3D12_RENDER_PASS_DEPTH_STENCIL_DESC renderPassDepthStencilDesc{ dsvHandle, renderPassBeginningAccessNoAccess, renderPassBeginningAccessNoAccess, renderPassEndingAccessNoAccess, renderPassEndingAccessNoAccess };
-				CommandList->BeginRenderPass(1, renderPassRenderTargetDesc.data(), &renderPassDepthStencilDesc, D3D12_RENDER_PASS_FLAG_NONE);
-			}
-			else
-			{
-				CommandList->BeginRenderPass(1, renderPassRenderTargetDesc.data(), nullptr, D3D12_RENDER_PASS_FLAG_NONE);
-			}
-		}
-		else
 		{
 			if (DepthTarget)
 			{
@@ -1179,7 +1130,7 @@ void D3D12CommandBuffer::ClearState()
 	CommandList->Reset(CommandAllocator.Get(), nullptr);
 	CommandList->Close();
 
-	bIsClosed = true;
+	State = ECommandContextState::Waiting;
 	bWaitForCompletion = false;
 }
 

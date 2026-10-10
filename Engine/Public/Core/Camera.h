@@ -70,8 +70,19 @@ public:
     virtual FMatrix GetInverseViewMatrix() const = 0;
     virtual FMatrix GetProjMatrix() const = 0;
     virtual FMatrix GetViewProjMatrix() const = 0;
+    virtual FMatrix GetPrevViewProjMatrix() const = 0;
+    virtual FMatrix GetJitteredProjMatrix() const = 0;
+    virtual FMatrix GetJitteredPrevProjMatrix() const = 0;
     virtual FMatrix GetReprojectionMatrix() const = 0;
     virtual FVector GetEye() const = 0;
+
+    virtual bool IsJitterEnabled() const = 0;
+    virtual void SetEnableJitter(bool bEnable) = 0;
+    virtual FVector2 GetJitter() const = 0;
+    virtual FVector2 GetPreviousJitter() const = 0;
+    virtual void SetJitter(const FVector2& Jitter) = 0;
+    virtual bool IsJitterCallBackSet() const = 0;
+    virtual void SetJitterCallBack(std::function<bool(FVector2&)> Callback) = 0;
 };
 
 class sCamera final : public ICamera
@@ -80,41 +91,61 @@ class sCamera final : public ICamera
 public:
     sCamera()
         : Super()
-        , m_ReverseZ(true)
-        , m_InfiniteZ(true)
-        , m_VerticalFOV(0.0f)
-        , m_AspectRatio(0.0f)
-        , m_NearClip(0.0f)
-        , m_FarClip(0.0f)
-        , m_vEye(FVector::Zero())
-        , m_vLookAt(FVector::Zero())
-        , m_ViewMatrix(FMatrix::Identity())
-        , m_mCameraWorld(FMatrix::Identity())
-        , m_ViewProjMatrix(FMatrix::Identity())
-        , m_ProjMatrix(FMatrix::Identity())
-        , m_PreviousViewProjMatrix(FMatrix::Identity())
-        , m_ReprojectMatrix(FMatrix::Identity())
+        , ReverseZ(true)
+        , InfiniteZ(true)
+        , VerticalFOV(0.0f)
+        , AspectRatio(0.0f)
+        , NearClip(0.0f)
+        , FarClip(0.0f)
+        , Eye(FVector::Zero())
+        , LookAt(FVector::Zero())
+        , ViewMatrix(FMatrix::Identity())
+        , CameraWorld(FMatrix::Identity())
+        , ViewProjMatrix(FMatrix::Identity())
+        , PreviousViewProjMatrix(FMatrix::Identity())
+        , ProjMatrix(FMatrix::Identity())
+        , ReprojectMatrix(FMatrix::Identity())
         , WorldMatrix(FMatrix::Identity())
         , bIsOrthographic(false)
         , sceneScaling(1.0f)
+        , bIsJitterEnabled(false)
+        , Jitter(FVector2())
+        , PreviousJitter(FVector2())
+        , JitterCallback(nullptr)
+        , JitteredProjMatrix(FMatrix::Identity())
+        , PreviousJitteredProjMatrix(FMatrix::Identity())
     {
-        SetPerspectiveMatrix((float)dPI_OVER_4, 9.0f / 16.0f, 0.01f, 4000.0f);
+        SetPerspectiveMatrix((float)dPI_OVER_4, 9.0f / 16.0f, 0.1f, 4000.0f);
         SetWorldScale(1.0f);
     }
 
 public:
     inline ~sCamera() = default;
 
-    // Call this function once per frame and after you've changed any state.  This
-    // regenerates all matrices.  Calling it more or less than once per frame will break
-    // temporal effects and cause unpredictable results.
     inline void Update()
     {
-        m_PreviousViewProjMatrix = m_ViewProjMatrix;
+        PreviousJitter = Jitter;
+        PreviousJitteredProjMatrix = JitteredProjMatrix;
+        PreviousViewProjMatrix = ViewProjMatrix;
 
-        m_ViewProjMatrix = m_ViewMatrix * m_ProjMatrix * WorldMatrix;
+        if (bIsJitterEnabled)
+        {
+            if (JitterCallback)
+            {
+                bool bSuccess = JitterCallback(Jitter);
+                if (!bSuccess)
+                    SetEnableJitter(false);
+            }
+            FMatrix JitterMat = FMatrix(TMatrix3x3<float>::Identity(), FVector(Jitter.X, Jitter.Y, 0.0f));
+            JitteredProjMatrix = ProjMatrix * JitterMat;
+            ViewProjMatrix = WorldMatrix * ViewMatrix * JitteredProjMatrix;
+        }
+        else
+        {
+            ViewProjMatrix = WorldMatrix * ViewMatrix * ProjMatrix;
+        }
         
-        m_ReprojectMatrix = Invert(GetViewProjMatrix()) * m_PreviousViewProjMatrix;
+        ReprojectMatrix = Invert(GetViewProjMatrix()) * PreviousViewProjMatrix;
     }
 
 private:
@@ -123,8 +154,8 @@ private:
         if (bIsOrthographic)
             return;
 
-        float Y = 1.0f / std::tanf(m_VerticalFOV * 0.5f);
-        float X = Y * m_AspectRatio;
+        float Y = 1.0f / std::tanf(VerticalFOV * 0.5f);
+        float X = Y * AspectRatio;
 
         float Q1, Q2;
 
@@ -132,30 +163,30 @@ private:
         // actually a great idea with F32 depth buffers to redistribute precision more evenly across
         // the entire range.  It requires clearing Z to 0.0f and using a GREATER variant depth test.
         // Some care must also be done to properly reconstruct linear W in a pixel shader from hyperbolic Z.
-        if (m_ReverseZ)
+        if (ReverseZ)
         {
-            if (m_InfiniteZ)
+            if (InfiniteZ)
             {
                 Q1 = 0.0f;
-                Q2 = m_NearClip;
+                Q2 = NearClip;
             }
             else
             {
-                Q1 = m_NearClip / (m_FarClip - m_NearClip);
-                Q2 = Q1 * m_FarClip;
+                Q1 = NearClip / (FarClip - NearClip);
+                Q2 = Q1 * FarClip;
             }
         }
         else
         {
-            if (m_InfiniteZ)
+            if (InfiniteZ)
             {
                 Q1 = -1.0f;
-                Q2 = -m_NearClip;
+                Q2 = -NearClip;
             }
             else
             {
-                Q1 = m_FarClip / (m_NearClip - m_FarClip);
-                Q2 = Q1 * m_NearClip;
+                Q1 = FarClip / (NearClip - FarClip);
+                Q2 = Q1 * NearClip;
             }
         }
 
@@ -175,39 +206,39 @@ private:
 
 public:
     inline virtual bool IsOrthographic() const override { return bIsOrthographic; }
-    inline virtual float GetFOV() const override { return m_VerticalFOV; }
+    inline virtual float GetFOV() const override { return VerticalFOV; }
     inline void SetFOV(float verticalFovInRadians)
     {
-        m_VerticalFOV = verticalFovInRadians;
+        VerticalFOV = verticalFovInRadians;
         UpdatePerspectiveProjMatrix();
     }
-    inline virtual float GetAspectRatio() const override { return m_AspectRatio; }
+    inline virtual float GetAspectRatio() const override { return AspectRatio; }
     inline void SetAspectRatio(float heightOverWidth)
     {
-        m_AspectRatio = heightOverWidth;
+        AspectRatio = heightOverWidth;
         UpdatePerspectiveProjMatrix();
     }
-    inline virtual float GetNearClip() const override { return m_NearClip; }
-    inline virtual float GetFarClip() const override { return m_FarClip; }
+    inline virtual float GetNearClip() const override { return NearClip; }
+    inline virtual float GetFarClip() const override { return FarClip; }
     inline void SetZRange(float nearZ, float farZ)
     {
-        m_NearClip = nearZ;
-        m_FarClip = farZ;
+        NearClip = nearZ;
+        FarClip = farZ;
         UpdatePerspectiveProjMatrix();
     }
 
-    inline virtual bool IsZReversed() const override { return m_ReverseZ; }
+    inline virtual bool IsZReversed() const override { return ReverseZ; }
     inline void SetReverseZ(bool Value)
     {
-        m_ReverseZ = Value;
+        ReverseZ = Value;
         UpdatePerspectiveProjMatrix();
     }
-    inline virtual float GetClearDepth() const override { return m_ReverseZ ? 0.0f : 1.0f; }
+    inline virtual float GetClearDepth() const override { return ReverseZ ? 0.0f : 1.0f; }
 
-    inline virtual bool IsZInfinite() const override { return m_InfiniteZ; }
+    inline virtual bool IsZInfinite() const override { return InfiniteZ; }
     inline void SetInfiniteZ(bool Value)
     {
-        m_InfiniteZ = Value;
+        InfiniteZ = Value;
         UpdatePerspectiveProjMatrix();
     }
 
@@ -230,45 +261,45 @@ public:
 public:
     inline void SetPerspectiveMatrix(float verticalFovRadians, float aspectHeightOverWidth, float nearZClip, float farZClip)
     {
-        m_VerticalFOV = verticalFovRadians;
-        m_AspectRatio = aspectHeightOverWidth;
-        m_NearClip = nearZClip;
-        m_FarClip = farZClip;
+        VerticalFOV = verticalFovRadians;
+        AspectRatio = aspectHeightOverWidth;
+        NearClip = nearZClip;
+        FarClip = farZClip;
 
         bIsOrthographic = false;
 
         UpdatePerspectiveProjMatrix();
 
-        m_PreviousViewProjMatrix = m_ViewProjMatrix;
+        PreviousViewProjMatrix = ViewProjMatrix;
     }
 
     inline void SetOrthographic(std::size_t Width, std::size_t Height)
     {
         bIsOrthographic = true;
 
-        m_ProjMatrix = GetOrthographicTransform((int)Width, (int)Height);
+        ProjMatrix = GetOrthographicTransform((int)Width, (int)Height);
 
-        m_ViewProjMatrix = m_ProjMatrix;
-        m_PreviousViewProjMatrix = m_ViewProjMatrix;
+        ViewProjMatrix = ProjMatrix;
+        PreviousViewProjMatrix = ViewProjMatrix;
     }
 
     inline void SetViewParams(FVector vEyePt, FVector vLookatPt)
     {
         using namespace DirectX;
 
-        m_vEye = vEyePt;
-        m_vLookAt = vLookatPt;
+        Eye = vEyePt;
+        LookAt = vLookatPt;
 
         // Calc the view matrix
-        m_ViewMatrix = XMMatrixLookAtLH(m_vEye, m_vLookAt, g_XMIdentityR1);
+        ViewMatrix = XMMatrixLookAtLH(Eye, LookAt, g_XMIdentityR1);
 
-        m_mCameraWorld = XMMatrixInverse(nullptr, m_ViewMatrix);
+        CameraWorld = XMMatrixInverse(nullptr, ViewMatrix);
 
         // The axis basis vectors and camera position are stored inside the 
         // position matrix in the 4 rows of the camera's world matrix.
         // To figure out the yaw/pitch of the camera, we just need the Z basis vector
         XMFLOAT3 zBasis;
-        XMStoreFloat3(&zBasis, m_mCameraWorld.r[2]);
+        XMStoreFloat3(&zBasis, CameraWorld.r[2]);
 
         const float fLen = sqrtf(zBasis.z * zBasis.z + zBasis.x * zBasis.x);
 
@@ -291,15 +322,15 @@ public:
         XMVECTOR vPosDeltaWorld = XMVector3TransformCoord(Position, mCameraRot);
 
         // Move the eye position 
-        m_vEye = vPosDeltaWorld;
+        Eye = vPosDeltaWorld;
 
         // Update the lookAt position based on the eye position
-        m_vLookAt = m_vEye + vWorldAhead;
+        LookAt = Eye + vWorldAhead;
 
         // Update the view matrix
-        m_ViewMatrix = XMMatrixLookAtLH(m_vEye, m_vLookAt, vWorldUp);
+        ViewMatrix = XMMatrixLookAtLH(Eye, LookAt, vWorldUp);
 
-        m_mCameraWorld = XMMatrixInverse(nullptr, m_ViewMatrix);
+        CameraWorld = XMMatrixInverse(nullptr, ViewMatrix);
     }
 
     inline void SetTransform(const FVector& Position, const float Pitch, const float Yaw, const float Roll)
@@ -320,59 +351,153 @@ public:
         XMVECTOR vPosDeltaWorld = XMVector3TransformCoord(Position, mCameraRot);
 
         // Move the eye position 
-        m_vEye += vPosDeltaWorld;
+        Eye += vPosDeltaWorld;
 
         // Update the lookAt position based on the eye position
-        m_vLookAt = m_vEye + vWorldAhead;
+        LookAt = Eye + vWorldAhead;
 
         // Update the view matrix
-        m_ViewMatrix = XMMatrixLookAtLH(m_vEye, m_vLookAt, vWorldUp);
+        ViewMatrix = XMMatrixLookAtLH(Eye, LookAt, vWorldUp);
 
-        m_mCameraWorld = XMMatrixInverse(nullptr, m_ViewMatrix);
+        CameraWorld = XMMatrixInverse(nullptr, ViewMatrix);
     }
 
-    inline virtual FVector GetPosition() const override { return m_vEye; }
+    inline FVector2 ConvertScreenToWorld(const float WorldWidth, const float WorldHeight, const FVector2& Screen) const
+    {
+        float Zoom = 1.0f;
+        FVector2 Center = FVector2::Zero();
+
+        float W = float(WorldWidth);
+        float H = float(WorldHeight);
+        float U = Screen.X / W;
+        float V = (H - Screen.Y) / H;
+
+        float Ratio = W / H;
+        FVector2 Extents(Ratio * 25.0f, 25.0f);
+        Extents *= Zoom;
+
+        FVector2 Lower = Center - Extents;
+        FVector2 Upper = Center + Extents;
+
+        FVector2 World;
+        World.X = (1.0f - U) * Lower.X + U * Upper.X;
+        World.Y = (1.0f - V) * Lower.Y + V * Upper.Y;
+        return World;
+    }
+
+    inline FVector2 ConvertWorldToScreen(const float ScreenWidth, const float ScreenHeight, const FVector2& World) const
+    {
+        float Zoom = 1.0f;
+        FVector2 Center = FVector2::Zero();
+
+        float W = float(ScreenWidth);
+        float H = float(ScreenHeight);
+        float Ratio = W / H;
+        FVector2 Extents(Ratio * 25.0f, 25.0f);
+        Extents *= Zoom;
+
+        FVector2 Lower = Center - Extents;
+        FVector2 Upper = Center + Extents;
+
+        float U = (World.X - Lower.X) / (Upper.X - Lower.X);
+        float V = (World.Y - Lower.Y) / (Upper.Y - Lower.Y);
+
+        FVector2 Screen;
+        Screen.X = U * W;
+        Screen.Y = (1.0f - V) * H;
+        return Screen;
+    }
+
+
+    inline virtual FVector GetPosition() const override { return Eye; }
     inline virtual FVector GetRotation() const override { return Rotation; }
-    inline virtual FVector GetFocus() const override { return m_vLookAt; }
+    inline virtual FVector GetFocus() const override { return LookAt; }
 
     inline virtual float GetSceneScaling() const override { return sceneScaling; }
     inline virtual FMatrix GetWorldMatrix() const override { return WorldMatrix; }
-    inline virtual FMatrix GetViewMatrix() const override { return m_ViewMatrix; }
-    inline virtual FMatrix GetInverseViewMatrix() const override { return m_mCameraWorld; }
-    inline virtual FMatrix GetProjMatrix() const override { return m_ProjMatrix; }
-    inline virtual FMatrix GetViewProjMatrix() const override { return m_ViewProjMatrix; }
-    inline virtual FMatrix GetReprojectionMatrix() const override { return m_ReprojectMatrix; }
-    inline virtual FVector GetEye() const override { return FVector(m_ViewMatrix.r[3].X, m_ViewMatrix.r[3].Y, m_ViewMatrix.r[3].Z); }
+    inline virtual FMatrix GetViewMatrix() const override { return ViewMatrix; }
+    inline virtual FMatrix GetInverseViewMatrix() const override { return CameraWorld; }
+    inline virtual FMatrix GetProjMatrix() const override { return ProjMatrix; }
+    inline virtual FMatrix GetViewProjMatrix() const override { return ViewProjMatrix; }
+    inline virtual FMatrix GetPrevViewProjMatrix() const override { return PreviousViewProjMatrix; }
+    inline virtual FMatrix GetJitteredProjMatrix() const override { return JitteredProjMatrix; }
+    inline virtual FMatrix GetJitteredPrevProjMatrix() const override { return PreviousJitteredProjMatrix; }
+    inline virtual FMatrix GetReprojectionMatrix() const override { return ReprojectMatrix; }
+    inline virtual FVector GetEye() const override { return FVector(ViewMatrix.r[3].X, ViewMatrix.r[3].Y, ViewMatrix.r[3].Z); }
 
-    inline void SetProjMatrix(const FMatrix& ProjMat) { m_ProjMatrix = ProjMat; }
+    inline void SetProjMatrix(const FMatrix& ProjMat) { ProjMatrix = ProjMat; }
     inline void SetViewMatrix(const FMatrix& InView)
     {
-        m_ViewMatrix = InView; 
-        m_mCameraWorld = DirectX::XMMatrixInverse(nullptr, m_ViewMatrix);
+        ViewMatrix = InView; 
+        CameraWorld = DirectX::XMMatrixInverse(nullptr, ViewMatrix);
+    }
+
+    virtual bool IsJitterEnabled() const override
+    {
+        return bIsJitterEnabled;
+    }
+
+    virtual void SetEnableJitter(bool bEnable) override
+    {
+        bIsJitterEnabled = bEnable;
+        if (!bIsJitterEnabled)
+            JitterCallback = nullptr;
+    }
+
+    virtual FVector2 GetPreviousJitter() const override
+    {
+        return PreviousJitter;
+    }
+
+    virtual FVector2 GetJitter() const override
+    {
+        return Jitter;
+    }
+
+    virtual void SetJitter(const FVector2& NewJitter) override
+    {
+        Jitter = NewJitter;
+    }
+
+    virtual bool IsJitterCallBackSet() const override
+    {
+        return JitterCallback != nullptr;
+    }
+    virtual void SetJitterCallBack(std::function<bool(FVector2&)> Callback) override
+    {
+        JitterCallback = Callback;
     }
 
 private:
-    float m_VerticalFOV;
-    float m_AspectRatio;
-    float m_NearClip;
-    float m_FarClip;
+    float VerticalFOV;
+    float AspectRatio;
+    float NearClip;
+    float FarClip;
 
-    bool m_ReverseZ;  // Invert near and far clip distances so that Z=0 is the far plane
-    bool m_InfiniteZ; // Move the far plane to infinity
+    bool ReverseZ;  // Invert near and far clip distances so that Z=0 is the far plane
+    bool InfiniteZ; // Move the far plane to infinity
 
     bool bIsOrthographic;
 
-    FVector m_vEye;
-    FVector m_vLookAt;
+    FVector Eye;
+    FVector LookAt;
     FVector Rotation;
-    FMatrix m_ViewMatrix;
-    FMatrix m_mCameraWorld;
+    FMatrix ViewMatrix;
+    FMatrix CameraWorld;
 
-    FMatrix m_ViewProjMatrix; 
-    FMatrix m_ProjMatrix;
-    FMatrix m_PreviousViewProjMatrix;
-    FMatrix m_ReprojectMatrix;
+    FMatrix ViewProjMatrix; 
+    FMatrix ProjMatrix;
+    FMatrix PreviousViewProjMatrix;
+    FMatrix ReprojectMatrix;
+
+    FMatrix JitteredProjMatrix;
+    FMatrix PreviousJitteredProjMatrix;
 
     FMatrix WorldMatrix;
     float sceneScaling;
+
+    bool bIsJitterEnabled;
+    FVector2 Jitter;
+    FVector2 PreviousJitter;
+    std::function<bool(FVector2&)> JitterCallback;
 };

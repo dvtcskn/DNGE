@@ -254,6 +254,11 @@ void D3D11Device::BeginFrame()
 		Viewport->BeginFrame();
 }
 
+void D3D11Device::RecreateSwapChain()
+{
+
+}
+
 void D3D11Device::Present(IRenderTarget* pRT)
 {
 	if (IsPrimaryGPU())
@@ -284,19 +289,9 @@ std::uint32_t D3D11Device::GetVsyncInterval() const
 	return -1;
 }
 
-void D3D11Device::GPUFlush()
+DisplayMode D3D11Device::GetDisplayMode() const
 {
-
-}
-
-void D3D11Device::WaitForGPU()
-{
-
-}
-
-void D3D11Device::WaitForCPU()
-{
-
+	return DisplayMode();
 }
 
 void D3D11Device::ResizeWindow(std::size_t Width, std::size_t Height)
@@ -323,11 +318,11 @@ void D3D11Device::VsyncInterval(const std::uint32_t value)
 		Viewport->VsyncInterval(value);
 }
 
-std::vector<sDisplayMode> D3D11Device::GetAllSupportedResolutions() const
+std::vector<sDisplayDesc> D3D11Device::GetAllSupportedResolutions() const
 {
 	if (IsPrimaryGPU())
 		return Viewport->GetAllSupportedResolutions();
-	return std::vector<sDisplayMode>();
+	return std::vector<sDisplayDesc>();
 }
 
 sScreenDimension D3D11Device::GetBackBufferDimension() const
@@ -365,6 +360,31 @@ std::uint32_t D3D11Device::GetCurrentBackBufferIndex() const
 		return std::uint32_t(-1);
 
 	return Viewport->GetCurrentBackBufferIndex();
+}
+
+void D3D11Device::GPUFlush()
+{
+
+}
+
+void D3D11Device::WaitForGPU()
+{
+
+}
+
+void D3D11Device::WaitForCPU()
+{
+
+}
+
+void D3D11Device::WaitForCPUFence(std::uint64_t Value)
+{
+
+}
+
+std::uint64_t D3D11Device::GPUFenceSignal()
+{
+	return 0;
 }
 
 IDXGIAdapter1* D3D11Device::GetAdapter(std::optional<short> Index)
@@ -625,14 +645,14 @@ ISamplerState::UniquePtr D3D11Device::CreateUniqueSamplerState(const std::string
 	return D3DX11SamplerState::CreateUnique(this, InName, InDesc);
 }
 
-IRenderTarget::SharedPtr D3D11Device::CreateRenderTarget(const std::string InName, const EFormat Format, const sFBODesc& Desc)
+IRenderTarget::SharedPtr D3D11Device::CreateRenderTarget(const std::string InName, const sFrameBuffer& Desc, const sFBODesc& FBODesc)
 {
-	return D3D11RenderTarget::Create(this, InName, Format, Desc);
+	return D3D11RenderTarget::Create(this, InName, Desc, FBODesc);
 }
 
-IRenderTarget::UniquePtr D3D11Device::CreateUniqueRenderTarget(const std::string InName, const EFormat Format, const sFBODesc& Desc)
+IRenderTarget::UniquePtr D3D11Device::CreateUniqueRenderTarget(const std::string InName, const sFrameBuffer& Desc, const sFBODesc& FBODesc)
 {
-	return D3D11RenderTarget::CreateUnique(this, InName, Format, Desc);
+	return D3D11RenderTarget::CreateUnique(this, InName, Desc, FBODesc);
 }
 
 IDepthTarget::SharedPtr D3D11Device::CreateDepthTarget(const std::string InName, const EFormat Format, const sFBODesc& Desc)

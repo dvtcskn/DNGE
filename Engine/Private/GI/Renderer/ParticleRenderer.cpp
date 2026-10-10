@@ -191,7 +191,7 @@ void ParticleRenderer::Render(const ILevel* Level, std::uint32_t CameraBindlessI
 		};
 
 	{
-		GraphicsCommandContext->BeginRecordCommandList(ERenderPass::GBuffer);
+		GraphicsCommandContext->BeginRecordCommandList(ECommandContextBeginState::Render);
 
 		GraphicsCommandContext->SetRenderTarget(pRT, Depth.get());
 

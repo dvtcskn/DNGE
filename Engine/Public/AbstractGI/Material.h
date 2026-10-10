@@ -548,6 +548,7 @@ public:
 	bool Compile(IFrameBuffer* FrameBuffer = nullptr);
 	bool Compile(IRenderTarget* RT, IDepthTarget* Depth = nullptr);
 	bool Compile(std::vector<IRenderTarget*> RTs, IDepthTarget* Depth = nullptr);
+	bool Recompile();
 
 	void ApplyMaterialInstance(IGraphicsCommandContext* InCMDBuffer = nullptr) const;
 
