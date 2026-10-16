@@ -47,7 +47,6 @@ public:
 	inline sFBODesc GetDesc() const { return FBODesc; }
 	const VkImage& GetImage() const { return Image; }
 	const VkImageView& GetView() const { return View; }
-	const VkImageView& GetUAV_View() const { return View; }
 	virtual void* GetNativeTexture() const override final { return Image; }
 
 	EFormat GetFormat() const { return Desc.Format; }
@@ -56,28 +55,29 @@ public:
 	virtual bool IsSRV_Allowed() const override final { return bIsSRVSupported; }
 	virtual bool IsUAV_Allowed() const override final { return bIsUAVSupported; }
 
-	virtual std::uint32_t GetSRVBindlessIndex() const override final { return std::uint32_t(-1); }
+	virtual std::uint32_t GetSRVBindlessIndex() const override final { return HeapIndex; }
 	virtual std::uint32_t GetUAVBindlessIndex() const override final { return std::uint32_t(-1); }
-
-	VkImageLayout CurrentLayout;
-
-	VkImage	Image;
-	VkDescriptorImageInfo DescriptorImageInfo;
 
 	virtual ResourceSharedHandle* GetSharedHandle() const override final { return nullptr; }
 	virtual bool CopyFrom(IRenderTarget* RenderTarget) override final { return false; }
 
+	VkImage	Image;
+	VkImageView View;
+	VkDescriptorImageInfo DescriptorImageInfo;
+	VkImageLayout CurrentLayout;
+
 private:
+	VulkanDevice* Owner;
 	std::string Name; 
 	sFrameBuffer Desc;
 	sFBODesc FBODesc;
 
 	VkDeviceMemory Memory;
-	VkImageView    View;
-	VkImageView    UAV_View;
 
 	bool bIsSRVSupported;
 	bool bIsUAVSupported;
+
+	std::uint32_t HeapIndex;
 };
 
 class VulkanDepthTarget final : public IDepthTarget
@@ -100,24 +100,26 @@ public:
 	virtual bool IsUAV_Allowed() const override final { return false; }
 
 	EFormat GetFormat() const { return Format; }
-	VkFormat GetVkFormat() const { return ConvertFormat_Format_To_VkFormat(Format); }
-
-	VkImageLayout CurrentLayout;
-
-	VkImage	Image;
+	VkFormat GetVkFormat() const { return GetVulkanDepthFormat(Format); }
 
 	virtual ResourceSharedHandle* GetSharedHandle() const override final { return nullptr; }
 	virtual bool CopyFrom(IDepthTarget* DepthTarget) override final { return false; }
 
+	VkImage	Image;
+	VkImageView View;
+	VkDescriptorImageInfo DescriptorImageInfo;
+	VkImageLayout CurrentLayout;
+
 private:
+	VulkanDevice* Owner;
 	std::string Name;
 	EFormat Format;
 	sFBODesc Desc;
 
 	VkDeviceMemory Memory;
-	VkImageView    View;
 
 	bool bIsSRVSupported;
+	std::uint32_t HeapIndex;
 };
 
 class VulkanUnorderedAccessTarget final : public IUnorderedAccessTarget
@@ -143,20 +145,19 @@ public:
 	EFormat GetFormat() const { return Format; }
 	VkFormat GetVkFormat() const { return ConvertFormat_Format_To_VkFormat(Format); }
 
-	VkImageLayout CurrentLayout;
-
-	VkImage	Image;
-
 	virtual ResourceSharedHandle* GetSharedHandle() const override final { return nullptr; }
 	virtual bool CopyFrom(IUnorderedAccessTarget* UnorderedAccessTarget) override final { return false; }
+
+	VkImageLayout CurrentLayout;
 
 private:
 	std::string Name;
 	EFormat Format;
 	sFBODesc Desc;
 
+	VkImage	Image;
+	VkImageView View;
 	VkDeviceMemory Memory;
-	VkImageView    View;
 
 	bool bIsSRVSupported;
 };

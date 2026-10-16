@@ -54,6 +54,7 @@ enum class ERenderPass
 	Tonemapper,
 	PostProcess,
 	UI,
+	UIDepth,
 	Custom1,
 	Custom2,
 	Custom3,
@@ -586,7 +587,7 @@ struct GPUCreateInfo
 {
 	struct DeviceCreateInfo
 	{
-		EGITypes Type = EGITypes::Default;
+		EGITypes Type = EGITypes::Undefined;
 		std::uint32_t GPUIndex = 0;
 		EGPUDeviceType DeviceType;
 	};

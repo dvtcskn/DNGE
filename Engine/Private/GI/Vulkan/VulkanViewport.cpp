@@ -32,6 +32,9 @@
 #include "VulkanFrameBuffer.h"
 #include "VulkanCommandBuffer.h"
 
+#define GET_INSTANCE_PROC_ADDR(name) name = (PFN_##name)vkGetInstanceProcAddr(Device->GetInstance(), #name);
+#define GET_DEVICE_PROC_ADDR(name) name = (PFN_##name)vkGetDeviceProcAddr(Device->Get(), #name);
+
 VulkanViewport::VulkanViewport(VulkanDevice* InDevice, HWND* InHandle)
 	: Device(InDevice)
 	, bRecreateSurface(false)
@@ -93,7 +96,7 @@ void VulkanViewport::InitWindow(HWND* InHandle, std::uint32_t InWidth, std::uint
 	VkSurfaceCapabilitiesKHR surface_properties;
 	VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(Device->GetPhysicalDevice(), Surface, &surface_properties));
 
-	std::vector<VkFormat> const& preferred_formats = { VK_FORMAT_R8G8B8A8_SRGB, VK_FORMAT_B8G8R8A8_SRGB, VK_FORMAT_A8B8G8R8_SRGB_PACK32 };
+	std::vector<VkFormat> const& preferred_formats = { VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_R8G8B8A8_SRGB, VK_FORMAT_B8G8R8A8_SRGB, VK_FORMAT_A8B8G8R8_SRGB_PACK32 };
 
 	VkSurfaceFormatKHR format;
 	{
@@ -113,6 +116,14 @@ void VulkanViewport::InitWindow(HWND* InHandle, std::uint32_t InWidth, std::uint
 
 		format = it != supported_surface_formats.end() ? *it : supported_surface_formats[0];
 	}
+
+	GET_INSTANCE_PROC_ADDR(vkGetPhysicalDeviceSurfaceFormats2KHR);
+	GET_INSTANCE_PROC_ADDR(vkGetPhysicalDeviceSurfaceCapabilities2KHR);
+	GET_DEVICE_PROC_ADDR(vkSetHdrMetadataEXT);
+
+	QuerySwapChainSupport();
+	// Find all HDR modes supported by current display and pick surface format
+	EnumerateDisplayModesAndFormats(formats2);
 
 	VkExtent2D swapchain_size;
 	if (surface_properties.currentExtent.width == 0xFFFFFFFF)
@@ -244,58 +255,52 @@ void VulkanViewport::InitWindow(HWND* InHandle, std::uint32_t InWidth, std::uint
 		VkImageView image_view;
 		VK_CHECK(vkCreateImageView(Device->Get(), &view_info, nullptr, &image_view));
 
-		VkFenceCreateInfo fenceInfo = {};
-		fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-		fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-
-		VkFence fence;
-		VkResult result = vkCreateFence(Device->Get(), &fenceInfo, nullptr, &fence);
-
-		SwapchainImages.push_back(SwapchainImage(Images[i], image_view, fence, VK_IMAGE_LAYOUT_UNDEFINED));
+		SwapchainImages.push_back(SwapchainImage(Images[i], image_view, VK_IMAGE_LAYOUT_UNDEFINED));
 	}
+
+	// Can only do this for Freesync Premium Pro HDR display on AMD hardware
+	if (strstr(Device->GetDeviceName().c_str(), "AMD") != nullptr)
+	{
+		EnumerateHDRMetadata(Device->GetPhysicalDevice(), physicalDeviceSurfaceInfo2, capabilities2);
+	}
+
+	// Set primaies based on displaymode
+	PopulateHDRMetadataBasedOnDisplayMode();
+
+	SetHDRMetadataAndColorspace();
+}
+
+void VulkanViewport::RecreateSwapChain()
+{
+
 }
 
 VkResult VulkanViewport::AcquireNextImageIndex(uint32_t* image)
 {
 	VkSemaphore acquire_semaphore = Device->AcquireSemaphore();
-
-	constexpr bool bWaitBefore = true;
-
-	VkResult Result_Wait = {};
-	VkResult Result_Reset = {};
-
-	if (bWaitBefore)
+	VkResult result = vkAcquireNextImageKHR(Device->Get(), Swapchain, UINT64_MAX, acquire_semaphore, VK_NULL_HANDLE, image);
+	if (result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR)
 	{
-		Result_Wait = vkWaitForFences(Device->Get(), 1, &SwapchainImages[*image].Fence, true, UINT64_MAX);
-		Result_Reset = vkResetFences(Device->Get(), 1, &SwapchainImages[*image].Fence);
+		AcquiredSemaphore = acquire_semaphore;
+		bAcquireSemaphoreWaited = false;
 	}
-
-	VkResult Result = vkAcquireNextImageKHR(Device->Get(), Swapchain, UINT64_MAX, acquire_semaphore, SwapchainImages[*image].Fence, image);
-
-	if (!bWaitBefore)
-	{
-		Result_Wait = vkWaitForFences(Device->Get(), 1, &SwapchainImages[*image].Fence, true, UINT64_MAX);
-		Result_Reset = vkResetFences(Device->Get(), 1, &SwapchainImages[*image].Fence);
-	}
-
-	return Result;
+	return result;
 }
 
 void VulkanViewport::BeginFrame()
 {
 	VkResult Result = AcquireNextImageIndex(&FrameIndex);
 
-	if (Result == VK_SUBOPTIMAL_KHR || Result == VK_ERROR_OUT_OF_DATE_KHR)
+	if (Result == VK_ERROR_OUT_OF_DATE_KHR)
 	{
 		if (!ResizeSwapChain(SizeX, SizeY))
 		{
 			Engine::WriteToConsole("Resize failed");
 		}
-		vkQueueWaitIdle(Device->GetQueue());
 		Result = AcquireNextImageIndex(&FrameIndex);
 	}
 
-	if (Result != VK_SUCCESS)
+	if (Result != VK_SUCCESS && Result != VK_SUBOPTIMAL_KHR)
 	{
 		throw ("Failed to get swapchain image.");
 	}
@@ -319,53 +324,100 @@ void VulkanViewport::Present(IRenderTarget* pRT)
 		);
 
 		CMD->FinishRecordCommandList();
-		CMD->ExecuteCommandList();
+		VkSemaphore acquire_semaphore = GetPendingAcquireSemaphore();
+		if (acquire_semaphore != VK_NULL_HANDLE)
+		{
+			if (!CMD->ExecuteCommandListWithWaitSemaphore(acquire_semaphore))
+				throw std::runtime_error("Failed to submit swapchain image transition.");
+			MarkAcquireSemaphoreWaited();
+		}
+		else
+		{
+			CMD->ExecuteCommandList();
+		}
 
 		SwapchainImages[FrameIndex].CurrentImageLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 	}
 
-	CopyToBackBuffer(pRT);
+	//Device->WaitForGPU();
 
+	VkSemaphore acquire_semaphore = GetPendingAcquireSemaphore();
+	if (acquire_semaphore != VK_NULL_HANDLE)
 	{
-		VkSemaphore acquire_semaphore = Device->AcquireSignalledSemaphore();
-		//if (!acquire_semaphore)
-		//	acquire_semaphore = Device->AcquireSemaphore(SemaphoreSignalStatus::Undefined);
+		VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+		VkSubmitInfo waitSubmit{};
+		waitSubmit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+		waitSubmit.waitSemaphoreCount = 1;
+		waitSubmit.pWaitSemaphores = &acquire_semaphore;
+		waitSubmit.pWaitDstStageMask = &waitStage;
+		VK_CHECK(vkQueueSubmit(Device->GetQueue(), 1, &waitSubmit, VK_NULL_HANDLE));
+		MarkAcquireSemaphoreWaited();
+		VK_CHECK(vkQueueWaitIdle(Device->GetQueue()));
+	}
 
-		VkPresentInfoKHR present{
-			.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
-			.waitSemaphoreCount = 1,
-			.pWaitSemaphores = &acquire_semaphore,
-			.swapchainCount = 1,
-			.pSwapchains = &Swapchain,
-			.pImageIndices = &FrameIndex,
-		};
+	VkPresentInfoKHR present{
+		.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+		.swapchainCount = 1,
+		.pSwapchains = &Swapchain,
+		.pImageIndices = &FrameIndex,
+	};
 
-		VkResult Result = vkQueuePresentKHR(Device->GetQueue(), &present);
+	VkResult Result = vkQueuePresentKHR(Device->GetQueue(), &present);
 
-		if (Result == VK_SUBOPTIMAL_KHR || Result == VK_ERROR_OUT_OF_DATE_KHR)
+	if (Result == VK_SUBOPTIMAL_KHR || Result == VK_ERROR_OUT_OF_DATE_KHR)
+	{
+		if (!ResizeSwapChain(SizeX, SizeY))
 		{
-			if (!ResizeSwapChain(SizeX, SizeY))
-			{
-				Engine::WriteToConsole("Resize failed");
-				vkQueueWaitIdle(Device->GetQueue());
-			}
-		}	
-		else if (Result != VK_SUCCESS)
-		{
-			throw ("Failed to present swapchain image.");
+			Engine::WriteToConsole("Resize failed");
+			vkQueueWaitIdle(Device->GetQueue());
 		}
+	}
+	else if (Result != VK_SUCCESS)
+	{
+		throw ("Failed to present swapchain image.");
 	}
 }
 
 void VulkanViewport::CopyToBackBuffer(IRenderTarget* pRT)
 {
+	if (SwapchainImages[FrameIndex].CurrentImageLayout != VK_IMAGE_LAYOUT_PRESENT_SRC_KHR)
+	{
+		auto CMD = Device->GetIMCommandBuffer();
+		CMD->BeginRecordCommandList();
+
+		CMD->TransitionTo(
+			SwapchainImages[FrameIndex].Image,
+			SwapchainImages[FrameIndex].CurrentImageLayout,
+			VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+			0,														// srcAccessMask
+			0,                                                      // dstAccessMask
+			VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,					// srcStage
+			VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT                  // dstStage
+		);
+
+		CMD->FinishRecordCommandList();
+		VkSemaphore acquire_semaphore = GetPendingAcquireSemaphore();
+		if (acquire_semaphore != VK_NULL_HANDLE)
+		{
+			if (!CMD->ExecuteCommandListWithWaitSemaphore(acquire_semaphore))
+				throw std::runtime_error("Failed to submit swapchain image transition.");
+			MarkAcquireSemaphoreWaited();
+		}
+		else
+		{
+			CMD->ExecuteCommandList();
+		}
+
+		SwapchainImages[FrameIndex].CurrentImageLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+	}
+
 	auto CMDList = Device->GetIMCommandBuffer();
 	CMDList->BeginRecordCommandList();
 
 	CMDList->CopyResource(SwapchainImages[FrameIndex].Image, VkImageLayout::VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, static_cast<VulkanRenderTarget*>(pRT)->Image, static_cast<VulkanRenderTarget*>(pRT)->CurrentLayout, {SizeX, SizeY});
 
 	CMDList->FinishRecordCommandList();
-	CMDList->ExecuteCommandList();
+	CMDList->ExecuteCommandList(ECommandContextExecuteType::Deferred, std::uint32_t(-1));
 }
 
 void VulkanViewport::FullScreen(const bool value)
@@ -438,4 +490,269 @@ bool VulkanViewport::ResizeSwapChain(std::size_t Width, std::size_t Height)
 	InitWindow(Handle, (std::uint32_t)Width, (std::uint32_t)Width, IsFullScreen());
 
 	return true;
+}
+
+void VulkanViewport::QuerySwapChainSupport()
+{
+	physicalDeviceSurfaceInfo2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SURFACE_INFO_2_KHR;
+	physicalDeviceSurfaceInfo2.pNext = nullptr;
+	physicalDeviceSurfaceInfo2.surface = Surface;
+
+	if (strstr(Device->GetDeviceName().c_str(), "AMD") != nullptr)
+	{
+		capabilities2.sType = VK_STRUCTURE_TYPE_SURFACE_CAPABILITIES_2_KHR;
+		capabilities2.pNext = &displayNativeHdrSurfaceCapabilitiesAMD;
+
+		displayNativeHdrSurfaceCapabilitiesAMD.sType = VK_STRUCTURE_TYPE_DISPLAY_NATIVE_HDR_SURFACE_CAPABILITIES_AMD;
+		displayNativeHdrSurfaceCapabilitiesAMD.pNext = nullptr;
+
+		// Calling this to check Local dimming support
+		vkGetPhysicalDeviceSurfaceCapabilities2KHR(Device->GetPhysicalDevice(), &physicalDeviceSurfaceInfo2, &capabilities2);
+
+		swapchainDisplayNativeHdrCreateInfoAMD.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_DISPLAY_NATIVE_HDR_CREATE_INFO_AMD;
+		swapchainDisplayNativeHdrCreateInfoAMD.pNext = nullptr;
+		swapchainDisplayNativeHdrCreateInfoAMD.localDimmingEnable = displayNativeHdrSurfaceCapabilitiesAMD.localDimmingSupport;
+	}
+
+	uint32_t formatCount;
+	vkGetPhysicalDeviceSurfaceFormats2KHR(Device->GetPhysicalDevice(), &physicalDeviceSurfaceInfo2, &formatCount, nullptr);
+	if (formatCount != 0)
+	{
+		formats2.resize(formatCount);
+		for (auto& surfaceFormat : formats2)
+		{
+			surfaceFormat.sType = VK_STRUCTURE_TYPE_SURFACE_FORMAT_2_KHR;
+			surfaceFormat.pNext = nullptr;
+		}
+		vkGetPhysicalDeviceSurfaceFormats2KHR(Device->GetPhysicalDevice(), &physicalDeviceSurfaceInfo2, &formatCount, formats2.data());
+	}
+
+	uint32_t presentModeCount;
+	vkGetPhysicalDeviceSurfacePresentModesKHR(Device->GetPhysicalDevice(), Surface, &presentModeCount, nullptr);
+	if (presentModeCount != 0)
+	{
+		presentModes.resize(presentModeCount);
+		vkGetPhysicalDeviceSurfacePresentModesKHR(Device->GetPhysicalDevice(), Surface, &presentModeCount, presentModes.data());
+	}
+}
+
+std::unordered_map<DisplayMode, VkSurfaceFormatKHR> VulkanViewport::GetAvailableFormats(const std::vector<VkSurfaceFormat2KHR>& surfaceFormats2)
+{
+	std::unordered_map<DisplayMode, VkSurfaceFormatKHR> modes;
+	for (const auto& surfaceFormat2 : surfaceFormats2)
+	{
+		VkSurfaceFormatKHR surfaceFormat = surfaceFormat2.surfaceFormat;
+		if ((surfaceFormat.format == VK_FORMAT_R8G8B8A8_SRGB || surfaceFormat.format == VK_FORMAT_B8G8R8A8_UNORM || surfaceFormat.format == VK_FORMAT_B8G8R8A8_SRGB) && surfaceFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+		{
+			modes[DisplayMode::DISPLAYMODE_LDR] = surfaceFormat;
+		}
+		else if (surfaceFormat.format == VK_FORMAT_A2B10G10R10_UNORM_PACK32
+			&& surfaceFormat.colorSpace == VK_COLOR_SPACE_DISPLAY_NATIVE_AMD)
+		{
+			modes[DisplayMode::DISPLAYMODE_FSHDR_2084] = surfaceFormat;
+		}
+		else if (surfaceFormat.format == VK_FORMAT_R16G16B16A16_SFLOAT && surfaceFormat.colorSpace == VK_COLOR_SPACE_DISPLAY_NATIVE_AMD)
+		{
+			modes[DisplayMode::DISPLAYMODE_FSHDR_SCRGB] = surfaceFormat;
+		}
+		else if (surfaceFormat.format == VK_FORMAT_A2B10G10R10_UNORM_PACK32
+			&& surfaceFormat.colorSpace == VK_COLOR_SPACE_HDR10_ST2084_EXT)
+		{
+			// NOTE: we don't have any preference for the format between the two
+			modes[DisplayMode::DISPLAYMODE_HDR10_2084] = surfaceFormat;
+		}
+		else if (surfaceFormat.format == VK_FORMAT_R16G16B16A16_SFLOAT && surfaceFormat.colorSpace == VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT)
+		{
+			modes[DisplayMode::DISPLAYMODE_HDR10_SCRGB] = surfaceFormat;
+		}
+	}
+
+	return modes;
+}
+
+DisplayMode VulkanViewport::CheckAndGetDisplayModeRequested(DisplayMode DispMode)
+{
+	for (const auto& it : SupportedDisplayModes)
+	{
+		if (it == DispMode)
+			return it;
+	}
+
+	if (DispMode == DisplayMode::DISPLAYMODE_FSHDR_2084) {
+
+		Engine::WriteToConsole(L"FSHDR PQ not supported, trying HDR10 PQ");
+		return CheckAndGetDisplayModeRequested(DisplayMode::DISPLAYMODE_HDR10_2084);
+	}
+	else if (DispMode == DisplayMode::DISPLAYMODE_FSHDR_SCRGB) {
+
+		Engine::WriteToConsole(L"FSHDR SCRGB not supported, trying HDR10 SCRGB");
+		return CheckAndGetDisplayModeRequested(DisplayMode::DISPLAYMODE_HDR10_SCRGB);
+	}
+
+	if (DispMode != DisplayMode::DISPLAYMODE_LDR)
+	{
+		Engine::WriteToConsole(L"HDR modes not supported, defaulting to LDR");
+	}
+
+	return DisplayMode::DISPLAYMODE_LDR;
+}
+
+void VulkanViewport::EnumerateDisplayModesAndFormats(const std::vector<VkSurfaceFormat2KHR>& formats2)
+{
+	SupportedDisplayModes.clear();
+
+	std::unordered_map<DisplayMode, VkSurfaceFormatKHR> modes = GetAvailableFormats(formats2);
+
+	for (const auto& it : modes)
+	{
+		SupportedDisplayModes.push_back(it.first);
+	}
+
+	// See if display mode requested in config is supported and return it, or default to LDR
+	CurrentDisplayMode = CheckAndGetDisplayModeRequested(DisplayMode::DISPLAYMODE_LDR);
+
+	auto found = modes.find(CurrentDisplayMode);
+
+	Engine::Assert(AssertLevel::ASSERT_CRITICAL, found != modes.end(), L"Unable to find a suitable swapchain format.");
+	CurrentDisplayMode = found->first;
+	auto m_SurfaceFormat = found->second;
+
+	// Set format based on display mode
+	//m_SwapChainFormat = ConvertFormat(m_SurfaceFormat.format);
+}
+
+void VulkanViewport::EnumerateHDRMetadata(VkPhysicalDevice PhysicalDevice, VkPhysicalDeviceSurfaceInfo2KHR& physicalDeviceSurfaceInfo2, VkSurfaceCapabilities2KHR& capabilities2)
+{
+	VkHdrMetadataEXT hdrMetadata = {};
+	hdrMetadata.sType = VK_STRUCTURE_TYPE_HDR_METADATA_EXT;
+	hdrMetadata.pNext = nullptr;
+
+	VkDisplayNativeHdrSurfaceCapabilitiesAMD* displayNativeHdrSurfaceCapabilitiesAMD = reinterpret_cast<VkDisplayNativeHdrSurfaceCapabilitiesAMD*>(capabilities2.pNext);
+	displayNativeHdrSurfaceCapabilitiesAMD->pNext = &hdrMetadata;
+
+	// Must requry FS HDR display capabilities
+	// After VkSwapchainDisplayNativeHdrCreateInfoAMD is set through swapchain creation when attached to swapchain pnext.
+	// This fills in data into VkHdrMetadataEXT attached as pNext in VkSurfaceCapabilities2KHR->VkDisplayNativeHdrSurfaceCapabilitiesAMD
+	vkGetPhysicalDeviceSurfaceCapabilities2KHR(PhysicalDevice, &physicalDeviceSurfaceInfo2, &capabilities2);
+
+	HDR.RedPrimary[0] = hdrMetadata.displayPrimaryRed.x;
+	HDR.RedPrimary[1] = hdrMetadata.displayPrimaryRed.y;
+	HDR.GreenPrimary[0] = hdrMetadata.displayPrimaryGreen.x;
+	HDR.GreenPrimary[1] = hdrMetadata.displayPrimaryGreen.y;
+	HDR.BluePrimary[0] = hdrMetadata.displayPrimaryBlue.x;
+	HDR.BluePrimary[1] = hdrMetadata.displayPrimaryBlue.y;
+	HDR.WhitePoint[0] = hdrMetadata.whitePoint.x;
+	HDR.WhitePoint[1] = hdrMetadata.whitePoint.y;
+	HDR.MinLuminance = hdrMetadata.minLuminance;
+	HDR.MaxLuminance = hdrMetadata.maxLuminance;
+}
+
+void VulkanViewport::SetHDRMetadataAndColorspace()
+{
+	VkHdrMetadataEXT hdrMetadata = {};
+	hdrMetadata.sType = VK_STRUCTURE_TYPE_HDR_METADATA_EXT;
+	hdrMetadata.pNext = nullptr;
+
+	hdrMetadata.displayPrimaryRed.x = HDR.RedPrimary[0];
+	hdrMetadata.displayPrimaryRed.y = HDR.RedPrimary[1];
+	hdrMetadata.displayPrimaryGreen.x = HDR.GreenPrimary[0];
+	hdrMetadata.displayPrimaryGreen.y = HDR.GreenPrimary[1];
+	hdrMetadata.displayPrimaryBlue.x = HDR.BluePrimary[0];
+	hdrMetadata.displayPrimaryBlue.y = HDR.BluePrimary[1];
+	hdrMetadata.whitePoint.x = HDR.WhitePoint[0];
+	hdrMetadata.whitePoint.y = HDR.WhitePoint[1];
+
+	hdrMetadata.maxLuminance = HDR.MaxLuminance;
+	hdrMetadata.minLuminance = HDR.MinLuminance;
+
+	hdrMetadata.maxContentLightLevel = HDR.MaxContentLightLevel;
+	hdrMetadata.maxFrameAverageLightLevel = HDR.MaxFrameAverageLightLevel;
+
+	if (vkSetHdrMetadataEXT)
+		vkSetHdrMetadataEXT(Device->Get(), 1, &Swapchain, &hdrMetadata);
+}
+
+void VulkanViewport::PopulateHDRMetadataBasedOnDisplayMode()
+{
+	switch (CurrentDisplayMode)
+	{
+	case DisplayMode::DISPLAYMODE_LDR:
+		// Values set here make no difference on HDR wide gamut monitors
+		// Monitors will not undersell their capabilities, if they can go beyond rec709 gamut and 100 nits.
+
+		// [0, 1] in respective RGB channel maps to display gamut.
+		HDR.RedPrimary[0] = 0.64f;
+		HDR.RedPrimary[1] = 0.33f;
+		HDR.GreenPrimary[0] = 0.30f;
+		HDR.GreenPrimary[1] = 0.60f;
+		HDR.BluePrimary[0] = 0.15f;
+		HDR.BluePrimary[1] = 0.06f;
+		HDR.WhitePoint[0] = 0.3127f;
+		HDR.WhitePoint[1] = 0.3290f;
+
+		// [0, 1] actually maps to display brightness.
+		// This gets ignored, writing it for completeness
+		HDR.MinLuminance = 0.0f;
+		HDR.MaxLuminance = 100.0f;
+
+		// Scene dependent
+		HDR.MaxContentLightLevel = 2000.0f;
+		HDR.MaxFrameAverageLightLevel = 500.0f;
+		break;
+
+	case DisplayMode::DISPLAYMODE_HDR10_2084:
+		// Values set here either get clipped at display capabilities or tone and gamut mapped on the display to fit its brightness and gamut range.
+
+		// rec 2020 primaries
+		HDR.RedPrimary[0] = 0.708f;
+		HDR.RedPrimary[1] = 0.292f;
+		HDR.GreenPrimary[0] = 0.170f;
+		HDR.GreenPrimary[1] = 0.797f;
+		HDR.BluePrimary[0] = 0.131f;
+		HDR.BluePrimary[1] = 0.046f;
+		HDR.WhitePoint[0] = 0.3127f;
+		HDR.WhitePoint[1] = 0.3290f;
+
+		// Max nits of 500 is actually low
+		// Can set this value to 1000, 2000 and 4000 based on target display and content contrast range
+		// However we are trying to make sure HDR10 mode doesn't look bad on HDR displays with only 300 nits brightness, hence the low max lum value.
+		HDR.MinLuminance = 0.0f;
+		HDR.MaxLuminance = 500.0f;
+
+		// Scene dependent
+		HDR.MaxContentLightLevel = 2000.0f;
+		HDR.MaxFrameAverageLightLevel = 500.0f;
+		break;
+
+	case DisplayMode::DISPLAYMODE_HDR10_SCRGB:
+		// Same as above
+
+		// rec 709 primaries
+		HDR.RedPrimary[0] = 0.64f;
+		HDR.RedPrimary[1] = 0.33f;
+		HDR.GreenPrimary[0] = 0.30f;
+		HDR.GreenPrimary[1] = 0.60f;
+		HDR.BluePrimary[0] = 0.15f;
+		HDR.BluePrimary[1] = 0.06f;
+		HDR.WhitePoint[0] = 0.3127f;
+		HDR.WhitePoint[1] = 0.3290f;
+
+		// Same comment as HDR10_2084.
+		HDR.MinLuminance = 0.0f;
+		HDR.MaxLuminance = 500.0f;
+
+		// Scene dependent
+		HDR.MaxContentLightLevel = 2000.0f;
+		HDR.MaxFrameAverageLightLevel = 500.0f;
+		break;
+
+	case DisplayMode::DISPLAYMODE_FSHDR_2084:
+	case DisplayMode::DISPLAYMODE_FSHDR_SCRGB:
+		// FS HDR modes should already have the monitor's primaries queried through backend API's like DXGI or VK ext
+
+		// Scene dependent
+		HDR.MaxContentLightLevel = 2000.0f;
+		HDR.MaxFrameAverageLightLevel = 500.0f;
+		break;
+	}
 }

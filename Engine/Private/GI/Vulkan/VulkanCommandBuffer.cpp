@@ -31,111 +31,94 @@
 #include "VulkanFrameBuffer.h"
 #include "VulkanException.h"
 
+#ifndef PROFILE
+#define PROFILE 0
+#endif
+
 VulkanCommandBuffer::VulkanCommandBuffer(VulkanDevice* InOwner)
 	: Owner(InOwner)
 	, StencilRef(0)
-	, bIsClosed(false)
 	, bWaitForCompletion(false)
 	, bIsRenderPassActive(false)
 	, State(ECommandContextState::Waiting)
 {
-	auto Device = Owner->Get();
-
-	CommandBuffer = Owner->RequestCommandBuffer();
-
-	/*VkCommandBufferAllocateInfo cmd_buf_info{
-		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-		.commandPool = CommandPool,
-		.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-		.commandBufferCount = 1 };*/
-	//VK_CHECK(vkAllocateCommandBuffers(Device, &cmd_buf_info, &CommandBuffer));
-
-	/*auto allocInfo = vk::CommandBufferAllocateInfo()
-		.setLevel(vk::CommandBufferLevel::ePrimary)
-		.setCommandPool(CommandPool)
-		.setCommandBufferCount(1);
-
-	auto Res = Owner->Get_Hpp().allocateCommandBuffers(&allocInfo, &CommandBuffer);
-	if (Res != vk::Result::eSuccess)
-	{
-
-	}*/
-
-	//CommandBuffer.end();
-
-	bIsClosed = true;
-
-	// The push descriptor update function is part of an extension so it has to be manually loaded
-	vkCmdPushDescriptorSetKHR = reinterpret_cast<PFN_vkCmdPushDescriptorSetKHR>(vkGetDeviceProcAddr(Owner->Get(), "vkCmdPushDescriptorSetKHR"));
-	if (!vkCmdPushDescriptorSetKHR)
-	{
-		throw std::runtime_error("Could not get a valid function pointer for vkCmdPushDescriptorSetKHR");
-	}
 }
 
 VulkanCommandBuffer::~VulkanCommandBuffer()
 {
-	if (!bIsClosed)
-		Close();
+	Owner->CancelPendingCommandBuffer(this);
+	WaitForGPU();
+	Pipeline = nullptr;
+	Sets.clear();
+	if (CommandBuffer)
+		Owner->ReturnCommandBuffer(GetCommandContextType(), Get());
+	CommandBuffer = nullptr;
 
-	//Owner->Get_Hpp().freeCommandBuffers(CommandPool, CommandBuffer);
-	//Owner->Get_Hpp().destroyCommandPool(CommandPool);
-	//vkFreeCommandBuffers(Owner->Get(), CommandPool, 1, &CommandBuffer);
-	//vkDestroyCommandPool(Owner->Get(), CommandPool, nullptr);
-	ClearCMDStates();
-
-	vkCmdPushDescriptorSetKHR = nullptr;
+	ClearState();
+	Owner = nullptr;
 }
 
 ECommandContextBeginResult VulkanCommandBuffer::BeginRecordCommandList(const ECommandContextBeginState Begin)
 {
+	if (Owner->IsCommandBufferPendingForExecute(this))
+		return ECommandContextBeginResult::Failed_WaitingForExecute;
+
+	bool bRestarted = false;
+	if (State == ECommandContextState::End)
+	{
+		Engine::WriteToConsole("WARNING : VulkanCommandBuffer is recording again. Previous records will be deleted!");
+		bRestarted = true;
+	}
+	if (State == ECommandContextState::Begin)
+		return ECommandContextBeginResult::AlreadyStarted;
+	if (State == ECommandContextState::WaitingForExecute)
+		return ECommandContextBeginResult::Failed_WaitingForExecute;
+
+	Sets.clear();
+
 	Open();
 
-	//if (RenderPass != ERenderPass::NONE)
+	if (Begin == ECommandContextBeginState::Render)
 	{
-		//Owner->SetHeaps(CommandList.Get());
+
 	}
-	//else
+	else if (Begin == ECommandContextBeginState::ApiRender)
+	{
+	}
+	else
 	{
 		//Owner->CPUWait();
 	}
 
-	return ECommandContextBeginResult::Started;
+	return bRestarted ? ECommandContextBeginResult::Restarted : ECommandContextBeginResult::Started;
 }
 
 void VulkanCommandBuffer::Open()
 {
-	//if (!CommandPool)
-	//	CommandPool = Owner->RequestCommandPool();
-
-	if (!Owner->IsCommandBufferAvailable(CommandBuffer))
+	if (!CommandBuffer)
 	{
-		auto Old = CommandBuffer;
-		CommandBuffer = Owner->RequestCommandBuffer();
-		Owner->ReturnCommandBuffer(Old);
+		CommandBuffer = Owner->RequestCommandBuffer(GetCommandContextType());
 	}
 	else
 	{
-		Owner->ResetCommandBuffer(CommandBuffer);
-		//VkResult result = vkResetCommandBuffer(CommandBuffer, 0);
-		//if (result != VK_SUCCESS)
-		//	throw std::runtime_error("Failed to reset command buffer");
+		const VkResult resetResult = vkResetCommandBuffer(CommandBuffer, 0);
+		if (resetResult != VK_SUCCESS)
+			throw std::runtime_error("vkResetCommandBuffer failed with VkResult " + std::to_string(resetResult));
 	}
 
-	auto beginInfo = vk::CommandBufferBeginInfo()
-		.setFlags(vk::CommandBufferUsageFlagBits::eSimultaneousUse);
+	auto beginInfo = vk::CommandBufferBeginInfo{};
 
 	CommandBuffer.begin(beginInfo);
-
-	bIsClosed = false;
+	State = ECommandContextState::Begin;
+	//vkBeginCommandBuffer();
+	
 	Sets.clear();
-
-	//ClearState(); 
+	Pipeline = nullptr;
+	bWaitForCompletion = false;
 }
 
 bool VulkanCommandBuffer::FinishRecordCommandList()
 {
-	//ClearCMDStates();
 	Close();
 	return true;
 }
@@ -143,41 +126,111 @@ bool VulkanCommandBuffer::FinishRecordCommandList()
 void VulkanCommandBuffer::Close()
 {
 	if (bIsRenderPassActive)
-		vkCmdEndRenderPass(CommandBuffer);
+	{
+		vkCmdEndRendering(CommandBuffer);
+		//vkCmdEndRenderPass(CommandBuffer);
+	}
 
 	auto Result = vkEndCommandBuffer(CommandBuffer); 
 	if (Result != VK_SUCCESS)
 		throw std::runtime_error("Failed to end command buffer");
 
 	//CommandBuffer.end();
-	bIsClosed = true;
+
+	Pipeline = nullptr;
+	State = ECommandContextState::End;
 	bIsRenderPassActive = false;
 	Sets.clear();
 }
 
 bool VulkanCommandBuffer::ExecuteCommandList(ECommandContextExecuteType ExecuteType, std::uint32_t Order)
 {
-	Owner->ExecuteGraphicsCommandBuffer(&CommandBuffer, bWaitForCompletion);
+	if (State != ECommandContextState::End)
+		return false;
 
-	//Owner->ReturnCommandPool(CommandPool);
-	//CommandPool = VK_NULL_HANDLE;
+	const auto fenceValue = Owner->ExecuteGraphicsCommandBuffer(ExecuteType, Order, this, ExecuteType == ECommandContextExecuteType::Immediate);
+
+	if (ExecuteType == ECommandContextExecuteType::Immediate)
+	{
+		OnExecuteCommandList(fenceValue);
+	}
+	else if (ExecuteType == ECommandContextExecuteType::Deferred)
+	{
+		State = ECommandContextState::WaitingForExecute;
+	}
+
 	bWaitForCompletion = false;
 
 	return true;
 }
 
-void VulkanCommandBuffer::ClearState()
+bool VulkanCommandBuffer::ExecuteCommandListWithWaitSemaphore(VkSemaphore WaitSemaphore, VkPipelineStageFlags WaitStage)
 {
-	StencilRef = 0;
+	if (State != ECommandContextState::End || WaitSemaphore == VK_NULL_HANDLE)
+		return false;
+
+	const auto fenceValue = Owner->ExecuteGraphicsCommandBuffer(
+		ECommandContextExecuteType::Immediate,
+		std::uint32_t(-1),
+		this,
+		true,
+		WaitSemaphore,
+		WaitStage);
+	OnExecuteCommandList(fenceValue);
+	bWaitForCompletion = false;
+	return true;
 }
 
-void VulkanCommandBuffer::ExecuteWithWait()
+void VulkanCommandBuffer::OnExecuteCommandList(std::uint64_t FenceValue)
 {
-	Owner->ExecuteGraphicsCommandBuffer(&CommandBuffer, true);
+	State = ECommandContextState::Waiting;
+	LastFenceValue = FenceValue;
+	Owner->ReturnCommandBuffer(GetCommandContextType(), Get(), FenceValue);
+	CommandBuffer = nullptr;
+	//Result = ProfileResult();
+}
 
-	//Owner->ReturnCommandPool(CommandPool);
-	//CommandPool = VK_NULL_HANDLE;
-	bWaitForCompletion = false;
+void VulkanCommandBuffer::TransitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, VkImageSubresourceRange subresourceRange)
+{
+	VkImageMemoryBarrier2 barrier{};
+	barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+	barrier.pNext = nullptr;
+	barrier.oldLayout = oldLayout;
+	barrier.newLayout = newLayout;
+	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.image = image;
+	barrier.subresourceRange = subresourceRange;
+
+	// Configure 64-bit stages and access masks for synchronization2
+	if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL) {
+		barrier.srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
+		barrier.srcAccessMask = VK_ACCESS_2_NONE;
+		barrier.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+		barrier.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+	}
+	else if (oldLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+		barrier.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+		barrier.srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+		barrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+		barrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
+	}
+	// Add additional transitions (e.g., General -> Shader Read, etc.) as your engine expands
+
+	// Package the barrier into a VkDependencyInfo structure
+	VkDependencyInfo dependencyInfo{};
+	dependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+	dependencyInfo.pNext = nullptr;
+	dependencyInfo.dependencyFlags = 0;
+	dependencyInfo.memoryBarrierCount = 0;
+	dependencyInfo.pMemoryBarriers = nullptr;
+	dependencyInfo.bufferMemoryBarrierCount = 0;
+	dependencyInfo.pBufferMemoryBarriers = nullptr;
+	dependencyInfo.imageMemoryBarrierCount = 1;
+	dependencyInfo.pImageMemoryBarriers = &barrier;
+
+	// Execute the modern synchronization2 barrier command
+	vkCmdPipelineBarrier2(CommandBuffer, &dependencyInfo);
 }
 
 void VulkanCommandBuffer::TransitionTo(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, VkAccessFlags2 srcAccessMask, VkAccessFlags2 dstAccessMask, VkPipelineStageFlags2 srcStage, VkPipelineStageFlags2 dstStage, std::uint32_t Mips)
@@ -245,39 +298,10 @@ void VulkanCommandBuffer::PipelineBarrier(VkImage image, VkImageLayout oldLayout
 	vkCmdPipelineBarrier(CommandBuffer, sourceStage, destinationStage, VkDependencyFlagBits::VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 1, &barrier);
 }
 
-void VulkanCommandBuffer::CopyResource(VkImage pDstResource, VkImageLayout DestState, VkImage pSrcResource, VkImageLayout SrcState, sDimension2D Dimension)
+void VulkanCommandBuffer::WaitForGPU()
 {
-	TransitionTo(
-		pDstResource,
-		DestState,
-		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
-	);
-	TransitionTo(
-		pSrcResource,
-		SrcState,
-		VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
-	);
-
-	VkImageCopy Copy{};
-	Copy.srcSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
-	Copy.srcOffset = { 0, 0, 0 };
-	Copy.dstSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
-	Copy.dstOffset = { 0, 0, 0 };
-	Copy.extent = { Dimension.Width, Dimension.Height, 1 };
-	vkCmdCopyImage(CommandBuffer, pSrcResource, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, pDstResource, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &Copy);
-
-	TransitionTo(
-		pDstResource,
-		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-		DestState
-	);
-	TransitionTo(
-		pSrcResource,
-		VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
-	);
-
-	bWaitForCompletion = true;
+	if (LastFenceValue != 0)
+		Owner->WaitForCPUFence(LastFenceValue);
 }
 
 void VulkanCommandBuffer::Set32BitConstant(std::uint32_t RootParameterIndex, std::uint32_t SrcData, std::uint32_t DestOffsetIn32BitValues)
@@ -302,7 +326,7 @@ void VulkanCommandBuffer::Draw(std::uint32_t VertexCount, std::uint32_t VertexSt
 {
 	if (!bIsRenderPassActive)
 		return;
-	BindDescriptorSets();
+
 	CommandBuffer.draw(VertexCount, 1, VertexStartOffset, 0);
 }
 
@@ -310,7 +334,7 @@ void VulkanCommandBuffer::DrawInstanced(std::uint32_t VertexCountPerInstance, st
 {
 	if (!bIsRenderPassActive)
 		return;
-	BindDescriptorSets();
+
 	CommandBuffer.draw(VertexCountPerInstance, InstanceCount, StartVertexLocation, StartInstanceLocation);
 }
 
@@ -318,7 +342,7 @@ void VulkanCommandBuffer::DrawIndexedInstanced(std::uint32_t IndexCountPerInstan
 {
 	if (!bIsRenderPassActive)
 		return;
-	BindDescriptorSets();
+
 	CommandBuffer.drawIndexed(IndexCountPerInstance, InstanceCount, StartIndexLocation, BaseVertexLocation, StartInstanceLocation);
 }
 
@@ -326,13 +350,26 @@ void VulkanCommandBuffer::DrawIndexedInstanced(const sObjectDrawParameters& Draw
 {
 	if (!bIsRenderPassActive)
 		return;
-	BindDescriptorSets();
+
 	CommandBuffer.drawIndexed(DrawParameters.IndexCountPerInstance, DrawParameters.InstanceCount, DrawParameters.StartIndexLocation, DrawParameters.BaseVertexLocation, DrawParameters.StartInstanceLocation);
 }
 
 void VulkanCommandBuffer::ExecuteIndirect(IIndirectBuffer* IndirectBuffer)
 {
-	Engine::WriteToConsole("Unimplemented VulkanCommandBuffer::ExecuteIndirect");
+	if (!IndirectBuffer)
+		return;
+
+	VulkanIndirectBuffer* ArgumentBuffer = static_cast<VulkanIndirectBuffer*>(IndirectBuffer);
+	const VkBuffer& Buffer = ArgumentBuffer->GetBuffer();
+	std::uint64_t ArgumentOffset = ArgumentBuffer->GetOffset();
+	//CommandBuffer.DrawIndexedIndirect(,);
+	vkCmdDrawIndexedIndirect(
+		CommandBuffer,										// Your active VkCommandBuffer
+		Buffer,												// The Vulkan buffer containing the commands
+		(std::uint32_t)ArgumentOffset,						// Byte offset into the buffer where parameters begin
+		(UINT)ArgumentBuffer->GetCurrentCommandSize(),		// Number of draws to execute
+		(std::uint32_t)ArgumentBuffer->GetStride()			// Stride between successive sets of parameters
+	);
 }
 
 void VulkanCommandBuffer::SetViewport(const sViewport& Viewport)
@@ -386,15 +423,52 @@ void VulkanCommandBuffer::ClearDepthTarget(IDepthTarget* DepthTarget)
 
 void VulkanCommandBuffer::SetFrameBuffer(IFrameBuffer* pFB, std::optional<std::size_t> FBOIndex)
 {
-	/*VkRenderPassBeginInfo renderPassInfo{};
-	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-	renderPassInfo.clearValueCount = ;
-	renderPassInfo.pClearValues = ;
-	renderPassInfo.renderPass = ;
-	renderPassInfo.renderArea = ;
-	renderPassInfo.framebuffer = ;
+	if (bIsRenderPassActive)
+	{
+		vkCmdEndRendering(CommandBuffer);
+		//vkCmdEndRenderPass(CommandBuffer);
+		bIsRenderPassActive = false;
+	}
+	VkImageSubresourceRange COLOR_Range{};
+	COLOR_Range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	COLOR_Range.baseMipLevel = 0;
+	COLOR_Range.levelCount = 1;
+	COLOR_Range.baseArrayLayer = 0;
+	COLOR_Range.layerCount = 1;
+	
+	for (auto& RT : pFB->GetRenderTargets())
+	{
+		VulkanRenderTarget* VRT = static_cast<VulkanRenderTarget*>(RT);
+		if (VRT->CurrentLayout != VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+		{
+			TransitionImageLayout(
+				VRT->Image,
+				VK_IMAGE_LAYOUT_UNDEFINED,
+				VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+				COLOR_Range
+			);
+			VRT->CurrentLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		}
+	}
 
-	bIsRenderPassActive = true;*/
+	VkImageSubresourceRange DEPTH_Range{};
+	DEPTH_Range.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+	DEPTH_Range.baseMipLevel = 0;
+	DEPTH_Range.levelCount = 1;
+	DEPTH_Range.baseArrayLayer = 0;
+	DEPTH_Range.layerCount = 1;
+
+	VulkanDepthTarget* Depth = static_cast<VulkanDepthTarget*>(pFB->GetDepthTarget());
+	if (Depth->CurrentLayout != VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL)
+	{
+		TransitionImageLayout(
+			Depth->Image,
+			VK_IMAGE_LAYOUT_UNDEFINED,
+			VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+			DEPTH_Range
+		);
+		Depth->CurrentLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
+	}
 }
 
 void VulkanCommandBuffer::SetRenderTarget(IRenderTarget* pRT, IDepthTarget* DepthTarget)
@@ -402,52 +476,94 @@ void VulkanCommandBuffer::SetRenderTarget(IRenderTarget* pRT, IDepthTarget* Dept
 	VulkanRenderTarget* RenderTarget = static_cast<VulkanRenderTarget*>(pRT);
 	VulkanDepthTarget* Depth = static_cast<VulkanDepthTarget*>(DepthTarget);
 
-	// Transition the render target to the appropriate layout
-	TransitionTo(
-		RenderTarget->Image,
-		RenderTarget->CurrentLayout,
-		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-		VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-		VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-		1
-	);
-	RenderTarget->CurrentLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-	// Transition the depth target to the appropriate layout if it exists
-	if (Depth)
+	if (RenderTarget)
 	{
-		TransitionTo(
-			Depth->Image,
-			Depth->CurrentLayout,
-			VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-			VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-			VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-			VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
-			VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
-			1
-		);
-		Depth->CurrentLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+		VkImageSubresourceRange COLOR_Range{};
+		COLOR_Range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		COLOR_Range.baseMipLevel = 0;
+		COLOR_Range.levelCount = 1;
+		COLOR_Range.baseArrayLayer = 0;
+		COLOR_Range.layerCount = 1;
+
+		if (RenderTarget->CurrentLayout != VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+		{
+			TransitionImageLayout(
+				RenderTarget->Image,
+				RenderTarget->CurrentLayout,
+				VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+				COLOR_Range
+			);
+			RenderTarget->CurrentLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		}
 	}
 
-	// Set the render pass and framebuffer
-	VkRenderPassBeginInfo renderPassInfo = {};
-	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-	renderPassInfo.renderPass = Pipeline->RenderPass->Get();
-	renderPassInfo.framebuffer = Pipeline->FrameBuffer;
-	renderPassInfo.renderArea.extent.width = Pipeline->FrameBufferDimension.Width;
-	renderPassInfo.renderArea.extent.height = Pipeline->FrameBufferDimension.Height;
-	renderPassInfo.clearValueCount = 2;
+	if (Depth)
+	{
+		VkImageSubresourceRange COLOR_Range{};
+		COLOR_Range.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+		COLOR_Range.baseMipLevel = 0;
+		COLOR_Range.levelCount = 1;
+		COLOR_Range.baseArrayLayer = 0;
+		COLOR_Range.layerCount = 1;
 
-	std::array<VkClearValue, 2> clearValues = {};
-	clearValues[0].color = { {0.0f, 0.0f, 0.0f, 1.0f} };
-	clearValues[1].depthStencil = { 1.0f, 0 };
+		if (Depth->CurrentLayout != VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL)
+		{
+			TransitionImageLayout(
+				Depth->Image,
+				Depth->CurrentLayout,
+				VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+				COLOR_Range
+			);
+			Depth->CurrentLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
+		}
+	}
 
-	renderPassInfo.pClearValues = clearValues.data();
+	// Transition the render target to the appropriate layout
+	//TransitionTo(
+	//	RenderTarget->Image,
+	//	RenderTarget->CurrentLayout,
+	//	VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+	//	VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+	//	VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+	//	VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+	//	VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+	//	1
+	//);
+	//RenderTarget->CurrentLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-	vkCmdBeginRenderPass(CommandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-	bIsRenderPassActive = true;
+	//// Transition the depth target to the appropriate layout if it exists
+	//if (Depth)
+	//{
+	//	TransitionTo(
+	//		Depth->Image,
+	//		Depth->CurrentLayout,
+	//		VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+	//		VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+	//		VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+	//		VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+	//		VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+	//		1
+	//	);
+	//	Depth->CurrentLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+	//}
+
+	//// Set the render pass and framebuffer
+	//VkRenderPassBeginInfo renderPassInfo = {};
+	//renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+	//renderPassInfo.renderPass = Pipeline->RenderPass->Get();
+	//renderPassInfo.framebuffer = Pipeline->FrameBuffer;
+	//renderPassInfo.renderArea.extent.width = Pipeline->FrameBufferDimension.Width;
+	//renderPassInfo.renderArea.extent.height = Pipeline->FrameBufferDimension.Height;
+	//renderPassInfo.clearValueCount = 2;
+
+	//std::array<VkClearValue, 2> clearValues = {};
+	//clearValues[0].color = { {0.0f, 0.0f, 0.0f, 1.0f} };
+	//clearValues[1].depthStencil = { 1.0f, 0 };
+
+	//renderPassInfo.pClearValues = clearValues.data();
+
+	//vkCmdBeginRenderPass(CommandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+	//bIsRenderPassActive = true;
 }
 
 void VulkanCommandBuffer::SetRenderTargets(std::vector<IRenderTarget*> pRTs, IDepthTarget* DepthTarget)
@@ -532,6 +648,9 @@ void VulkanCommandBuffer::SetUnorderedAccessBuffersAsResource(std::vector<IStruc
 
 void VulkanCommandBuffer::SetPipeline(IPipeline* pipeline)
 {
+	if (Pipeline == pipeline)
+		return;
+
 	Pipeline = static_cast<VulkanPipeline*>(pipeline);
 
 	//if (bIsRenderPassActive)
@@ -540,7 +659,7 @@ void VulkanCommandBuffer::SetPipeline(IPipeline* pipeline)
 	if (!bIsRenderPassActive)
 	{
 		// Set clear color values.
-		std::vector<VkClearValue> clear_value;
+		/*std::vector<VkClearValue> clear_value;
 		for (std::size_t i = 0; i < Pipeline->RenderPass->Info.GetAttachmentCount(); i++)
 			clear_value.push_back({ {0.0f, 0.0f, 0.0f, 0.0f} });
 
@@ -552,13 +671,20 @@ void VulkanCommandBuffer::SetPipeline(IPipeline* pipeline)
 		renderPassInfo.renderArea.extent.width = Pipeline->FrameBufferDimension.Width;
 		renderPassInfo.renderArea.extent.height = Pipeline->FrameBufferDimension.Height;
 		renderPassInfo.framebuffer = Pipeline->FrameBuffer;
-		vkCmdBeginRenderPass(CommandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+		vkCmdBeginRenderPass(CommandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);*/
+
+		//if (bIsRenderPassActive)
+		//	vkCmdEndRendering(CommandBuffer);
+
+		vkCmdBeginRendering(CommandBuffer, &Pipeline->RenderingInfo);
 
 		bIsRenderPassActive = true;
 	}
 
 	//CommandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, static_cast<VulkanPipeline*>(Pipeline)->Get(), nullptr);
 	vkCmdBindPipeline(CommandBuffer, VkPipelineBindPoint::VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline->Get());
+
+	BindDescriptorSets();
 }
 
 void VulkanCommandBuffer::SetConstantBuffer(IConstantBuffer* CB, std::optional<std::uint32_t> InRootParameterIndex)
@@ -610,39 +736,43 @@ void VulkanCommandBuffer::SetTexture2D(ITexture2D* Texture2D, std::optional<std:
 
 void VulkanCommandBuffer::BindDescriptorSets()
 {
-	if (Sets.size() == 0)
-		return;
+	//if (Sets.size() == 0)
+	//	return;
 
-	std::vector<VkWriteDescriptorSet> WriteDescriptorSets;
-	for (auto& Set : Sets)
-	{
-		VkWriteDescriptorSet DescSet = {};
-		DescSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		DescSet.pNext = nullptr;
-		DescSet.descriptorCount = 1;
-		DescSet.dstArrayElement = 0;
-		DescSet.dstBinding = Set.Location;
-		DescSet.dstSet = 0;
-		DescSet.pTexelBufferView = nullptr;
-		if (Set.IsBuffer)
-		{
-			DescSet.descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-			DescSet.pBufferInfo = &Set.DescriptorBufferInfo;
-			DescSet.pImageInfo = nullptr;
-		}
-		else
-		{
-			DescSet.descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-			DescSet.pImageInfo = &Set.DescriptorImageInfo;
-			DescSet.pBufferInfo = nullptr;
-		}
-		WriteDescriptorSets.push_back(DescSet);
-	}
+	//std::vector<VkWriteDescriptorSet> WriteDescriptorSets;
+	//for (auto& Set : Sets)
+	//{
+	//	VkWriteDescriptorSet DescSet = {};
+	//	DescSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	//	DescSet.pNext = nullptr;
+	//	DescSet.descriptorCount = 1;
+	//	DescSet.dstArrayElement = 0;
+	//	DescSet.dstBinding = Set.Location;
+	//	DescSet.dstSet = 0;
+	//	DescSet.pTexelBufferView = nullptr;
+	//	if (Set.IsBuffer)
+	//	{
+	//		DescSet.descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	//		DescSet.pBufferInfo = &Set.DescriptorBufferInfo;
+	//		DescSet.pImageInfo = nullptr;
+	//	}
+	//	else
+	//	{
+	//		DescSet.descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	//		DescSet.pImageInfo = &Set.DescriptorImageInfo;
+	//		DescSet.pBufferInfo = nullptr;
+	//	}
+	//	WriteDescriptorSets.push_back(DescSet);
+	//}
 
-	//vkCmdPushDescriptorSet(CommandBuffer, VkPipelineBindPoint::VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline->GetLayout(), 0, WriteDescriptorSets.size(), WriteDescriptorSets.data());
-	vkCmdPushDescriptorSetKHR(CommandBuffer, VkPipelineBindPoint::VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline->GetLayout(), 0, (std::uint32_t)WriteDescriptorSets.size(), WriteDescriptorSets.data());
+	////vkCmdPushDescriptorSet(CommandBuffer, VkPipelineBindPoint::VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline->GetLayout(), 0, WriteDescriptorSets.size(), WriteDescriptorSets.data());
+	//vkCmdPushDescriptorSetKHR(CommandBuffer, VkPipelineBindPoint::VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline->GetLayout(), 0, (std::uint32_t)WriteDescriptorSets.size(), WriteDescriptorSets.data());
 
-	Sets.clear();
+	//Sets.clear();
+
+	VkDescriptorSet BindlessDescriptorSet = Owner->GetBindlessDescriptorSet();
+	vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline->GetLayout(), 0, 1, &BindlessDescriptorSet, 0, nullptr);
+
 }
 
 void VulkanCommandBuffer::SetVertexBuffer(IVertexBuffer* VBuffer, std::uint32_t Slot)
@@ -696,34 +826,61 @@ void VulkanCommandBuffer::UpdateBufferSubresource(IIndexBuffer* Buffer, BufferSu
 
 void VulkanCommandBuffer::UpdateBufferSubresource(IIndexBuffer* Buffer, std::size_t Location, std::size_t Size, const void* pSrcData)
 {
-	if (bIsRenderPassActive)
+	/*if (bIsRenderPassActive)
 		return;
 
-	//VulkanUploadBuffer::SharedPtr UploadBuffer = VulkanUploadBuffer::Create(Owner, "Temp", Buffer->GetSize());
-	//UploadBuffer->Map();
+	VkBufferCopy copyRegion = {};
+	copyRegion.srcOffset = Location;
+	copyRegion.dstOffset = Location;
+	copyRegion.size = Size;
 
-	////memcpy((BYTE*)UploadBuffer->GetData() + Location, pSrcData, Size);
+	vkCmdCopyBuffer(CommandBuffer, UploadBuffer->GetBuffer(), static_cast<VulkanIndexBuffer*>(Buffer)->GetBuffer(), 1, &copyRegion);
+	bWaitForCompletion = true;
+	
+	UploadBuffer = nullptr;*/
 
-	//UploadBuffer->Unmap();
-
-	//VkBufferCopy copyRegion = {};
-	//copyRegion.srcOffset = Location;
-	//copyRegion.dstOffset = Location;
-	//copyRegion.size = Size;
-
-	//vkCmdCopyBuffer(CommandBuffer, UploadBuffer->GetBuffer(), static_cast<VulkanIndexBuffer*>(Buffer)->GetBuffer(), 1, &copyRegion);
+	//static_cast<VulkanIndexBuffer*>(Buffer)->Map(pSrcData);
+	//static_cast<VulkanIndexBuffer*>(Buffer)->Unmap();
 	//bWaitForCompletion = true;
-	//
-	//UploadBuffer = nullptr;
+}
 
-	static_cast<VulkanIndexBuffer*>(Buffer)->Map(pSrcData);
-	static_cast<VulkanIndexBuffer*>(Buffer)->Unmap();
+void VulkanCommandBuffer::CopyResource(VkImage pDstResource, VkImageLayout DestState, VkImage pSrcResource, VkImageLayout SrcState, sDimension2D Dimension)
+{
+	TransitionTo(
+		pDstResource,
+		DestState,
+		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
+	);
+	TransitionTo(
+		pSrcResource,
+		SrcState,
+		VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
+	);
+
+	VkImageCopy Copy{};
+	Copy.srcSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
+	Copy.srcOffset = { 0, 0, 0 };
+	Copy.dstSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
+	Copy.dstOffset = { 0, 0, 0 };
+	Copy.extent = { Dimension.Width, Dimension.Height, 1 };
+	vkCmdCopyImage(CommandBuffer, pSrcResource, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, pDstResource, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &Copy);
+
+	TransitionTo(
+		pDstResource,
+		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		DestState
+	);
+	TransitionTo(
+		pSrcResource,
+		VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+	);
+
 	bWaitForCompletion = true;
 }
 
-void VulkanCommandBuffer::ClearCMDStates()
+void VulkanCommandBuffer::ClearState()
 {
-	//CommandBuffer.();
 	StencilRef = 0;
 }
 

@@ -39,13 +39,11 @@ public:
 	VulkanTexture(VulkanDevice* Device, const std::string InName, void* InBuffer, const std::size_t InSize, const sTextureDesc& InDesc, std::uint32_t RootParameterIndex = 0);
 	VulkanTexture(VulkanDevice* Device, const std::string InName, const sTextureDesc& InDesc, std::uint32_t RootParameterIndex = 0);
 
-	virtual ~VulkanTexture()
-	{
-	}
+	virtual ~VulkanTexture();
 
 	virtual std::string GetName() const override final { return Name; }
 	virtual std::wstring GetPath() const override final { return Path; }
-	virtual std::uint32_t GetBindlessIndex() const override final { return std::uint32_t(-1); }
+	virtual std::uint32_t GetBindlessIndex() const override final { return HeapIndex; }
 
 	virtual sTextureDesc GetDesc() const override final { return Desc; }
 
@@ -83,4 +81,5 @@ private:
 	VkImage Image;
 	VkImageView View;
 	VkDeviceMemory Memory;
+	std::uint32_t HeapIndex;
 };

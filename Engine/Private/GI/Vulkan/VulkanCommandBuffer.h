@@ -38,16 +38,17 @@ public:
 	VulkanCommandBuffer(VulkanDevice* Device);
 	virtual ~VulkanCommandBuffer();
 
+	virtual void* GetInternalCommandContext() override final { return CommandBuffer; }
+
 	virtual ECommandContextBeginResult BeginRecordCommandList(const ECommandContextBeginState Begin = ECommandContextBeginState::Render) override final;
 	virtual bool FinishRecordCommandList() override final;
 	virtual bool ExecuteCommandList(ECommandContextExecuteType ExecuteType = ECommandContextExecuteType::Immediate, std::uint32_t Order = std::uint32_t(-1)) override final;
-	virtual void ClearState() override final;
+	bool ExecuteCommandListWithWaitSemaphore(VkSemaphore WaitSemaphore, VkPipelineStageFlags WaitStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
+	void OnExecuteCommandList(std::uint64_t FenceValue);
 
 	virtual void BeginProfile(ERenderPass RenderPass, bool bProfileCPU = false) override final {}
 	virtual void EndProfile() override final {}
 	virtual ProfileResult GetProfileResult() const override final { return ProfileResult(); }
-
-	void ExecuteWithWait();
 
 	virtual ECommandContextState GetState() const override final { return State; }
 
@@ -59,16 +60,14 @@ public:
 #ifdef VK_HPP
 	vk::CommandBuffer Get_hpp() const { return CommandBuffer; }
 #endif
-
 	void Open();
 	void Close();
-	bool IsClosed() const { return bIsClosed; }
+	bool IsClosed() const { return State == ECommandContextState::End; }
 
+	void TransitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, VkImageSubresourceRange subresourceRange);
 	void TransitionTo(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, VkAccessFlags2 srcAccessMask = 0, VkAccessFlags2 dstAccessMask = 0, VkPipelineStageFlags2 srcStage = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, VkPipelineStageFlags2 dstStage = VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT, std::uint32_t Mips = 1);
-	void PipelineBarrier(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, VkAccessFlags srcAccessMask, VkAccessFlags dstAccessMask, VkPipelineStageFlags sourceStage, VkPipelineStageFlags destinationStage,  uint32_t mipLevels);
-	void CopyResource(VkImage pDstResource, VkImageLayout DestState, VkImage pSrcResource, VkImageLayout SrcState, sDimension2D Dimension);
-
-	virtual void* GetInternalCommandContext() override final { return nullptr; }
+	void PipelineBarrier(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, VkAccessFlags srcAccessMask, VkAccessFlags dstAccessMask, VkPipelineStageFlags sourceStage, VkPipelineStageFlags destinationStage, uint32_t mipLevels);
+	void WaitForGPU();
 
 	virtual void SetViewport(const sViewport& Viewport) override final;
 
@@ -108,6 +107,8 @@ public:
 	virtual void UpdateBufferSubresource(IIndexBuffer* Buffer, BufferSubresource* Subresource) override final;
 	virtual void UpdateBufferSubresource(IIndexBuffer* Buffer, std::size_t Location, std::size_t Size, const void* pSrcData) override final;
 
+	void CopyResource(VkImage pDstResource, VkImageLayout DestState, VkImage pSrcResource, VkImageLayout SrcState, sDimension2D Dimension);
+
 	virtual void Set32BitConstant(std::uint32_t RootParameterIndex, std::uint32_t SrcData, std::uint32_t DestOffsetIn32BitValues = 0) override final;
 	virtual void Set32BitConstants(std::uint32_t RootParameterIndex, const void* pSrcData, std::uint32_t Num32BitValuesToSet = 1, std::uint32_t DestOffsetIn32BitValues = 0) override final;
 
@@ -120,7 +121,7 @@ public:
 
 	virtual void ExecuteIndirect(IIndirectBuffer* IndirectBuffer) override final;
 
-	void ClearCMDStates();
+	virtual void ClearState() override final;
 
 private:
 	void BindDescriptorSets();
@@ -128,13 +129,11 @@ private:
 private:
 	VulkanDevice* Owner;
 	vk::CommandBuffer CommandBuffer;
-	bool bIsSingleThreaded;
 	std::uint32_t StencilRef;
 	ECommandContextState State;
+	std::uint64_t LastFenceValue = 0;
 
 	VulkanPipeline* Pipeline;
-
-	PFN_vkCmdPushDescriptorSetKHR vkCmdPushDescriptorSetKHR;
 
 	struct DescCopy
 	{
@@ -146,7 +145,6 @@ private:
 
 	std::vector<DescCopy> Sets;
 
-	bool bIsClosed;
 	bool bIsRenderPassActive;
 	bool bWaitForCompletion;
 };

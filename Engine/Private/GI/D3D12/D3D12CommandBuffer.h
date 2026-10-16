@@ -96,9 +96,6 @@ public:
 	virtual void SetUnorderedAccessBufferAsResource(IStructuredBuffer* pUAV, std::optional<std::uint32_t> RootParameterIndex = std::nullopt) override final;
 	virtual void SetUnorderedAccessBuffersAsResource(std::vector<IStructuredBuffer*> UAVs, std::optional<std::uint32_t> RootParameterIndex = std::nullopt) override final;
 
-	void CopyBufferRegion(ID3D12Resource* Buffer, D3D12_RESOURCE_STATES State, ID3D12Resource* UploadBuffer, void* UploadData, BufferSubresource* Subresource);
-	void UpdateBuffer(ID3D12Resource* Buffer, ID3D12Resource* UploadBuffer, BufferSubresource* Subresource);
-
 	virtual void SetPipeline(IPipeline* Pipeline) override final;
 
 	virtual void SetVertexBuffer(IVertexBuffer* VB, std::uint32_t Slot = 0) override final;
@@ -112,6 +109,9 @@ public:
 	virtual void UpdateBufferSubresource(IVertexBuffer* Buffer, std::size_t Location, std::size_t Size, const void* pSrcData) override final;
 	virtual void UpdateBufferSubresource(IIndexBuffer* Buffer, BufferSubresource* Subresource) override final;
 	virtual void UpdateBufferSubresource(IIndexBuffer* Buffer, std::size_t Location, std::size_t Size, const void* pSrcData) override final;
+
+	void CopyBufferRegion(ID3D12Resource* Buffer, D3D12_RESOURCE_STATES State, ID3D12Resource* UploadBuffer, void* UploadData, BufferSubresource* Subresource);
+	void UpdateBuffer(ID3D12Resource* Buffer, ID3D12Resource* UploadBuffer, BufferSubresource* Subresource);
 
 	virtual void Set32BitConstant(std::uint32_t RootParameterIndex, std::uint32_t SrcData, std::uint32_t DestOffsetIn32BitValues = 0) override final;
 	virtual void Set32BitConstants(std::uint32_t RootParameterIndex, const void* pSrcData, std::uint32_t Num32BitValuesToSet = 1, std::uint32_t DestOffsetIn32BitValues = 0) override final;

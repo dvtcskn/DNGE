@@ -60,7 +60,7 @@ public:
 
 	virtual ERenderPass GetRenderPass() const override final { return Desc.RenderPass; }
 	virtual IRootSignature* GetRootSignature() const override final { return nullptr; }
-	virtual bool IsIndirectCommandAvailable() const override final { return false; }
+	virtual bool IsIndirectCommandAvailable() const override final { return bIsIndirectCommandAvailable; }
 	virtual bool Compile(IFrameBuffer* FrameBuffer = nullptr) override final;
 	virtual bool Compile(IRenderTarget* RT, IDepthTarget* Depth = nullptr) override final;
 	virtual bool Compile(std::vector<IRenderTarget*> RTs, IDepthTarget* Depth = nullptr) override final;
@@ -71,6 +71,8 @@ public:
 	VulkanRenderpass::SharedPtr RenderPass;
 	sDimension2D FrameBufferDimension;
 
+	VkRenderingInfo RenderingInfo;
+
 private:
 	void CompilePipeline();
 
@@ -79,12 +81,18 @@ protected:
 	std::string Name;
 	sPipelineDesc Desc;
 	bool Compiled;
+	bool bIsIndirectCommandAvailable;
+	VkIndirectCommandsLayoutEXT layout = VK_NULL_HANDLE;
 
 	VkPipelineLayout PipelineLayout;
 	VkGraphicsPipelineCreateInfo PipelineCreateInfo;
 
 	VkPipeline Pipeline;
 	VkPipelineCache PipelineCache;
+
+	std::vector<VkRenderingAttachmentInfo> pColorAttachments;
+	std::vector<VkRenderingAttachmentInfo> pDepthAttachment;
+	std::vector<VkRenderingAttachmentInfo> pStencilAttachment;
 };
 
 class VulkanComputePipeline final : public IComputePipeline

@@ -139,55 +139,47 @@ public:
 		: Device(device)
 		, SemaphoreCounter(-1)
 	{
-		VkSemaphoreTypeCreateInfo SemaphoreTypeCreateInfo = {};
-		SemaphoreTypeCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
-		SemaphoreTypeCreateInfo.pNext = VK_NULL_HANDLE;
-		SemaphoreTypeCreateInfo.semaphoreType = VK_SEMAPHORE_TYPE_BINARY; // VK_SEMAPHORE_TYPE_TIMELINE;
-		SemaphoreTypeCreateInfo.initialValue = 0;
-		VkSemaphoreCreateInfo semaphoreInfo = {};
+		VkSemaphoreCreateInfo semaphoreInfo{};
 		semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-		semaphoreInfo.pNext = &SemaphoreTypeCreateInfo;
-		semaphoreInfo.flags = 0;
-		
+
+		for (std::size_t i = 0; i < 3; ++i)
 		{
-			VkSemaphore semaphore;
+			VkSemaphore semaphore = VK_NULL_HANDLE;
 			VkResult result = vkCreateSemaphore(Device->Get(), &semaphoreInfo, nullptr, &semaphore);
-			SemaphorePool.push_back(semaphore);
-		}
-		{
-			VkSemaphore semaphore;
-			VkResult result = vkCreateSemaphore(Device->Get(), &semaphoreInfo, nullptr, &semaphore);
-			SemaphorePool.push_back(semaphore);
-		}
-		{
-			VkSemaphore semaphore;
-			VkResult result = vkCreateSemaphore(Device->Get(), &semaphoreInfo, nullptr, &semaphore);
+			if (result != VK_SUCCESS)
+				throw std::runtime_error("Failed to create Vulkan semaphore.");
 			SemaphorePool.push_back(semaphore);
 		}
 	}
 
 	~VulkanSyncManager() 
 	{
+		vkDeviceWaitIdle(Device->Get());
 		for (auto semaphore : SemaphorePool)
 			vkDestroySemaphore(Device->Get(), semaphore, nullptr);
 		SemaphorePool.clear();
 
-		WaitForPastFence();
-
-		for (auto& fence : FencePool)
-			vkDestroyFence(Device->Get(), fence, nullptr);
 	}
 
 	VkSemaphore AcquireSemaphore() const
 	{
-		SemaphoreCounter++;
-		if (SemaphoreCounter == SemaphorePool.size())
-			SemaphoreCounter = 0;
+		std::lock_guard<std::mutex> lock(Mutex);
+		if (SemaphorePool.empty())
+			throw std::runtime_error("No Vulkan semaphores are available.");
+
+		const VkResult waitResult = vkQueueWaitIdle(Device->GetQueue());
+		if (waitResult != VK_SUCCESS)
+			throw std::runtime_error("Failed to wait for the Vulkan present queue.");
+
+		SemaphoreCounter = (SemaphoreCounter + 1) % static_cast<std::int64_t>(SemaphorePool.size());
 		return SemaphorePool[SemaphoreCounter];
 	}
 
 	VkSemaphore AcquireSignalledSemaphore() const
 	{
+		std::lock_guard<std::mutex> lock(Mutex);
+		if (SemaphoreCounter < 0 || SemaphorePool.empty())
+			throw std::runtime_error("No acquired Vulkan semaphore is available.");
 		return SemaphorePool[SemaphoreCounter];
 	}
 
@@ -201,61 +193,11 @@ public:
 		return SemaphoreCounter >= 0;
 	}
 
-	VkFence AcquireFence()
-	{
-		std::lock_guard<std::mutex> Lock(Mutex);
-		if (!FencePool.empty())
-		{
-			VkFence fence = FencePool.back();
-			FencePool.pop_back();
-			return fence;
-		}
-
-		VkFenceCreateInfo fenceInfo = {};
-		fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-		fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-
-		VkFence fence;
-		VkResult result = vkCreateFence(Device->Get(), &fenceInfo, nullptr, &fence);
-		assert(result == VK_SUCCESS);
-		vkResetFences(Device->Get(), 1, &fence);
-		return fence;
-	}
-
-	void AddUsedFence(VkFence fence)
-	{
-		std::lock_guard<std::mutex> Lock(Mutex);
-		UsedFencePool.push_back(fence);
-	}
-
-	void WaitForPastFence()
-	{
-		std::lock_guard<std::mutex> Lock(Mutex);
-		if (UsedFencePool.size() > 0)
-		{
-			for (auto& fence : UsedFencePool)
-			{
-				RecycleFence(fence);
-			}
-			UsedFencePool.clear();
-		}
-	}
-
-	void RecycleFence(VkFence fence)
-	{
-		std::lock_guard<std::mutex> Lock(Mutex);
-		vkWaitForFences(Device->Get(), 1, &fence, VK_TRUE, UINT64_MAX);
-		vkResetFences(Device->Get(), 1, &fence);
-		FencePool.push_back(fence);
-	}
-
 private:
 	VulkanDevice* Device;
 	mutable std::int64_t SemaphoreCounter;
 	std::vector<VkSemaphore> SemaphorePool;
-	std::vector<VkFence> FencePool;
-	std::vector<VkFence> UsedFencePool;
-	std::mutex Mutex;
+	mutable std::mutex Mutex;
 };
 
 class VulkanDevice::VkCommandPoolManager
@@ -535,33 +477,6 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL FDebugCallback(VkDebugUtilsMessageSeverity
 }
 #endif
 
-bool validate_extensions(const std::vector<const char*>& required, const std::vector<VkExtensionProperties>& available)
-{
-	bool all_found = true;
-
-	for (const auto* extension_name : required)
-	{
-		bool found = false;
-		for (const auto& available_extension : available)
-		{
-			if (strcmp(available_extension.extensionName, extension_name) == 0)
-			{
-				found = true;
-				break;
-			}
-		}
-
-		if (!found)
-		{
-			// Output an error message for the missing extension
-			Engine::WriteToConsole("Warning: Required extension not found: " + std::string(extension_name));
-			all_found = false;
-		}
-	}
-
-	return all_found;
-}
-
 bool validate_layers(const std::vector<const char*>& required, const std::vector<VkLayerProperties>& available)
 {
 	bool all_found = true;
@@ -664,297 +579,117 @@ uint32_t GetQueueFamilyIndex(std::vector<VkQueueFamilyProperties> queue_family_p
 
 	throw std::runtime_error("Could not find a matching queue family index");
 }
-class ScopedSetEnvVar
-{
-public:
-	ScopedSetEnvVar(std::string name)
-		: name(name)
-	{
-		assert(!name.empty());
-	}
-
-	ScopedSetEnvVar(std::string name, std::string value)
-		: name(name)
-	{
-		set(value);
-	}
-
-	~ScopedSetEnvVar()
-	{
-		restore();
-	}
-
-	void set(std::string value)
-	{
-		restore();
-		if (auto ov = getEnv(name.data()))
-		{
-			oldValue = ov;
-		}
-		putEnv((name + std::string("=") + value).c_str());
-	}
-
-	void restore()
-	{
-		if (!oldValue.empty())
-		{
-			putEnv((name + std::string("=") + oldValue).c_str());
-			oldValue.clear();
-		}
-	}
-
-private:
-	void putEnv(const char* env)
-	{
-		// POSIX putenv needs 'env' to live beyond the call
-		envCopy = env;
-
-		[[maybe_unused]] auto r = ::_putenv(envCopy.c_str());
-		assert(r == 0);
-	}
-
-	const char* getEnv(const char* name)
-	{
-		char* pathBuffer = nullptr;
-		size_t bufferSize = 0;
-		::_dupenv_s(&pathBuffer, &bufferSize, name);
-		return pathBuffer;
-	}
-
-	std::string name;
-	std::string oldValue;
-	std::string envCopy;
-};
-
-class ScopedSetIcdFilenames
-{
-public:
-	ScopedSetIcdFilenames() = default;
-	ScopedSetIcdFilenames(const char* driverPath)
-	{
-		std::ofstream fout(icdFileName);
-		assert(fout && "Failed to create generated icd file");
-		fout << R"raw({ "file_format_version": "1.0.0", "ICD": { "library_path": ")raw" << driverPath << R"raw(", "api_version": "1.0.5" } } )raw";
-		fout.close();
-
-		setEnvVar.set(icdFileName);
-	}
-
-	~ScopedSetIcdFilenames()
-	{
-		if (std::filesystem::exists("vk_swiftshader_generated_icd.json"))
-		{
-			//std::filesystem::remove("vk_swiftshader_generated_icd.json");
-		}
-	}
-
-private:
-	static constexpr const char* icdFileName = "vk_swiftshader_generated_icd.json";
-	ScopedSetEnvVar setEnvVar{ "VK_ICD_FILENAMES" };
-};
-
-std::vector<const char*> getDriverPaths()
-{
-	std::vector<const char*> Paths;
-	Paths.push_back("vk_swiftshader.dll");
-	return Paths;
-}
-
-bool fileExists(const char* path)
-{
-	std::ifstream f(path);
-	return f.good();
-}
-
-std::string findDriverPath()
-{
-	for (auto& path : getDriverPaths())
-	{
-		if (fileExists(path))
-			return path;
-	}
-
-#if(OS_LINUX || OS_ANDROID || OS_FUCHSIA)
-	// On Linux-based OSes, the lib path may be resolved by dlopen
-	for (auto& path : getDriverPaths())
-	{
-		auto lib = dlopen(path, RTLD_LAZY | RTLD_LOCAL);
-		if (lib)
-		{
-			char libPath[2048] = { '\0' };
-			dlinfo(lib, RTLD_DI_ORIGIN, libPath);
-			dlclose(lib);
-			return std::string{ libPath } + "/" + path;
-		}
-	}
-#endif
-
-	return {};
-}
-
-std::unique_ptr<vk::detail::DynamicLoader> loadDriver(bool LOAD_SWIFTSHADER_DIRECTLY)
-{
-	auto driverPath = findDriverPath();
-	assert(!driverPath.empty());
-
-	if (LOAD_SWIFTSHADER_DIRECTLY)
-	{
-		return std::make_unique<vk::detail::DynamicLoader>(driverPath);
-	}
-
-	// Load SwiftShader via loader
-
-	// Set VK_ICD_FILENAMES env var so it gets picked up by the loading of the ICD driver
-	auto setIcdFilenames = std::make_unique<ScopedSetIcdFilenames>(driverPath.c_str());
-
-	std::unique_ptr<vk::detail::DynamicLoader> dl;
-#ifndef VULKAN_HPP_NO_EXCEPTIONS
-	try
-	{
-		dl = std::make_unique<vk::detail::DynamicLoader>();
-	}
-	catch (std::exception& ex)
-	{
-		std::cerr << "vk::detail::DynamicLoader exception: " << ex.what() << std::endl;
-		std::cerr << "Falling back to loading SwiftShader directly (i.e. no validation layers)" << std::endl;
-		dl = std::make_unique<vk::detail::DynamicLoader>(driverPath);
-	}
-#else
-	dl = std::make_unique<vk::detail::DynamicLoader>();
-#endif
-
-	return dl;
-}
-
-void* lookup(HMODULE DLL, const char* name)
-{
-	return GetProcAddress((HMODULE)DLL, name);
-}
-
-template<typename T>
-bool lookup(HMODULE DLL, T* ptr, const char* name)
-{
-	void* sym = lookup(DLL, name);
-	if (sym == nullptr)
-	{
-		return false;
-	}
-	*ptr = reinterpret_cast<T>(sym);
-	return true;
-}
 
 VulkanDevice::VulkanDevice(const GPUCreateInfo& DeviceCreateInfo, std::uint32_t InDeviceIndex)
 	: Super()
 	, GPUIndex(DeviceCreateInfo.PrimaryGPU.GPUIndex)
 	, DeviceType(DeviceCreateInfo.PrimaryGPU.DeviceType)
 	, DeviceIndex(InDeviceIndex)
+	, InstanceApiVersion(1)
+	, deviceProperties2Available(false)
+	, deviceFormatProperties2Available(false)
 {
-	//std::unique_ptr<vk::detail::DynamicLoader> dl = loadDriver(true);
-	//assert(dl && dl->success());
-
-	//PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr = dl->getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
-	
-	//auto vkCreateInstance = reinterpret_cast<PFN_vkCreateInstance>(vkGetInstanceProcAddr);
-
-//	VKAPI_ATTR PFN_vkVoidFunction(VKAPI_CALL * vk_icdGetInstanceProcAddr)(VkInstance instance, const char* pName);
-//
-//	HMODULE  dll = LoadLibraryA("vk_swiftshader.dll");
-//	if (!lookup(dll, &vk_icdGetInstanceProcAddr, "vk_icdGetInstanceProcAddr"))
-//	{
-//		// Nope, attempt to use the loader version.
-//		if (!lookup(dll, &vk_icdGetInstanceProcAddr, "vkGetInstanceProcAddr"))
-//		{
-//
-//		}
-//	}
-//
-//#define VK_GLOBAL(N, R, ...)                              \
-//	if(auto pfn = vk_icdGetInstanceProcAddr(nullptr, #N)) \
-//	{                                                     \
-//		N = reinterpret_cast<decltype(N)>(pfn);           \
-//	}
-////#include "VkGlobalFuncs.hpp"
-//#undef VK_GLOBAL
-
-	//VkApplicationInfo appest{
-	//	.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
-	//	.pApplicationName = "Game Engine",
-	//	.pEngineName = "DNGE",
-	//	.apiVersion = VK_MAKE_VERSION(1, 4, 0) };
-	//VkInstanceCreateInfo instance_infotest{
-	//	.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-	//	.pApplicationInfo = &appest,
-	//	//.enabledLayerCount = (uint32_t)requested_validation_layers.size(),
-	//	//.ppEnabledLayerNames = requested_validation_layers.data(),
-	//	//.enabledExtensionCount = (uint32_t)required_instance_extensions.size(),
-	//	//.ppEnabledExtensionNames = required_instance_extensions.data()
-	//};
-
-	//VK_CHECK(vkCreateInstance(&instance_infotest, nullptr, &instance));
-
 	Engine::WriteToConsole("Initializing Vulkan instance.");
 
-	uint32_t instance_extension_count;
-	VK_CHECK(vkEnumerateInstanceExtensionProperties(nullptr, &instance_extension_count, nullptr));
-
-	std::vector<VkExtensionProperties> available_instance_extensions(instance_extension_count);
-	VK_CHECK(vkEnumerateInstanceExtensionProperties(nullptr, &instance_extension_count, available_instance_extensions.data()));
-
-	std::vector<const char*> required_instance_extensions{ VK_KHR_SURFACE_EXTENSION_NAME };
-
+	// Platform specific surface extensions
+	std::vector<std::string> possibleSurfaceExtensions = {
 #if defined(VK_USE_PLATFORM_ANDROID_KHR)
-	required_instance_extensions.push_back(VK_KHR_ANDROID_SURFACE_EXTENSION_NAME);
-#elif defined(VK_USE_PLATFORM_WIN32_KHR)
-	required_instance_extensions.push_back(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
-#elif defined(VK_USE_PLATFORM_METAL_EXT)
-	required_instance_extensions.push_back(VK_EXT_METAL_SURFACE_EXTENSION_NAME);
-#elif defined(VK_USE_PLATFORM_XCB_KHR)
-	required_instance_extensions.push_back(VK_KHR_XCB_SURFACE_EXTENSION_NAME);
-#elif defined(VK_USE_PLATFORM_XLIB_KHR)
-	required_instance_extensions.push_back(VK_KHR_XLIB_SURFACE_EXTENSION_NAME);
-#elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
-	required_instance_extensions.push_back(VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME);
-#elif defined(VK_USE_PLATFORM_DISPLAY_KHR)
-	required_instance_extensions.push_back(VK_KHR_DISPLAY_EXTENSION_NAME);
-#else
-#	pragma error Platform not supported
+	  VK_KHR_ANDROID_SURFACE_EXTENSION_NAME,
+#endif
+#if defined(VK_USE_PLATFORM_WAYLAND_KHR)
+	  VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME,
+#endif
+#if defined(VK_USE_PLATFORM_WIN32_KHR)
+	  VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
+#endif
+#if defined(VK_USE_PLATFORM_XCB_KHR)
+	  VK_KHR_XCB_SURFACE_EXTENSION_NAME,
 #endif
 
-#if defined(VK_DEBUG) || defined(VK_VALIDATION_LAYERS)
-	required_instance_extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-	required_instance_extensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
+#if defined(VK_USE_PLATFORM_METAL_EXT)
+	VK_EXT_METAL_SURFACE_EXTENSION_NAME,
 #endif
-	required_instance_extensions.push_back(VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME);
-	required_instance_extensions.push_back(VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME);
-	//required_instance_extensions.push_back(VK_EXT_DIRECT_MODE_DISPLAY_EXTENSION_NAME);
-	//required_instance_extensions.push_back(VK_KHR_DISPLAY_EXTENSION_NAME);
-	//required_instance_extensions.push_back(VK_EXT_DISPLAY_SURFACE_COUNTER_EXTENSION_NAME);
-	required_instance_extensions.push_back(VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME);
-	required_instance_extensions.push_back(VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_EXTENSION_NAME);
-	required_instance_extensions.push_back(VK_KHR_DEVICE_GROUP_CREATION_EXTENSION_NAME);
-	required_instance_extensions.push_back(VK_KHR_EXTERNAL_FENCE_CAPABILITIES_EXTENSION_NAME);
-	//required_instance_extensions.push_back(VK_KHR_SURFACE_MAINTENANCE_1_EXTENSION_NAME);
-	//required_instance_extensions.push_back(VK_KHR_GET_DISPLAY_PROPERTIES_2_EXTENSION_NAME);
-	//required_instance_extensions.push_back(VK_NV_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME);
+	};
 
-	//required_instance_extensions.push_back("VK_KHR_get_surface_capabilities2");
-	bool AllRequiredInstanceExtFound = validate_extensions(required_instance_extensions, available_instance_extensions);
-	if (AllRequiredInstanceExtFound)
+	std::vector<const char*> enabledExtensions = {};
+
+	uint32_t availableExtensionCount = 0;
+	vkEnumerateInstanceExtensionProperties(nullptr, &availableExtensionCount, nullptr);
+	std::vector<VkExtensionProperties> availableExtensions(availableExtensionCount);
+	vkEnumerateInstanceExtensionProperties(nullptr, &availableExtensionCount, availableExtensions.data());
+
+	if (availableExtensionCount != 0) {
+		enabledExtensions.push_back(VK_KHR_SURFACE_EXTENSION_NAME);
+	}
+
+	std::vector<std::string> surfaceExtensionsAvailable = {};
+
+	for (const std::string& possibleExtension : possibleSurfaceExtensions) 
 	{
-		bool InstanceExt = true;
-		if (InstanceExt)
+		for (const auto& availableExtension : availableExtensions) 
 		{
-			Engine::WriteToConsole("Required Instance Extensions:");
-			for (const auto& Ext : required_instance_extensions)
-				Engine::WriteToConsole(Ext);
+			if (possibleExtension == availableExtension.extensionName) 
+			{
+				surfaceExtensionsAvailable.push_back(possibleExtension);
+				enabledExtensions.push_back(possibleExtension.c_str());
+				break;
+			}
 		}
 	}
-	else
-	{
-		Engine::WriteToConsole("Required Instance Extensions:");
-		for (const auto& Ext : required_instance_extensions)
-			Engine::WriteToConsole(Ext);
-		throw std::runtime_error("Required instance extensions are missing.");
+
+	VkResult vkRes;
+	std::vector<VkExtensionProperties> instanceExtensions;
+	instanceExtensions.clear();
+	do {
+		uint32_t extCount;
+		vkRes = vkEnumerateInstanceExtensionProperties(NULL, &extCount, NULL);
+		if (vkRes != VK_SUCCESS) {
+			break;
+		}
+		std::vector<VkExtensionProperties> extensions(extCount);
+		vkRes = vkEnumerateInstanceExtensionProperties(NULL, &extCount, &extensions.front());
+		instanceExtensions.insert(instanceExtensions.end(), extensions.begin(), extensions.end());
+	} while (vkRes == VK_INCOMPLETE);
+
+	bool bInstancePortability = false;
+	const std::vector<const char*> reqInstanceExtensions{
+	   VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME,
+	   VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME,
+	   VK_EXT_DIRECT_MODE_DISPLAY_EXTENSION_NAME,
+#if _DEBUG
+	   VK_EXT_DEBUG_REPORT_EXTENSION_NAME,
+	   VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
+#endif
+	   VK_KHR_DISPLAY_EXTENSION_NAME,
+	   VK_EXT_DISPLAY_SURFACE_COUNTER_EXTENSION_NAME,
+	   VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME,
+	   VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_EXTENSION_NAME,
+	   VK_KHR_DEVICE_GROUP_CREATION_EXTENSION_NAME,
+	   VK_KHR_EXTERNAL_FENCE_CAPABILITIES_EXTENSION_NAME,
+	   VK_KHR_SURFACE_MAINTENANCE_1_EXTENSION_NAME,
+	   VK_KHR_GET_DISPLAY_PROPERTIES_2_EXTENSION_NAME,
+	   VK_NV_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME,
+	};
+
+	for (auto& ext : instanceExtensions) {
+		if (strcmp(ext.extensionName, VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME) == 0) {
+			deviceProperties2Available = true;
+			deviceFormatProperties2Available = true;
+			enabledExtensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+		}
+		for (auto& reqExt : reqInstanceExtensions) {
+			if (strcmp(ext.extensionName, reqExt) == 0) {
+				enabledExtensions.push_back(reqExt);
+				break;
+			}
+		}
+
+		// IF the portability extension is available, enable it here.
+		if (strcmp(ext.extensionName, VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME) == 0)
+		{
+			bInstancePortability = true;
+			enabledExtensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+		}
 	}
 
 	uint32_t instance_layer_count;
@@ -987,19 +722,40 @@ VulkanDevice::VulkanDevice(const GPUCreateInfo& DeviceCreateInfo, std::uint32_t 
 		//throw std::runtime_error("Required validation layers are missing.");
 	}
 
-	VkApplicationInfo app{
-		.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
-		.pApplicationName = "Game Engine",
-		.pEngineName = "DNGE",
-		.apiVersion = VK_MAKE_VERSION(1, 3, 0) };
+	// Get the max. supported Vulkan Version if vkEnumerateInstanceVersion is available (loader version 1.1 and up)
+	PFN_vkEnumerateInstanceVersion vkEnumerateInstanceVersion = reinterpret_cast<PFN_vkEnumerateInstanceVersion>(vkGetInstanceProcAddr(nullptr, "vkEnumerateInstanceVersion"));
+	if (vkEnumerateInstanceVersion) 
+	{
+		vkEnumerateInstanceVersion(&InstanceApiVersion);
+	}
+	else 
+	{
+		InstanceApiVersion = VK_API_VERSION_1_0;
+	}
+
+	//InstanceApiVersion = VK_MAKE_VERSION(1, 3, 0);
+
+	VkApplicationInfo app = {};
+	app.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+	app.pApplicationName = "GameEngine";
+	app.applicationVersion = 1;
+	app.pEngineName = "DNGE";
+	app.engineVersion = 1;
+	app.apiVersion = InstanceApiVersion;
 
 	VkInstanceCreateInfo instance_info{
 		.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
 		.pApplicationInfo = &app,
 		.enabledLayerCount = (uint32_t)requested_validation_layers.size(),
 		.ppEnabledLayerNames = requested_validation_layers.data(),
-		.enabledExtensionCount = (uint32_t)required_instance_extensions.size(),
-		.ppEnabledExtensionNames = required_instance_extensions.data() };
+		.enabledExtensionCount = (uint32_t)enabledExtensions.size(),
+		.ppEnabledExtensionNames = enabledExtensions.data() };
+
+	if (bInstancePortability)
+		instance_info.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
+
+	requested_validation_layers.clear();
+	enabledExtensions.clear();
 
 #if defined(VK_DEBUG) || defined(VK_VALIDATION_LAYERS)
 	VkDebugUtilsMessengerCreateInfoEXT debug_messenger_create_info = { VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT };
@@ -1012,8 +768,6 @@ VulkanDevice::VulkanDevice(const GPUCreateInfo& DeviceCreateInfo, std::uint32_t 
 #endif
 
 	VK_CHECK(vkCreateInstance(&instance_info, nullptr, &instance));
-	//instance = vk::createInstance(instance_info);
-	//instance = vk::raii::Instance(context, instance_info);
 
 	//if (bIsPrimaryGPU)
 		Viewport = VulkanViewport::CreateUnique(this, static_cast<HWND*>(DeviceCreateInfo.pHWND));
@@ -1032,73 +786,71 @@ VulkanDevice::VulkanDevice(const GPUCreateInfo& DeviceCreateInfo, std::uint32_t 
 		}
 	}
 
-	Engine::WriteToConsole(DeviceProperties.deviceName);
+	DeviceName = std::string(DeviceProperties.deviceName);
+	std::string SwitftShaderName("SwiftShader Device (LLVM 10.0.0)");
+	std::string LavaPipeName("llvmpipe (LLVM 23.1.2, 256 bits)");
 
-	std::uint32_t device_extension_count;
-	VK_CHECK(vkEnumerateDeviceExtensionProperties(PhysicalDevice, nullptr, &device_extension_count, nullptr));
+	Engine::WriteToConsole(DeviceName);
 
-	std::vector<VkExtensionProperties> device_extensions(device_extension_count);
-	VK_CHECK(vkEnumerateDeviceExtensionProperties(PhysicalDevice, nullptr, &device_extension_count, device_extensions.data()));
+	//std::uint32_t device_extension_count;
+	//VK_CHECK(vkEnumerateDeviceExtensionProperties(PhysicalDevice, nullptr, &device_extension_count, nullptr));
+
+	//std::vector<VkExtensionProperties> device_extensions(device_extension_count);
+	//VK_CHECK(vkEnumerateDeviceExtensionProperties(PhysicalDevice, nullptr, &device_extension_count, device_extensions.data()));
 
 	// Since this sample has visual output, the device needs to support the swapchain extension
-	std::vector<const char*> required_device_extensions{ VK_KHR_SWAPCHAIN_EXTENSION_NAME };
-	//required_device_extensions.push_back("VK_EXT_full_screen_exclusive");
-	required_device_extensions.push_back("VK_KHR_shader_float16_int8");
-	required_device_extensions.push_back("VK_KHR_16bit_storage");
-	required_device_extensions.push_back("VK_EXT_shader_atomic_float");
-	bool AllRequiredExtFound = validate_extensions(required_device_extensions, device_extensions);
-	if (AllRequiredExtFound)
+	std::vector<const char*> required_device_extensions{  };
+	
+	//if (DeviceType == EGPUDeviceType::Hardware || (DeviceType == EGPUDeviceType::Software && DeviceName != SwitftShaderName.c_str()))
+	//{
+	//	required_device_extensions.push_back(VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME);
+	//	required_device_extensions.push_back(VK_KHR_16BIT_STORAGE_EXTENSION_NAME);
+	//	required_device_extensions.push_back(VK_EXT_SHADER_ATOMIC_FLOAT_EXTENSION_NAME);
+	//	required_device_extensions.push_back(VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME);
+	//	//required_device_extensions.push_back(VK_EXT_ZERO_INITIALIZE_DEVICE_MEMORY_EXTENSION_NAME);
+	//}
+	//if (DeviceType == EGPUDeviceType::Hardware)
+	//	required_device_extensions.push_back(VK_EXT_FULL_SCREEN_EXCLUSIVE_EXTENSION_NAME);
+	//if (DeviceType == EGPUDeviceType::Hardware || (DeviceType == EGPUDeviceType::Software && DeviceName != SwitftShaderName.c_str()))
+	//{
+	//	//required_device_extensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+	//	required_device_extensions.push_back(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
+	//}
+
+	//bool AllRequiredExtFound = validate_extensions(required_device_extensions, device_extensions);
+	//if (AllRequiredExtFound)
+	//{
+	//	bool PrintDeviceExtensions = true;
+	//	if (PrintDeviceExtensions)
+	//	{
+	//		Engine::WriteToConsole("Required Device Extensions:");
+	//		for (const auto& layer : required_device_extensions)
+	//			Engine::WriteToConsole(layer);
+	//	}
+	//}
+	//else
+	//{
+	//	//throw std::runtime_error("Required required device extensions are missing.");
+	//}
+
+	std::vector<VkExtensionProperties> extensions;
 	{
-		bool PrintDeviceExtensions = true;
-		if (PrintDeviceExtensions)
-		{
-			Engine::WriteToConsole("Required Device Extensions:");
-			for (const auto& layer : required_device_extensions)
-				Engine::WriteToConsole(layer);
-		}
+		VkResult vkRes;
+		do {
+			uint32_t extCount;
+			vkRes = vkEnumerateDeviceExtensionProperties(PhysicalDevice, NULL, &extCount, NULL);
+			assert(!vkRes);
+			std::vector<VkExtensionProperties> exts(extCount);
+			vkRes = vkEnumerateDeviceExtensionProperties(PhysicalDevice, NULL, &extCount, &exts.front());
+			for (auto& ext : exts)
+				extensions.push_back(ext);
+		} while (vkRes == VK_INCOMPLETE);
+		assert(!vkRes);
 	}
-	else
-	{
-		//throw std::runtime_error("Required required device extensions are missing.");
-	}
+	//for (const auto& ext : extensions)
+	//	required_device_extensions.push_back(ext.extensionName);
 
-	{
-		VkPhysicalDeviceShaderFloat16Int8FeaturesKHR float16Features = {};
-		float16Features.sType = VkStructureType::VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES;
-		float16Features.pNext = VK_NULL_HANDLE;
-
-		VkPhysicalDeviceFeatures2 PhysicalDeviceFeatures = {};
-		PhysicalDeviceFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-		PhysicalDeviceFeatures.pNext = &float16Features;
-		vkGetPhysicalDeviceFeatures2(PhysicalDevice, &PhysicalDeviceFeatures);
-		if (!float16Features.shaderFloat16)
-			Engine::WriteToConsole("16 bit float not supported.");
-	}
-
-	{
-		// Query for Vulkan 1.3 features
-		VkPhysicalDeviceFeatures2                       query_device_features2{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
-		VkPhysicalDeviceVulkan12Features vulkan12Features = {};
-		vulkan12Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
-		query_device_features2.pNext = &vulkan12Features;
-		VkPhysicalDeviceVulkan13Features                query_vulkan13_features{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES };
-		VkPhysicalDeviceExtendedDynamicStateFeaturesEXT query_extended_dynamic_state_features{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT };
-		vulkan12Features.pNext = &query_vulkan13_features;
-		query_vulkan13_features.pNext = &query_extended_dynamic_state_features;
-
-		vkGetPhysicalDeviceFeatures2(PhysicalDevice, &query_device_features2);
-
-		// Check if Physical device supports Vulkan 1.3 features
-		if (!query_vulkan13_features.dynamicRendering)
-			Engine::WriteToConsole("(Vulkan 1.3) Dynamic Rendering feature is missing");
-
-		if (!query_vulkan13_features.synchronization2)
-			Engine::WriteToConsole("(Vulkan 1.3) Synchronization2 feature is missing");
-
-		if (!query_extended_dynamic_state_features.extendedDynamicState)
-			Engine::WriteToConsole("(Vulkan 1.3) Extended Dynamic State feature is missing");
-
-	}
+	required_device_extensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
 
 	VkPhysicalDeviceExtendedDynamicStateFeaturesEXT enable_extended_dynamic_state_features = {
 		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT,
@@ -1121,12 +873,21 @@ VulkanDevice::VulkanDevice(const GPUCreateInfo& DeviceCreateInfo, std::uint32_t 
 		.descriptorBindingVariableDescriptorCount = TRUE,
 	};
 
-	VkPhysicalDevicePushDescriptorPropertiesKHR pushDescriptorProperties{};
-	pushDescriptorProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PUSH_DESCRIPTOR_PROPERTIES_KHR;
+	VkPhysicalDeviceSynchronization2Features sync2Features{};
+	sync2Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES;
+	sync2Features.synchronization2 = VK_TRUE;
+	sync2Features.pNext = &enable_vulkan12_features;
+
+	VkPhysicalDeviceShaderFloat16Int8FeaturesKHR float16Features = {};
+	float16Features.sType = VkStructureType::VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES;
+	float16Features.pNext = &sync2Features;
+	float16Features.shaderFloat16 = VK_TRUE;
+	float16Features.shaderInt8 = VK_TRUE;
 
 	VkPhysicalDeviceFeatures2 enable_device_features2{
 		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
-		.pNext = &enable_vulkan12_features };
+		.pNext = &float16Features };
+	enable_device_features2.features.multiDrawIndirect = VK_TRUE;
 
 	/*VkPhysicalDevicePerStageDescriptorSetFeaturesNV perStageFeatures = {
 		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PER_STAGE_DESCRIPTOR_SET_FEATURES_NV,
@@ -1171,13 +932,9 @@ VulkanDevice::VulkanDevice(const GPUCreateInfo& DeviceCreateInfo, std::uint32_t 
 		DeviceQueueCreateInfos.push_back(copy_queue_info);
 	}
 
-	required_device_extensions.push_back(VK_EXT_FULL_SCREEN_EXCLUSIVE_EXTENSION_NAME);
-	//required_device_extensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-	required_device_extensions.push_back(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
-
 	VkDeviceCreateInfo device_info{
 		.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-		.pNext = &enable_vulkan12_features,
+		.pNext = &enable_device_features2,
 		.queueCreateInfoCount = (std::uint32_t)DeviceQueueCreateInfos.size(),
 		.pQueueCreateInfos = DeviceQueueCreateInfos.data(),
 		.enabledExtensionCount = (std::uint32_t)(required_device_extensions.size()),
@@ -1216,19 +973,32 @@ VulkanDevice::VulkanDevice(const GPUCreateInfo& DeviceCreateInfo, std::uint32_t 
 	}
 	{
 		MemoryManager = VulkanMemoryManager::CreateUnique(this);
-		CommandPoolManager = VkCommandPoolManager::CreateUnique(this, FamilyProperties.graphicsQueueFamilyIndex);
-		CommandBufferManager = VkCommandBufferManager::CreateUnique(this);
 		SyncManager = VulkanSyncManager::CreateUnique(this);
 		{
 			IMCommandBuffer = VulkanCommandBuffer::CreateUnique(this);
 		}
 	}
+	{
+		IndirectCommandsCreateLayout = (PFN_vkCreateIndirectCommandsLayoutEXT)vkGetDeviceProcAddr(Device, "vkCreateIndirectCommandsLayoutEXT");
+		IndirectCommandsDestroyLayout = (PFN_vkDestroyIndirectCommandsLayoutEXT)vkGetDeviceProcAddr(Device, "vkDestroyIndirectCommandsLayoutEXT");
+		GeneratedCommandsMemoryRequirements = (PFN_vkGetGeneratedCommandsMemoryRequirementsEXT)vkGetDeviceProcAddr(Device, "vkGetGeneratedCommandsMemoryRequirementsEXT");
+		CmdExecuteGeneratedCommands = (PFN_vkCmdExecuteGeneratedCommandsEXT)vkGetDeviceProcAddr(Device, "vkCmdExecuteGeneratedCommandsEXT");
+	}
 }
 
 VulkanDevice::~VulkanDevice()
 {
+	if (Device != VK_NULL_HANDLE)
+		vkDeviceWaitIdle(Device);
+
 	// destroy a vk::Device
 	//Device.destroy();
+
+	for (auto& Sampler : SamplerCache)
+	{
+		Sampler.second = nullptr;
+	}
+	SamplerCache.clear();
 
 	ShaderCompiler = nullptr;
 	//pShaderCompiler = nullptr;
@@ -1238,10 +1008,13 @@ VulkanDevice::~VulkanDevice()
 	BindlessDescriptorPool = nullptr;
 
 	IMCommandBuffer = nullptr;
-	CommandPoolManager = nullptr;
-	CommandBufferManager = nullptr;
 	MemoryManager = nullptr;
 	SyncManager = nullptr;
+	for (const auto& pool : CommandPools)
+		vkDestroyCommandPool(Device, pool.Pool, nullptr);
+	CommandPools.clear();
+	CommandBuffers.clear();
+	SubmissionFences.clear();
 	vkDestroyInstance(instance, nullptr);
 }
 
@@ -1288,6 +1061,11 @@ bool VulkanDevice::GetAdapter(std::optional<short> Index, VkPhysicalDevice& GPU,
 		// Check if the device supports Vulkan 1.3
 		VkPhysicalDeviceProperties device_properties;
 		vkGetPhysicalDeviceProperties(physical_device, &device_properties);
+
+		if (DeviceType == EGPUDeviceType::Software && device_properties.deviceType != VK_PHYSICAL_DEVICE_TYPE_CPU)
+		{
+			continue;
+		}
 
 		if (device_properties.apiVersion < VK_API_VERSION_1_3)
 		{
@@ -1360,13 +1138,72 @@ bool VulkanDevice::GetAdapter(std::optional<short> Index, VkPhysicalDevice& GPU,
 	return false;
 }
 
+void VulkanDevice::CancelPendingCommandBuffer(VulkanCommandBuffer* CommandBuffer)
+{
+	std::lock_guard<std::mutex> lock(Mutex);
+	for (auto it = DeferredCommandLists.begin(); it != DeferredCommandLists.end();)
+	{
+		auto& submissions = it->second;
+		submissions.erase(
+			std::remove_if(submissions.begin(), submissions.end(),
+				[CommandBuffer](const PendingSubmission& submission)
+				{
+					return submission.CommandBuffer == CommandBuffer;
+				}),
+			submissions.end());
+
+		if (submissions.empty())
+			it = DeferredCommandLists.erase(it);
+		else
+			++it;
+	}
+}
+
 void VulkanDevice::RecreateSwapChain()
 {
-
+	if (IsPrimaryGPU())
+		Viewport->RecreateSwapChain();
 }
 
 void VulkanDevice::Present(IRenderTarget* pRT)
 {
+	if (IsPrimaryGPU())
+	{
+		Viewport->CopyToBackBuffer(pRT);
+	}
+
+	std::map<ECommandContextType, std::vector<PendingSubmission>> PendingLists;
+	{
+		std::lock_guard<std::mutex> lock(Mutex);
+		PendingLists.swap(DeferredCommandLists);
+	}
+
+	for (auto& DeferredCommandList : PendingLists)
+	{
+		auto& PendingList = DeferredCommandList.second;
+		std::vector<VkCommandBuffer> lists;
+		lists.reserve(PendingList.size());
+		for (const auto& submission : PendingList)
+			lists.push_back(submission.CommandList);
+
+		VkQueue Queue = GraphicsQueue;
+		if (DeferredCommandList.first == ECommandContextType::Compute && ComputeQueue != VK_NULL_HANDLE)
+			Queue = ComputeQueue;
+
+		VkSemaphore waitSemaphore = VK_NULL_HANDLE;
+		if (IsPrimaryGPU() && DeferredCommandList.first == ECommandContextType::Graphics)
+			waitSemaphore = Viewport->GetPendingAcquireSemaphore();
+
+		const auto fenceValue = SubmitCommandBuffers(Queue, lists, false, waitSemaphore);
+		if (waitSemaphore != VK_NULL_HANDLE)
+			Viewport->MarkAcquireSemaphoreWaited();
+		for (const auto& submission : PendingList)
+		{
+			if (submission.CommandBuffer && submission.Type == ECommandContextType::Graphics)
+				static_cast<VulkanCommandBuffer*>(submission.CommandBuffer)->OnExecuteCommandList(fenceValue);
+		}
+	}
+
 	if (IsPrimaryGPU())
 		Viewport->Present(pRT);
 }
@@ -1394,32 +1231,48 @@ std::uint32_t VulkanDevice::GetVsyncInterval() const
 
 DisplayMode VulkanDevice::GetDisplayMode() const
 {
+	if (IsPrimaryGPU())
+		return Viewport->GetCurrentDisplayMode();
 	return DisplayMode();
 }
 
 void VulkanDevice::GPUFlush()
 {
-
+	WaitForGPU();
 }
 
 void VulkanDevice::WaitForGPU()
 {
-
+	const VkResult result = vkDeviceWaitIdle(Device);
+	if (result != VK_SUCCESS)
+		throw std::runtime_error("vkDeviceWaitIdle failed with VkResult " + std::to_string(result));
+	CollectCompletedFences();
 }
 
 void VulkanDevice::WaitForCPU()
 {
-
+	WaitForCPUFence(GPUFenceSignal());
 }
 
 void VulkanDevice::WaitForCPUFence(std::uint64_t Value)
 {
+	{
+		std::lock_guard<std::mutex> lock(Mutex);
+		if (Value <= CompletedFenceValue)
+			return;
 
+		auto it = SubmissionFences.find(Value);
+		if (it == SubmissionFences.end())
+			throw std::invalid_argument("Unknown Vulkan fence value.");
+		if (!it->second->CpuWait())
+			throw std::runtime_error("Timed out while waiting for a Vulkan submission fence.");
+	}
+	CollectCompletedFences();
 }
 
 std::uint64_t VulkanDevice::GPUFenceSignal()
 {
-	return 0;
+	return GPUSignal(ECommandContextType::Graphics);
 }
 
 uint32_t VulkanDevice::GetMemoryType(uint32_t type_filter, VkMemoryPropertyFlags properties)
@@ -1618,154 +1471,215 @@ bool VulkanDevice::GetDeviceIdentification(std::wstring& InVendorID, std::wstrin
 	return true;
 }
 
-VkCommandBuffer VulkanDevice::RequestCommandBuffer()
+VkCommandBuffer VulkanDevice::RequestCommandBuffer(ECommandContextType Type)
 {
-	return CommandBufferManager->GetAvailableCommandBuffer();
-}
+	CollectCompletedFences();
+	std::lock_guard<std::mutex> lock(Mutex);
 
-void VulkanDevice::ReturnCommandBuffer(VkCommandBuffer commandPool)
-{
-	CommandBufferManager->RecycleCommandBuffer(commandPool);
-}
-
-bool VulkanDevice::IsCommandBufferAvailable(VkCommandBuffer commandBuffer) const
-{
-	return CommandBufferManager->IsCommandBufferAvailable(commandBuffer);
-}
-
-void VulkanDevice::ExecuteGraphicsCommandBuffer(VkCommandBuffer CommandBuffer, bool WaitForCompletion)
-{
-	if (SyncManager->IsSignalledSemaphoresAvailable())
+	for (auto& entry : CommandBuffers)
 	{
-		VkSemaphore Wait = SyncManager->AcquireSignalledSemaphore();
-		VkSemaphore Signal = SyncManager->AcquireSemaphore();
-		VkFence QueueFence = CommandBufferManager->GetFence(CommandBuffer);
-
-		VkResult Result = vkGetFenceStatus(Device, QueueFence);
-		if (Result == VkResult::VK_SUCCESS)
-			vkResetFences(Get(), 1, &QueueFence);
-
-		VkPipelineStageFlags wait_stage{ VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT };
-
-		VkSubmitInfo info{
-			.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-			.waitSemaphoreCount = 1,
-			.pWaitSemaphores = &Wait,
-			.pWaitDstStageMask = &wait_stage,
-			.commandBufferCount = 1,
-			.pCommandBuffers = &CommandBuffer,
-			.signalSemaphoreCount = 1,
-			.pSignalSemaphores = &Signal };
-
-		/*std::vector<uint64_t> m_WaitSemaphoreValues;
-		m_WaitSemaphoreValues.push_back(0);
-		std::vector<uint64_t> m_SignalSemaphoreValues;
-		m_SignalSemaphoreValues.push_back(0);
-		VkTimelineSemaphoreSubmitInfo TimelineSemaphoreSubmitInfo;
-		TimelineSemaphoreSubmitInfo.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
-		TimelineSemaphoreSubmitInfo.waitSemaphoreValueCount = m_WaitSemaphoreValues.size();
-		TimelineSemaphoreSubmitInfo.pWaitSemaphoreValues = m_SignalSemaphoreValues.data();
-		TimelineSemaphoreSubmitInfo.signalSemaphoreValueCount = m_SignalSemaphoreValues.size();
-		TimelineSemaphoreSubmitInfo.pSignalSemaphoreValues = m_SignalSemaphoreValues.data();
-		info.pNext = &TimelineSemaphoreSubmitInfo;*/
-
-		VK_CHECK(vkQueueSubmit(GraphicsQueue, 1, &info, QueueFence));
-
-		if (WaitForCompletion)
+		if (entry.Type == Type && !entry.IsLeased && entry.FenceValue <= CompletedFenceValue)
 		{
-			vkWaitForFences(Device, 1, &QueueFence, true, UINT64_MAX /*33 * 1000 * 1000*/);
+			const VkResult result = vkResetCommandBuffer(entry.Buffer, 0);
+			if (result != VK_SUCCESS)
+				throw std::runtime_error("vkResetCommandBuffer failed with VkResult " + std::to_string(result));
+
+			entry.FenceValue = 0;
+			entry.IsLeased = true;
+			return entry.Buffer;
 		}
 	}
-	else
+
+	std::int32_t queueFamilyIndex = FamilyProperties.graphicsQueueFamilyIndex;
+	if (Type == ECommandContextType::Compute && FamilyProperties.computeQueueFamilyIndex >= 0)
+		queueFamilyIndex = FamilyProperties.computeQueueFamilyIndex;
+	else if (Type == ECommandContextType::Copy && FamilyProperties.copyQueueFamilyIndex >= 0)
+		queueFamilyIndex = FamilyProperties.copyQueueFamilyIndex;
+
+	if (queueFamilyIndex < 0)
+		throw std::runtime_error("No Vulkan queue family is available for the command context.");
+
+	VkCommandPool pool = VK_NULL_HANDLE;
+	for (const auto& entry : CommandPools)
 	{
-		VkFence QueueFence = CommandBufferManager->GetFence(CommandBuffer);
-
-		VkResult Result = vkGetFenceStatus(Device, QueueFence);
-		if (Result == VkResult::VK_SUCCESS)
-			vkResetFences(Get(), 1, &QueueFence);
-
-		VkSubmitInfo info{
-			.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-			.commandBufferCount = 1,
-			.pCommandBuffers = &CommandBuffer,
-		};
-
-		VK_CHECK(vkQueueSubmit(GraphicsQueue, 1, &info, QueueFence));
-
-		if (WaitForCompletion)
+		if (entry.Type == Type)
 		{
-			vkWaitForFences(Device, 1, &QueueFence, true, UINT64_MAX /*33 * 1000 * 1000*/);
+			pool = entry.Pool;
+			break;
 		}
 	}
+
+	if (pool == VK_NULL_HANDLE)
+	{
+		VkCommandPoolCreateInfo createInfo{};
+		createInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+		createInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+		createInfo.queueFamilyIndex = static_cast<std::uint32_t>(queueFamilyIndex);
+
+		const VkResult createResult = vkCreateCommandPool(Device, &createInfo, nullptr, &pool);
+		if (createResult != VK_SUCCESS)
+			throw std::runtime_error("vkCreateCommandPool failed with VkResult " + std::to_string(createResult));
+		CommandPools.push_back({ Type, pool });
+	}
+
+	constexpr std::uint32_t BufferBatchSize = 8;
+	VkCommandBufferAllocateInfo allocInfo{};
+	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	allocInfo.commandPool = pool;
+	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	allocInfo.commandBufferCount = BufferBatchSize;
+	std::vector<VkCommandBuffer> buffers(BufferBatchSize);
+	const VkResult allocateResult = vkAllocateCommandBuffers(Device, &allocInfo, buffers.data());
+	if (allocateResult != VK_SUCCESS)
+		throw std::runtime_error("vkAllocateCommandBuffers failed with VkResult " + std::to_string(allocateResult));
+
+	for (std::size_t i = 0; i < buffers.size(); ++i)
+		CommandBuffers.push_back({ Type, pool, buffers[i], 0, i == 0 });
+	return buffers.front();
 }
 
-#ifdef VK_HPP
-void VulkanDevice::ExecuteGraphicsCommandBuffer(vk::CommandBuffer* pCommandList, bool WaitForCompletion)
+void VulkanDevice::ReturnCommandBuffer(ECommandContextType Type, VkCommandBuffer Buffer, std::uint64_t FenceValue)
 {
-	VkCommandBuffer CommandBuffer = *pCommandList;
-	ExecuteGraphicsCommandBuffer(CommandBuffer, WaitForCompletion);
+	if (Buffer == VK_NULL_HANDLE)
+		return;
+
+	std::lock_guard<std::mutex> lock(Mutex);
+	for (auto& entry : CommandBuffers)
+	{
+		if (entry.Type == Type && entry.Buffer == Buffer && entry.IsLeased)
+		{
+			entry.FenceValue = FenceValue;
+			entry.IsLeased = false;
+			return;
+		}
+	}
+	throw std::invalid_argument("The returned Vulkan command buffer is not currently leased.");
 }
-#endif
+
+void VulkanDevice::CollectCompletedFences()
+{
+	std::lock_guard<std::mutex> lock(Mutex);
+	while (!SubmissionFences.empty())
+	{
+		auto it = SubmissionFences.begin();
+		if (!it->second->IsComplete())
+			break;
+		CompletedFenceValue = it->first;
+		SubmissionFences.erase(it);
+	}
+
+}
+
+//VkCommandBuffer VulkanDevice::RequestCommandBuffer()
+//{
+//	return CommandBufferManager->GetAvailableCommandBuffer();
+//}
+//
+//void VulkanDevice::ReturnCommandBuffer(VkCommandBuffer commandPool)
+//{
+//	CommandBufferManager->RecycleCommandBuffer(commandPool);
+//}
+//
+//bool VulkanDevice::IsCommandBufferAvailable(VkCommandBuffer commandBuffer) const
+//{
+//	return CommandBufferManager->IsCommandBufferAvailable(commandBuffer);
+//}
+
+std::uint64_t VulkanDevice::SubmitCommandBuffers(VkQueue Queue, const std::vector<VkCommandBuffer>& CommandBuffers, bool WaitForCompletion, VkSemaphore WaitSemaphore, VkPipelineStageFlags WaitStage)
+{
+	if (Queue == VK_NULL_HANDLE)
+		throw std::runtime_error("Cannot submit command buffers to a null Vulkan queue.");
+
+	VkSubmitInfo submitInfo{};
+	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submitInfo.waitSemaphoreCount = WaitSemaphore != VK_NULL_HANDLE ? 1 : 0;
+	submitInfo.pWaitSemaphores = WaitSemaphore != VK_NULL_HANDLE ? &WaitSemaphore : nullptr;
+	submitInfo.pWaitDstStageMask = WaitSemaphore != VK_NULL_HANDLE ? &WaitStage : nullptr;
+	submitInfo.commandBufferCount = static_cast<std::uint32_t>(CommandBuffers.size());
+	submitInfo.pCommandBuffers = CommandBuffers.empty() ? nullptr : CommandBuffers.data();
+
+	auto Fence = std::make_unique<VulkanFence>(Device);
+	std::uint64_t FenceValue;
+	{
+		std::lock_guard<std::mutex> lock(Mutex);
+		const VkResult result = vkQueueSubmit(Queue, 1, &submitInfo, Fence->Get());
+		if (result != VK_SUCCESS)
+			throw std::runtime_error("vkQueueSubmit failed with VkResult " + std::to_string(result));
+
+		FenceValue = ++NextFenceValue;
+		SubmissionFences.emplace(FenceValue, std::move(Fence));
+	}
+
+	if (WaitForCompletion)
+		WaitForCPUFence(FenceValue);
+
+	return FenceValue;
+}
+
+std::uint64_t VulkanDevice::ExecuteGraphicsCommandBuffer(ECommandContextExecuteType ExecuteType, std::uint32_t Order, VulkanCommandBuffer* CommandList, bool WaitForCompletion, VkSemaphore WaitSemaphore, VkPipelineStageFlags WaitStage)
+{
+	if (ExecuteType == ECommandContextExecuteType::Immediate)
+	{
+		return SubmitCommandBuffers(GraphicsQueue, { CommandList->Get() }, WaitForCompletion, WaitSemaphore, WaitStage);
+	}
+
+	if (ExecuteType == ECommandContextExecuteType::Deferred)
+	{
+		PendingSubmission Submission;
+		Submission.CommandBuffer = CommandList;
+		Submission.CommandList = CommandList->Get();
+		Submission.Type = ECommandContextType::Graphics;
+		std::lock_guard<std::mutex> lock(Mutex);
+		if (DeferredCommandLists[ECommandContextType::Graphics].size() > Order)
+		{
+			auto Begin = DeferredCommandLists[ECommandContextType::Graphics].begin();
+			DeferredCommandLists[ECommandContextType::Graphics].insert(Begin + Order, Submission);
+		}
+		else
+		{
+			DeferredCommandLists[ECommandContextType::Graphics].push_back(Submission);
+		}
+		return std::numeric_limits<std::uint64_t>::max();
+	}
+
+	return 0;
+}
 
 void VulkanDevice::ExecuteComputeCommandBuffer(VkCommandBuffer CommandBuffer, bool WaitForCompletion)
 {
-	if (!ComputeQueue)
-		return;
-
-	auto Wait = SyncManager->AcquireSignalledSemaphore();
-	auto Signal = SyncManager->AcquireSemaphore();
-	auto QueueFence = CommandBufferManager->GetFence(CommandBuffer);
-
-	auto Result = vkGetFenceStatus(Device, QueueFence);
-	if (Result == VkResult::VK_SUCCESS)
-		vkResetFences(Get(), 1, &QueueFence);
-
-	VkPipelineStageFlags wait_stage{ VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT };
-
-	VkSubmitInfo info{
-		.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-		.waitSemaphoreCount = 1,
-		.pWaitSemaphores = &Wait,
-		.pWaitDstStageMask = &wait_stage,
-		.commandBufferCount = 1,
-		.pCommandBuffers = &CommandBuffer,
-		.signalSemaphoreCount = 1,
-		.pSignalSemaphores = &Signal };
-
-	VK_CHECK(vkQueueSubmit(ComputeQueue, 1, &info, QueueFence));
+	SubmitCommandBuffers(ComputeQueue != VK_NULL_HANDLE ? ComputeQueue : GraphicsQueue, { CommandBuffer }, WaitForCompletion);
 }
 
 void VulkanDevice::ExecuteCopyCommandBuffer(VkCommandBuffer pCommandList, bool WaitForCompletion)
 {
-	/*auto Wait = SyncManager->AcquireSemaphore();
-	auto Signal = SyncManager->AcquireSemaphore();
-	auto QueueFence = CommandBufferManager->GetFence(CommandBuffer);
-
-	auto Result = vkGetFenceStatus(Device, QueueFence);
-	if (Result == VkResult::VK_SUCCESS)
-		vkResetFences(Get(), 1, &QueueFence);
-
-	VkPipelineStageFlags wait_stage{ VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT };
-
-	VkSubmitInfo info{
-		.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-		.waitSemaphoreCount = 1,
-		.pWaitSemaphores = &Wait,
-		.pWaitDstStageMask = &wait_stage,
-		.commandBufferCount = 1,
-		.pCommandBuffers = &CommandBuffer,
-		.signalSemaphoreCount = 1,
-		.pSignalSemaphores = &Signal };
-
-	VK_CHECK(vkQueueSubmit(ComputeQueue, 1, &info, QueueFence));
-
-	SyncManager->RecycleSemaphore(Wait);
-	SyncManager->RecycleSemaphore(Signal);*/
+	SubmitCommandBuffers(GraphicsQueue, { pCommandList }, WaitForCompletion);
 }
 
-void VulkanDevice::ResetCommandBuffer(VkCommandBuffer CommandBuffer)
+//void VulkanDevice::ResetCommandBuffer(VkCommandBuffer CommandBuffer)
+//{
+//	CommandBufferManager->ResetCommandBuffer(CommandBuffer);
+//}
+
+std::uint64_t VulkanDevice::GPUSignal(ECommandContextType CommandContextType)
 {
-	CommandBufferManager->ResetCommandBuffer(CommandBuffer);
+	VkQueue Queue = GraphicsQueue;
+	if (CommandContextType == ECommandContextType::Compute && ComputeQueue != VK_NULL_HANDLE)
+		Queue = ComputeQueue;
+	return SubmitCommandBuffers(Queue, {}, false);
+}
+
+bool VulkanDevice::IsCommandBufferPendingForExecute(VulkanCommandBuffer* CommandBuffer)
+{
+	std::lock_guard<std::mutex> lock(Mutex);
+	for (const auto& [type, submissions] : DeferredCommandLists)
+	{
+		for (const auto& submission : submissions)
+		{
+			if (submission.CommandBuffer == CommandBuffer)
+				return true;
+		}
+	}
+	return false;
 }
 
 VkDescriptorSetLayout VulkanDevice::GetBindlessDescriptorSetLayout() const
@@ -1778,14 +1692,19 @@ VkDescriptorSet VulkanDevice::GetBindlessDescriptorSet() const
 	return BindlessDescriptorPool->GetDescriptorSet();
 }
 
-void VulkanDevice::UpdateBindlessImageDescriptor(uint32_t binding, uint32_t arrayIndex, VkDescriptorImageInfo* imageInfo)
+void VulkanDevice::UpdateBindlessImageDescriptor(uint32_t& HeapIndex, VkDescriptorImageInfo* imageInfo) 
 {
-	BindlessDescriptorPool->UpdateImageDescriptor(binding, arrayIndex, imageInfo);
+	BindlessDescriptorPool->WriteImageDescriptor(HeapIndex, imageInfo);
 }
 
-void VulkanDevice::UpdateBindlessBufferDescriptor(uint32_t binding, uint32_t arrayIndex, VkDescriptorBufferInfo* bufferInfo)
+void VulkanDevice::UpdateBindlessSamplerDescriptor(uint32_t& HeapIndex, VkDescriptorImageInfo* imageInfo) 
 {
-	BindlessDescriptorPool->UpdateBufferDescriptor(binding, arrayIndex, bufferInfo);
+	BindlessDescriptorPool->WriteSamplerDescriptor(HeapIndex, imageInfo);
+}
+
+void VulkanDevice::UpdateBindlessBufferDescriptor(uint32_t& HeapIndex, VkDescriptorBufferInfo* bufferInfo) 
+{
+	BindlessDescriptorPool->WriteBufferDescriptor(HeapIndex, bufferInfo);
 }
 
 VkSemaphore VulkanDevice::AcquireSignalledSemaphore()
@@ -1796,16 +1715,6 @@ VkSemaphore VulkanDevice::AcquireSignalledSemaphore()
 VkSemaphore VulkanDevice::AcquireSemaphore()
 {
 	return SyncManager->AcquireSemaphore();
-}
-
-VkFence VulkanDevice::AcquireFence()
-{
-	return SyncManager->AcquireFence();
-}
-
-void VulkanDevice::RecycleFence(VkFence Fence)
-{
-	SyncManager->RecycleFence(Fence);
 }
 
 IShader* VulkanDevice::CompileVkShader(const sShaderAttachment& Attachment, bool Spirv)
@@ -1936,32 +1845,32 @@ IIndexBuffer::UniquePtr VulkanDevice::CreateUniqueIndexBuffer(std::string InName
 
 IByteAddressBuffer::SharedPtr VulkanDevice::CreateByteAddressBuffer(std::string InName, std::uint64_t Size, bool bReadWriteAllowed)
 {
-	return nullptr;
+	return VulkanByteAddressBuffer::Create(this, InName, Size, bReadWriteAllowed);
 }
 
 IByteAddressBuffer::UniquePtr VulkanDevice::CreateUniqueByteAddressBuffer(std::string InName, std::uint64_t Size, bool bReadWriteAllowed)
 {
-	return nullptr;
+	return VulkanByteAddressBuffer::CreateUnique(this, InName, Size, bReadWriteAllowed);
 }
 
 IStructuredBuffer::SharedPtr VulkanDevice::CreateStructuredBuffer(std::string InName, const BufferLayout& InDesc, bool bSRVAllowed)
 {
-	return nullptr;
+	return VulkanStructuredBuffer::Create(this, InName, InDesc, bSRVAllowed);
 }
 
 IStructuredBuffer::UniquePtr VulkanDevice::CreateUniqueStructuredBuffer(std::string InName, const BufferLayout& InDesc, bool bSRVAllowed)
 {
-	return nullptr;
+	return VulkanStructuredBuffer::CreateUnique(this, InName, InDesc, bSRVAllowed);
 }
 
 IIndirectBuffer::SharedPtr VulkanDevice::CreateIndirectBuffer(std::string InName, BufferLayout NewLayout)
 {
-	return IIndirectBuffer::SharedPtr();
+	return VulkanIndirectBuffer::Create(this, InName, NewLayout);
 }
 
 IIndirectBuffer::UniquePtr VulkanDevice::CreateUniqueIndirectBuffer(std::string InName, BufferLayout NewLayout)
 {
-	return IIndirectBuffer::UniquePtr();
+	return VulkanIndirectBuffer::CreateUnique(this, InName, NewLayout);
 }
 
 IFrameBuffer::SharedPtr VulkanDevice::CreateFrameBuffer(const std::string InName, const sFrameBufferAttachmentInfo& InAttachments)
@@ -1976,7 +1885,15 @@ IFrameBuffer::UniquePtr VulkanDevice::CreateUniqueFrameBuffer(const std::string 
 
 ISamplerState::SharedPtr VulkanDevice::CreateSamplerState(const std::string InName, const sSamplerAttributeDesc& InDesc)
 {
-	return VulkanSamplerState::Create(this, InName, InDesc);
+	std::size_t Hash = sSamplerAttributeDescHash{}(InDesc);
+	if (SamplerCache.contains(Hash))
+	{
+		return SamplerCache[Hash];
+	}
+
+	ISamplerState::SharedPtr Sampler = VulkanSamplerState::Create(this, InName, InDesc);
+	SamplerCache.insert({ Hash, Sampler });
+	return Sampler;
 }
 
 ISamplerState::UniquePtr VulkanDevice::CreateUniqueSamplerState(const std::string InName, const sSamplerAttributeDesc& InDesc)

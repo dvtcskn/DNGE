@@ -230,7 +230,13 @@ public:
 		, Owner(InOwner)
 		, Name(InName)
 		, SamplerState(VulkanStaticSamplerState(InDesc))
+		, HeapIndex(std::uint32_t(-1))
 	{
+		Sampler = SamplerState.Get(InOwner->Get());
+		Descriptor.sampler = Sampler;
+		Descriptor.imageView = VK_NULL_HANDLE;
+		Descriptor.imageLayout = VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		InOwner->UpdateBindlessSamplerDescriptor(HeapIndex, &Descriptor);
 	}
 
 	VulkanSamplerState(VulkanDevice* InOwner, sSamplerAttributeDesc InDesc)
@@ -238,16 +244,24 @@ public:
 		, Owner(InOwner)
 		, Name("VulkanSamplerState_NoName")
 		, SamplerState(VulkanStaticSamplerState(InDesc))
-	{}
+		, HeapIndex(std::uint32_t(-1))
+	{
+		Sampler = SamplerState.Get(InOwner->Get());
+		Descriptor.sampler = Sampler;
+		Descriptor.imageView = VK_NULL_HANDLE;
+		Descriptor.imageLayout = VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		InOwner->UpdateBindlessSamplerDescriptor(HeapIndex, &Descriptor);
+	}
 
 	virtual ~VulkanSamplerState()
 	{
+		vkDestroySampler(Owner->Get(), Sampler, nullptr);
 		Owner = nullptr;
 	}
 
 	virtual std::string GetName() const override { return Name; }
 	virtual sSamplerAttributeDesc GetSamplerDesc() const override { return SamplerState.GetSamplerDesc(); }
-	virtual std::uint32_t GetBindlessIndex() const override { return std::uint32_t(-1); }
+	virtual std::uint32_t GetBindlessIndex() const override { return HeapIndex; }
 
 	FORCEINLINE VulkanStaticSamplerState Get() const { return SamplerState;	}
 
@@ -255,6 +269,10 @@ private:
 	VulkanDevice* Owner;
 	std::string Name;
 	VulkanStaticSamplerState SamplerState;
+
+	std::uint32_t HeapIndex;
+	VkSampler Sampler;
+	VkDescriptorImageInfo Descriptor;
 };
 
 class VulkanDepthStencilState
@@ -604,9 +622,11 @@ public:
 		, maxImageDescriptors(maxImageDescriptors)
 		, maxBufferDescriptors(maxBufferDescriptors)
 	{
-		CreateDescriptorPool();
-		CreateDescriptorSetLayout();
-		AllocateDescriptorSets();
+		CreateBindlessLayout(device->GetPhysicalDevice(), device->Get(), BindlessLayoutKind::RawBuffers, 100000, 60);
+
+		//CreateDescriptorPool();
+		//CreateDescriptorSetLayout();
+		//AllocateDescriptorSets();
 	}
 
 	~VulkanBindlessDescriptorPool() 
@@ -625,35 +645,237 @@ public:
 		return globalBindlessSet;
 	}
 
-	void UpdateImageDescriptor(uint32_t binding, uint32_t arrayIndex, VkDescriptorImageInfo* imageInfo)
+	// Texture2D
+	void WriteImageDescriptor(uint32_t& HeapIndex, VkDescriptorImageInfo* imageInfo)
 	{
 		VkWriteDescriptorSet writeDescriptorSet{};
 		writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 		writeDescriptorSet.dstSet = globalBindlessSet;
-		writeDescriptorSet.dstBinding = binding;
-		writeDescriptorSet.dstArrayElement = arrayIndex;	// The bindless ?
+		writeDescriptorSet.dstBinding = 0;
+		writeDescriptorSet.dstArrayElement = ImageHeapLocation;
 		writeDescriptorSet.descriptorCount = 1;
-		writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
 		writeDescriptorSet.pImageInfo = imageInfo;
 
 		vkUpdateDescriptorSets(Device->Get(), 1, &writeDescriptorSet, 0, nullptr);
+		HeapIndex = ImageHeapLocation;
+		ImageHeapLocation++;
 	}
 
-	void UpdateBufferDescriptor(uint32_t binding, uint32_t arrayIndex, VkDescriptorBufferInfo* bufferInfo)
+	// SamplerState
+	void WriteSamplerDescriptor(uint32_t& HeapIndex, VkDescriptorImageInfo* imageInfo)
 	{
 		VkWriteDescriptorSet writeDescriptorSet{};
 		writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 		writeDescriptorSet.dstSet = globalBindlessSet;
-		writeDescriptorSet.dstBinding = binding;
-		writeDescriptorSet.dstArrayElement = arrayIndex;	// The bindless ?
+		writeDescriptorSet.dstBinding = 1;
+		writeDescriptorSet.dstArrayElement = SamplerHeapLocation;
+		writeDescriptorSet.descriptorCount = 1;
+		writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
+		writeDescriptorSet.pImageInfo = imageInfo;
+
+		vkUpdateDescriptorSets(Device->Get(), 1, &writeDescriptorSet, 0, nullptr);
+		HeapIndex = SamplerHeapLocation;
+		SamplerHeapLocation++;
+	}
+
+	// ByteAddressBuffer
+	void WriteBufferDescriptor(uint32_t& HeapIndex, VkDescriptorBufferInfo* bufferInfo)
+	{
+		VkWriteDescriptorSet writeDescriptorSet{};
+		writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writeDescriptorSet.dstSet = globalBindlessSet;
+		writeDescriptorSet.dstBinding = 2;
+		writeDescriptorSet.dstArrayElement = BufferHeapLocation;
 		writeDescriptorSet.descriptorCount = 1;
 		writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 		writeDescriptorSet.pBufferInfo = bufferInfo;
 
 		vkUpdateDescriptorSets(Device->Get(), 1, &writeDescriptorSet, 0, nullptr);
+		HeapIndex = BufferHeapLocation;
+		BufferHeapLocation++;
 	}
 
+	void WriteTexelBufferViewDescriptor(uint32_t binding, uint32_t arrayIndex, VkBufferView* BufferView)
+	{
+		VkWriteDescriptorSet writeDescriptorSet{};
+		writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writeDescriptorSet.dstSet = globalBindlessSet;
+		writeDescriptorSet.dstBinding = binding;
+		writeDescriptorSet.dstArrayElement = arrayIndex;
+		writeDescriptorSet.descriptorCount = 1;
+		writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER;
+		writeDescriptorSet.pTexelBufferView = BufferView;
+
+		vkUpdateDescriptorSets(Device->Get(), 1, &writeDescriptorSet, 0, nullptr);
+	}
+
+	//std::uint32_t HeapLocation = 0;
+	std::uint32_t ImageHeapLocation = 0;
+	std::uint32_t SamplerHeapLocation = 0;
+	std::uint32_t BufferHeapLocation = 0;
+
 private:
+	enum class BindlessLayoutKind {
+		PerType, RawBuffers
+	};
+
+	inline VkDescriptorSetLayoutBinding BindlessBinding(uint32_t binding, VkDescriptorType type, uint32_t count)
+	{
+		VkDescriptorSetLayoutBinding b{};
+		b.binding = binding;
+		b.descriptorType = type;
+		b.descriptorCount = count;
+		b.stageFlags = VK_SHADER_STAGE_ALL;
+		b.pImmutableSamplers = nullptr;
+		return b;
+	}
+
+	// ---- Layout 1: one array per resource type -----------------------------------------------------
+	inline std::vector<VkDescriptorSetLayoutBinding> MakePerTypeBindings(uint32_t n)
+	{
+		return {
+			BindlessBinding(0, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,  n),   // Texture2D[]
+			BindlessBinding(1, VK_DESCRIPTOR_TYPE_SAMPLER,        n),   // SamplerState[]
+			BindlessBinding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, n),   // StructuredBuffer<MaterialInstanceDescriptor>[]
+			BindlessBinding(3, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, n),   // ConstantBuffer<sCamera>[]
+			BindlessBinding(4, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, n),   // ConstantBuffer<ObjectCBuffer>[]
+			BindlessBinding(5, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, n),   // ConstantBuffer<sTimeBuffer>[]
+			BindlessBinding(6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, n),   // ByteAddressBuffer[]
+			BindlessBinding(7, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, n),   // ConstantBuffer<UICBuffer>[]
+			BindlessBinding(8, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, n),   // ConstantBuffer<UICBuffer>[]
+			BindlessBinding(9, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, n),   // ConstantBuffer<CBGradientIdx>[]
+		};
+	}
+
+	// ---- Layout 2: ByteAddressBuffer for all buffer data -------------------------------------------
+	inline std::vector<VkDescriptorSetLayoutBinding> MakeRawBufferBindings(uint32_t n)
+	{
+		return {
+			BindlessBinding(0, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,  n),   // Texture2D[]
+			BindlessBinding(1, VK_DESCRIPTOR_TYPE_SAMPLER,        n),   // SamplerState[]
+			BindlessBinding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, n),   // ByteAddressBuffer[]
+		};
+	}
+
+	// Reduces descriptorCount so the layout fits the device's update-after-bind limits. Bindings that share a
+	// descriptor type (e.g. the two UNIFORM_BUFFER arrays) split that type's budget between them.
+	// NOTE: maxPerStageDescriptorUpdateAfterBindUniformBuffers can be tiny on some hardware; if the clamped
+	// UNIFORM_BUFFER count comes out small, prefer the RawBuffers layout.
+	inline void ClampBindlessCounts(VkPhysicalDevice phys, std::vector<VkDescriptorSetLayoutBinding>& bindings)
+	{
+		VkPhysicalDeviceVulkan12Properties p12{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_PROPERTIES };
+		VkPhysicalDeviceProperties2        p2{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2, &p12 };
+		vkGetPhysicalDeviceProperties2(phys, &p2);
+
+		auto typeLimit = [&](VkDescriptorType t) -> uint32_t {
+			switch (t)
+			{
+			//case VK_DESCRIPTOR_TYPE_INLINE_UNIFORM_BLOCK:
+			//	return 1024;
+			case VK_DESCRIPTOR_TYPE_SAMPLER:
+				return std::min(p12.maxDescriptorSetUpdateAfterBindSamplers, p12.maxPerStageDescriptorUpdateAfterBindSamplers);
+			case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
+				return std::min(p12.maxDescriptorSetUpdateAfterBindSampledImages, p12.maxPerStageDescriptorUpdateAfterBindSampledImages);
+			case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:
+				return std::min(p12.maxDescriptorSetUpdateAfterBindStorageBuffers, p12.maxPerStageDescriptorUpdateAfterBindStorageBuffers);
+			case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
+				return std::min(p12.maxDescriptorSetUpdateAfterBindUniformBuffers, p12.maxPerStageDescriptorUpdateAfterBindUniformBuffers);
+			default:
+				return 0;
+			}
+			};
+
+		const uint32_t resourceBudget = p12.maxPerStageUpdateAfterBindResources / static_cast<uint32_t>(bindings.size());
+		for (auto& b : bindings)
+		{
+			const uint32_t sharing = static_cast<uint32_t>(std::count_if(bindings.begin(), bindings.end(),
+				[&](const VkDescriptorSetLayoutBinding& o) { return o.descriptorType == b.descriptorType; }));
+			b.descriptorCount = std::min({ b.descriptorCount, typeLimit(b.descriptorType) / sharing, resourceBudget });
+		}
+	}
+
+	inline void DestroyBindlessLayout(VkDevice device)
+	{
+		//if (pipelineLayout) 
+		//	vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+		if (bindlessPool)
+			vkDestroyDescriptorPool(device, bindlessPool, nullptr);   // also frees l.set
+		if (bindlessLayout)
+			vkDestroyDescriptorSetLayout(device, bindlessLayout, nullptr);
+	}
+
+	inline VkResult CreateBindlessLayout(VkPhysicalDevice phys, VkDevice device, BindlessLayoutKind kind, uint32_t requestedCount, uint32_t pushConstantBytes)
+	{
+		std::vector<VkDescriptorSetLayoutBinding> bindings = (kind == BindlessLayoutKind::PerType) ? MakePerTypeBindings(requestedCount)
+			: MakeRawBufferBindings(requestedCount);
+		ClampBindlessCounts(phys, bindings);
+
+		// UPDATE_AFTER_BIND: write descriptors any time, even while the set is bound.
+		// PARTIALLY_BOUND:   slots that are never written may exist as long as no shader reads them.
+		const VkDescriptorBindingFlags flags = VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT |
+			VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT;
+		std::vector<VkDescriptorBindingFlags> bindingFlags(bindings.size(), flags);
+
+		VkDescriptorSetLayoutBindingFlagsCreateInfo flagsInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO };
+		flagsInfo.bindingCount = static_cast<uint32_t>(bindingFlags.size());
+		flagsInfo.pBindingFlags = bindingFlags.data();
+
+		VkDescriptorSetLayoutCreateInfo layoutInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO, &flagsInfo };
+		layoutInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
+		layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+		layoutInfo.pBindings = bindings.data();
+
+		VkResult r = vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &bindlessLayout);
+		if (r != VK_SUCCESS) return r;
+
+		// One pool, one set: this set is your descriptor heap for the whole run of the program.
+		std::vector<VkDescriptorPoolSize> poolSizes;
+		for (const auto& b : bindings)
+		{
+			auto it = std::find_if(poolSizes.begin(), poolSizes.end(),
+				[&](const VkDescriptorPoolSize& s) { return s.type == b.descriptorType; });
+			if (it == poolSizes.end()) poolSizes.push_back({ b.descriptorType, b.descriptorCount });
+			else                       it->descriptorCount += b.descriptorCount;
+		}
+
+		VkDescriptorPoolCreateInfo poolInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
+		poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
+		poolInfo.maxSets = 1;
+		poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
+		poolInfo.pPoolSizes = poolSizes.data();
+		r = vkCreateDescriptorPool(device, &poolInfo, nullptr, &bindlessPool);
+		if (r != VK_SUCCESS) {
+			DestroyBindlessLayout(device); 
+			return r;
+		}
+
+		VkDescriptorSetAllocateInfo allocInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
+		allocInfo.descriptorPool = bindlessPool;
+		allocInfo.descriptorSetCount = 1;
+		allocInfo.pSetLayouts = &bindlessLayout;
+		r = vkAllocateDescriptorSets(device, &allocInfo, &globalBindlessSet);
+		if (r != VK_SUCCESS) {
+			DestroyBindlessLayout(device); 
+			return r;
+		}
+
+		// Pipeline layout = [bindless set 0] + push constants (your "root constants").
+		/*VkPushConstantRange pc{ VK_SHADER_STAGE_ALL, 0, pushConstantBytes };
+		VkPipelineLayoutCreateInfo plInfo{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
+		plInfo.setLayoutCount = 1;
+		plInfo.pSetLayouts = &bindlessLayout;
+		plInfo.pushConstantRangeCount = 1;
+		plInfo.pPushConstantRanges = &pc;
+		r = vkCreatePipelineLayout(device, &plInfo, nullptr, &pipelineLayout);
+		if (r != VK_SUCCESS) {
+			DestroyBindlessLayout(device);
+			return r;
+		}*/
+
+		return VK_SUCCESS;
+	}
+
 	void CreateDescriptorPool() 
 	{
 		VkDescriptorPoolSize poolSize{};
@@ -751,27 +973,50 @@ private:
 		//	{ 2, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,         10000,  VK_SHADER_STAGE_ALL, nullptr }
 		//};
 
-		VkDescriptorSetLayoutBinding binding{};
+		std::vector<VkDescriptorSetLayoutBinding> bindings = 
+		{
+			{ 0, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,			500000, VK_SHADER_STAGE_ALL, nullptr },		// Texture2D[]
+			{ 1, VK_DESCRIPTOR_TYPE_SAMPLER,				100000, VK_SHADER_STAGE_ALL, nullptr },		// SamplerState[]
+			{ 2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,         10000,  VK_SHADER_STAGE_ALL, nullptr },		// StructuredBuffer<MaterialInstanceDescriptor>[]
+			{ 3, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,         10000,  VK_SHADER_STAGE_ALL, nullptr },		// ConstantBuffer<sCamera>[]
+			{ 4, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,         10000,  VK_SHADER_STAGE_ALL, nullptr },		// ConstantBuffer<ObjectCBuffer>[]
+			{ 5, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,         10000,  VK_SHADER_STAGE_ALL, nullptr },		// ConstantBuffer<sTimeBuffer>[]
+			{ 6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,         10000,  VK_SHADER_STAGE_ALL, nullptr },		// ByteAddressBuffer[]
+			{ 7, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,         10000,  VK_SHADER_STAGE_ALL, nullptr },		// ConstantBuffer<UICBuffer>[]
+			{ 8, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,         10000,  VK_SHADER_STAGE_ALL, nullptr },		// ConstantBuffer<UICBuffer>[]
+			{ 9, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,         10000,  VK_SHADER_STAGE_ALL, nullptr },		// ConstantBuffer<CBGradientIdx>[]
+		};
+
+		/*VkDescriptorSetLayoutBinding binding{};
 		binding.binding = 0;
 		binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		binding.descriptorCount = maxBindlessResources;
-		binding.stageFlags = VK_SHADER_STAGE_ALL;
+		binding.stageFlags = VK_SHADER_STAGE_ALL;*/
 
-		VkDescriptorBindingFlags bindlessFlags =
-			VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT |
-			VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT |
-			VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT;
+		VkDescriptorBindingFlags bindlessFlags = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT |	VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT;
+
+		std::vector<VkDescriptorBindingFlags> bindingFlags;
+		bindingFlags.push_back(VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT |  VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT);
+		bindingFlags.push_back(VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT |  VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT);
+		bindingFlags.push_back(VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT |  VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT);
+		bindingFlags.push_back(VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT |  VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT);
+		bindingFlags.push_back(VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT |  VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT);
+		bindingFlags.push_back(VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT |  VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT);
+		bindingFlags.push_back(VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT |  VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT);
+		bindingFlags.push_back(VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT |  VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT);
+		bindingFlags.push_back(VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT |  VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT);
+		bindingFlags.push_back(VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT);
 
 		VkDescriptorSetLayoutBindingFlagsCreateInfo extendedInfo{};
 		extendedInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
-		extendedInfo.bindingCount = 1;
-		extendedInfo.pBindingFlags = &bindlessFlags;
+		extendedInfo.bindingCount = (std::uint32_t)bindingFlags.size();
+		extendedInfo.pBindingFlags = bindingFlags.data();
 
 		VkDescriptorSetLayoutCreateInfo layoutInfo{};
 		layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 		layoutInfo.pNext = &extendedInfo;
-		layoutInfo.bindingCount = 1;
-		layoutInfo.pBindings = &binding;
+		layoutInfo.bindingCount = (std::uint32_t)bindings.size();
+		layoutInfo.pBindings = bindings.data();
 		layoutInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
 
 		vkCreateDescriptorSetLayout(Device->Get(), &layoutInfo, nullptr, &bindlessLayout);
@@ -779,7 +1024,7 @@ private:
 
 	void AllocateDescriptorSets() 
 	{
-		uint32_t maxBinding = maxBindlessResources - 1;
+		uint32_t maxBinding = maxBindlessResources;
 
 		VkDescriptorSetVariableDescriptorCountAllocateInfo countInfo{};
 		countInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO;
@@ -872,5 +1117,5 @@ private:
 	uint32_t maxImageDescriptors;
 	uint32_t maxBufferDescriptors;
 
-	uint32_t maxBindlessResources = 100000;
+	uint32_t maxBindlessResources = 10000;
 };

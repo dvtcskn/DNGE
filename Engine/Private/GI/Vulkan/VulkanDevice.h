@@ -29,6 +29,8 @@
 #include <string>
 #include "GI/AbstractGI/AbstractGIDevice.h"
 
+#include "VulkanFence.h"
+
 #ifndef WIN32
 #define WIN32
 #endif // !WIN32
@@ -79,28 +81,32 @@ public:
 	virtual void Present(IRenderTarget* pRT) override final;
 	bool GetDeviceIdentification(std::wstring& InVendorID, std::wstring& InDeviceID);
 
-	void ExecuteGraphicsCommandBuffer(VkCommandBuffer pCommandList, bool WaitForCompletion = false);
-#ifdef VK_HPP
-	void ExecuteGraphicsCommandBuffer(vk::CommandBuffer* pCommandList, bool WaitForCompletion = false);
-#endif
+	std::uint64_t ExecuteGraphicsCommandBuffer(ECommandContextExecuteType ExecuteType, std::uint32_t Order, VulkanCommandBuffer* CommandList, bool WaitForCompletion = false, VkSemaphore WaitSemaphore = VK_NULL_HANDLE, VkPipelineStageFlags WaitStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
 	void ExecuteComputeCommandBuffer(VkCommandBuffer pCommandList, bool WaitForCompletion = false);
 	void ExecuteCopyCommandBuffer(VkCommandBuffer pCommandList, bool WaitForCompletion = false);
 
-	void ResetCommandBuffer(VkCommandBuffer CommandBuffer);
+	std::uint64_t GPUSignal(ECommandContextType CommandContextType);
+
+	//void ResetCommandBuffer(VkCommandBuffer CommandBuffer);
+
+	bool IsCommandBufferPendingForExecute(VulkanCommandBuffer* CommandBuffer);
+	void CancelPendingCommandBuffer(VulkanCommandBuffer* CommandBuffer);
 
 	VkDescriptorSetLayout GetBindlessDescriptorSetLayout() const;
 	VkDescriptorSet GetBindlessDescriptorSet() const;
-	void UpdateBindlessImageDescriptor(uint32_t binding, uint32_t arrayIndex, VkDescriptorImageInfo* imageInfo);
-	void UpdateBindlessBufferDescriptor(uint32_t binding, uint32_t arrayIndex, VkDescriptorBufferInfo* bufferInfo);
+	void UpdateBindlessImageDescriptor(uint32_t& HeapIndex, VkDescriptorImageInfo* imageInfo);
+	void UpdateBindlessSamplerDescriptor(uint32_t& HeapIndex, VkDescriptorImageInfo* imageInfo);
+	void UpdateBindlessBufferDescriptor(uint32_t& HeapIndex, VkDescriptorBufferInfo* bufferInfo);
 
 	VkSemaphore AcquireSignalledSemaphore();
 	VkSemaphore AcquireSemaphore();
-	VkFence AcquireFence();
-	void RecycleFence(VkFence Fence);
 
-	VkCommandBuffer RequestCommandBuffer();
-	void ReturnCommandBuffer(VkCommandBuffer commandBuffer);
-	bool IsCommandBufferAvailable(VkCommandBuffer commandBuffer) const;
+	VkCommandBuffer RequestCommandBuffer(ECommandContextType Type);
+	void ReturnCommandBuffer(ECommandContextType Type, VkCommandBuffer CommandBuffer, std::uint64_t FenceValue = 0);
+
+	//VkCommandBuffer RequestCommandBuffer();
+	//void ReturnCommandBuffer(VkCommandBuffer commandBuffer);
+	//bool IsCommandBufferAvailable(VkCommandBuffer commandBuffer) const;
 
 	bool GetAdapter(std::optional<short> Index, VkPhysicalDevice& GPU, QueueFamilyProperties& FamilyProperties, VkPhysicalDeviceProperties& properties) const;
 
@@ -259,7 +265,31 @@ public:
 		return DeviceIndex;
 	}
 
+	FORCEINLINE std::string GetDeviceName() const
+	{
+		return DeviceName;
+	}
+
+	PFN_vkCreateIndirectCommandsLayoutEXT GetIndirectCommandsCreateLayout()
+	{
+		return IndirectCommandsCreateLayout;
+	}
+	PFN_vkDestroyIndirectCommandsLayoutEXT GetIndirectCommandsDestroyLayout()
+	{
+		return IndirectCommandsDestroyLayout;
+	}
+	PFN_vkGetGeneratedCommandsMemoryRequirementsEXT GetGeneratedCommandsMemoryRequirements()
+	{
+		return GeneratedCommandsMemoryRequirements;
+	}
+	PFN_vkCmdExecuteGeneratedCommandsEXT GetCmdExecuteGeneratedCommands()
+	{
+		return CmdExecuteGeneratedCommands;
+	}
+
 private:
+	std::string DeviceName;
+	std::uint32_t InstanceApiVersion;
 	VkInstance instance = VK_NULL_HANDLE;
 	VkDevice Device;
 	VkPhysicalDevice PhysicalDevice;
@@ -277,6 +307,47 @@ private:
 
 	VkQueue GraphicsQueue;
 	VkQueue ComputeQueue;
+
+	std::map<std::uint64_t, std::unique_ptr<VulkanFence>> SubmissionFences;
+	std::uint64_t NextFenceValue = 0;
+	std::uint64_t CompletedFenceValue = 0;
+
+	struct PendingSubmission
+	{
+		ICommandContext* CommandBuffer = nullptr;
+		VkCommandBuffer CommandList;
+		ECommandContextType Type;
+	};
+	struct CommandPoolEntry
+	{
+		ECommandContextType Type;
+		VkCommandPool Pool;
+	};
+	struct CommandBufferEntry
+	{
+		ECommandContextType Type;
+		VkCommandPool Pool;
+		VkCommandBuffer Buffer;
+		std::uint64_t FenceValue = 0;
+		bool IsLeased = false;
+	};
+	std::map<ECommandContextType, std::vector<PendingSubmission>> DeferredCommandLists;
+	std::vector<CommandPoolEntry> CommandPools;
+	std::vector<CommandBufferEntry> CommandBuffers;
+	std::mutex Mutex;
+
+	std::uint64_t SubmitCommandBuffers(VkQueue Queue, const std::vector<VkCommandBuffer>& CommandBuffers, bool WaitForCompletion, VkSemaphore WaitSemaphore = VK_NULL_HANDLE, VkPipelineStageFlags WaitStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
+	void CollectCompletedFences();
+
+	bool deviceProperties2Available = false;
+	bool deviceFormatProperties2Available = false;
+
+	std::map<std::size_t, ISamplerState::SharedPtr> SamplerCache;
+
+	PFN_vkCreateIndirectCommandsLayoutEXT           IndirectCommandsCreateLayout = nullptr;
+	PFN_vkDestroyIndirectCommandsLayoutEXT          IndirectCommandsDestroyLayout = nullptr;
+	PFN_vkGetGeneratedCommandsMemoryRequirementsEXT GeneratedCommandsMemoryRequirements = nullptr;
+	PFN_vkCmdExecuteGeneratedCommandsEXT            CmdExecuteGeneratedCommands = nullptr;
 
 private:
 	QueueFamilyProperties FamilyProperties;

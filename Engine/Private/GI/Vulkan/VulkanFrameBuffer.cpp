@@ -32,12 +32,14 @@
 
 VulkanRenderTarget::VulkanRenderTarget(VulkanDevice* InOwner, const std::string InName, const sFrameBuffer& InDesc, const sFBODesc& InFBODesc)
 	: Super()
+	, Owner(InOwner)
 	, Name(InName)
 	, Desc(InDesc)
 	, FBODesc(InFBODesc)
 	, bIsSRVSupported(false)
 	, bIsUAVSupported(false)
 	, CurrentLayout(VkImageLayout::VK_IMAGE_LAYOUT_UNDEFINED)
+	, HeapIndex(std::uint32_t(-1))
 {
 	bIsSRVSupported = InDesc.AttachmentType == EFrameBufferAttachmentType::RT_SRV || InDesc.AttachmentType == EFrameBufferAttachmentType::RT_SRV_UAV;
 	bIsUAVSupported = InDesc.AttachmentType == EFrameBufferAttachmentType::RT_UAV || InDesc.AttachmentType == EFrameBufferAttachmentType::RT_SRV_UAV;
@@ -53,11 +55,22 @@ VulkanRenderTarget::VulkanRenderTarget(VulkanDevice* InOwner, const std::string 
 	imageInfo.arrayLayers = 1;
 	imageInfo.format = VulkanFormat;
 	imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL; // Optimal tiling for GPU access
-	imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED; // Will transition later
-	imageInfo.usage = bIsSRVSupported ? VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT
-		: VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT; // As render target and texture
+	imageInfo.initialLayout = CurrentLayout; // Will transition later
+	imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT; // As render target and texture
 	imageInfo.samples = VK_SAMPLE_COUNT_1_BIT; // No MSAA
 	imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+	if (bIsSRVSupported)
+	{
+		imageInfo.usage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+	}
+	/*if (bIsUAVSupported)
+	{
+		if (bIsSRVSupported)
+			imageInfo.usage |= VK_IMAGE_USAGE_STORAGE_BIT;
+		else
+			imageInfo.usage |= VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+	}*/
 
 	if (vkCreateImage(InOwner->Get(), &imageInfo, nullptr, &Image) != VK_SUCCESS)
 		throw std::runtime_error("Failed to create image!");
@@ -76,40 +89,41 @@ VulkanRenderTarget::VulkanRenderTarget(VulkanDevice* InOwner, const std::string 
 
 	vkBindImageMemory(InOwner->Get(), Image, Memory, 0);
 
-	// Create VkImageView
-	VkImageViewCreateInfo viewInfo{};
-	viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-	viewInfo.image = Image;
-	viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D; // Assuming a 2D image
-	viewInfo.format = VulkanFormat;
-
-	// Specify how the image will be used
-	viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	viewInfo.subresourceRange.baseMipLevel = 0;
-	viewInfo.subresourceRange.levelCount = 1;
-	viewInfo.subresourceRange.baseArrayLayer = 0;
-	viewInfo.subresourceRange.layerCount = 1;
-	
-	if (vkCreateImageView(InOwner->Get(), &viewInfo, nullptr, &View) != VK_SUCCESS)
-		throw std::runtime_error("Failed to create image view!");
-
 	if (bIsSRVSupported)
 	{
+		// Create VkImageView
+		VkImageViewCreateInfo viewInfo{};
+		viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		viewInfo.image = Image;
+		viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D; // Assuming a 2D image
+		viewInfo.format = VulkanFormat;
+
+		// Specify how the image will be used
+		viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		viewInfo.subresourceRange.baseMipLevel = 0;
+		viewInfo.subresourceRange.levelCount = 1;
+		viewInfo.subresourceRange.baseArrayLayer = 0;
+		viewInfo.subresourceRange.layerCount = 1;
+
+		if (vkCreateImageView(InOwner->Get(), &viewInfo, nullptr, &View) != VK_SUCCESS)
+			throw std::runtime_error("Failed to create image view!");
+
 		{
 			DescriptorImageInfo.imageLayout = VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 			DescriptorImageInfo.imageView = View;
 			VulkanStaticSamplerState Sampler = VulkanStaticSamplerState(sSamplerAttributeDesc(ESamplerStateMode::AnisotropicWrap));
 			DescriptorImageInfo.sampler = Sampler.Get(InOwner->Get());
+			Owner->UpdateBindlessImageDescriptor(HeapIndex, &DescriptorImageInfo);
 		}
 	}
 
-	if (bIsUAVSupported)
+	/*if (bIsUAVSupported)
 	{
 		// Create VkImageView
 		VkImageViewCreateInfo UAV_viewInfo{};
 		UAV_viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 		UAV_viewInfo.image = Image;
-		UAV_viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D; // Adjust for 1D, 3D, or cubemap
+		UAV_viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
 		UAV_viewInfo.format = VulkanFormat;
 		UAV_viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		UAV_viewInfo.subresourceRange.baseMipLevel = 0;
@@ -119,7 +133,7 @@ VulkanRenderTarget::VulkanRenderTarget(VulkanDevice* InOwner, const std::string 
 
 		if (vkCreateImageView(InOwner->Get(), &UAV_viewInfo, nullptr, &UAV_View) != VK_SUCCESS)
 			throw std::runtime_error("Failed to create UAV image view!");
-	}
+	}*/
 
 	{
 		std::string STR = std::string("VulkanRenderTarget::") + Name.c_str();
@@ -129,10 +143,18 @@ VulkanRenderTarget::VulkanRenderTarget(VulkanDevice* InOwner, const std::string 
 
 VulkanRenderTarget::~VulkanRenderTarget()
 {
+	vkDestroyImage(Owner->Get(), Image, nullptr);
+	vkDestroyImageView(Owner->Get(), View, nullptr);
+	vkFreeMemory(Owner->Get(), Memory, nullptr);
+	Image = nullptr;
+	View = nullptr;
+	Owner = nullptr;
 }
 
 VulkanDepthTarget::VulkanDepthTarget(VulkanDevice* InOwner, const std::string InName, const EFormat InFormat, const sFBODesc& InDesc)
-	: Name(InName)
+	: Super()
+	, Owner(InOwner)
+	, Name(InName)
 	, Format(InFormat)
 	, Desc(InDesc)
 	, bIsSRVSupported(false)
@@ -140,6 +162,7 @@ VulkanDepthTarget::VulkanDepthTarget(VulkanDevice* InOwner, const std::string In
 	, Memory(VK_NULL_HANDLE)
 	, View(VK_NULL_HANDLE)
 	, CurrentLayout(VkImageLayout::VK_IMAGE_LAYOUT_UNDEFINED)
+	, HeapIndex(std::uint32_t(-1))
 {
 	bIsSRVSupported = IsDepthSRVSupported(Format);
 
@@ -148,10 +171,16 @@ VulkanDepthTarget::VulkanDepthTarget(VulkanDevice* InOwner, const std::string In
 	* Usage : VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT
 	*/
 
-	VkFormat DepthFormat = ConvertFormat_Format_To_VkFormat(Format);
+	//vkGetPhysicalDeviceImageFormatProperties2();
+	VkFormat DepthFormat = GetVulkanDepthFormat(Format);
 
 	if (!IsValidVulkanDepthFormat(DepthFormat))
 		throw std::runtime_error("Invalid Depth Format");
+
+	//VkImageFormatListCreateInfo formatListInfo{};
+	//formatListInfo.sType = VK_STRUCTURE_TYPE_IMAGE_FORMAT_LIST_CREATE_INFO;
+	//formatListInfo.viewFormatCount = 2;
+	//formatListInfo.pViewFormats = compatibleFormats;
 
 	VkImageCreateInfo image_create_info{};
 	image_create_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -162,9 +191,12 @@ VulkanDepthTarget::VulkanDepthTarget(VulkanDevice* InOwner, const std::string In
 	image_create_info.arrayLayers = 1;
 	image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
 	image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
-	image_create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	image_create_info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+	image_create_info.initialLayout = CurrentLayout;
+	image_create_info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 	image_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	image_create_info.flags = VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;
+
+	//image_create_info.pNext = &ImageStencilUsageCreateInfo;
 
 	VK_CHECK(vkCreateImage(InOwner->Get(), &image_create_info, nullptr, &Image));
 	VkMemoryRequirements memReqs{};
@@ -177,27 +209,38 @@ VulkanDepthTarget::VulkanDepthTarget(VulkanDevice* InOwner, const std::string In
 	VK_CHECK(vkAllocateMemory(InOwner->Get(), &memory_allocation, nullptr, &Memory));
 	VK_CHECK(vkBindImageMemory(InOwner->Get(), Image, Memory, 0));
 
-	VkImageViewCreateInfo image_view_create_info{};
-	image_view_create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-	image_view_create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-	image_view_create_info.image = Image;
-	image_view_create_info.format = DepthFormat;
-	image_view_create_info.subresourceRange.baseMipLevel = 0;
-	image_view_create_info.subresourceRange.levelCount = 1;
-	image_view_create_info.subresourceRange.baseArrayLayer = 0;
-	image_view_create_info.subresourceRange.layerCount = 1;
-	image_view_create_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-
-	// Stencil aspect should only be set on depth + stencil formats (VK_FORMAT_D16_UNORM_S8_UINT..VK_FORMAT_D32_SFLOAT_S8_UINT
-	if (DepthFormat >= VK_FORMAT_D16_UNORM_S8_UINT)
-	{
-		image_view_create_info.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
-	}
-	VK_CHECK(vkCreateImageView(InOwner->Get(), &image_view_create_info, nullptr, &View));
-
 	if (IsVulkanDepthSRVSupported(DepthFormat))
 	{
+		VkImageViewCreateInfo srvInfo{};
+		srvInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		srvInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		srvInfo.image = Image;
+		srvInfo.format = DepthFormat;
 
+		srvInfo.subresourceRange.baseMipLevel = 0;
+		srvInfo.subresourceRange.levelCount = 1;
+		srvInfo.subresourceRange.baseArrayLayer = 0;
+		srvInfo.subresourceRange.layerCount = 1;
+
+		if (IsValidVulkanDepthStencilFormat(DepthFormat))
+		{
+			srvInfo.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+		}
+		else
+		{
+			srvInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+		}
+
+		if (vkCreateImageView(InOwner->Get(), &srvInfo, nullptr, &View) != VK_SUCCESS)
+			throw std::runtime_error("Failed to create image view!");
+
+		{
+			DescriptorImageInfo.imageLayout = VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			DescriptorImageInfo.imageView = View;
+			VulkanStaticSamplerState Sampler = VulkanStaticSamplerState(sSamplerAttributeDesc(ESamplerStateMode::AnisotropicWrap));
+			DescriptorImageInfo.sampler = Sampler.Get(InOwner->Get());
+			Owner->UpdateBindlessImageDescriptor(HeapIndex, &DescriptorImageInfo);
+		}
 	}
 
 	{
@@ -208,6 +251,12 @@ VulkanDepthTarget::VulkanDepthTarget(VulkanDevice* InOwner, const std::string In
 
 VulkanDepthTarget::~VulkanDepthTarget()
 {
+	vkDestroyImage(Owner->Get(), Image, nullptr);
+	vkDestroyImageView(Owner->Get(), View, nullptr);
+	vkFreeMemory(Owner->Get(), Memory, nullptr);
+	Image = nullptr;
+	View = nullptr;
+	Owner = nullptr;
 }
 
 VulkanUnorderedAccessTarget::VulkanUnorderedAccessTarget(VulkanDevice* InOwner, const std::string InName, const EFormat InFormat, const sFBODesc& InDesc, bool InEnableSRV)

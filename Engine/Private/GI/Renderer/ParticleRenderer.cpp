@@ -122,7 +122,8 @@ ParticleRenderer::ParticleRenderer(std::size_t Width, std::size_t Height, IGraph
 	Depth = IDepthTarget::Create("ParticleDepth", GPU::GetDefaultDepthFormat(), Desc);
 
 	{
-		sPipelineDesc pPipelineDesc;
+		sPipelineDesc pPipelineDesc(ERenderPass::Particle);
+		//sPipelineDesc.RenderPass = ERenderPass::Particle;
 		pPipelineDesc.BlendAttribute = sBlendAttributeDesc(EBlendStateMode::NonPremultiplied);
 		pPipelineDesc.DepthStencilAttribute = sDepthStencilAttributeDesc(ECompareFunction::GreaterEqual, true, true);
 		//pPipelineDesc.DepthStencilAttribute.DepthTest = ECompareFunction::GreaterEqual;
@@ -350,6 +351,11 @@ void ParticleRenderer::SetRenderSize(std::size_t InWidth, std::size_t InHeight)
 {
 	ScreenDimension.Width = InWidth;
 	ScreenDimension.Height = InHeight;
+	Depth = nullptr;
+	sFBODesc Desc;
+	Desc.Dimensions.X = (std::uint32_t)ScreenDimension.Width;
+	Desc.Dimensions.Y = (std::uint32_t)ScreenDimension.Height;
+	Depth = IDepthTarget::Create("ParticleDepth", GPU::GetDefaultDepthFormat(), Desc);
 }
 
 void ParticleRenderer::OnInputProcess(const GMouseInput& MouseInput, const GKeyboardChar& KeyboardChar)

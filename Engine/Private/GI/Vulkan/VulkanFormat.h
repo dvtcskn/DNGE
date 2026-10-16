@@ -156,7 +156,7 @@ namespace
 		case VK_FORMAT_B10G11R11_UFLOAT_PACK32: return EFormat::R11G11B10_FLOAT;
 		case VK_FORMAT_R16G16_UINT: return EFormat::RG16_UINT;
 		case VK_FORMAT_R16G16_SFLOAT: return EFormat::RG16_FLOAT;
-		case VK_FORMAT_R32_UINT: return EFormat::R32_UINT;
+		case VK_FORMAT_R32_UINT: return EFormat::R32_UINT;	// R32_Typeless ?
 		case VK_FORMAT_R32_SINT: return EFormat::R32_SINT;
 		case VK_FORMAT_R32_SFLOAT: return EFormat::R32_FLOAT;
 		case VK_FORMAT_R16G16B16A16_SFLOAT: return EFormat::RGBA16_FLOAT;
@@ -171,13 +171,13 @@ namespace
 		case VK_FORMAT_R32G32B32A32_UINT:	return EFormat::RGBA32_UINT;
 		case VK_FORMAT_R32G32B32A32_SINT:	return EFormat::RGBA32_SINT;
 		case VK_FORMAT_R32G32B32A32_SFLOAT: return EFormat::RGBA32_FLOAT;
-			//case VK_FORMAT_R32_TYPELESS: return EFormat::R32_Typeless;
+			//case VK_FORMAT_R32_TYPELESS: return EFormat::R32_UINT;
 			//case VK_FORMAT_R24G8_TYPELESS: return EFormat::R24G8_Typeless;
 			//case VK_FORMAT_R32G8X24_TYPELESS: return EFormat::R32G8X24_Typeless;
 		case VK_FORMAT_D16_UNORM: return EFormat::D16_UNORM;
 		case VK_FORMAT_D32_SFLOAT: return EFormat::D32_FLOAT;
 		case VK_FORMAT_D24_UNORM_S8_UINT: return EFormat::D24_UNORM_S8_UINT;
-		case VK_FORMAT_D32_SFLOAT_S8_UINT: return EFormat::D32_FLOAT_S8X24_UINT;
+		case VK_FORMAT_D32_SFLOAT_S8_UINT: return EFormat::R32_Typeless;// EFormat::D32_FLOAT_S8X24_UINT;
 		}
 		return EFormat::UNKNOWN;
 	};
@@ -215,7 +215,7 @@ namespace
 		case EFormat::R32_UINT: return VK_FORMAT_R32_UINT;
 		case EFormat::R32_SINT: return VK_FORMAT_R32_SINT;
 		case EFormat::R32_FLOAT: return VK_FORMAT_R32_SFLOAT;
-			//case EFormat::R32_Typeless:	return VK_FORMAT_R32_TYPELESS;
+		case EFormat::R32_Typeless:	return VK_FORMAT_D32_SFLOAT_S8_UINT;// VK_FORMAT_R32_UINT;
 		case EFormat::RGBA16_FLOAT:	return VK_FORMAT_R16G16B16A16_SFLOAT;
 		case EFormat::RGBA16_UNORM:	return VK_FORMAT_R16G16B16A16_UNORM;
 		case EFormat::RGBA16_SNORM:	return VK_FORMAT_R16G16B16A16_SNORM;
@@ -271,7 +271,6 @@ namespace
 			Formats.push_back(VK_FORMAT_R32_UINT);
 			Formats.push_back(VK_FORMAT_R32_SINT);
 			Formats.push_back(VK_FORMAT_R32_SFLOAT);
-			//Formats.push_back(VK_FORMAT_R32_TYPELESS);
 			Formats.push_back(VK_FORMAT_R16G16B16A16_SFLOAT);
 			Formats.push_back(VK_FORMAT_R16G16B16A16_UNORM);
 			Formats.push_back(VK_FORMAT_R16G16B16A16_SNORM);
@@ -296,7 +295,7 @@ namespace
 
 	inline bool IsValidVulkanDepthOnlyFormat(const VkFormat Format)
 	{
-		return Format == VK_FORMAT_D32_SFLOAT || Format == VK_FORMAT_D16_UNORM;
+		return Format == VK_FORMAT_D32_SFLOAT || Format == VK_FORMAT_D16_UNORM || Format == VK_FORMAT_R32_UINT;
 	};
 
 	inline bool IsValidVulkanDepthStencilFormat(const VkFormat Format)
@@ -311,6 +310,59 @@ namespace
 
 	inline bool IsVulkanDepthSRVSupported(const VkFormat Format)
 	{
-		return Format == VK_FORMAT_R16_SFLOAT || Format == VK_FORMAT_R32_SFLOAT;
+		return Format == VK_FORMAT_D32_SFLOAT_S8_UINT || Format == VK_FORMAT_R16_SFLOAT || Format == VK_FORMAT_R32_SFLOAT || Format == VK_FORMAT_D32_SFLOAT;
 	};
+
+	inline auto GetVulkanDepthFormat = [](const EFormat Format) -> VkFormat
+		{
+			/*if (Format == EFormat::R16_Typeless)
+			{
+				return DXGI_FORMAT_R16_FLOAT; // UINT ?
+			}
+			else*/ if (Format == EFormat::R32_Typeless)
+			{
+				return VK_FORMAT_D32_SFLOAT_S8_UINT;//VK_FORMAT_D32_SFLOAT; // UNORM ?
+			}
+			/*else if (Format == EFormat:R24G8_Typeless)
+			{
+				return ;
+			}*/
+			return VkFormat::VK_FORMAT_UNDEFINED;
+		};
+	//inline auto GetVulkanDepthSRVFormat = [](const EFormat Format) -> VkFormat
+	//	{
+	//		/*if (Format == EFormat::R16_Typeless)
+	//		{
+	//			return DXGI_FORMAT_R16_FLOAT; // UINT ?
+	//		}
+	//		else*/ if (Format == EFormat::R32_Typeless)
+	//		{
+	//			return VK_FORMAT_R32_SFLOAT; // UNORM ?
+	//		}
+	//		/*else if (Format == EFormat:R24G8_Typeless)
+	//		{
+	//			return ;
+	//		}*/
+	//		return VkFormat::VK_FORMAT_UNDEFINED;
+	//	};
+	inline auto GetVulkanDepthViewFormat = [](const EFormat Format) -> VkFormat
+		{
+			/*if (Format == EFormat::R16_Typeless)
+			{
+				return DXGI_FORMAT_D16_UNORM;
+			}
+			else*/ if (Format == EFormat::R32_Typeless)
+			{
+				return VK_FORMAT_D32_SFLOAT_S8_UINT;// VK_FORMAT_D32_SFLOAT;
+			}
+			/*else if (Format == EFormat::R24G8_Typeless)
+			{
+				return DXGI_FORMAT_D24_UNORM_S8_UINT;
+			}*/
+			/*else if (Format == EFormat::R32G8X24_Typeless)
+			{
+				return DXGI_FORMAT_D32_FLOAT_S8X24_UINT;
+			}*/
+			return VkFormat::VK_FORMAT_UNDEFINED;
+		};
 }

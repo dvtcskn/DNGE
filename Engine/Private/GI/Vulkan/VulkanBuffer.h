@@ -71,6 +71,7 @@ private:
 	BufferLayout Desc;
 	void* pData;
 	bool bIsMapped;
+	std::uint32_t HeapIndex;
 
 public:
 	VulkanConstantBuffer(VulkanDevice* Device, std::string InName, const BufferLayout& InDesc, std::uint32_t InRootParameterIndex);
@@ -78,7 +79,7 @@ public:
 	virtual ~VulkanConstantBuffer();
 
 	FORCEINLINE virtual std::string GetName() const override final { return Name; };
-	virtual std::uint32_t GetBindlessIndex() const override final {	return std::uint32_t(-1); }
+	virtual std::uint32_t GetBindlessIndex() const override final {	return HeapIndex; }
 
 	VkBuffer GetBuffer() const { return Buffer; }
 	void* GetData() const { return pData; }
@@ -160,29 +161,109 @@ public:
 	virtual bool CopyFrom(IIndexBuffer* IndexBuffer) override final { return false; }
 };
 
+class VulkanIndirectBuffer final : public IIndirectBuffer
+{
+	sClassBody(sClassConstructor, VulkanIndirectBuffer, IIndirectBuffer)
+private:
+	std::string Name;
+	VulkanDevice* Owner;
+	BufferLayout Desc;
+
+	std::uint64_t Offset;
+	std::uint64_t CommandSize;
+	VkBuffer Buffer;
+	VkDeviceMemory Memory;
+
+	void* pData;
+	bool bIsMapped;
+
+public:
+	VulkanIndirectBuffer(VulkanDevice* InDevice, std::string InName, BufferLayout NewLayout);
+	virtual ~VulkanIndirectBuffer();
+
+	const VkBuffer& GetBuffer() const { return Buffer; }
+
+	virtual std::string GetName() const override final { return Name; };
+	virtual std::uint64_t GetSize() const override final { return Desc.Size * Desc.Stride; };
+	virtual std::uint64_t GetTotalCommandSize() const override final { return Desc.Size; };
+	virtual std::uint64_t GetCurrentCommandSize() const override final { return CommandSize; };
+	virtual std::uint64_t GetStride() const override final { return Desc.Stride; };
+	virtual std::uint64_t GetOffset() const override final { return Offset; };
+
+	virtual void SetArgument(void* InArgument, std::size_t NewCommandSize = 1, std::size_t NewOffset = 0) override final;
+
+	virtual ResourceSharedHandle* GetSharedHandle() const override final { return nullptr; }
+	virtual bool CopyFrom(IIndirectBuffer* IndirectBuffer) override final { return false; }
+};
+
+class VulkanByteAddressBuffer final : public IByteAddressBuffer
+{
+	sClassBody(sClassConstructor, VulkanByteAddressBuffer, IByteAddressBuffer)
+private:
+	std::string Name;
+	VulkanDevice* Owner;
+
+	std::uint64_t Size;
+	VkBuffer Buffer;
+	VkDeviceMemory Memory;
+
+	void* pData;
+	bool bIsMapped;
+	bool bIsReadWriteAllowed;
+
+	VkDescriptorBufferInfo DescriptorInfo;
+	std::uint32_t HeapIndex;
+
+public:
+	VulkanByteAddressBuffer(VulkanDevice* InDevice, std::string InName, std::uint64_t Size, bool bReadWriteAllowed);
+	virtual ~VulkanByteAddressBuffer();
+
+	FORCEINLINE virtual std::string GetName() const override final { return Name; };
+	virtual std::uint32_t GetBindlessIndex() const override final { return HeapIndex; }
+
+	virtual bool IsReadWriteAllowed() const { return bIsReadWriteAllowed; }
+
+	virtual std::uint64_t GetSize() const override final { return Size; }
+	virtual bool IsMapable() const override final { return true; }
+	virtual void Map(const void* Ptr, std::size_t Location, std::uint32_t Stride, IGraphicsCommandContext* InCMDBuffer = nullptr) override final;
+	void Unmap();
+
+	virtual ResourceSharedHandle* GetSharedHandle() const override final { return nullptr; }
+	virtual bool CopyFrom(IByteAddressBuffer* UnorderedAccessBuffer) override final { return false; }
+};
+
 class VulkanStructuredBuffer final : public IStructuredBuffer
 {
 	sClassBody(sClassConstructor, VulkanStructuredBuffer, IStructuredBuffer)
 private:
 	std::string Name;
+	VulkanDevice* Owner;
+	BufferLayout Desc;
+
+	VkBuffer Buffer;
+	VkDeviceMemory Memory;
+
+	void* pData;
+	bool bIsMapped;
+	bool bIsSRVAllowed;
+
+	VkDescriptorBufferInfo DescriptorInfo;
+	std::uint32_t HeapIndex;
 
 public:
 	VulkanStructuredBuffer(VulkanDevice* InDevice, std::string InName, const BufferLayout& InDesc, bool bSRVAllowed = true);
 
-	virtual ~VulkanStructuredBuffer()
-	{
-
-	}
+	virtual ~VulkanStructuredBuffer();
 
 	FORCEINLINE virtual std::string GetName() const override final { return Name; };
-	virtual std::uint32_t GetBindlessIndex() const override final {	return std::uint32_t(-1); }
+	virtual std::uint32_t GetBindlessIndex() const override final {	return HeapIndex; }
 
-	virtual bool IsSRV_Allowed() const { return false; }
+	virtual bool IsSRV_Allowed() const { return bIsSRVAllowed; }
 
-	VkBuffer GetBuffer() const { return VK_NULL_HANDLE; }
-	virtual std::size_t GetSize() const override final { return 0; }
-	virtual bool IsMapable() const override final { return false; }
+	virtual std::size_t GetSize() const override final { return Desc.Size; }
+	virtual bool IsMapable() const override final { return true; }
 	virtual void Map(const void* Ptr, std::size_t Location, IGraphicsCommandContext* InCMDBuffer = nullptr) override final;
+	void Unmap();
 
 	virtual ResourceSharedHandle* GetSharedHandle() const override final { return nullptr; }
 	virtual bool CopyFrom(IStructuredBuffer* UnorderedAccessBuffer) override final { return false; }

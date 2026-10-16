@@ -380,7 +380,7 @@ namespace
         imageInfo.samples = VkSampleCountFlagBits::VK_SAMPLE_COUNT_1_BIT;
         imageInfo.sharingMode = VkSharingMode::VK_SHARING_MODE_EXCLUSIVE;
 
-        vkCreateImage(Device->Get(), &imageInfo, nullptr, texture);
+        VK_CHECK(vkCreateImage(Device->Get(), &imageInfo, nullptr, texture));
 
         VkMemoryRequirements memRequirements;
         vkGetImageMemoryRequirements(Device->Get(), *texture, &memRequirements);
@@ -389,11 +389,11 @@ namespace
         VkMemoryAllocateInfo alloc_info{
             .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
             .allocationSize = memRequirements.size,
-            .memoryTypeIndex = Device->GetMemoryType(memRequirements.memoryTypeBits,	VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) };
+            .memoryTypeIndex = Device->GetMemoryType(memRequirements.memoryTypeBits,	VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) }; // VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT ?
 
         VK_CHECK(vkAllocateMemory(Device->Get(), &alloc_info, nullptr, &Memory));
 
-        vkBindImageMemory(Device->Get(), *texture, Memory, 0);
+        VK_CHECK(vkBindImageMemory(Device->Get(), *texture, Memory, 0));
 
         hr = S_OK;
         return hr;

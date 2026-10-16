@@ -250,7 +250,7 @@ public:
 		}
 		else
 		{
-			Containers.insert({ Handle->GetLayoutType(), sMaterialInstanceContainer::Create(this, 16384, Handle->GetLayoutType()) });
+			Containers.insert({ Handle->GetLayoutType(), sMaterialInstanceContainer::Create(this, 1024 * 1024 * 10, Handle->GetLayoutType()) });
 			Containers[Handle->GetLayoutType()]->AllocateMaterialInstanceDescriptor(Handle);
 		}
 	}

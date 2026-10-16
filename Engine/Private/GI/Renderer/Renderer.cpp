@@ -119,7 +119,8 @@ public:
 	{
 		BufferLayout BufferDesc;
 		BufferDesc.Size = sizeof(sTimeBuffer);
-		TimeCB = IConstantBuffer::Create("TimeCB", BufferDesc, 2);
+		TimeCB.First = IConstantBuffer::Create("TimeCB_First", BufferDesc, 2);
+		TimeCB.Second = IConstantBuffer::Create("TimeCB_Second", BufferDesc, 2);
 
 		{
 			sFrameBufferAttachmentInfo AttachmentInfo;
@@ -167,7 +168,8 @@ public:
 		CameraCBs.clear();
 		GBuffer = nullptr;
 
-		TimeCB = nullptr;
+		//TimeCB = nullptr;
+		TimeCB.Release();
 	}
 
 	void ClearGBuffer()
@@ -192,7 +194,7 @@ public:
 	void Tick(double DeltaTime)
 	{
 		TimeBuffer.Time += (float)DeltaTime;
-		TimeCB->Map(&TimeBuffer);
+		TimeCB.Get()->Map(&TimeBuffer);
 	}
 
 	sIndirectLayoutBindingDesc GetIndirectLayoutBindingDesc() const
@@ -529,13 +531,18 @@ public:
 				Descriptor.MaterialIndex = MaterialInstance	? MaterialInstance->GetId()	: DefaultMatInstance->GetId();
 				Descriptor.CameraConstantBuffer = CameraCBs[index].Get()->GetBindlessIndex();
 				Descriptor.ObjectConstantBuffer = Mesh->GetMeshConstantBuffer()->GetBindlessIndex();
-				Descriptor.TimeConstantBuffer = TimeCB->GetBindlessIndex();
+				Descriptor.TimeConstantBuffer = TimeCB.Get()->GetBindlessIndex();
 
 				if (!Descriptor.IsValid(bInstance))
 					throw std::runtime_error("Invalid GeometrySceneDescriptor for mesh: " + Mesh->GetName());
 					
 				if (bEnableExecuteIndirect && LastMaterial->IsIndirectCommandAvailable())
 				{
+					if (GPU::GetGIType() == EGITypes::Vulkan)
+					{
+						sGeometrySceneDescriptor SceneDescriptor(Descriptor);
+						CMD->SetBindlessDescriptor(0, &SceneDescriptor);
+					}
 					GeometrySceneIndirectCommand Command;
 					Command.Descriptor = Descriptor;
 					Command.DrawArgs = Mesh->GetDrawParameters();
@@ -667,13 +674,13 @@ public:
 			{
 				BufferLayout BufferDesc;
 				BufferDesc.Size = sizeof(sCameraBuffer);
-				IConstantBuffer::SharedPtr CameraCB = IConstantBuffer::Create("CameraCB_" + std::to_string(CameraCBs.size()), BufferDesc, 0); // 0
+				IConstantBuffer::SharedPtr CameraCB = IConstantBuffer::Create("CameraCB_First_" + std::to_string(CameraCBs.size()), BufferDesc, 0); // 0
 				DoubleBuffer.First = CameraCB;
 			}
 			{
 				BufferLayout BufferDesc;
 				BufferDesc.Size = sizeof(sCameraBuffer);
-				IConstantBuffer::SharedPtr CameraCB = IConstantBuffer::Create("CameraCB_" + std::to_string(CameraCBs.size() + 1), BufferDesc, 0); // 0
+				IConstantBuffer::SharedPtr CameraCB = IConstantBuffer::Create("CameraCB_Second_" + std::to_string(CameraCBs.size() + 1), BufferDesc, 0); // 0
 				DoubleBuffer.Second = CameraCB;
 			}
 			CameraCBs.push_back(DoubleBuffer);
@@ -758,7 +765,7 @@ private:
 		float Time;
 	};
 	sTimeBuffer TimeBuffer;
-	IConstantBuffer::SharedPtr TimeCB;
+	TDoubleBuffer<IConstantBuffer> TimeCB;
 	//static_assert((sizeof(sTimeBuffer) % 256) == 0, "Constant Buffer size must be 256-byte aligned");
 	sScreenDimension CustomScreenDimension;
 	float MipBias;
@@ -875,6 +882,7 @@ void sRenderer::CompileMaterial(sMaterial* Material, bool bRecompile)
 		break;
 	case ERenderPass::PostProcess:
 		break;
+	case ERenderPass::UIDepth:
 	case ERenderPass::UI:
 		break;
 	}
@@ -892,6 +900,7 @@ void sRenderer::CompilePipeline(IPipeline* Pipeline, bool bRecompile)
 		break;
 	case ERenderPass::PostProcess:
 		break;
+	case ERenderPass::UIDepth:
 	case ERenderPass::UI:
 		break;
 	}
@@ -909,6 +918,7 @@ sIndirectLayoutBindingDesc sRenderer::GetRenderPassIndirectLayoutBindingDesc(ERe
 			return pParticleRenderer->GetIndirectLayoutBindingDesc();
 		case ERenderPass::PostProcess:
 			return PostProcessRenderer->GetIndirectLayoutBindingDesc();
+		case ERenderPass::UIDepth:
 		case ERenderPass::UI:
 			break;
 	}
@@ -927,6 +937,7 @@ IFrameBuffer* sRenderer::GetFrameBuffer(ERenderPass RenderPass) const
 		break;
 	case ERenderPass::PostProcess:
 		break;
+	case ERenderPass::UIDepth:
 	case ERenderPass::UI:
 		break;
 	}
@@ -1006,7 +1017,7 @@ void sRenderer::Render()
 	if (!World)
 		return;
 
-	if (GBufferClearMode == ERendererClear::Driver  /*|| GBufferClearMode == ERendererClear::Sky*/)
+	if (GBufferClearMode == ERendererClear::Driver || GBufferClearMode == ERendererClear::Sky)
 	{
 		GBuffer->ClearGBuffer();
 	}
@@ -1042,6 +1053,7 @@ void sRenderer::Render()
 			pParticleRenderer->Render(World->GetActiveLevel(), GBuffer->GetCameraConstantBuffer(i)->GetBindlessIndex(), FinalRenderTarget, ViewportInstance->Viewport);
 			if (UpscalerType == ERendererUpscalerType::FSR && FSR && (GPU::GetDeviceType() != EGPUDeviceType::Software || bSoftwareDeviceUpscallerSupport))
 			{
+				//to do : use global camera
 				FSR->Render(FinalRenderTarget, GBuffer->GetGBuffer()->GetRenderTarget(4), GBuffer->GetGBuffer()->GetRenderTarget(5), GBuffer->GetDepth(), ViewportInstance->pCamera.get());
 				FinalRenderTarget = FSR->GetOutputRenderTarget();
 			}
@@ -1223,6 +1235,7 @@ void sRenderer::SetInternalBaseRenderResolution(std::size_t Width, std::size_t H
 {
 	InternalBaseRenderResolution = sScreenDimension(Width, Height);
 	GBuffer->SetRenderSize(InternalBaseRenderResolution.Width, InternalBaseRenderResolution.Height);
+	pParticleRenderer->SetRenderSize(InternalBaseRenderResolution.Width, InternalBaseRenderResolution.Height);
 	LineRenderer->SetRenderSize(InternalBaseRenderResolution.Width, InternalBaseRenderResolution.Height);
 	if (UpscalerType == ERendererUpscalerType::FSR && FSR && (GPU::GetDeviceType() != EGPUDeviceType::Software || bSoftwareDeviceUpscallerSupport))
 		FSR->SetRenderSize(InternalBaseRenderResolution.Width, InternalBaseRenderResolution.Height);

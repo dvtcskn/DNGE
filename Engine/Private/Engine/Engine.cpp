@@ -1365,7 +1365,7 @@ sEngine::sEngine(const GPUCreateInfo& CreateInfo, const IPhysicalWorld::SharedPt
 		break;
 	}
 
-	if (CreateInfo.SecondaryGPU.Type != CreateInfo.PrimaryGPU.Type || CreateInfo.SecondaryGPU.GPUIndex != CreateInfo.PrimaryGPU.GPUIndex)
+	if (CreateInfo.SecondaryGPU.Type != EGITypes::Undefined && CreateInfo.SecondaryGPU.GPUIndex != CreateInfo.PrimaryGPU.GPUIndex)
 	{
 		switch (CreateInfo.SecondaryGPU.Type)
 		{
@@ -1490,14 +1490,14 @@ void sEngine::EngineInternalTick()
 
 	FixedStepTimer.Tick([&]()
 		{
+			PhysicsTick(FixedStepTimer.GetElapsedSeconds());
+			FixedTick(FixedStepTimer.GetElapsedSeconds());
 		});
-	PhysicsTick(FixedStepTimer.GetElapsedSeconds());
-	FixedTick(FixedStepTimer.GetElapsedSeconds());
 
 	mStepTimer.Tick([&]()
 		{
+			Tick(mStepTimer.GetElapsedSeconds());
 		});
-	Tick(mStepTimer.GetElapsedSeconds());
 
 	Render();
 	Present();

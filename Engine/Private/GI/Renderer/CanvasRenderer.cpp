@@ -137,6 +137,7 @@ sCanvasRenderer::sCanvasRenderer(std::size_t Width, std::size_t Height)
 {
 	{
 		sPipelineDesc pPipelineDesc;
+		pPipelineDesc.RenderPass = ERenderPass::UI;
 		pPipelineDesc.BlendAttribute = sBlendAttributeDesc();
 		pPipelineDesc.DepthStencilAttribute = sDepthStencilAttributeDesc();
 		pPipelineDesc.DepthStencilAttribute.DepthTest = ECompareFunction::Always;
@@ -181,6 +182,7 @@ sCanvasRenderer::sCanvasRenderer(std::size_t Width, std::size_t Height)
 
 	{
 		sPipelineDesc pPipelineDesc;
+		pPipelineDesc.RenderPass = ERenderPass::UIDepth;
 		pPipelineDesc.BlendAttribute = sBlendAttributeDesc();
 
 		pPipelineDesc.DepthStencilAttribute.bEnableDepthWrite = false;
@@ -216,6 +218,7 @@ sCanvasRenderer::sCanvasRenderer(std::size_t Width, std::size_t Height)
 
 	{
 		sPipelineDesc pPipelineDesc;
+		pPipelineDesc.RenderPass = ERenderPass::UIDepth;
 		pPipelineDesc.BlendAttribute = sBlendAttributeDesc();
 
 		pPipelineDesc.DepthStencilAttribute.bEnableDepthWrite = false;

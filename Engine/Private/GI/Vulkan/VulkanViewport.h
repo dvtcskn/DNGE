@@ -38,10 +38,13 @@ public:
 	~VulkanViewport();
 
 	void InitWindow(HWND* Handle, std::uint32_t InWidth, std::uint32_t InHeight, bool bFullscreen);
+	void RecreateSwapChain();
 
 	void BeginFrame();
 	void Present(IRenderTarget* pRT);
 	bool ResizeSwapChain(std::size_t Width, std::size_t Height);
+	VkSemaphore GetPendingAcquireSemaphore() const { return bAcquireSemaphoreWaited ? VK_NULL_HANDLE : AcquiredSemaphore; }
+	void MarkAcquireSemaphoreWaited() { bAcquireSemaphoreWaited = true; }
 
 	void FullScreen(const bool value);
 	void Vsync(const bool value);
@@ -58,14 +61,39 @@ public:
 	FORCEINLINE std::uint32_t GetViewportWidth() const { return SizeX; }
 	FORCEINLINE std::uint32_t GetViewportHeight() const { return SizeY; }
 	FORCEINLINE sScreenDimension GetScreenDimension() const { return sScreenDimension(SizeX, SizeY); }
+	FORCEINLINE DisplayMode GetCurrentDisplayMode() const { return CurrentDisplayMode; }
 
 	const VkSurfaceKHR& GetSurface() const { return Surface; }
 
 	EFormat GetFormat() const { return Format; }
 
-private:
-	VkResult AcquireNextImageIndex(uint32_t* image);
 	void CopyToBackBuffer(IRenderTarget* pRT);
+
+	void EnumerateDisplayModesAndFormats(const std::vector<VkSurfaceFormat2KHR>& formats2);
+	void EnumerateHDRMetadata(VkPhysicalDevice PhysicalDevice, VkPhysicalDeviceSurfaceInfo2KHR& physicalDeviceSurfaceInfo2, VkSurfaceCapabilities2KHR& capabilities2);
+	void SetHDRMetadataAndColorspace();
+	void PopulateHDRMetadataBasedOnDisplayMode();
+	DisplayMode CheckAndGetDisplayModeRequested(DisplayMode DispMode);
+	std::unordered_map<DisplayMode, VkSurfaceFormatKHR> GetAvailableFormats(const std::vector<VkSurfaceFormat2KHR>& surfaceFormats2);
+
+	PFN_vkSetHdrMetadataEXT GetSetHdrMetadataEXT() const
+	{
+		return vkSetHdrMetadataEXT;
+	}
+
+	PFN_vkGetPhysicalDeviceSurfaceCapabilities2KHR GetPhysicalDeviceSurfaceCapabilities2KHR() const
+	{
+		return vkGetPhysicalDeviceSurfaceCapabilities2KHR;
+	}
+
+	PFN_vkGetPhysicalDeviceSurfaceFormats2KHR GetPhysicalDeviceSurfaceFormats2KHR() const
+	{
+		return vkGetPhysicalDeviceSurfaceFormats2KHR;
+	}
+
+private:
+	void QuerySwapChainSupport();
+	VkResult AcquireNextImageIndex(uint32_t* image);
 
 private:
 	VulkanDevice* Device;
@@ -77,13 +105,11 @@ private:
 		VkImage Image;
 		VkImageView View;
 		VkImageLayout CurrentImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		VkFence Fence;
 
-		SwapchainImage(VkImage image = VK_NULL_HANDLE, VkImageView view = VK_NULL_HANDLE, VkFence fence = VK_NULL_HANDLE, VkImageLayout currentImageLayout = VK_IMAGE_LAYOUT_UNDEFINED)
+		SwapchainImage(VkImage image = VK_NULL_HANDLE, VkImageView view = VK_NULL_HANDLE, VkImageLayout currentImageLayout = VK_IMAGE_LAYOUT_UNDEFINED)
 			: Image(image)
 			, View(view)
 			, CurrentImageLayout(currentImageLayout)
-			, Fence(fence)
 		{}
 
 		void Destroy(VkDevice Device)
@@ -92,8 +118,6 @@ private:
 			View = VK_NULL_HANDLE;
 			vkDestroyImage(Device, Image, nullptr);
 			Image = VK_NULL_HANDLE;
-			vkDestroyFence(Device, Fence, nullptr);
-			Fence = VK_NULL_HANDLE;
 		}
 	};
 
@@ -102,6 +126,8 @@ private:
 private:
 	HWND* Handle;
 	bool bRecreateSurface;
+	VkSemaphore AcquiredSemaphore = VK_NULL_HANDLE;
+	bool bAcquireSemaphoreWaited = false;
 
 	bool bIsFullScreen;
 	bool bVSYNC;
@@ -115,4 +141,18 @@ private:
 	std::uint32_t SizeX;
 	std::uint32_t SizeY;
 	sViewport Viewport;
+
+	DisplayMode CurrentDisplayMode;
+	std::vector<DisplayMode> SupportedDisplayModes;
+	HDRMetadata HDR;
+	PFN_vkSetHdrMetadataEXT vkSetHdrMetadataEXT = nullptr;
+	PFN_vkGetPhysicalDeviceSurfaceCapabilities2KHR vkGetPhysicalDeviceSurfaceCapabilities2KHR = nullptr;
+	PFN_vkGetPhysicalDeviceSurfaceFormats2KHR vkGetPhysicalDeviceSurfaceFormats2KHR = nullptr;
+
+	VkSurfaceCapabilities2KHR capabilities2 = {};
+	VkPhysicalDeviceSurfaceInfo2KHR physicalDeviceSurfaceInfo2 = {};
+	VkDisplayNativeHdrSurfaceCapabilitiesAMD displayNativeHdrSurfaceCapabilitiesAMD = {};
+	VkSwapchainDisplayNativeHdrCreateInfoAMD swapchainDisplayNativeHdrCreateInfoAMD = {};
+	std::vector<VkSurfaceFormat2KHR> formats2;
+	std::vector<VkPresentModeKHR> presentModes;
 };

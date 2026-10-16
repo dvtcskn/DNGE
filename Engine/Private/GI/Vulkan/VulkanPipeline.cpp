@@ -32,12 +32,41 @@
 #include "VulkanShaderStates.h"
 #include "VulkanFrameBuffer.h"
 
+std::string RenderPassToString(ERenderPass RenderPass)
+{
+	switch (RenderPass)
+	{
+	case ERenderPass::NONE:			return "NONE";
+	case ERenderPass::GBuffer:		return "GBuffer";
+	case ERenderPass::Line:			return "Line";
+	case ERenderPass::Particle:		return "Particle";
+	case ERenderPass::FSR:			return "FSR";
+	case ERenderPass::Tonemapper:	return "Tonemapper";
+	case ERenderPass::PostProcess:	return "PostProcess";
+	case ERenderPass::UI:			return "UI";
+	case ERenderPass::UIDepth:		return "UIDepth";
+	case ERenderPass::Custom1:		return "Custom1";
+	case ERenderPass::Custom2:		return "Custom2";
+	case ERenderPass::Custom3:		return "Custom3";
+	case ERenderPass::Custom4:		return "Custom4";
+	case ERenderPass::Custom5:		return "Custom5";
+	case ERenderPass::Custom6:		return "Custom6";
+	case ERenderPass::Custom7:		return "Custom7";
+	case ERenderPass::Custom8:		return "Custom8";
+	case ERenderPass::Custom9:		return "Custom9";
+	case ERenderPass::Custom10:		return "Custom10";
+	}
+
+	return "";
+}
+
 VulkanPipeline::VulkanPipeline(VulkanDevice* Device, std::string InName, sPipelineDesc InDesc)
 	: Name(InName)
 	, Desc(InDesc)
 	, Owner(Device)
 	, PipelineCreateInfo(VkGraphicsPipelineCreateInfo(VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO))
 	, Compiled(false)
+	, bIsIndirectCommandAvailable(false)
 {
 	Compile();
 }
@@ -70,6 +99,57 @@ bool VulkanPipeline::Compile(IFrameBuffer* InFrameBuffer)
 
 	RenderPass = VulkanRenderpass::Create(Owner, Name + "_RenderPass", FB->GetAttachmentInfo());
 
+	std::vector<VkFormat> colorFormats;
+	VkFormat DepthFormat = static_cast<VulkanDepthTarget*>(FB->GetDepthTarget())->GetVkFormat();
+	{
+		for (std::size_t i = 0; i < FB->RenderTargets.size(); i++)
+		{
+			VkClearValue clear = {};
+			clear.color.float32[0] = 0.0f;
+			clear.color.float32[1] = 0.0f;
+			clear.color.float32[2] = 0.0f;
+			clear.color.float32[3] = 1.0f;
+			VkRenderingAttachmentInfo Info = {};
+			Info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+			Info.clearValue = clear;
+			Info.imageView = static_cast<VulkanRenderTarget*>(FB->GetRenderTarget(i))->View;						// The target image view to render into
+			Info.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;	// Expected layout during rendering
+			Info.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;						// Action at the start of the pass
+			Info.storeOp = VK_ATTACHMENT_STORE_OP_STORE;					// Action at the end of the pass
+			Info.pNext = nullptr;
+			colorFormats.push_back(static_cast<VulkanRenderTarget*>(FB->GetRenderTarget(i))->GetVkFormat());
+			pColorAttachments.push_back(Info);
+		}
+
+		VkClearValue clearDepth = {};
+		clearDepth.depthStencil.depth = 1.0f;
+		VkRenderingAttachmentInfo Info = {};
+		Info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+		Info.clearValue = clearDepth;
+		Info.imageView = static_cast<VulkanDepthTarget*>(FB->GetDepthTarget())->View;                      // The target depth image view
+		Info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;	// Expected layout during rendering
+		Info.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;						// Action at the start of the pass
+		Info.storeOp = VK_ATTACHMENT_STORE_OP_STORE;					// Use DONT_CARE if you don't need it later
+		Info.pNext = nullptr;
+		pDepthAttachment.push_back(Info);
+
+		RenderingInfo = {};
+		RenderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+		VkRect2D Rect = {};
+		Rect.extent.width = FB->GetAttachmentInfo().Desc.Dimensions.X;
+		Rect.extent.height = FB->GetAttachmentInfo().Desc.Dimensions.Y;
+		Rect.offset.x = 0;
+		Rect.offset.y = 0;
+		RenderingInfo.renderArea = Rect;
+		RenderingInfo.layerCount = 1;
+		RenderingInfo.pNext = nullptr;
+		RenderingInfo.colorAttachmentCount = (uint32_t)FB->RenderTargets.size();
+		RenderingInfo.pColorAttachments = pColorAttachments.data();
+		RenderingInfo.pDepthAttachment = pDepthAttachment.data();
+		RenderingInfo.pStencilAttachment = nullptr;// pStencilAttachment.data();
+		RenderingInfo.flags = 0;
+	}
+
 	VkFramebufferCreateInfo FramebufferCreateInfo = {};
 	FramebufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 	FramebufferCreateInfo.pNext = NULL;
@@ -86,9 +166,18 @@ bool VulkanPipeline::Compile(IFrameBuffer* InFrameBuffer)
 
 	vkCreateFramebuffer(Owner->Get(), &FramebufferCreateInfo, nullptr, &FrameBuffer);
 
+	// 2. Create the Dynamic Rendering pipeline extension struct
+	VkPipelineRenderingCreateInfo pipelineRenderingInfo {};
+	pipelineRenderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+	pipelineRenderingInfo.colorAttachmentCount = (uint32_t)colorFormats.size(); // Matches pColorBlendState->attachmentCount!
+	pipelineRenderingInfo.pColorAttachmentFormats = colorFormats.data();
+	pipelineRenderingInfo.depthAttachmentFormat = DepthFormat; // Include if using depth
+	pipelineRenderingInfo.stencilAttachmentFormat = VK_FORMAT_UNDEFINED;
+
 	VulkanBlendState BlendState(Desc.BlendAttribute, RenderTargetAttachmentCount);
 	auto Blend = BlendState.Get();
 	PipelineCreateInfo.pColorBlendState = &Blend;
+	PipelineCreateInfo.pNext = &pipelineRenderingInfo; // <--- CRITICAL: This links the missing info
 
 	CompilePipeline();
 
@@ -119,6 +208,59 @@ bool VulkanPipeline::Compile(IRenderTarget* InRT, IDepthTarget* Depth)
 
 	RenderPass = VulkanRenderpass::Create(Owner, Name + "_RenderPass", AttachmentInfo);
 
+	std::vector<VkFormat> colorFormats;
+	VkFormat DepthFormat = Depth ? static_cast<VulkanDepthTarget*>(Depth)->GetVkFormat() : VkFormat::VK_FORMAT_UNDEFINED;
+	{
+		{
+			VkClearValue clear = {};
+			clear.color.float32[0] = 0.0f;
+			clear.color.float32[1] = 0.0f;
+			clear.color.float32[2] = 0.0f;
+			clear.color.float32[3] = 1.0f;
+			VkRenderingAttachmentInfo Info = {};
+			Info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+			Info.clearValue = clear;
+			Info.imageView = static_cast<VulkanRenderTarget*>(InRT)->View;						// The target image view to render into
+			Info.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;	// Expected layout during rendering
+			Info.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;						// Action at the start of the pass
+			Info.storeOp = VK_ATTACHMENT_STORE_OP_STORE;					// Action at the end of the pass
+			Info.pNext = nullptr;
+			colorFormats.push_back(static_cast<VulkanRenderTarget*>(InRT)->GetVkFormat());
+			pColorAttachments.push_back(Info);
+		}
+
+		if (Depth)
+		{
+			VkClearValue clearDepth = {};
+			clearDepth.depthStencil.depth = 1.0f;
+			VkRenderingAttachmentInfo Info = {};
+			Info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+			Info.clearValue = clearDepth;
+			Info.imageView = static_cast<VulkanDepthTarget*>(Depth)->View;                      // The target depth image view
+			Info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;	// Expected layout during rendering
+			Info.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;						// Action at the start of the pass
+			Info.storeOp = VK_ATTACHMENT_STORE_OP_STORE;					// Use DONT_CARE if you don't need it later
+			Info.pNext = nullptr;
+			pDepthAttachment.push_back(Info);
+		}
+
+		RenderingInfo = {};
+		RenderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+		VkRect2D Rect = {};
+		Rect.extent.width = RT->GetDesc().Dimensions.X;
+		Rect.extent.height = RT->GetDesc().Dimensions.Y;
+		Rect.offset.x = 0;
+		Rect.offset.y = 0;
+		RenderingInfo.renderArea = Rect;
+		RenderingInfo.layerCount = 1;
+		RenderingInfo.pNext = nullptr;
+		RenderingInfo.colorAttachmentCount = (uint32_t)pColorAttachments.size();
+		RenderingInfo.pColorAttachments = pColorAttachments.data();
+		RenderingInfo.pDepthAttachment = pDepthAttachment.data();
+		RenderingInfo.pStencilAttachment = nullptr;// pStencilAttachment.data();
+		RenderingInfo.flags = 0;
+	}
+
 	VkFramebufferCreateInfo FramebufferCreateInfo = {};
 	FramebufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 	FramebufferCreateInfo.pNext = NULL;
@@ -134,9 +276,18 @@ bool VulkanPipeline::Compile(IRenderTarget* InRT, IDepthTarget* Depth)
 
 	vkCreateFramebuffer(Owner->Get(), &FramebufferCreateInfo, nullptr, &FrameBuffer);
 
+	// 2. Create the Dynamic Rendering pipeline extension struct
+	VkPipelineRenderingCreateInfo pipelineRenderingInfo{};
+	pipelineRenderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+	pipelineRenderingInfo.colorAttachmentCount = (uint32_t)colorFormats.size(); // Matches pColorBlendState->attachmentCount!
+	pipelineRenderingInfo.pColorAttachmentFormats = colorFormats.data();
+	pipelineRenderingInfo.depthAttachmentFormat = DepthFormat; // Include if using depth
+	pipelineRenderingInfo.stencilAttachmentFormat = VK_FORMAT_UNDEFINED;
+
 	VulkanBlendState BlendState(Desc.BlendAttribute, 1);
 	auto Blend = BlendState.Get();
 	PipelineCreateInfo.pColorBlendState = &Blend;
+	PipelineCreateInfo.pNext = &pipelineRenderingInfo; // <--- CRITICAL: This links the missing info
 
 	CompilePipeline();
 
@@ -261,7 +412,7 @@ void VulkanPipeline::CompilePipeline()
 		stage_create_infos.push_back(Shader->shader_stage);
 	}*/
 
-	for (const auto& Attachment : Desc.ShaderAttachments)
+	for (auto& Attachment : Desc.ShaderAttachments)
 	{
 		VkPipelineShaderStageCreateInfo shader_stage = {};
 		shader_stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -294,6 +445,11 @@ void VulkanPipeline::CompilePipeline()
 			break;
 		}
 
+		if (Desc.RenderPass != ERenderPass::NONE)
+		{
+			std::string Define = RenderPassToString(Desc.RenderPass);
+			Attachment.ShaderDefines.push_back(sShaderDefines(Define, "1"));
+		}
 		auto pShader = Owner->CompileVkShader(Attachment, true);
 		//Shaders.push_back(pShader);
 
@@ -403,31 +559,62 @@ void VulkanPipeline::CompilePipeline()
 
 	VkDescriptorSetLayout Layout = Owner->GetBindlessDescriptorSetLayout();
 
-	std::vector<VkPushConstantRange> Ranges;
-	for (const auto& Layout : Desc.Bindings)
-	{
-		VkPushConstantRange pushConstantRange{};
-		pushConstantRange.stageFlags = VK_SHADER_STAGE_ALL;
-		pushConstantRange.offset = 0;
-		pushConstantRange.size = sizeof(std::uint32_t) * Layout.Size;
-		Ranges.push_back(pushConstantRange);
-	}
-
 	VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 	pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 
 	pipelineLayoutInfo.pSetLayouts = &Layout;
 	pipelineLayoutInfo.setLayoutCount = 1;
 
-	pipelineLayoutInfo.pushConstantRangeCount = (std::uint32_t)Ranges.size();
-	pipelineLayoutInfo.pPushConstantRanges = Ranges.data();
+	VkPhysicalDeviceProperties deviceProperties{};
+	vkGetPhysicalDeviceProperties(Owner->GetPhysicalDevice(), &deviceProperties);
+	std::vector<VkPushConstantRange> PushConstantRanges;
+	for (const auto& Binding : Desc.Bindings)
+	{
+		if (Binding.GetDescriptorType() == EDescriptorType::e32BitConstant)
+		{
+			VkPushConstantRange pushConstantRange{};
+			pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+			pushConstantRange.offset = 0;
+			pushConstantRange.size = deviceProperties.limits.maxPushConstantsSize;
+			PushConstantRanges.push_back(pushConstantRange);
+		}
+	}
+	pipelineLayoutInfo.pushConstantRangeCount = (std::uint32_t)PushConstantRanges.size();
+	pipelineLayoutInfo.pPushConstantRanges = PushConstantRanges.data();
 
 	vkCreatePipelineLayout(Owner->Get(), &pipelineLayoutInfo, nullptr, &PipelineLayout);
 
+	//if (Desc.IndirectLayoutBindingDesc.DrawType != EDrawTypes::Undefined &&	Desc.IndirectLayoutBindingDesc.NumArguments > 0)
+	//{
+	//	VkIndirectCommandsPushConstantTokenEXT pushToken{};
+	//	pushToken.updateRange = { VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, Desc.IndirectLayoutBindingDesc.Stride };
+
+	//	VkIndirectCommandsLayoutTokenEXT tokens[2]{};
+	//	tokens[0].sType = VK_STRUCTURE_TYPE_INDIRECT_COMMANDS_LAYOUT_TOKEN_EXT;
+	//	tokens[0].type = VK_INDIRECT_COMMANDS_TOKEN_TYPE_PUSH_CONSTANT_EXT;
+	//	tokens[0].data.pPushConstant = &pushToken;
+	//	tokens[0].offset = 0;
+
+	//	tokens[1].sType = VK_STRUCTURE_TYPE_INDIRECT_COMMANDS_LAYOUT_TOKEN_EXT;
+	//	tokens[1].type = VK_INDIRECT_COMMANDS_TOKEN_TYPE_DRAW_INDEXED_EXT;     // the action token must come last
+	//	tokens[1].offset = Desc.IndirectLayoutBindingDesc.Stride - sizeof(sObjectDrawParameters);
+
+	//	VkIndirectCommandsLayoutCreateInfoEXT info{ VK_STRUCTURE_TYPE_INDIRECT_COMMANDS_LAYOUT_CREATE_INFO_EXT };
+	//	info.flags = 0;                                                  // draws stay in sequence order
+	//	info.shaderStages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+	//	info.indirectStride = Desc.IndirectLayoutBindingDesc.Stride;
+	//	info.pipelineLayout = PipelineLayout;
+	//	info.tokenCount = 2;
+	//	info.pTokens = tokens;
+
+	//	auto Result = Owner->GetIndirectCommandsCreateLayout()(Owner->Get(), &info, nullptr, &layout);
+	//	bIsIndirectCommandAvailable = true;
+	//}
+
 	PipelineCreateInfo.layout = PipelineLayout;
 
-	PipelineCreateInfo.renderPass = RenderPass->Get();
-	PipelineCreateInfo.subpass = RenderPass->SubpassIndex();
+	PipelineCreateInfo.renderPass = VK_NULL_HANDLE; //RenderPass->Get();
+	//PipelineCreateInfo.subpass = RenderPass->SubpassIndex();
 
 	auto result = vkCreateGraphicsPipelines(Owner->Get(), nullptr, /*PipelineCache,*/ 1, &PipelineCreateInfo, nullptr, &Pipeline);
 

@@ -160,6 +160,8 @@ IShader::SharedPtr DXCShaderCompiler::CompileShader(const void* InCode, std::siz
         // Use DirectX memory layout for Vulkan resources
         Arguments.push_back(L"-fvk-use-dx-layout"); 
 
+        //Arguments.push_back(L"-fvk-support-nonzero-base-instance");
+
         // Specify the SPIR - V entry point name.Defaults to the HLSL entry point name.
         //Arguments.push_back(L"-fspv-entrypoint-name=");
         // Specify SPIR - V extension permitted to use
@@ -177,7 +179,7 @@ IShader::SharedPtr DXCShaderCompiler::CompileShader(const void* InCode, std::siz
         // Specify the target environment : vulkan1.0 (default), vulkan1.1, vulkan1.1spirv1.4, vulkan1.2, vulkan1.3, or universal1.5
         //Arguments.push_back(L"-fspv-target-env=");
         // Assume the legacy matrix order(row major) when accessing raw buffers(e.g., ByteAdddressBuffer)
-        //Arguments.push_back(L"-fspv-use-legacy-buffer-matrix-order");
+        Arguments.push_back(L"-fspv-use-legacy-buffer-matrix-order");
         // Apply fvk - *-shift to resources without an explicit register assignment.
         //Arguments.push_back(L"-fvk-auto-shift-bindings");
         // Specify Vulkan binding number shift for b - type register
@@ -237,21 +239,37 @@ IShader::SharedPtr DXCShaderCompiler::CompileShader(const void* InCode, std::siz
     //Arguments.push_back(L"-Gec");
 
     std::vector<std::wstring> Params;
-    for (const sShaderDefines& define : InDefines)
-    {
-        Arguments.push_back(L"-D");
-        std::string STR = define.Name + "=" + define.Definition;
-        std::wstring WSTR = FileManager::StringToWstring(STR).c_str();
-        Params.push_back(WSTR);
-        Arguments.push_back(Params.back().c_str());
-    }
-
     if (GPU::IsBindlessRendererEnabled())
     {
         Arguments.push_back(L"-D");
         std::string STR2 = std::string("BINDLESS") + std::string("=") + std::string("1");
         std::wstring WSTR2 = FileManager::StringToWstring(STR2).c_str();
         Params.push_back(WSTR2);
+        Arguments.push_back(Params.back().c_str());
+    }
+
+    if (Spirv || GPU::GetGIType() == EGITypes::Vulkan)
+    {
+        Arguments.push_back(L"-D");
+        std::string STR2 = std::string("VULKAN") + std::string("=") + std::string("1");
+        std::wstring WSTR2 = FileManager::StringToWstring(STR2).c_str();
+        Params.push_back(WSTR2);
+        Arguments.push_back(Params.back().c_str());
+    }
+    else if (GPU::GetGIType() == EGITypes::D3D11)
+    {
+        Arguments.push_back(L"-D");
+        std::string STR2 = std::string("D3D11") + std::string("=") + std::string("1");
+        std::wstring WSTR2 = FileManager::StringToWstring(STR2).c_str();
+        Params.push_back(WSTR2);
+        Arguments.push_back(Params.back().c_str());
+    }
+    for (const sShaderDefines& define : InDefines)
+    {
+        Arguments.push_back(L"-D");
+        std::string STR = define.Name + "=" + define.Definition;
+        std::wstring WSTR = FileManager::StringToWstring(STR).c_str();
+        Params.push_back(WSTR);
         Arguments.push_back(Params.back().c_str());
     }
 

@@ -217,12 +217,12 @@ bool D3D12CommandBuffer::ExecuteCommandList(ECommandContextExecuteType ExecuteTy
 	if (State != ECommandContextState::End)
 		return false;
 
-	const auto fenceValue = Owner->ExecuteDirectCommandLists(ExecuteType, Order, this /*CommandList.Get()*//*, bWaitForCompletion*/);
+	const auto fenceValue = Owner->ExecuteDirectCommandLists(ExecuteType, Order, this, ExecuteType == ECommandContextExecuteType::Immediate /*|| bWaitForCompletion*/);
 
 	if (ExecuteType == ECommandContextExecuteType::Immediate)
 	{
-		State = ECommandContextState::Waiting;
 		Owner->DiscardCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, CommandAllocator, fenceValue);
+		OnExecuteCommandList();
 	}
 	else if (ExecuteType == ECommandContextExecuteType::Deferred)
 	{
@@ -997,49 +997,6 @@ void D3D12CommandBuffer::SetUnorderedAccessBuffersAsResource(std::vector<IStruct
 {
 }
 
-void D3D12CommandBuffer::CopyBufferRegion(ID3D12Resource* Buffer, D3D12_RESOURCE_STATES State, ID3D12Resource* UploadBuffer, void* UploadData, BufferSubresource* Subresource)
-{
-	if (!Buffer || !UploadBuffer || !Subresource)
-		return;
-
-	memcpy((BYTE*)UploadData + Subresource->Location, Subresource->pSysMem, Subresource->Size);
-
-	const bool IsEnhancedBarriersSupported = Owner->IsEnhancedBarriersSupported();
-	if (IsEnhancedBarriersSupported)
-	{
-
-	}
-	else
-	{
-		D3D12_RESOURCE_BARRIER preCopyBarriers = CD3DX12_RESOURCE_BARRIER::Transition(Buffer, State, D3D12_RESOURCE_STATE_COPY_DEST);
-		CommandList->ResourceBarrier(1, &preCopyBarriers);
-	}
-
-	CommandList->CopyBufferRegion(Buffer, (UINT64)Subresource->Location, UploadBuffer, (UINT64)Subresource->Location, (UINT64)Subresource->Size);
-
-	if (IsEnhancedBarriersSupported)
-	{
-
-	}
-	else
-	{
-		D3D12_RESOURCE_BARRIER postCopyBarriers = CD3DX12_RESOURCE_BARRIER::Transition(Buffer, D3D12_RESOURCE_STATE_COPY_DEST, State);
-		CommandList->ResourceBarrier(1, &postCopyBarriers);
-	}
-}
-
-void D3D12CommandBuffer::UpdateBuffer(ID3D12Resource* Buffer, ID3D12Resource* UploadBuffer, BufferSubresource* Subresource)
-{
-	if (!Buffer || !UploadBuffer || !Subresource)
-		return;
-
-	D3D12_SUBRESOURCE_DATA SUBRESOURCE = {};
-	SUBRESOURCE.pData = Subresource->pSysMem;
-	SUBRESOURCE.RowPitch = Subresource->Size;
-	SUBRESOURCE.SlicePitch = Subresource->Location;
-	UpdateSubresources<1>(CommandList.Get(), Buffer, UploadBuffer, 0, 0, 1, &SUBRESOURCE);
-}
-
 void D3D12CommandBuffer::SetPipeline(IPipeline* Pipeline)
 {
 	if (Pipeline && CurrentPipeline != Pipeline)
@@ -1138,6 +1095,49 @@ void D3D12CommandBuffer::UpdateBufferSubresource(IIndexBuffer* Buffer, std::size
 	Subresource.Size = Size;
 
 	static_cast<D3D12IndexBuffer*>(Buffer)->UpdateSubresource(&Subresource, this);
+}
+
+void D3D12CommandBuffer::CopyBufferRegion(ID3D12Resource* Buffer, D3D12_RESOURCE_STATES State, ID3D12Resource* UploadBuffer, void* UploadData, BufferSubresource* Subresource)
+{
+	if (!Buffer || !UploadBuffer || !Subresource)
+		return;
+
+	memcpy((BYTE*)UploadData + Subresource->Location, Subresource->pSysMem, Subresource->Size);
+
+	const bool IsEnhancedBarriersSupported = Owner->IsEnhancedBarriersSupported();
+	if (IsEnhancedBarriersSupported)
+	{
+
+	}
+	else
+	{
+		D3D12_RESOURCE_BARRIER preCopyBarriers = CD3DX12_RESOURCE_BARRIER::Transition(Buffer, State, D3D12_RESOURCE_STATE_COPY_DEST);
+		CommandList->ResourceBarrier(1, &preCopyBarriers);
+	}
+
+	CommandList->CopyBufferRegion(Buffer, (UINT64)Subresource->Location, UploadBuffer, (UINT64)Subresource->Location, (UINT64)Subresource->Size);
+
+	if (IsEnhancedBarriersSupported)
+	{
+
+	}
+	else
+	{
+		D3D12_RESOURCE_BARRIER postCopyBarriers = CD3DX12_RESOURCE_BARRIER::Transition(Buffer, D3D12_RESOURCE_STATE_COPY_DEST, State);
+		CommandList->ResourceBarrier(1, &postCopyBarriers);
+	}
+}
+
+void D3D12CommandBuffer::UpdateBuffer(ID3D12Resource* Buffer, ID3D12Resource* UploadBuffer, BufferSubresource* Subresource)
+{
+	if (!Buffer || !UploadBuffer || !Subresource)
+		return;
+
+	D3D12_SUBRESOURCE_DATA SUBRESOURCE = {};
+	SUBRESOURCE.pData = Subresource->pSysMem;
+	SUBRESOURCE.RowPitch = Subresource->Size;
+	SUBRESOURCE.SlicePitch = Subresource->Location;
+	UpdateSubresources<1>(CommandList.Get(), Buffer, UploadBuffer, 0, 0, 1, &SUBRESOURCE);
 }
 
 void D3D12CommandBuffer::Set32BitConstant(std::uint32_t RootParameterIndex, std::uint32_t SrcData, std::uint32_t DestOffsetIn32BitValues)

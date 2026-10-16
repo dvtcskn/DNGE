@@ -25,6 +25,13 @@
 */
 
 #include "pch.h"
+#include <filesystem>
+#include <cwctype>
+#include <algorithm>
+#include <cstring>
+#include <vector>
+#include <fstream>
+#include <span>
 #include "VulkanTexture.h"
 #include "VulkanException.h"
 #include "VulkanFormat.h"
@@ -33,8 +40,6 @@
 #include "DDSTextureLoader_Vulkan.h"
 #include "WICTextureLoader_Vulkan.h"
 #include "VulkanCommandBuffer.h"
-#include <fstream>
-#include <span>
 
 static std::uint32_t vkBytesPerPixel(VkFormat Format)
 {
@@ -81,6 +86,15 @@ VulkanTexture::VulkanTexture(VulkanDevice* Device, const std::wstring FilePath, 
 
 		VkBuffer stagingBuffer = nullptr;
 		VkDeviceMemory stagingBufferMemory = nullptr;
+		/*int stagingCleanupToken = 0;
+		auto stagingCleanup = [Device, &stagingBuffer, &stagingBufferMemory](void*) noexcept
+		{
+			if (stagingBuffer != VK_NULL_HANDLE)
+				vkDestroyBuffer(Device->Get(), stagingBuffer, nullptr);
+			if (stagingBufferMemory != VK_NULL_HANDLE)
+				vkFreeMemory(Device->Get(), stagingBufferMemory, nullptr);
+		};
+		std::unique_ptr<void, decltype(stagingCleanup)> stagingCleanupGuard(&stagingCleanupToken, stagingCleanup);*/
 
 		{
 			VkBufferCreateInfo bufferInfo = {};
@@ -135,8 +149,10 @@ VulkanTexture::VulkanTexture(VulkanDevice* Device, const std::wstring FilePath, 
 
 		//transitioned to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL while generating mipmaps
 
-		vkDestroyBuffer(Device->Get(), stagingBuffer, nullptr);
-		vkFreeMemory(Device->Get(), stagingBufferMemory, nullptr);
+		GPU::WaitForCPU();
+		GPU::WaitForGPU();
+		vkDestroyBuffer(Owner->Get(), stagingBuffer, nullptr);
+		vkFreeMemory(Owner->Get(), stagingBufferMemory, nullptr);
 
 		VkImageViewCreateInfo viewInfo = {};
 		viewInfo.sType = VkStructureType::VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -236,6 +252,8 @@ VulkanTexture::VulkanTexture(VulkanDevice* Device, const std::wstring FilePath, 
 
 		//transitioned to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL while generating mipmaps
 
+		GPU::WaitForCPU();
+		GPU::WaitForGPU();
 		vkDestroyBuffer(Owner->Get(), stagingBuffer, nullptr);
 		vkFreeMemory(Owner->Get(), stagingBufferMemory, nullptr);
 
@@ -258,8 +276,9 @@ VulkanTexture::VulkanTexture(VulkanDevice* Device, const std::wstring FilePath, 
 	{
 		DescriptorImageInfo.imageLayout = VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		DescriptorImageInfo.imageView = View;
-		VulkanStaticSamplerState Sampler = VulkanStaticSamplerState(sSamplerAttributeDesc(ESamplerStateMode::AnisotropicWrap));
-		DescriptorImageInfo.sampler = Sampler.Get(Owner->Get());
+		//VulkanStaticSamplerState Sampler = VulkanStaticSamplerState(sSamplerAttributeDesc(ESamplerStateMode::AnisotropicWrap));
+		//DescriptorImageInfo.sampler = Sampler.Get(Owner->Get());
+		Owner->UpdateBindlessImageDescriptor(HeapIndex, &DescriptorImageInfo);
 	}
 
 	{
@@ -268,12 +287,253 @@ VulkanTexture::VulkanTexture(VulkanDevice* Device, const std::wstring FilePath, 
 	}
 }
 
+/*VulkanTexture::VulkanTexture(VulkanDevice* Device, const std::wstring FilePath, const std::string InName, std::uint32_t InRootParameterIndex)
+	: Super()
+	, Owner(Device)
+	, Name(InName)
+	, Path(FilePath)
+	, Desc(sTextureDesc())
+	, CurrentLayout(VkImageLayout::VK_IMAGE_LAYOUT_UNDEFINED)
+	, RootParameterIndex(InRootParameterIndex)
+	, Image(VK_NULL_HANDLE)
+	, View(VK_NULL_HANDLE)
+	, Memory(VK_NULL_HANDLE)
+	, HeapIndex(std::uint32_t(-1))
+{
+	if (!Device)
+		throw std::invalid_argument("VulkanTexture requires a valid device.");
+
+	try
+	{
+		// Determine the file type without assuming the path has a four-character suffix.
+		std::wstring extension = std::filesystem::path(FilePath).extension().wstring();
+		std::transform(extension.begin(), extension.end(), extension.begin(), [](wchar_t c) { return static_cast<wchar_t>(std::towlower(c)); });
+
+		const bool isDDS = (extension == L".dds");
+
+		std::unique_ptr<std::uint8_t[]> decodedData;
+		std::vector<TextureSubresource> ddsSubresources;
+		TextureSubresource wicSubresource{};
+		bool isCubeMap = false;
+
+		HRESULT loadResult = E_FAIL;
+		if (isDDS)
+		{
+			loadResult = Vulkan::LoadDDSTextureFromFile(Device, FilePath.c_str(), &Image, Memory, Desc, decodedData, ddsSubresources, 0, nullptr, &isCubeMap);
+
+			if (FAILED(loadResult))
+				throw std::runtime_error("DDS texture load failed.");
+
+			if (isCubeMap || Desc.ArraySize != 1)
+				throw std::runtime_error("This VulkanTexture constructor supports only single-layer 2D DDS textures.");
+		}
+		else
+		{
+			loadResult = Vulkan::LoadWICTextureFromFile(Device, FilePath.c_str(), &Image, Memory, Desc, decodedData, wicSubresource);
+
+			if (FAILED(loadResult))
+				throw std::runtime_error("WIC texture load failed.");
+
+			//auto WideStringToString = [](const std::wstring& s) -> std::string
+			//{
+			//	int len;
+			//	int slength = (int)s.length() + 1;
+			//	len = WideCharToMultiByte(0, 0, s.c_str(), slength, 0, 0, 0, 0);
+			//	std::string r(len, '\0');
+			//	WideCharToMultiByte(0, 0, s.c_str(), slength, &r[0], len, 0, 0);
+			//	return r;
+			//};
+			//int texWidth, texHeight, texChannels;
+			//stbi_uc* pixels = nullptr;
+			//pixels = stbi_load(WideStringToString(FilePath).c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+			//VkDeviceSize imageSize = texWidth * texHeight;
+
+			//wicSubresource.pData = pixels;
+			//wicSubresource.RowPitch = vkBytesPerPixel(ConvertFormat_Format_To_VkFormat(Desc.Format));
+			//wicSubresource.SlicePitch = static_cast<LONG>(imageSize) * vkBytesPerPixel(ConvertFormat_Format_To_VkFormat(Desc.Format));
+
+			//if (!pixels) 
+			//{
+			//	throw std::runtime_error("failed to load texture image!");
+			//}
+			//stbi_image_free(pixels);
+		}
+
+		if (Image == VK_NULL_HANDLE || Memory == VK_NULL_HANDLE || Desc.Dimensions.X == 0 || Desc.Dimensions.Y == 0 || Desc.MipLevels == 0)
+		{
+			throw std::runtime_error("Texture loader returned an invalid image.");
+		}
+
+		struct UploadRegion
+		{
+			const void* Data;
+			std::size_t Size;
+			VkBufferImageCopy Copy;
+		};
+
+		std::vector<UploadRegion> uploads;
+		VkDeviceSize stagingSize = 0;
+
+		const std::size_t uploadCount = isDDS ? ddsSubresources.size() : 1;
+		if (uploadCount == 0 || (isDDS && uploadCount != Desc.MipLevels))
+			throw std::runtime_error("Texture subresource data does not match its mip count.");
+
+		uploads.reserve(uploadCount);
+
+		for (std::size_t mip = 0; mip < uploadCount; ++mip)
+		{
+			const TextureSubresource& subresource = isDDS ? ddsSubresources[mip] : wicSubresource;
+
+			if (!subresource.pData || subresource.SlicePitch <= 0)
+				throw std::runtime_error("Texture loader returned an invalid subresource.");
+
+			// VkBufferImageCopy offsets must be suitably aligned. Four bytes is
+			// sufficient for the formats handled by these loaders.
+			stagingSize = (stagingSize + 3u) & ~VkDeviceSize(3u);
+
+			VkBufferImageCopy copy{};
+			copy.bufferOffset = stagingSize;
+			copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			copy.imageSubresource.mipLevel = static_cast<std::uint32_t>(mip);
+			copy.imageSubresource.baseArrayLayer = 0;
+			copy.imageSubresource.layerCount = 1;
+			copy.imageExtent.width = std::max(1u, Desc.Dimensions.X >> mip);
+			copy.imageExtent.height = std::max(1u, Desc.Dimensions.Y >> mip);
+			copy.imageExtent.depth = 1;
+
+			const auto size = static_cast<std::size_t>(subresource.SlicePitch);
+			uploads.push_back({ subresource.pData, size, copy });
+			stagingSize += static_cast<VkDeviceSize>(size);
+		}
+
+		VkBuffer stagingBuffer = VK_NULL_HANDLE;
+		VkDeviceMemory stagingMemory = VK_NULL_HANDLE;
+		int cleanupToken = 0;
+		auto cleanupStaging = [device = Device->Get(), &stagingBuffer, &stagingMemory](void*) noexcept
+			{
+				if (stagingBuffer != VK_NULL_HANDLE)
+					vkDestroyBuffer(device, stagingBuffer, nullptr);
+				if (stagingMemory != VK_NULL_HANDLE)
+					vkFreeMemory(device, stagingMemory, nullptr);
+			};
+		std::unique_ptr<void, decltype(cleanupStaging)> stagingGuard(&cleanupToken, cleanupStaging);
+
+		VkBufferCreateInfo bufferInfo{};
+		bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+		bufferInfo.size = stagingSize;
+		bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+		bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		VK_CHECK(vkCreateBuffer(Device->Get(), &bufferInfo, nullptr, &stagingBuffer));
+
+		VkMemoryRequirements requirements{};
+		vkGetBufferMemoryRequirements(Device->Get(), stagingBuffer, &requirements);
+
+		VkMemoryAllocateInfo allocationInfo{};
+		allocationInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		allocationInfo.allocationSize = requirements.size;
+		allocationInfo.memoryTypeIndex = Device->GetMemoryType(requirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+		VK_CHECK(vkAllocateMemory(Device->Get(), &allocationInfo, nullptr, &stagingMemory));
+		VK_CHECK(vkBindBufferMemory(Device->Get(), stagingBuffer, stagingMemory, 0));
+
+		void* mapped = nullptr;
+		VK_CHECK(vkMapMemory(Device->Get(), stagingMemory, 0, stagingSize, 0, &mapped));
+
+		for (const UploadRegion& upload : uploads)
+			std::memcpy(static_cast<std::uint8_t*>(mapped) + upload.Copy.bufferOffset, upload.Data, upload.Size);
+
+		vkUnmapMemory(Device->Get(), stagingMemory);
+
+		TransitionImageLayout(
+			Image, 
+			ConvertFormat_Format_To_VkFormat(Desc.Format),
+			VkImageLayout::VK_IMAGE_LAYOUT_UNDEFINED,
+			VkImageLayout::VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			Desc.MipLevels);
+
+		{
+			auto commandBuffer = Owner->GetIMCommandBuffer();
+			Owner->GetIMCommandBuffer()->BeginRecordCommandList();
+
+			std::vector<VkBufferImageCopy> copyRegions;
+			copyRegions.reserve(uploads.size());
+			for (const UploadRegion& upload : uploads)
+				copyRegions.push_back(upload.Copy);
+
+			vkCmdCopyBufferToImage(commandBuffer->Get(), stagingBuffer, Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, static_cast<std::uint32_t>(copyRegions.size()), copyRegions.data());
+
+			Owner->GetIMCommandBuffer()->FinishRecordCommandList();
+			Owner->GetIMCommandBuffer()->ExecuteCommandList();
+		}
+
+		if (isDDS)
+		{
+			TransitionImageLayout(
+				Image,
+				ConvertFormat_Format_To_VkFormat(Desc.Format),
+				VkImageLayout::VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+				VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+				Desc.MipLevels);
+		}
+		else
+		{
+			GenerateMipmaps(
+				Image,
+				ConvertFormat_Format_To_VkFormat(Desc.Format),
+				static_cast<std::int32_t>(Desc.Dimensions.X),
+				static_cast<std::int32_t>(Desc.Dimensions.Y),
+				Desc.MipLevels);
+
+			CurrentLayout = VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		}
+
+		VkImageViewCreateInfo viewInfo{};
+		viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		viewInfo.image = Image;
+		viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		viewInfo.format = ConvertFormat_Format_To_VkFormat(Desc.Format);
+		viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		viewInfo.subresourceRange.baseMipLevel = 0;
+		viewInfo.subresourceRange.levelCount = Desc.MipLevels;
+		viewInfo.subresourceRange.baseArrayLayer = 0;
+		viewInfo.subresourceRange.layerCount = 1;
+		VK_CHECK(vkCreateImageView(Device->Get(), &viewInfo, nullptr, &View));
+
+		auto SamplerDesc = sSamplerAttributeDesc(ESamplerStateMode::AnisotropicWrap);
+		DescriptorImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		DescriptorImageInfo.imageView = View;
+		VulkanStaticSamplerState sampler(SamplerDesc);
+		//BDescriptorImageInfo.sampler = sampler.Get(Device->Get());
+		Owner->UpdateBindlessImageDescriptor(HeapIndex, &DescriptorImageInfo);
+
+#if _DEBUG
+		const std::string resourceName = "VulkanTexture::" + Name;
+		Device->SetResourceName(VK_OBJECT_TYPE_IMAGE, reinterpret_cast<std::uint64_t>(Image), resourceName.c_str());
+#endif
+	}
+	catch (...)
+	{
+		if (View != VK_NULL_HANDLE)
+			vkDestroyImageView(Device->Get(), View, nullptr);
+		if (Image != VK_NULL_HANDLE)
+			vkDestroyImage(Device->Get(), Image, nullptr);
+		if (Memory != VK_NULL_HANDLE)
+			vkFreeMemory(Device->Get(), Memory, nullptr);
+
+		View = VK_NULL_HANDLE;
+		Image = VK_NULL_HANDLE;
+		Memory = VK_NULL_HANDLE;
+		throw;
+	}
+}*/
+
 VulkanTexture::VulkanTexture(VulkanDevice* Device, const std::string InName, void* InBuffer, const std::size_t __InSize, const sTextureDesc& InDesc, std::uint32_t InRootParameterIndex)
 	: Owner(Device)
 	, Name(InName)
 	, Path(L"")
 	, Desc(InDesc)
 	, RootParameterIndex(InRootParameterIndex)
+	, HeapIndex(std::uint32_t(-1))
 {
 	Desc.MipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(InDesc.Dimensions.X, InDesc.Dimensions.Y)))) + 1;
 
@@ -366,6 +626,7 @@ VulkanTexture::VulkanTexture(VulkanDevice* Device, const std::string InName, voi
 		//SamplerDesc.Filter = ESamplerFilter::AnisotropicLinear;
 		VulkanStaticSamplerState Sampler = VulkanStaticSamplerState(SamplerDesc);
 		DescriptorImageInfo.sampler = Sampler.Get(Owner->Get());
+		Owner->UpdateBindlessImageDescriptor(HeapIndex, &DescriptorImageInfo);
 	}
 
 	{
@@ -380,6 +641,7 @@ VulkanTexture::VulkanTexture(VulkanDevice* Device, const std::string InName, con
 	, Path(L"")
 	, Desc(InDesc)
 	, RootParameterIndex(InRootParameterIndex)
+	, HeapIndex(std::uint32_t(-1))
 {
 	Desc.MipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(InDesc.Dimensions.X, InDesc.Dimensions.Y)))) + 1;
 
@@ -423,12 +685,23 @@ VulkanTexture::VulkanTexture(VulkanDevice* Device, const std::string InName, con
 		DescriptorImageInfo.imageView = View;
 		VulkanStaticSamplerState Sampler = VulkanStaticSamplerState(sSamplerAttributeDesc(ESamplerStateMode::AnisotropicWrap));
 		DescriptorImageInfo.sampler = Sampler.Get(Owner->Get());
+		Owner->UpdateBindlessImageDescriptor(HeapIndex, &DescriptorImageInfo);
 	}
 
 	{
 		std::string STR = std::string("VulkanTexture::") + Name.c_str();
 		Device->SetResourceName(VkObjectType::VK_OBJECT_TYPE_IMAGE, reinterpret_cast<std::uint64_t>(Image), STR.c_str());
 	}
+}
+
+VulkanTexture::~VulkanTexture()
+{
+	vkDestroyImage(Owner->Get(), Image, nullptr);
+	vkDestroyImageView(Owner->Get(), View, nullptr);
+	vkFreeMemory(Owner->Get(), Memory, nullptr);
+	Image = nullptr;
+	View = nullptr;
+	Owner = nullptr;
 }
 
 void VulkanTexture::UpdateTexture(ITexture2D* SourceTexture, std::size_t SourceArrayIndex, std::size_t ArrayIndex, const std::optional<IntVector2> Dest, const std::optional<FBounds2D> TargetBounds)
@@ -447,7 +720,7 @@ void VulkanTexture::UpdateTexture(ITexture2D* SourceTexture, std::size_t SourceA
 		);
 		CurrentLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 		Owner->GetIMCommandBuffer()->FinishRecordCommandList();
-		Owner->GetIMCommandBuffer()->ExecuteWithWait();
+		Owner->GetIMCommandBuffer()->ExecuteCommandList();
 	}
 	{
 		Owner->GetIMCommandBuffer()->BeginRecordCommandList();
@@ -462,7 +735,7 @@ void VulkanTexture::UpdateTexture(ITexture2D* SourceTexture, std::size_t SourceA
 		);
 		Texure->CurrentLayout = VK_IMAGE_LAYOUT_GENERAL;
 		Owner->GetIMCommandBuffer()->FinishRecordCommandList();
-		Owner->GetIMCommandBuffer()->ExecuteWithWait();
+		Owner->GetIMCommandBuffer()->ExecuteCommandList();
 	}
 	VkImageCopy Copy = {};
 	Copy.dstOffset.x = 0;
@@ -486,7 +759,7 @@ void VulkanTexture::UpdateTexture(ITexture2D* SourceTexture, std::size_t SourceA
 	Owner->GetIMCommandBuffer()->BeginRecordCommandList();
 	vkCmdCopyImage(Owner->GetIMCommandBuffer()->Get(), Texure->Image, Texure->CurrentLayout, Image, CurrentLayout, 1, &Copy);
 	Owner->GetIMCommandBuffer()->FinishRecordCommandList();
-	Owner->GetIMCommandBuffer()->ExecuteWithWait();
+	Owner->GetIMCommandBuffer()->ExecuteCommandList();
 
 	{
 		Owner->GetIMCommandBuffer()->BeginRecordCommandList();
@@ -501,7 +774,7 @@ void VulkanTexture::UpdateTexture(ITexture2D* SourceTexture, std::size_t SourceA
 		);
 		CurrentLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		Owner->GetIMCommandBuffer()->FinishRecordCommandList();
-		Owner->GetIMCommandBuffer()->ExecuteWithWait();
+		Owner->GetIMCommandBuffer()->ExecuteCommandList();
 	}
 	{
 		Owner->GetIMCommandBuffer()->BeginRecordCommandList();
@@ -516,7 +789,7 @@ void VulkanTexture::UpdateTexture(ITexture2D* SourceTexture, std::size_t SourceA
 		);
 		Texure->CurrentLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		Owner->GetIMCommandBuffer()->FinishRecordCommandList();
-		Owner->GetIMCommandBuffer()->ExecuteWithWait();
+		Owner->GetIMCommandBuffer()->ExecuteCommandList();
 	}
 }
 
@@ -628,11 +901,12 @@ void VulkanTexture::SaveToFile(std::wstring InPath) const
 
 void VulkanTexture::GenerateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32_t mipLevels)
 {
-	VkCommandBuffer commandBuffer = Owner->GetIMCommandBuffer()->Get();
+	auto commandBuffer = Owner->GetIMCommandBuffer();
 
-	VkCommandBufferBeginInfo cmdBufInfo = {};
-	cmdBufInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-	vkBeginCommandBuffer(commandBuffer, &cmdBufInfo);
+	//VkCommandBufferBeginInfo cmdBufInfo = {};
+	//cmdBufInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	//VK_CHECK(vkBeginCommandBuffer(commandBuffer, &cmdBufInfo));
+	commandBuffer->BeginRecordCommandList();
 
 	VkImageMemoryBarrier barrier = {};
 	barrier.sType = VkStructureType::VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -655,7 +929,7 @@ void VulkanTexture::GenerateMipmaps(VkImage image, VkFormat imageFormat, int32_t
 		barrier.srcAccessMask = VkAccessFlagBits::VK_ACCESS_TRANSFER_WRITE_BIT;
 		barrier.dstAccessMask = VkAccessFlagBits::VK_ACCESS_TRANSFER_READ_BIT;
 
-		vkCmdPipelineBarrier(commandBuffer, VkPipelineStageFlagBits::VK_PIPELINE_STAGE_TRANSFER_BIT, VkPipelineStageFlagBits::VK_PIPELINE_STAGE_TRANSFER_BIT, VkDependencyFlagBits::VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 1, &barrier);
+		vkCmdPipelineBarrier(commandBuffer->Get(), VkPipelineStageFlagBits::VK_PIPELINE_STAGE_TRANSFER_BIT, VkPipelineStageFlagBits::VK_PIPELINE_STAGE_TRANSFER_BIT, VkDependencyFlagBits::VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 1, &barrier);
 
 		VkImageBlit blit = {};
 		blit.srcOffsets[0] = VkOffset3D(0, 0, 0);
@@ -671,14 +945,14 @@ void VulkanTexture::GenerateMipmaps(VkImage image, VkFormat imageFormat, int32_t
 		blit.dstSubresource.baseArrayLayer = 0;
 		blit.dstSubresource.layerCount = 1;
 
-		vkCmdBlitImage(commandBuffer, image, VkImageLayout::VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, image, VkImageLayout::VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VkFilter::VK_FILTER_LINEAR);
+		vkCmdBlitImage(commandBuffer->Get(), image, VkImageLayout::VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, image, VkImageLayout::VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VkFilter::VK_FILTER_LINEAR);
 
 		barrier.oldLayout = VkImageLayout::VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
 		barrier.newLayout = VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		barrier.srcAccessMask = VkAccessFlagBits::VK_ACCESS_TRANSFER_READ_BIT;
 		barrier.dstAccessMask = VkAccessFlagBits::VK_ACCESS_SHADER_READ_BIT;
 
-		vkCmdPipelineBarrier(commandBuffer, VkPipelineStageFlagBits::VK_PIPELINE_STAGE_TRANSFER_BIT, VkPipelineStageFlagBits::VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VkDependencyFlagBits::VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 1, &barrier);
+		vkCmdPipelineBarrier(commandBuffer->Get(), VkPipelineStageFlagBits::VK_PIPELINE_STAGE_TRANSFER_BIT, VkPipelineStageFlagBits::VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VkDependencyFlagBits::VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 1, &barrier);
 
 		if (mipWidth > 1) mipWidth /= 2;
 		if (mipHeight > 1) mipHeight /= 2;
@@ -690,11 +964,13 @@ void VulkanTexture::GenerateMipmaps(VkImage image, VkFormat imageFormat, int32_t
 	barrier.srcAccessMask = VkAccessFlagBits::VK_ACCESS_TRANSFER_WRITE_BIT;
 	barrier.dstAccessMask = VkAccessFlagBits::VK_ACCESS_SHADER_READ_BIT;
 
-	vkCmdPipelineBarrier(commandBuffer, VkPipelineStageFlagBits::VK_PIPELINE_STAGE_TRANSFER_BIT, VkPipelineStageFlagBits::VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VkDependencyFlagBits::VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 1, &barrier);
+	vkCmdPipelineBarrier(commandBuffer->Get(), VkPipelineStageFlagBits::VK_PIPELINE_STAGE_TRANSFER_BIT, VkPipelineStageFlagBits::VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VkDependencyFlagBits::VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 1, &barrier);
 
-	vkEndCommandBuffer(commandBuffer);
+	//VK_CHECK(vkEndCommandBuffer(commandBuffer));
+	commandBuffer->FinishRecordCommandList();
+	commandBuffer->ExecuteCommandList();
 
-	VkSubmitInfo submitInfo = {};
+	/*VkSubmitInfo submitInfo = {};
 	submitInfo.sType = VkStructureType::VK_STRUCTURE_TYPE_SUBMIT_INFO;
 	submitInfo.commandBufferCount = 1;
 	submitInfo.pCommandBuffers = &commandBuffer;
@@ -702,24 +978,30 @@ void VulkanTexture::GenerateMipmaps(VkImage image, VkFormat imageFormat, int32_t
 	// Create fence to ensure that the command buffer has finished executing
 	VkFenceCreateInfo fenceInfo = {};
 	fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-	VkFence fence;
-	vkCreateFence(Owner->Get(), &fenceInfo, nullptr, &fence);
+	VkFence fence = VK_NULL_HANDLE;
+	VK_CHECK(vkCreateFence(Owner->Get(), &fenceInfo, nullptr, &fence));
+	int fenceCleanupToken = 0;
+	auto fenceCleanup = [device = Owner->Get(), fence](void*) noexcept
+	{
+		vkDestroyFence(device, fence, nullptr);
+	};
+	std::unique_ptr<void, decltype(fenceCleanup)> fenceCleanupGuard(&fenceCleanupToken, fenceCleanup);
 
 	// Submit to the queue
-	vkQueueSubmit(Owner->GetQueue(), 1, &submitInfo, fence);
+	VK_CHECK(vkQueueSubmit(Owner->GetQueue(), 1, &submitInfo, fence));
 
 	// Wait for the fence to signal that command buffer has finished executing
-	vkWaitForFences(Owner->Get(), 1, &fence, VK_TRUE, 1000000000);
-	vkDestroyFence(Owner->Get(), fence, nullptr);
+	VK_CHECK(vkWaitForFences(Owner->Get(), 1, &fence, VK_TRUE, UINT64_MAX));*/
 }
 
 void VulkanTexture::TransitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels)
 {
-	VkCommandBuffer commandBuffer = Owner->GetIMCommandBuffer()->Get();
+	auto commandBuffer = Owner->GetIMCommandBuffer();
 
-	VkCommandBufferBeginInfo cmdBufInfo = {};
-	cmdBufInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-	vkBeginCommandBuffer(commandBuffer, &cmdBufInfo);
+	//VkCommandBufferBeginInfo cmdBufInfo = {};
+	//cmdBufInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	//VK_CHECK(vkBeginCommandBuffer(commandBuffer, &cmdBufInfo));
+	commandBuffer->BeginRecordCommandList();
 
 	VkImageMemoryBarrier barrier = {};
 	barrier.sType = VkStructureType::VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -757,13 +1039,15 @@ void VulkanTexture::TransitionImageLayout(VkImage image, VkFormat format, VkImag
 		throw std::invalid_argument("unsupported layout transition!");
 	}
 
-	vkCmdPipelineBarrier(commandBuffer, sourceStage, destinationStage, VkDependencyFlagBits::VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 1, &barrier);
+	vkCmdPipelineBarrier(commandBuffer->Get(), sourceStage, destinationStage, VkDependencyFlagBits::VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 1, &barrier);
 
 	CurrentLayout = newLayout;
 
-	vkEndCommandBuffer(commandBuffer);
+	//VK_CHECK(vkEndCommandBuffer(commandBuffer));
+	commandBuffer->FinishRecordCommandList();
+	commandBuffer->ExecuteCommandList();
 
-	VkSubmitInfo submitInfo = {};
+	/*VkSubmitInfo submitInfo = {};
 	submitInfo.sType = VkStructureType::VK_STRUCTURE_TYPE_SUBMIT_INFO;
 	submitInfo.commandBufferCount = 1;
 	submitInfo.pCommandBuffers = &commandBuffer;
@@ -771,24 +1055,30 @@ void VulkanTexture::TransitionImageLayout(VkImage image, VkFormat format, VkImag
 	// Create fence to ensure that the command buffer has finished executing
 	VkFenceCreateInfo fenceInfo = {};
 	fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-	VkFence fence;
-	vkCreateFence(Owner->Get(), &fenceInfo, nullptr, &fence);
+	VkFence fence = VK_NULL_HANDLE;
+	VK_CHECK(vkCreateFence(Owner->Get(), &fenceInfo, nullptr, &fence));
+	int fenceCleanupToken = 0;
+	auto fenceCleanup = [device = Owner->Get(), fence](void*) noexcept
+	{
+		vkDestroyFence(device, fence, nullptr);
+	};
+	std::unique_ptr<void, decltype(fenceCleanup)> fenceCleanupGuard(&fenceCleanupToken, fenceCleanup);
 
 	// Submit to the queue
-	vkQueueSubmit(Owner->GetQueue(), 1, &submitInfo, fence);
+	VK_CHECK(vkQueueSubmit(Owner->GetQueue(), 1, &submitInfo, fence));
 
 	// Wait for the fence to signal that command buffer has finished executing
-	vkWaitForFences(Owner->Get(), 1, &fence, VK_TRUE, 1000000000);
-	vkDestroyFence(Owner->Get(), fence, nullptr);
+	VK_CHECK(vkWaitForFences(Owner->Get(), 1, &fence, VK_TRUE, UINT64_MAX));*/
 }
 
 void VulkanTexture::CopyBufferToImage(VkBuffer buffer, VkImage image, std::uint32_t width, std::uint32_t height, std::int32_t OffsetX, std::int32_t OffsetY)
 {
-	VkCommandBuffer commandBuffer = Owner->GetIMCommandBuffer()->Get();
+	auto commandBuffer = Owner->GetIMCommandBuffer();
 
-	VkCommandBufferBeginInfo cmdBufInfo = {};
-	cmdBufInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-	vkBeginCommandBuffer(commandBuffer, &cmdBufInfo);
+	//VkCommandBufferBeginInfo cmdBufInfo = {};
+	//cmdBufInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	//VK_CHECK(vkBeginCommandBuffer(commandBuffer, &cmdBufInfo));
+	commandBuffer->BeginRecordCommandList();
 
 	VkBufferImageCopy region = {};
 	region.bufferOffset = 0;
@@ -805,11 +1095,13 @@ void VulkanTexture::CopyBufferToImage(VkBuffer buffer, VkImage image, std::uint3
 		1
 	};
 
-	vkCmdCopyBufferToImage(commandBuffer, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+	vkCmdCopyBufferToImage(commandBuffer->Get(), buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
-	vkEndCommandBuffer(commandBuffer);
+	//VK_CHECK(vkEndCommandBuffer(commandBuffer));
+	commandBuffer->FinishRecordCommandList();
+	commandBuffer->ExecuteCommandList();
 
-	VkSubmitInfo submitInfo = {};
+	/*VkSubmitInfo submitInfo = {};
 	submitInfo.sType = VkStructureType::VK_STRUCTURE_TYPE_SUBMIT_INFO;
 	submitInfo.commandBufferCount = 1;
 	submitInfo.pCommandBuffers = &commandBuffer;
@@ -817,15 +1109,20 @@ void VulkanTexture::CopyBufferToImage(VkBuffer buffer, VkImage image, std::uint3
 	// Create fence to ensure that the command buffer has finished executing
 	VkFenceCreateInfo fenceInfo = {};
 	fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-	VkFence fence;
-	vkCreateFence(Owner->Get(), &fenceInfo, nullptr, &fence);
+	VkFence fence = VK_NULL_HANDLE;
+	VK_CHECK(vkCreateFence(Owner->Get(), &fenceInfo, nullptr, &fence));
+	int fenceCleanupToken = 0;
+	auto fenceCleanup = [device = Owner->Get(), fence](void*) noexcept
+	{
+		vkDestroyFence(device, fence, nullptr);
+	};
+	std::unique_ptr<void, decltype(fenceCleanup)> fenceCleanupGuard(&fenceCleanupToken, fenceCleanup);
 
 	// Submit to the queue
-	vkQueueSubmit(Owner->GetQueue(), 1, &submitInfo, fence);
+	VK_CHECK(vkQueueSubmit(Owner->GetQueue(), 1, &submitInfo, fence));
 
 	// Wait for the fence to signal that command buffer has finished executing
-	vkWaitForFences(Owner->Get(), 1, &fence, VK_TRUE, 1000000000);
-	vkDestroyFence(Owner->Get(), fence, nullptr);
+	VK_CHECK(vkWaitForFences(Owner->Get(), 1, &fence, VK_TRUE, UINT64_MAX));*/
 }
 
 void VulkanTexture::CreateImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory)

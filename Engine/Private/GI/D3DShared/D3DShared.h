@@ -456,7 +456,7 @@ namespace
 
 	inline bool IsDXGIDepthSRVSupported(const DXGI_FORMAT Format)
 	{
-		return Format == DXGI_FORMAT_R16_FLOAT || Format == DXGI_FORMAT_R32_FLOAT || DXGI_FORMAT_R32_TYPELESS; /* || Format == DXGI_FORMAT_R32_FLOAT*/
+		return Format == DXGI_FORMAT_R16_FLOAT || Format == DXGI_FORMAT_R32_FLOAT || Format == DXGI_FORMAT_R32_TYPELESS; /* || Format == DXGI_FORMAT_R32_FLOAT*/
 	};
 
 	inline auto GetDXGIDepthSRVFormat = [](const DXGI_FORMAT Format) -> DXGI_FORMAT

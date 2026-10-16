@@ -137,6 +137,7 @@ namespace GameMaterials
 
 		{
 			sPipelineDesc pPipelineDesc;
+			pPipelineDesc.RenderPass = ERenderPass::UI;
 			pPipelineDesc.BlendAttribute = sBlendAttributeDesc(EBlendStateMode::Opaque);
 			for (std::uint32_t i = 0; i < 8; i++)
 			{
@@ -261,6 +262,7 @@ namespace GameMaterials
 
 		{
 			sPipelineDesc pPipelineDesc;
+			pPipelineDesc.RenderPass = ERenderPass::UI;
 			pPipelineDesc.BlendAttribute = sBlendAttributeDesc(EBlendStateMode::Opaque);
 			for (std::uint32_t i = 0; i < 8; i++)
 			{
@@ -297,6 +299,7 @@ namespace GameMaterials
 
 		{
 			sPipelineDesc pPipelineDesc;
+			pPipelineDesc.RenderPass = ERenderPass::UI;
 			pPipelineDesc.BlendAttribute = sBlendAttributeDesc(EBlendStateMode::Opaque);
 			for (std::uint32_t i = 0; i < 8; i++)
 			{
