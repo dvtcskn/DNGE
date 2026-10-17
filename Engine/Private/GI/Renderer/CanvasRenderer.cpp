@@ -144,7 +144,7 @@ sCanvasRenderer::sCanvasRenderer(std::size_t Width, std::size_t Height)
 		pPipelineDesc.PrimitiveTopologyType = EPrimitiveType::LINE_LIST;
 		pPipelineDesc.RasterizerAttribute = sRasterizerAttributeDesc();
 		pPipelineDesc.RasterizerAttribute.bEnableLineAA = true;
-		pPipelineDesc.RasterizerAttribute.CullMode = ERasterizerCullMode::None;
+		//pPipelineDesc.RasterizerAttribute.CullMode = ERasterizerCullMode::None;
 
 		std::vector<sVertexAttributeDesc> VertexLayout =
 		{
@@ -559,6 +559,24 @@ void sCanvasRenderer::Draw(IRenderTarget* pFB, IVertexBuffer* VertexBuffer, IInd
 		//CMD->SetScissorRect(0, 0, 9999, 9999);
 
 		const auto& GeometryDrawData = Node->Widget->GetGeometryDrawData();
+		if (Node->bVertexDirty || Node->bIndexDirty)
+		{
+			if (Node->bVertexDirty)
+			{
+				const auto& Data = Node->Widget->GetVertexData();
+				if (Data.size() > 0)
+					CMD->UpdateBufferSubresource(VertexBuffer, Node->DrawParams.VertexOffset * sizeof(cbgui::cbGeometryVertexData), Data.size() * sizeof(cbgui::cbGeometryVertexData), Data.data());
+				Node->bVertexDirty = false;
+			}
+			if (Node->bIndexDirty)
+			{
+				const auto& IndexData = Node->Widget->GetIndexData();
+				if (IndexData.size() > 0)
+					CMD->UpdateBufferSubresource(IndexBuffer, Node->DrawParams.IndexOffset * sizeof(std::uint32_t), GeometryDrawData.IndexCount * sizeof(std::uint32_t), IndexData.data());
+				Node->bIndexDirty = false;
+			}
+		}
+
 		const auto& pMat = Node->MaterialStyle;
 		const auto& pMaterialInstace = pMat->GetMaterial(GeometryDrawData.StyleState)->Material;
 		if (!pMaterialInstace)
@@ -585,23 +603,6 @@ void sCanvasRenderer::Draw(IRenderTarget* pFB, IVertexBuffer* VertexBuffer, IInd
 		sCanvasDescriptor Descriptor(CanvasGraph);
 		CMD->SetBindlessDescriptor(0, &Descriptor);
 
-		if (Node->bVertexDirty || Node->bIndexDirty)
-		{
-			if (Node->bVertexDirty)
-			{
-				const auto& Data = Node->Widget->GetVertexData();
-				if (Data.size() > 0)
-					CMD->UpdateBufferSubresource(VertexBuffer, Node->DrawParams.VertexOffset * sizeof(cbgui::cbGeometryVertexData), Data.size() * sizeof(cbgui::cbGeometryVertexData), Data.data());
-				Node->bVertexDirty = false;
-			}
-			if (Node->bIndexDirty)
-			{
-				const auto& IndexData = Node->Widget->GetIndexData();
-				if (IndexData.size() > 0)
-					CMD->UpdateBufferSubresource(IndexBuffer, Node->DrawParams.IndexOffset * sizeof(std::uint32_t), GeometryDrawData.IndexCount * sizeof(std::uint32_t), IndexData.data());
-				Node->bIndexDirty = false;
-			}
-		}
 		CMD->DrawIndexedInstanced((std::uint32_t)GeometryDrawData.DrawCount, 1, (std::uint32_t)Node->DrawParams.IndexOffset, (std::uint32_t)Node->DrawParams.VertexOffset, 0);
 	}
 	else
@@ -639,6 +640,24 @@ void sCanvasRenderer::Draw(IRenderTarget* pFB, IVertexBuffer* VertexBuffer, IInd
 		if (GeometryDrawData.GeometryType == "NONE")
 			return;
 
+		if (Node->bVertexDirty || Node->bIndexDirty)
+		{
+			if (Node->bVertexDirty)
+			{
+				const auto& Data = Node->Widget->GetVertexData(true);
+				if (Data.size() > 0)
+					CMD->UpdateBufferSubresource(VertexBuffer, Node->DrawParams.VertexOffset * sizeof(cbgui::cbGeometryVertexData), Data.size() * sizeof(cbgui::cbGeometryVertexData), Data.data());
+				Node->bVertexDirty = false;
+			}
+			if (Node->bIndexDirty)
+			{
+				const auto& IndexData = Node->Widget->GetIndexData(true);
+				if (IndexData.size() > 0)
+					CMD->UpdateBufferSubresource(IndexBuffer, Node->DrawParams.IndexOffset * sizeof(std::uint32_t), GeometryDrawData.IndexCount * sizeof(std::uint32_t), IndexData.data());
+				Node->bIndexDirty = false;
+			}
+		}
+
 		const auto pMaterialInstace = DefaultLineColorMatStyle->GetMaterial(GeometryDrawData.StyleState)->Material;
 		if (!pMaterialInstace)
 			return;
@@ -664,23 +683,6 @@ void sCanvasRenderer::Draw(IRenderTarget* pFB, IVertexBuffer* VertexBuffer, IInd
 		sCanvasDescriptor Descriptor(CanvasGraph);
 		CMD->SetBindlessDescriptor(0, &Descriptor);
 
-		if (Node->bVertexDirty || Node->bIndexDirty)
-		{
-			if (Node->bVertexDirty)
-			{
-				const auto& Data = Node->Widget->GetVertexData(true);
-				if (Data.size() > 0)
-					CMD->UpdateBufferSubresource(VertexBuffer, Node->DrawParams.VertexOffset * sizeof(cbgui::cbGeometryVertexData), Data.size() * sizeof(cbgui::cbGeometryVertexData), Data.data());
-				Node->bVertexDirty = false;
-			}
-			if (Node->bIndexDirty)
-			{
-				const auto& IndexData = Node->Widget->GetIndexData(true);
-				if (IndexData.size() > 0)
-					CMD->UpdateBufferSubresource(IndexBuffer, Node->DrawParams.IndexOffset * sizeof(std::uint32_t), GeometryDrawData.IndexCount * sizeof(std::uint32_t), IndexData.data());
-				Node->bIndexDirty = false;
-			}
-		}
 		CMD->DrawIndexedInstanced((std::uint32_t)GeometryDrawData.DrawCount, 1, (std::uint32_t)Node->DrawParams.IndexOffset, (std::uint32_t)Node->DrawParams.VertexOffset, 0);
 	}
 }

@@ -388,8 +388,8 @@ void D3D12CommandBuffer::CopyResource(ID3D12Resource* pDstResource, D3D12_RESOUR
 
 void D3D12CommandBuffer::WaitForGPU()
 {
-	Owner->GPUSignal(D3D12_COMMAND_LIST_TYPE_DIRECT);
-	Owner->CpuWait(D3D12_COMMAND_LIST_TYPE_DIRECT);
+	const auto fenceValue = Owner->GPUSignal(D3D12_COMMAND_LIST_TYPE_DIRECT);
+	Owner->WaitForFence(D3D12_COMMAND_LIST_TYPE_DIRECT, fenceValue);
 }
 
 void D3D12CommandBuffer::SetViewport(const sViewport& Viewport)
@@ -1316,8 +1316,8 @@ void D3D12CopyCommandBuffer::ResourceBarrier(UINT NumBarriers, const D3D12_RESOU
 
 void D3D12CopyCommandBuffer::WaitForGPU()
 {
-	Owner->GPUSignal();
-	Owner->CpuWait(D3D12_COMMAND_LIST_TYPE_COPY);
+	const auto fenceValue = Owner->GPUSignal(D3D12_COMMAND_LIST_TYPE_COPY);
+	Owner->WaitForFence(D3D12_COMMAND_LIST_TYPE_COPY, fenceValue);
 }
 
 void D3D12CopyCommandBuffer::CopyResource(ID3D12Resource* pDstResource, D3D12_RESOURCE_STATES DestState, ID3D12Resource* pSrcResource, D3D12_RESOURCE_STATES SrcState)

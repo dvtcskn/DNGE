@@ -116,11 +116,6 @@ ParticleRenderer::ParticleRenderer(std::size_t Width, std::size_t Height, IGraph
 	, ScreenDimension(sScreenDimension(Width, Height))
 	, bEnableExecuteIndirect(true)
 {
-	sFBODesc Desc;
-	Desc.Dimensions.X = (std::uint32_t)ScreenDimension.Width;
-	Desc.Dimensions.Y = (std::uint32_t)ScreenDimension.Height;
-	Depth = IDepthTarget::Create("ParticleDepth", GPU::GetDefaultDepthFormat(), Desc);
-
 	{
 		sPipelineDesc pPipelineDesc(ERenderPass::Particle);
 		//sPipelineDesc.RenderPass = ERenderPass::Particle;
@@ -131,6 +126,7 @@ ParticleRenderer::ParticleRenderer(std::size_t Width, std::size_t Height, IGraph
 		//pPipelineDesc.DepthStencilAttribute.DepthTest = ECompareFunction::Always;
 		pPipelineDesc.PrimitiveTopologyType = EPrimitiveType::TRIANGLE_LIST;
 		pPipelineDesc.RasterizerAttribute = sRasterizerAttributeDesc();
+		//pPipelineDesc.RasterizerAttribute.CullMode = ERasterizerCullMode::None;
 
 		pPipelineDesc.VertexLayout = sVertexAttributeDesc::GetDefaultParticleVertexLayout();
 
@@ -157,7 +153,6 @@ ParticleRenderer::~ParticleRenderer()
 	DefaultParticle_EngineMat = nullptr;
 	DefaultParticle_MatInstance = nullptr;
 	GraphicsCommandContext = nullptr;
-	Depth = nullptr;
 }
 
 void ParticleRenderer::BeginPlay()
@@ -169,7 +164,7 @@ void ParticleRenderer::Tick(const double DeltaTime)
 
 }
 
-void ParticleRenderer::Render(const ILevel* Level, std::uint32_t CameraBindlessIndex, IRenderTarget* pRT, std::optional<sViewport> Viewport)
+void ParticleRenderer::Render(const ILevel* Level, std::uint32_t CameraBindlessIndex, IRenderTarget* pRT, IDepthTarget* InDepth, std::optional<sViewport> Viewport)
 {
 	if (!Level || !pRT)
 		return;
@@ -197,7 +192,7 @@ void ParticleRenderer::Render(const ILevel* Level, std::uint32_t CameraBindlessI
 
 		GraphicsCommandContext->BeginProfile(ERenderPass::Particle, true);
 
-		GraphicsCommandContext->SetRenderTarget(pRT, Depth.get());
+		GraphicsCommandContext->SetRenderTarget(pRT, InDepth);
 
 		if (Viewport.has_value())
 			GraphicsCommandContext->SetViewport(*Viewport);
@@ -226,7 +221,7 @@ void ParticleRenderer::Render(const ILevel* Level, std::uint32_t CameraBindlessI
 						if (pMaterialInstance)
 						{
 							if (!pMaterialInstance->IsCompiled())
-								pMaterialInstance->Compile(pRT, Depth.get());
+								pMaterialInstance->Compile(pRT, InDepth);
 
 							sMaterial* pMaterial = pMaterialInstance->GetParent();
 							{
@@ -244,7 +239,7 @@ void ParticleRenderer::Render(const ILevel* Level, std::uint32_t CameraBindlessI
 							if (LastMaterial != DefaultParticle_EngineMat.get())
 							{
 								if (!DefaultParticle_EngineMat->IsCompiled())
-									DefaultParticle_EngineMat->Compile(pRT, Depth.get());
+									DefaultParticle_EngineMat->Compile(pRT, InDepth);
 
 								FlushIndirectCommands(GraphicsCommandContext.get());
 								LastMaterial = DefaultParticle_EngineMat.get();
@@ -351,11 +346,6 @@ void ParticleRenderer::SetRenderSize(std::size_t InWidth, std::size_t InHeight)
 {
 	ScreenDimension.Width = InWidth;
 	ScreenDimension.Height = InHeight;
-	Depth = nullptr;
-	sFBODesc Desc;
-	Desc.Dimensions.X = (std::uint32_t)ScreenDimension.Width;
-	Desc.Dimensions.Y = (std::uint32_t)ScreenDimension.Height;
-	Depth = IDepthTarget::Create("ParticleDepth", GPU::GetDefaultDepthFormat(), Desc);
 }
 
 void ParticleRenderer::OnInputProcess(const GMouseInput& MouseInput, const GKeyboardChar& KeyboardChar)

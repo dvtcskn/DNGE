@@ -1050,8 +1050,8 @@ void sRenderer::Render()
 
 			FinalRenderTarget = GBuffer->Render(World->GetActiveLevel(), i, ViewportInstance->pCamera.get(), ViewportInstance->Viewport);
 			LineRenderer->Render(FinalRenderTarget, GBuffer->GetCameraConstantBuffer(i)->GetBindlessIndex(), ViewportInstance->Viewport);
-			pParticleRenderer->Render(World->GetActiveLevel(), GBuffer->GetCameraConstantBuffer(i)->GetBindlessIndex(), FinalRenderTarget, ViewportInstance->Viewport);
-			if (UpscalerType == ERendererUpscalerType::FSR && FSR && (GPU::GetDeviceType() != EGPUDeviceType::Software || bSoftwareDeviceUpscallerSupport))
+			pParticleRenderer->Render(World->GetActiveLevel(), GBuffer->GetCameraConstantBuffer(i)->GetBindlessIndex(), FinalRenderTarget, GBuffer->GetDepth(), ViewportInstance->Viewport);
+			if (UpscalerType == ERendererUpscalerType::FSR && GPU::GetGIType() == EGITypes::D3D12 && FSR && (GPU::GetDeviceType() != EGPUDeviceType::Software || bSoftwareDeviceUpscallerSupport))
 			{
 				//to do : use global camera
 				FSR->Render(FinalRenderTarget, GBuffer->GetGBuffer()->GetRenderTarget(4), GBuffer->GetGBuffer()->GetRenderTarget(5), GBuffer->GetDepth(), ViewportInstance->pCamera.get());
@@ -1065,7 +1065,7 @@ void sRenderer::Render()
 		{
 			sViewportInstance* ViewportInstance = ViewportInstances[i];
 			FinalRenderTarget = GBuffer->Render(World->GetActiveLevel(), i, ViewportInstance->pCamera.get(), ViewportInstance->Viewport);
-			pParticleRenderer->Render(World->GetActiveLevel(), GBuffer->GetCameraConstantBuffer(i)->GetBindlessIndex(), FinalRenderTarget, ViewportInstance->Viewport);
+			pParticleRenderer->Render(World->GetActiveLevel(), GBuffer->GetCameraConstantBuffer(i)->GetBindlessIndex(), FinalRenderTarget, GBuffer->GetDepth(), ViewportInstance->Viewport);
 		}
 	}
 
@@ -1213,9 +1213,16 @@ void sRenderer::OnInputProcess(const GMouseInput& MouseInput, const GKeyboardCha
 	}
 	else if (KeyboardChar.KeyCode == 13 && KeyboardChar.bIsPressed /*&& KeyboardChar.bIsChar*/)
 	{
-		GPU::WaitForGPU();
-		SetUpscalerType(ERendererUpscalerType::FSR);
-		Engine::WriteToConsole("SetUpscalerType::FSR");
+		if (GPU::GetGIType() == EGITypes::D3D12)
+		{
+			GPU::WaitForGPU();
+			SetUpscalerType(ERendererUpscalerType::FSR);
+			Engine::WriteToConsole("SetUpscalerType::FSR");
+		}
+		else
+		{
+			Engine::WriteToConsole("FSR 3/4 does not support Vulkan or D3D11.");
+		}
 	}
 }
 

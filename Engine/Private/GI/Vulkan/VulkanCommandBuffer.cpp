@@ -70,7 +70,14 @@ ECommandContextBeginResult VulkanCommandBuffer::BeginRecordCommandList(const ECo
 		bRestarted = true;
 	}
 	if (State == ECommandContextState::Begin)
+	{
+		if (bIsRenderPassActive)
+		{
+			vkCmdEndRendering(CommandBuffer);
+			//vkCmdEndRenderPass(CommandBuffer);
+		}
 		return ECommandContextBeginResult::AlreadyStarted;
+	}
 	if (State == ECommandContextState::WaitingForExecute)
 		return ECommandContextBeginResult::Failed_WaitingForExecute;
 
@@ -376,11 +383,11 @@ void VulkanCommandBuffer::SetViewport(const sViewport& Viewport)
 {
 	vk::Viewport VP = {};
 	VP.width = (float)Viewport.Width;
-	VP.height = (float)Viewport.Height;
+	VP.height = -(float)Viewport.Height;
 	VP.minDepth = Viewport.MinDepth;
 	VP.maxDepth = Viewport.MaxDepth;
-	VP.x = (float)Viewport.TopLeftX;
-	VP.y = (float)Viewport.TopLeftY;
+	VP.x = 0.0;// (float)Viewport.TopLeftX;
+	VP.y = (float)Viewport.Height; //(float)Viewport.TopLeftY;
 	CommandBuffer.setViewport(0, VP);
 }
 
@@ -389,8 +396,8 @@ void VulkanCommandBuffer::SetScissorRect(std::uint32_t X, std::uint32_t Y, std::
 	vk::Rect2D Rect;
 	Rect.extent.width = W - Y;
 	Rect.extent.height = Z - X;
-	Rect.offset.x = 0;
-	Rect.offset.y = 0;
+	Rect.offset.x = Y;
+	Rect.offset.y = X;
 	CommandBuffer.setScissor(0, Rect);
 }
 
@@ -794,29 +801,7 @@ void VulkanCommandBuffer::UpdateBufferSubresource(IVertexBuffer* Buffer, BufferS
 
 void VulkanCommandBuffer::UpdateBufferSubresource(IVertexBuffer* Buffer, std::size_t Location, std::size_t Size, const void* pSrcData)
 {
-	if (bIsRenderPassActive)
-		return;
-
-	/*VulkanUploadBuffer::SharedPtr UploadBuffer = VulkanUploadBuffer::Create(Owner, "Temp", Buffer->GetSize());
-	UploadBuffer->Map();
-
-	memcpy((BYTE*)UploadBuffer->pData, pSrcData, Size);
-
-	UploadBuffer->Unmap();
-
-	VkBufferCopy copyRegion = {};
-	copyRegion.srcOffset = Location;
-	copyRegion.dstOffset = Location;
-	copyRegion.size = UploadBuffer->GetSize();
-
-	vkCmdCopyBuffer(CommandBuffer, UploadBuffer->GetBuffer(), static_cast<VulkanVertexBuffer*>(Buffer)->GetBuffer(), 1, &copyRegion);
-	bWaitForCompletion = true;
-
-	UploadBuffer = nullptr;*/
-
-	static_cast<VulkanVertexBuffer*>(Buffer)->Map(pSrcData);
-	static_cast<VulkanVertexBuffer*>(Buffer)->Unmap();
-	bWaitForCompletion = true;
+	static_cast<VulkanVertexBuffer*>(Buffer)->MapEx(pSrcData, (std::uint32_t)Location, (std::uint32_t)Size);
 }
 
 void VulkanCommandBuffer::UpdateBufferSubresource(IIndexBuffer* Buffer, BufferSubresource* Subresource)
@@ -826,22 +811,7 @@ void VulkanCommandBuffer::UpdateBufferSubresource(IIndexBuffer* Buffer, BufferSu
 
 void VulkanCommandBuffer::UpdateBufferSubresource(IIndexBuffer* Buffer, std::size_t Location, std::size_t Size, const void* pSrcData)
 {
-	/*if (bIsRenderPassActive)
-		return;
-
-	VkBufferCopy copyRegion = {};
-	copyRegion.srcOffset = Location;
-	copyRegion.dstOffset = Location;
-	copyRegion.size = Size;
-
-	vkCmdCopyBuffer(CommandBuffer, UploadBuffer->GetBuffer(), static_cast<VulkanIndexBuffer*>(Buffer)->GetBuffer(), 1, &copyRegion);
-	bWaitForCompletion = true;
-	
-	UploadBuffer = nullptr;*/
-
-	//static_cast<VulkanIndexBuffer*>(Buffer)->Map(pSrcData);
-	//static_cast<VulkanIndexBuffer*>(Buffer)->Unmap();
-	//bWaitForCompletion = true;
+	static_cast<VulkanIndexBuffer*>(Buffer)->MapEx(pSrcData, (std::uint32_t)Location, (std::uint32_t)Size);
 }
 
 void VulkanCommandBuffer::CopyResource(VkImage pDstResource, VkImageLayout DestState, VkImage pSrcResource, VkImageLayout SrcState, sDimension2D Dimension)

@@ -62,7 +62,8 @@ public:
 #endif
 	void Open();
 	void Close();
-	bool IsClosed() const { return State == ECommandContextState::End; }
+	inline bool IsClosed() const { return State == ECommandContextState::End; }
+	inline bool IsRenderPassActive() const { return bIsRenderPassActive; }
 
 	void TransitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, VkImageSubresourceRange subresourceRange);
 	void TransitionTo(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, VkAccessFlags2 srcAccessMask = 0, VkAccessFlags2 dstAccessMask = 0, VkPipelineStageFlags2 srcStage = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, VkPipelineStageFlags2 dstStage = VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT, std::uint32_t Mips = 1);

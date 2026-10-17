@@ -40,7 +40,7 @@ public:
 	virtual void BeginPlay() override final;
 	virtual void Tick(const double DeltaTime) override final;
 
-	void Render(const ILevel* Level, std::uint32_t CameraBindlessIndex, IRenderTarget* pRT, std::optional<sViewport> Viewport);
+	void Render(const ILevel* Level, std::uint32_t CameraBindlessIndex, IRenderTarget* pRT, IDepthTarget* InDepth, std::optional<sViewport> Viewport);
 
 	virtual void SetRenderSize(std::size_t Width, std::size_t Height) override final;
 	virtual void OnInputProcess(const GMouseInput& MouseInput, const GKeyboardChar& KeyboardChar) override final;
@@ -57,7 +57,6 @@ private:
 	IGraphicsCommandContext::SharedPtr GraphicsCommandContext;
 	sMaterial::SharedPtr DefaultParticle_EngineMat;
 	sMaterialInstance::SharedPtr DefaultParticle_MatInstance;
-	IDepthTarget::SharedPtr Depth;
 	IIndirectBuffer::SharedPtr IndirectBuffer;
 	bool bEnableExecuteIndirect;
 };

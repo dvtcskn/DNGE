@@ -88,6 +88,7 @@ public:
 	void SetUpscaleMode(ERendererUpscaleMode Mode);
     inline ERendererUpscaleMode GetUpscaleMode() const { return UpscaleMode; }
 	void SetFrameGenerationEnabled(bool bEnabled);
+    void SetAsyncComputeEnabled(bool bEnabled);
 
 	ffxQueryGetProviderVersion GetVersion() /*const*/;
 	ffx::QueryDescUpscaleGetGPUMemoryUsage GetUpscaleGetGPUMemoryUsage() /*const*/;

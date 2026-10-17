@@ -189,6 +189,12 @@ sFSR::sFSR(std::size_t Width, std::size_t Height)
     ffx::CreateContextDescOverrideVersion versionOverride{};
     ffx::ReturnCode retCode;
 
+    if (GPU::GetGIType() == EGITypes::Vulkan || GPU::GetGIType() == EGITypes::D3D11)
+    {
+        Engine::WriteToConsole("FSR 3/4 does not support Vulkan or D3D11. or D3D11.");
+        return;
+    }
+
     // Chain ffxCreateBackendDX12Desc to provide device for null-context queries to reach external driver provider
     struct ffxCreateBackendDX12Desc backendDX12Desc = {};
     backendDX12Desc.header.type = FFX_API_CREATE_CONTEXT_DESC_TYPE_BACKEND_DX12;
@@ -267,6 +273,11 @@ void sFSR::OnDisabled()
 
 void sFSR::SetUpscaleEnabled(bool bEnabled)
 {
+    if (GPU::GetGIType() == EGITypes::Vulkan || GPU::GetGIType() == EGITypes::D3D11)
+    {
+        Engine::WriteToConsole("FSR 3/4 does not support Vulkan or D3D11.");
+        return;
+    }
     if (bEnabled)
     {
         bUpscalingActive = true;
@@ -384,17 +395,32 @@ void sFSR::SetUpscaleEnabled(bool bEnabled)
 
 void sFSR::SetUpscaleSharpness(float NewSharpness)
 {
+    if (GPU::GetGIType() == EGITypes::Vulkan || GPU::GetGIType() == EGITypes::D3D11)
+    {
+        Engine::WriteToConsole("FSR 3/4 does not support Vulkan or D3D11.");
+        return;
+    }
     Sharpness = NewSharpness;
 }
 
 void sFSR::SetUpscaleMode(ERendererUpscaleMode Mode)
 {
+    if (GPU::GetGIType() == EGITypes::Vulkan || GPU::GetGIType() == EGITypes::D3D11)
+    {
+        Engine::WriteToConsole("FSR 3/4 does not support Vulkan or D3D11.");
+        return;
+    }
     UpscaleMode = Mode;
     UpdatePreset(nullptr);
 }
 
 void sFSR::SetFrameGenerationEnabled(bool bEnabled)
 {
+    if (GPU::GetGIType() == EGITypes::Vulkan || GPU::GetGIType() == EGITypes::D3D11)
+    {
+        Engine::WriteToConsole("FSR 3/4 does not support Vulkan or D3D11.");
+        return;
+    }
     /*{
         ffx::ReturnCode retCode;
         FfxApiEffectMemoryUsage gpuMemoryUsageSwapChainV2;
@@ -535,6 +561,7 @@ void sFSR::SetFrameGenerationEnabled(bool bEnabled)
         //FfxApiResource hudLessResource = SDKWrapper::ffxGetResourceApi(m_pHudLessTexture[m_curUiTextureIndex]->GetResource(), FFX_API_RESOURCE_STATE_PIXEL_COMPUTE_READ);
 
         FrameGenerationConfig.frameGenerationEnabled = false;
+        FrameGenerationConfig.allowAsyncWorkloads = bEnableAsyncCompute;
         FrameGenerationConfig.frameGenerationCallback = [](ffxDispatchDescFrameGeneration* params, void* pUserCtx) -> ffxReturnCode_t
             {
                 return ffxDispatch(reinterpret_cast<ffxContext*>(pUserCtx), &params->header);
@@ -588,8 +615,33 @@ void sFSR::SetFrameGenerationEnabled(bool bEnabled)
     }
 }
 
+void sFSR::SetAsyncComputeEnabled(bool bEnabled)
+{
+    if (GPU::GetGIType() == EGITypes::Vulkan || GPU::GetGIType() == EGITypes::D3D11)
+    {
+        Engine::WriteToConsole("FSR 3/4 does not support Vulkan or D3D11.");
+        return;
+    }
+    if (bEnableAsyncCompute == bEnabled)
+        return;
+
+    const bool bRecreateFrameGenerationContext = FrameGenContext != nullptr;
+    if (bRecreateFrameGenerationContext)
+        SetFrameGenerationEnabled(false);
+
+    bEnableAsyncCompute = bEnabled;
+
+    if (bRecreateFrameGenerationContext)
+        SetFrameGenerationEnabled(true);
+}
+
 void sFSR::EnableFrameInterpolationSwapchain(bool enabled)
 {
+    if (GPU::GetGIType() == EGITypes::Vulkan || GPU::GetGIType() == EGITypes::D3D11)
+    {
+        Engine::WriteToConsole("FSR 3/4 does not support Vulkan or D3D11.");
+        return;
+    }
     if (enabled)
     {
         bEnableFrameInterpolationSwapchain = true;
@@ -740,6 +792,13 @@ void sFSR::EnableFrameInterpolationSwapchain(bool enabled)
 
 ffxQueryGetProviderVersion sFSR::GetVersion()
 {
+    if (GPU::GetGIType() == EGITypes::Vulkan || GPU::GetGIType() == EGITypes::D3D11)
+    {
+        Engine::WriteToConsole("FSR 3/4 does not support Vulkan or D3D11.");
+        return ffxQueryGetProviderVersion();
+    }
+    if (!UpscalingContext)
+        return ffxQueryGetProviderVersion();
     ffxQueryGetProviderVersion Version = { 0 };
     Version.header.type = FFX_API_QUERY_DESC_TYPE_GET_PROVIDER_VERSION;
     ffx::ReturnCode retCode = ffx::Query(UpscalingContext, Version);
@@ -748,6 +807,13 @@ ffxQueryGetProviderVersion sFSR::GetVersion()
 
 ffx::QueryDescUpscaleGetGPUMemoryUsage sFSR::GetUpscaleGetGPUMemoryUsage()
 {
+    if (GPU::GetGIType() == EGITypes::Vulkan || GPU::GetGIType() == EGITypes::D3D11)
+    {
+        Engine::WriteToConsole("FSR 3/4 does not support Vulkan or D3D11.");
+        return ffx::QueryDescUpscaleGetGPUMemoryUsage();
+    }
+    if (!UpscalingContext)
+        return ffx::QueryDescUpscaleGetGPUMemoryUsage();
     FfxApiEffectMemoryUsage gpuMemoryUsageUpscaler;
     ffx::QueryDescUpscaleGetGPUMemoryUsage upscalerGetGPUMemoryUsage{};
     upscalerGetGPUMemoryUsage.gpuMemoryUsageUpscaler = &gpuMemoryUsageUpscaler;
@@ -758,6 +824,11 @@ ffx::QueryDescUpscaleGetGPUMemoryUsage sFSR::GetUpscaleGetGPUMemoryUsage()
 
 bool sFSR::SetJitter(FVector2& Vec)
 {
+    if (GPU::GetGIType() == EGITypes::Vulkan || GPU::GetGIType() == EGITypes::D3D11)
+    {
+        Engine::WriteToConsole("FSR 3/4 does not support Vulkan or D3D11.");
+        return false;
+    }
     if (!UpscalingContext)
     {
         Vec = FVector2::Zero();
@@ -793,6 +864,11 @@ bool sFSR::SetJitter(FVector2& Vec)
 
 void sFSR::Render(IRenderTarget* Color, IRenderTarget* MotionVectors, IRenderTarget* Reactive, IDepthTarget* Depth, ICamera* pCamera)
 {
+    if (GPU::GetGIType() == EGITypes::Vulkan || GPU::GetGIType() == EGITypes::D3D11)
+    {
+        Engine::WriteToConsole("FSR 3/4 does not support Vulkan or D3D11.");
+        return;
+    }
     if (pCamera)
     {
         if (!pCamera->IsJitterEnabled())
@@ -873,6 +949,11 @@ void sFSR::Render(IRenderTarget* Color, IRenderTarget* MotionVectors, IRenderTar
 
 void sFSR::GenerateReactiveMask(IRenderTarget* Color)
 {
+    if (GPU::GetGIType() == EGITypes::Vulkan || GPU::GetGIType() == EGITypes::D3D11)
+    {
+        Engine::WriteToConsole("FSR 3/4 does not support Vulkan or D3D11.");
+        return;
+    }
     CMD->BeginRecordCommandList(ECommandContextBeginState::ApiRender);
 
     GeneratedReactiveMask->AsResource(EResourceState::UAV, CMD.get());
@@ -911,6 +992,10 @@ void sFSR::CopyToFrameBuffer(IRenderTarget* Target)
 
 void sFSR::SetRenderSize(std::size_t InWidth, std::size_t InHeight)
 {
+    if (GPU::GetGIType() == EGITypes::Vulkan || GPU::GetGIType() == EGITypes::D3D11)
+    {
+        return;
+    }
     RenderDimension.DisplayWidth = (std::uint32_t)InWidth;
     RenderDimension.DisplayHeight = (std::uint32_t)InHeight;
     RenderDimension.RenderWidth = (std::uint32_t)InWidth;
@@ -950,6 +1035,10 @@ sRenderDimension sFSR::UpdateResolution(uint32_t displayWidth, uint32_t displayH
 
 void sFSR::OnInputProcess(const GMouseInput& MouseInput, const GKeyboardChar& KeyboardChar)
 {
+    if (GPU::GetGIType() == EGITypes::Vulkan || GPU::GetGIType() == EGITypes::D3D11)
+    {
+        return;
+    }
     if (KeyboardChar.KeyCode == 40 && KeyboardChar.bIsPressed /*&& KeyboardChar.bIsChar*/)
     {
         if (UpscaleMode == ERendererUpscaleMode::UltraPerformance)
@@ -1050,6 +1139,11 @@ void sFSR::SetGlobalDebugCheckerMode(FSRDebugCheckerMode mode, bool recreate)
 
 void sFSR::UpdateUpscaleRatio()
 {
+    if (GPU::GetGIType() == EGITypes::Vulkan || GPU::GetGIType() == EGITypes::D3D11)
+    {
+        Engine::WriteToConsole("FSR 3/4 does not support Vulkan or D3D11.");
+        return;
+    }
     if (bFrameInterpolationActive)
     {
         void* ffxSwapChain = GPU::GetInternalSwapChain();
@@ -1074,6 +1168,11 @@ void sFSR::UpdateUpscaleRatio()
 
 void sFSR::UpdatePreset(const int32_t* pOldPreset)
 {
+    if (GPU::GetGIType() == EGITypes::Vulkan || GPU::GetGIType() == EGITypes::D3D11)
+    {
+        Engine::WriteToConsole("FSR 3/4 does not support Vulkan or D3D11.");
+        return;
+    }
     if ((pOldPreset && *pOldPreset == static_cast<int32_t>(ERendererUpscaleMode::DynamicResolution)) || UpscaleMode == ERendererUpscaleMode::DynamicResolution)
     {
         bNeedReInit = true;

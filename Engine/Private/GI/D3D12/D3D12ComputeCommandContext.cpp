@@ -112,8 +112,8 @@ void D3D12ComputeCommandContext::ResourceBarrier(UINT NumBarriers, const D3D12_R
 
 void D3D12ComputeCommandContext::WaitForGPU()
 {
-	Owner->GPUSignal();
-	Owner->CpuWait(D3D12_COMMAND_LIST_TYPE_COMPUTE);
+	const auto fenceValue = Owner->GPUSignal(D3D12_COMMAND_LIST_TYPE_COMPUTE);
+	Owner->WaitForFence(D3D12_COMMAND_LIST_TYPE_COMPUTE, fenceValue);
 }
 
 void D3D12ComputeCommandContext::SetFrameBuffer(IFrameBuffer* pFB, std::optional<std::size_t> FBOIndex)

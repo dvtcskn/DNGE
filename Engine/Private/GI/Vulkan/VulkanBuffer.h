@@ -119,11 +119,14 @@ public:
 	std::size_t Stride() const { return Desc.Stride; }
 	virtual bool IsMapable() const override final { return false; }
 	virtual void UpdateSubresource(BufferSubresource* Subresource, IGraphicsCommandContext* InCMDBuffer = nullptr) override final;
+	void MapEx(const void* Ptr, std::uint32_t Location, std::uint32_t Size);
 
 	bool bIsMapped;
 	void* pData;
 	void Map(const void* Ptr = nullptr, IGraphicsCommandContext* InCMDBuffer = nullptr);
 	void Unmap();
+
+	VulkanUploadBuffer* GetUploadBuffer() const { return UploadBuffer.get(); }
 
 	virtual ResourceSharedHandle* GetSharedHandle() const override final { return nullptr; }
 	virtual bool CopyFrom(IVertexBuffer* VertexBuffer) override final { return false; }
@@ -151,11 +154,14 @@ public:
 	virtual std::size_t GetSize() const override final { return Desc.Size; }
 	virtual bool IsMapable() const override final { return false; }
 	virtual void UpdateSubresource(BufferSubresource* Subresource, IGraphicsCommandContext* InCMDBuffer = nullptr) override final;
+	void MapEx(const void* Ptr, std::uint32_t Location, std::uint32_t Size);
 
 	bool bIsMapped;
 	void* pData;
 	void Map(const void* Ptr = nullptr, IGraphicsCommandContext* InCMDBuffer = nullptr);
 	void Unmap();
+
+	VulkanUploadBuffer* GetUploadBuffer() const { return UploadBuffer.get(); }
 
 	virtual ResourceSharedHandle* GetSharedHandle() const override final { return nullptr; }
 	virtual bool CopyFrom(IIndexBuffer* IndexBuffer) override final { return false; }

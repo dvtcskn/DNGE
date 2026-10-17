@@ -46,10 +46,10 @@
 using namespace Microsoft::WRL;
 
 #ifndef Pix3_Enabled
-#define Pix3_Enabled 0
+#define Pix3_Enabled 1
 #endif
 #ifndef AGS_Enable
-#define AGS_Enable 0
+#define AGS_Enable 1
 #endif
 
 #if AGS_Enable
@@ -228,7 +228,7 @@ private:
 		ComPtr<ID3D12CommandAllocator> Allocator;
 	};
 	std::map<D3D12_COMMAND_LIST_TYPE, std::vector<PendingSubmission>> DeferredCommandLists;
-	std::mutex Mutex;
+	mutable std::mutex Mutex;
 
 	D3D_FEATURE_LEVEL FeatureLevel;
 

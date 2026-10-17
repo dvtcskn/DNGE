@@ -87,33 +87,6 @@ namespace cbgui
 		Super::InputProcess(InMouseInput, KeyboardChar);
 	}
 
-	std::string RenderPassToString(ERenderPass RenderPass)
-	{
-		switch (RenderPass)
-		{
-		case ERenderPass::NONE:			return "NONE";
-		case ERenderPass::GBuffer:		return "GBuffer";
-		case ERenderPass::Line:			return "Line";
-		case ERenderPass::Particle:		return "Particle";
-		case ERenderPass::FSR:			return "FSR";
-		case ERenderPass::Tonemapper:	return "Tonemapper";
-		case ERenderPass::PostProcess:	return "PostProcess";
-		case ERenderPass::UI:			return "UI";
-		case ERenderPass::Custom1:		return "Custom1";
-		case ERenderPass::Custom2:		return "Custom2";
-		case ERenderPass::Custom3:		return "Custom3";
-		case ERenderPass::Custom4:		return "Custom4";
-		case ERenderPass::Custom5:		return "Custom5";
-		case ERenderPass::Custom6:		return "Custom6";
-		case ERenderPass::Custom7:		return "Custom7";
-		case ERenderPass::Custom8:		return "Custom8";
-		case ERenderPass::Custom9:		return "Custom9";
-		case ERenderPass::Custom10:		return "Custom10";
-		}
-
-		return "";
-	}
-
 	void sCanvas::AddRendererProfileResult(const ProfileResult& Result)
 	{
 		if (ProfileElements.contains(Result.RenderPass))

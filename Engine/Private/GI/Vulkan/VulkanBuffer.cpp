@@ -244,6 +244,24 @@ VulkanVertexBuffer::~VulkanVertexBuffer()
 	vkFreeMemory(Owner->Get(), Memory, nullptr);
 }
 
+void VulkanVertexBuffer::UpdateSubresource(BufferSubresource* Subresource, IGraphicsCommandContext* InCMDBuffer)
+{
+	if (!Subresource)
+		return;
+
+	MapEx(Subresource->pSysMem, Subresource->Location, Subresource->Size);
+}
+
+void VulkanVertexBuffer::MapEx(const void* Ptr, std::uint32_t Location, std::uint32_t Size)
+{
+	if (!bIsMapped)
+	{
+		VK_CHECK(vkMapMemory(Owner->Get(), Memory, 0, Desc.Size, 0, &pData));
+		bIsMapped = true;
+	}
+	memcpy((BYTE*)pData + Location, Ptr, Size);
+}
+
 void VulkanVertexBuffer::Map(const void* Ptr, IGraphicsCommandContext* InCMDBuffer)
 {
 	if (!bIsMapped)
@@ -264,31 +282,6 @@ void VulkanVertexBuffer::Unmap()
 {
 	if (bIsMapped)
 		vkUnmapMemory(Owner->Get(), Memory);
-}
-
-void VulkanVertexBuffer::UpdateSubresource(BufferSubresource* Subresource, IGraphicsCommandContext* InCMDBuffer)
-{
-	if (!Subresource)
-		return;
-
-	if (!bIsMapped)
-	{
-		VK_CHECK(vkMapMemory(Owner->Get(), Memory, 0, Desc.Size, 0, &pData));
-		bIsMapped = true;
-	}
-	memcpy((BYTE*)pData + Subresource->Location, Subresource->pSysMem, Subresource->Size);
-
-	/*if (InCMDBuffer)
-	{
-		static_cast<VulkanCommandBuffer*>(InCMDBuffer)->UpdateBufferSubresource(this, Subresource);
-	}
-	else
-	{
-		Owner->GetIMCommandBuffer()->BeginRecordCommandList();
-		Owner->GetIMCommandBuffer()->UpdateBufferSubresource(this, Subresource);
-		Owner->GetIMCommandBuffer()->FinishRecordCommandList();
-		Owner->GetIMCommandBuffer()->ExecuteCommandList();
-	}*/
 }
 
 VulkanIndexBuffer::VulkanIndexBuffer(VulkanDevice* Device, std::string InName, const BufferLayout& InDesc, BufferSubresource* InSubresource)
@@ -356,32 +349,17 @@ void VulkanIndexBuffer::UpdateSubresource(BufferSubresource* Subresource, IGraph
 	if (!Subresource)
 		return;
 
+	MapEx(Subresource->pSysMem, Subresource->Location, Subresource->Size);
+}
+
+void VulkanIndexBuffer::MapEx(const void* Ptr, std::uint32_t Location, std::uint32_t Size)
+{
 	if (!bIsMapped)
 	{
 		VK_CHECK(vkMapMemory(Owner->Get(), Memory, 0, Desc.Size, 0, &pData));
 		bIsMapped = true;
 	}
-	memcpy((BYTE*)pData + Subresource->Location, Subresource->pSysMem, Subresource->Size);
-
-	/*
-	VulkanUploadBuffer::SharedPtr UploadBuffer = VulkanUploadBuffer::Create(Owner, "Temp", Buffer->GetSize());
-	UploadBuffer->Map();
-
-	memcpy((BYTE*)UploadBuffer->GetData() + Location, pSrcData, Size);
-
-	UploadBuffer->Unmap();
-
-	if (InCMDBuffer)
-	{
-		static_cast<VulkanCommandBuffer*>(InCMDBuffer)->UpdateBufferSubresource(this, Subresource);
-	}
-	else
-	{
-		Owner->GetIMCommandBuffer()->BeginRecordCommandList();
-		Owner->GetIMCommandBuffer()->UpdateBufferSubresource(this, Subresource);
-		Owner->GetIMCommandBuffer()->FinishRecordCommandList();
-		Owner->GetIMCommandBuffer()->ExecuteCommandList();
-	}*/
+	memcpy((BYTE*)pData + Location, Ptr, Size);
 }
 
 void VulkanIndexBuffer::Map(const void* Ptr, IGraphicsCommandContext* InCMDBuffer)

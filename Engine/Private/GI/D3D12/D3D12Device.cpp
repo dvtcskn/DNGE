@@ -629,8 +629,8 @@ D3D12Device::D3D12Device(const GPUCreateInfo& DeviceCreateInfo, std::uint32_t In
 D3D12Device::~D3D12Device()
 {
 	{
-		GPUSignal();
-		CpuWait(D3D12_COMMAND_LIST_TYPE_DIRECT);
+		const auto fenceValue = GPUSignal(D3D12_COMMAND_LIST_TYPE_DIRECT);
+		WaitForFence(D3D12_COMMAND_LIST_TYPE_DIRECT, fenceValue);
 	}
 
 #if AGS_Enable
@@ -732,8 +732,8 @@ void D3D12Device::Present(IRenderTarget* pRT)
 		Viewport->OnPresent(pRT);
 	}
 
-	if (DeferredCommandLists.size() > 0)
 	{
+		std::lock_guard<std::mutex> lock(Mutex);
 		for (auto& DeferredCommandList : DeferredCommandLists)
 		{
 			auto& PendingList = DeferredCommandList.second;
@@ -1004,21 +1004,18 @@ IShader::SharedPtr D3D12Device::CompileShader(const void* InCode, std::size_t Si
 
 void D3D12Device::GPUFlush()
 {
-	GPUFlush(D3D12_COMMAND_LIST_TYPE_DIRECT);
-	GPUFlush(D3D12_COMMAND_LIST_TYPE_COMPUTE);
-	GPUFlush(D3D12_COMMAND_LIST_TYPE_COPY);
+	WaitForGPU();
 }
 
 void D3D12Device::WaitForGPU()
 {
-	GPUSignal(D3D12_COMMAND_LIST_TYPE_DIRECT);
-	CpuWait(D3D12_COMMAND_LIST_TYPE_DIRECT);
+	const auto directFenceValue = GPUSignal(D3D12_COMMAND_LIST_TYPE_DIRECT);
+	const auto computeFenceValue = GPUSignal(D3D12_COMMAND_LIST_TYPE_COMPUTE);
+	const auto copyFenceValue = GPUSignal(D3D12_COMMAND_LIST_TYPE_COPY);
 
-	GPUSignal(D3D12_COMMAND_LIST_TYPE_COMPUTE);
-	CpuWait(D3D12_COMMAND_LIST_TYPE_COMPUTE);
-
-	GPUSignal(D3D12_COMMAND_LIST_TYPE_COPY);
-	CpuWait(D3D12_COMMAND_LIST_TYPE_COPY);
+	WaitForFence(D3D12_COMMAND_LIST_TYPE_DIRECT, directFenceValue);
+	WaitForFence(D3D12_COMMAND_LIST_TYPE_COMPUTE, computeFenceValue);
+	WaitForFence(D3D12_COMMAND_LIST_TYPE_COPY, copyFenceValue);
 }
 
 void D3D12Device::WaitForCPU()
@@ -1042,6 +1039,8 @@ bool D3D12Device::IsCommandBufferPendingForExecute(ICommandContext* CommandConte
 {
 	if (!CommandContext)
 		return false;
+
+	std::lock_guard<std::mutex> lock(Mutex);
 
 	switch (CommandContext->GetCommandContextType())
 	{
@@ -1084,6 +1083,8 @@ bool D3D12Device::IsCommandBufferPendingForExecute(ICommandContext* CommandConte
 
 void D3D12Device::OnCommandBufferDestroyed(ICommandContext* CommandContext)
 {
+	std::lock_guard<std::mutex> lock(Mutex);
+
 	switch (CommandContext->GetCommandContextType())
 	{
 		case ECommandContextType::Graphics:
@@ -1288,7 +1289,8 @@ void D3D12Device::CpuWait(D3D12_COMMAND_LIST_TYPE Type)
 
 ComPtr<ID3D12CommandAllocator> D3D12Device::RequestCommandAllocator(D3D12_COMMAND_LIST_TYPE cmdType)
 {
-	return CommandAllocatorPool->RequestAllocator(cmdType == D3D12_COMMAND_LIST_TYPE_BUNDLE ? D3D12_COMMAND_LIST_TYPE_DIRECT : cmdType, Fences.at(cmdType)->GetCompletedValue());
+	const auto allocatorType = cmdType == D3D12_COMMAND_LIST_TYPE_BUNDLE ? D3D12_COMMAND_LIST_TYPE_DIRECT : cmdType;
+	return CommandAllocatorPool->RequestAllocator(allocatorType, Fences.at(allocatorType)->GetCompletedValue());
 }
 
 void D3D12Device::DiscardCommandAllocator(D3D12_COMMAND_LIST_TYPE cmdType, ComPtr<ID3D12CommandAllocator> Allocator, std::uint64_t FenceValue)
@@ -1298,46 +1300,19 @@ void D3D12Device::DiscardCommandAllocator(D3D12_COMMAND_LIST_TYPE cmdType, ComPt
 
 void D3D12Device::GPUFlush(D3D12_COMMAND_LIST_TYPE queueType)
 {
-	ID3D12Fence* pFence;
-	ThrowIfFailed(Direct3DDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&pFence)));
-
-	ID3D12CommandQueue* queue = nullptr;
 	switch (queueType)
 	{
 	case D3D12_COMMAND_LIST_TYPE_BUNDLE:
 	case D3D12_COMMAND_LIST_TYPE_DIRECT:
-		queue = GetGraphicsQueue();
-		break;
 	case D3D12_COMMAND_LIST_TYPE_COMPUTE:
-		queue = GetComputeQueue();
-		break;
 	case D3D12_COMMAND_LIST_TYPE_COPY:
-		queue = GetCopyQueue();
-		break;
-	case D3D12_COMMAND_LIST_TYPE_VIDEO_DECODE:
-		break;
-	case D3D12_COMMAND_LIST_TYPE_VIDEO_PROCESS:
-		break;
-	case D3D12_COMMAND_LIST_TYPE_VIDEO_ENCODE:
-		break;
-	case D3D12_COMMAND_LIST_TYPE_NONE:
 		break;
 	default:
-		break;
+		return;
 	}
 
-	if (!queue)
-		return;
-
-	ThrowIfFailed(queue->Signal(pFence, 1));
-
-	HANDLE mHandleFenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
-	pFence->SetEventOnCompletion(1, mHandleFenceEvent);
-	WaitForSingleObject(mHandleFenceEvent, INFINITE);
-
-	CloseHandle(mHandleFenceEvent);
-	pFence->Release();
-	//delete pFence;
+	const auto fenceValue = GPUSignal(queueType);
+	WaitForFence(queueType, fenceValue);
 }
 
 void D3D12Device::SetHeaps(ID3D12GraphicsCommandList* cmd)

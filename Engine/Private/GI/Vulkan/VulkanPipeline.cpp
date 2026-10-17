@@ -32,34 +32,6 @@
 #include "VulkanShaderStates.h"
 #include "VulkanFrameBuffer.h"
 
-std::string RenderPassToString(ERenderPass RenderPass)
-{
-	switch (RenderPass)
-	{
-	case ERenderPass::NONE:			return "NONE";
-	case ERenderPass::GBuffer:		return "GBuffer";
-	case ERenderPass::Line:			return "Line";
-	case ERenderPass::Particle:		return "Particle";
-	case ERenderPass::FSR:			return "FSR";
-	case ERenderPass::Tonemapper:	return "Tonemapper";
-	case ERenderPass::PostProcess:	return "PostProcess";
-	case ERenderPass::UI:			return "UI";
-	case ERenderPass::UIDepth:		return "UIDepth";
-	case ERenderPass::Custom1:		return "Custom1";
-	case ERenderPass::Custom2:		return "Custom2";
-	case ERenderPass::Custom3:		return "Custom3";
-	case ERenderPass::Custom4:		return "Custom4";
-	case ERenderPass::Custom5:		return "Custom5";
-	case ERenderPass::Custom6:		return "Custom6";
-	case ERenderPass::Custom7:		return "Custom7";
-	case ERenderPass::Custom8:		return "Custom8";
-	case ERenderPass::Custom9:		return "Custom9";
-	case ERenderPass::Custom10:		return "Custom10";
-	}
-
-	return "";
-}
-
 VulkanPipeline::VulkanPipeline(VulkanDevice* Device, std::string InName, sPipelineDesc InDesc)
 	: Name(InName)
 	, Desc(InDesc)
@@ -122,7 +94,7 @@ bool VulkanPipeline::Compile(IFrameBuffer* InFrameBuffer)
 		}
 
 		VkClearValue clearDepth = {};
-		clearDepth.depthStencil.depth = 1.0f;
+		clearDepth.depthStencil.depth = 0.0f;
 		VkRenderingAttachmentInfo Info = {};
 		Info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
 		Info.clearValue = clearDepth;
@@ -232,13 +204,13 @@ bool VulkanPipeline::Compile(IRenderTarget* InRT, IDepthTarget* Depth)
 		if (Depth)
 		{
 			VkClearValue clearDepth = {};
-			clearDepth.depthStencil.depth = 1.0f;
+			clearDepth.depthStencil.depth = 0.0f;
 			VkRenderingAttachmentInfo Info = {};
 			Info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
 			Info.clearValue = clearDepth;
 			Info.imageView = static_cast<VulkanDepthTarget*>(Depth)->View;                      // The target depth image view
 			Info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;	// Expected layout during rendering
-			Info.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;						// Action at the start of the pass
+			Info.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;						// Action at the start of the pass
 			Info.storeOp = VK_ATTACHMENT_STORE_OP_STORE;					// Use DONT_CARE if you don't need it later
 			Info.pNext = nullptr;
 			pDepthAttachment.push_back(Info);

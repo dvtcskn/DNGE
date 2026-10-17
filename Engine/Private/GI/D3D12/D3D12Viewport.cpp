@@ -329,8 +329,8 @@ void D3D12Viewport::ResizeSwapChain(std::size_t Width, std::size_t Height)
 	for (std::size_t i = 0; i < SwapChainBufferCount; i++)
 		RTV[i].Release();
 
-	Owner->GPUSignal();
-	Owner->CpuWait(D3D12_COMMAND_LIST_TYPE_DIRECT);
+	const auto fenceValue = Owner->GPUSignal(D3D12_COMMAND_LIST_TYPE_DIRECT);
+	Owner->WaitForFence(D3D12_COMMAND_LIST_TYPE_DIRECT, fenceValue);
 
 	SwapChain->ResizeBuffers(SwapChainBufferCount, SizeX, SizeY, ConvertFormat_Format_To_DXGI(BackBufferFormat),
 		DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING | DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH);
