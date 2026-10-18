@@ -259,75 +259,75 @@ VulkanDepthTarget::~VulkanDepthTarget()
 	Owner = nullptr;
 }
 
-VulkanUnorderedAccessTarget::VulkanUnorderedAccessTarget(VulkanDevice* InOwner, const std::string InName, const EFormat InFormat, const sFBODesc& InDesc, bool InEnableSRV)
-	: Super()
-	, Name(InName)
-	, Format(InFormat)
-	, Desc(InDesc)
-	, bIsSRVSupported(InEnableSRV)
-	, CurrentLayout(VkImageLayout::VK_IMAGE_LAYOUT_UNDEFINED)
-{
-	VkFormat VulkanFormat = ConvertFormat_Format_To_VkFormat(Format);
-
-	// Create VkImage
-	VkImageCreateInfo imageInfo{};
-	imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-	imageInfo.imageType = VK_IMAGE_TYPE_2D; // Adjust for 1D, 3D if necessary
-	imageInfo.extent = { Desc.Dimensions.X, Desc.Dimensions.Y, 1 };
-	imageInfo.mipLevels = 1;
-	imageInfo.arrayLayers = 1;
-	imageInfo.format = VulkanFormat;
-	imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-	imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	imageInfo.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT; // Storage and sampling
-	imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-	imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-	if (vkCreateImage(InOwner->Get(), &imageInfo, nullptr, &Image) != VK_SUCCESS)
-		throw std::runtime_error("Failed to create UAV image!");
-
-	// Allocate memory for VkImage
-	VkMemoryRequirements memRequirements;
-	vkGetImageMemoryRequirements(InOwner->Get(), Image, &memRequirements);
-
-	VkMemoryAllocateInfo allocInfo{};
-	allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-	allocInfo.allocationSize = memRequirements.size;
-	allocInfo.memoryTypeIndex = InOwner->GetMemoryType(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-	if (vkAllocateMemory(InOwner->Get(), &allocInfo, nullptr, &Memory) != VK_SUCCESS)
-		throw std::runtime_error("Failed to allocate UAV image memory!");
-
-	vkBindImageMemory(InOwner->Get(), Image, Memory, 0);
-
-	// Create VkImageView
-	VkImageViewCreateInfo viewInfo{};
-	viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-	viewInfo.image = Image;
-	viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D; // Adjust for 1D, 3D, or cubemap
-	viewInfo.format = VulkanFormat;
-	viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	viewInfo.subresourceRange.baseMipLevel = 0;
-	viewInfo.subresourceRange.levelCount = 1;
-	viewInfo.subresourceRange.baseArrayLayer = 0;
-	viewInfo.subresourceRange.layerCount = 1;
-
-	if (vkCreateImageView(InOwner->Get(), &viewInfo, nullptr, &View) != VK_SUCCESS)
-		throw std::runtime_error("Failed to create UAV image view!");
-
-	if (bIsSRVSupported)
-	{
-	}
-
-	{
-		std::string STR = std::string("VulkanUnorderedAccessTarget::") + Name.c_str();
-		InOwner->SetResourceName(VkObjectType::VK_OBJECT_TYPE_IMAGE, reinterpret_cast<std::uint64_t>(Image), STR.c_str());
-	}
-}
-
-VulkanUnorderedAccessTarget::~VulkanUnorderedAccessTarget()
-{
-}
+//VulkanUnorderedAccessTarget::VulkanUnorderedAccessTarget(VulkanDevice* InOwner, const std::string InName, const EFormat InFormat, const sFBODesc& InDesc, bool InEnableSRV)
+//	: Super()
+//	, Name(InName)
+//	, Format(InFormat)
+//	, Desc(InDesc)
+//	, bIsSRVSupported(InEnableSRV)
+//	, CurrentLayout(VkImageLayout::VK_IMAGE_LAYOUT_UNDEFINED)
+//{
+//	VkFormat VulkanFormat = ConvertFormat_Format_To_VkFormat(Format);
+//
+//	// Create VkImage
+//	VkImageCreateInfo imageInfo{};
+//	imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+//	imageInfo.imageType = VK_IMAGE_TYPE_2D; // Adjust for 1D, 3D if necessary
+//	imageInfo.extent = { Desc.Dimensions.X, Desc.Dimensions.Y, 1 };
+//	imageInfo.mipLevels = 1;
+//	imageInfo.arrayLayers = 1;
+//	imageInfo.format = VulkanFormat;
+//	imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+//	imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+//	imageInfo.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT; // Storage and sampling
+//	imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+//	imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+//
+//	if (vkCreateImage(InOwner->Get(), &imageInfo, nullptr, &Image) != VK_SUCCESS)
+//		throw std::runtime_error("Failed to create UAV image!");
+//
+//	// Allocate memory for VkImage
+//	VkMemoryRequirements memRequirements;
+//	vkGetImageMemoryRequirements(InOwner->Get(), Image, &memRequirements);
+//
+//	VkMemoryAllocateInfo allocInfo{};
+//	allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+//	allocInfo.allocationSize = memRequirements.size;
+//	allocInfo.memoryTypeIndex = InOwner->GetMemoryType(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+//
+//	if (vkAllocateMemory(InOwner->Get(), &allocInfo, nullptr, &Memory) != VK_SUCCESS)
+//		throw std::runtime_error("Failed to allocate UAV image memory!");
+//
+//	vkBindImageMemory(InOwner->Get(), Image, Memory, 0);
+//
+//	// Create VkImageView
+//	VkImageViewCreateInfo viewInfo{};
+//	viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+//	viewInfo.image = Image;
+//	viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D; // Adjust for 1D, 3D, or cubemap
+//	viewInfo.format = VulkanFormat;
+//	viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+//	viewInfo.subresourceRange.baseMipLevel = 0;
+//	viewInfo.subresourceRange.levelCount = 1;
+//	viewInfo.subresourceRange.baseArrayLayer = 0;
+//	viewInfo.subresourceRange.layerCount = 1;
+//
+//	if (vkCreateImageView(InOwner->Get(), &viewInfo, nullptr, &View) != VK_SUCCESS)
+//		throw std::runtime_error("Failed to create UAV image view!");
+//
+//	if (bIsSRVSupported)
+//	{
+//	}
+//
+//	{
+//		std::string STR = std::string("VulkanUnorderedAccessTarget::") + Name.c_str();
+//		InOwner->SetResourceName(VkObjectType::VK_OBJECT_TYPE_IMAGE, reinterpret_cast<std::uint64_t>(Image), STR.c_str());
+//	}
+//}
+//
+//VulkanUnorderedAccessTarget::~VulkanUnorderedAccessTarget()
+//{
+//}
 
 VulkanFrameBuffer::VulkanFrameBuffer(VulkanDevice* InOwner, const std::string InName, const sFrameBufferAttachmentInfo& InAttachments)
 	: Owner(InOwner)
@@ -340,7 +340,7 @@ VulkanFrameBuffer::VulkanFrameBuffer(VulkanDevice* InOwner, const std::string In
 	{
 		const auto& FB = AttachmentInfo.FrameBuffer[i];
 
-		if (FB.AttachmentType == EFrameBufferAttachmentType::UAV)
+		/*if (FB.AttachmentType == EFrameBufferAttachmentType::UAV)
 		{
 			UnorderedAccessTargets.push_back(VulkanUnorderedAccessTarget::Create(Owner, Name + "_UAV_" + std::to_string(UnorderedAccessTargets.size()), FB.Format, FDesc, false));
 		}
@@ -348,7 +348,7 @@ VulkanFrameBuffer::VulkanFrameBuffer(VulkanDevice* InOwner, const std::string In
 		{
 			UnorderedAccessTargets.push_back(VulkanUnorderedAccessTarget::Create(Owner, Name + "_UAV_" + std::to_string(UnorderedAccessTargets.size()), FB.Format, FDesc, true));
 		}
-		else if (FB.AttachmentType == EFrameBufferAttachmentType::RT)
+		else*/ if (FB.AttachmentType == EFrameBufferAttachmentType::RT)
 		{
 			RenderTargets.push_back(VulkanRenderTarget::Create(Owner, Name + "_RenderTarget_" + std::to_string(RenderTargets.size()), sFrameBuffer(FB.Format, FB.AttachmentType), FDesc));
 		}
@@ -450,31 +450,31 @@ void VulkanFrameBuffer::AttachRenderTarget(const IRenderTarget::SharedPtr& Rende
 	}
 }
 
-void VulkanFrameBuffer::AttachUnorderedAccessTarget(const IUnorderedAccessTarget::SharedPtr& UnorderedAccessTarget, std::optional<std::size_t> Index)
-{
-	if (auto ST = std::dynamic_pointer_cast<VulkanUnorderedAccessTarget>(UnorderedAccessTarget))
-	{
-		EFrameBufferAttachmentType AttachmentType;
-		if (!ST->IsSRV_Allowed())
-		{
-			AttachmentType = EFrameBufferAttachmentType::UAV;
-		}
-		else if (ST->IsSRV_Allowed())
-		{
-			AttachmentType = EFrameBufferAttachmentType::UAV_SRV;
-		}
-
-		if (Index.has_value())
-			UnorderedAccessTargets.insert(UnorderedAccessTargets.begin() + Index.value(), ST);
-		else
-			UnorderedAccessTargets.push_back(ST);
-
-		if (Index.has_value())
-			AttachmentInfo.FrameBuffer.insert(AttachmentInfo.FrameBuffer.begin() + Index.value(), sFrameBuffer(ST->GetFormat(), AttachmentType));
-		else
-			AttachmentInfo.AddFrameBuffer(ST->GetFormat(), AttachmentType);
-	}
-}
+//void VulkanFrameBuffer::AttachUnorderedAccessTarget(const IUnorderedAccessTarget::SharedPtr& UnorderedAccessTarget, std::optional<std::size_t> Index)
+//{
+//	if (auto ST = std::dynamic_pointer_cast<VulkanUnorderedAccessTarget>(UnorderedAccessTarget))
+//	{
+//		EFrameBufferAttachmentType AttachmentType;
+//		if (!ST->IsSRV_Allowed())
+//		{
+//			AttachmentType = EFrameBufferAttachmentType::UAV;
+//		}
+//		else if (ST->IsSRV_Allowed())
+//		{
+//			AttachmentType = EFrameBufferAttachmentType::UAV_SRV;
+//		}
+//
+//		if (Index.has_value())
+//			UnorderedAccessTargets.insert(UnorderedAccessTargets.begin() + Index.value(), ST);
+//		else
+//			UnorderedAccessTargets.push_back(ST);
+//
+//		if (Index.has_value())
+//			AttachmentInfo.FrameBuffer.insert(AttachmentInfo.FrameBuffer.begin() + Index.value(), sFrameBuffer(ST->GetFormat(), AttachmentType));
+//		else
+//			AttachmentInfo.AddFrameBuffer(ST->GetFormat(), AttachmentType);
+//	}
+//}
 
 void VulkanFrameBuffer::SetDepthTarget(const IDepthTarget::SharedPtr& InDepthTarget)
 {

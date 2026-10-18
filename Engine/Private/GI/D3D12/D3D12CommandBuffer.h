@@ -43,6 +43,8 @@ public:
 	D3D12CommandBuffer(D3D12Device* InOwner);
 	virtual ~D3D12CommandBuffer();
 
+	virtual void SetName(std::string Name) override final;
+
 	FORCEINLINE ID3D12GraphicsCommandList8* Get() const { return CommandList.Get(); }
 	FORCEINLINE ComPtr<ID3D12CommandList> GetAsCOM() const { return CommandList; }
 	FORCEINLINE ComPtr<ID3D12CommandAllocator> GetAllocator() const { return CommandAllocator; }

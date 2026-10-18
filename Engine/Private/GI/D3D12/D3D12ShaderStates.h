@@ -40,7 +40,7 @@ class D3D12Rasterizer
 {
 	sBaseClassBody(sClassConstructor, D3D12Rasterizer)
 public:
-	D3D12Rasterizer(sRasterizerAttributeDesc InDesc, bool EnableConservativeRaster = false)
+	D3D12Rasterizer(sRasterizerAttributeDesc InDesc)
 		: RasterizerDesc(InDesc)
 	{
 		RasterizerStateDesc = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
@@ -77,7 +77,7 @@ public:
 		RasterizerStateDesc.AntialiasedLineEnable = InDesc.bEnableLineAA ? TRUE : FALSE;
 		RasterizerStateDesc.ForcedSampleCount = 0;
 
-		if (EnableConservativeRaster)
+		if (InDesc.bConservativeRasterization)
 			RasterizerStateDesc.ConservativeRaster = D3D12_CONSERVATIVE_RASTERIZATION_MODE_ON;
 		else
 			RasterizerStateDesc.ConservativeRaster = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;

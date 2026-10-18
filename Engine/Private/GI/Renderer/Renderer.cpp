@@ -1048,6 +1048,14 @@ void sRenderer::Render()
 			if (!ViewportInstance->bIsEnabled)
 				continue;
 
+			if (GBufferClearMode == ERendererClear::Sky && GPU::GetGIType() == EGITypes::D3D12)
+			{
+				//SkyDome->UpdateCameraBuffer(ViewportInstance->pCamera->GetViewProjMatrix());
+				//PostProcessRenderer->Render(GBuffer->GetCommandContext(), SkyDome.get(), FinalRenderTarget, ViewportInstance->Viewport);
+				//PostProcessRenderer->Render(SkyDome.get(), FinalRenderTarget, std::nullopt);
+				//FinalRenderTarget = SkyDome->GetFrameBuffer();
+			}
+
 			FinalRenderTarget = GBuffer->Render(World->GetActiveLevel(), i, ViewportInstance->pCamera.get(), ViewportInstance->Viewport);
 			LineRenderer->Render(FinalRenderTarget, GBuffer->GetCameraConstantBuffer(i)->GetBindlessIndex(), ViewportInstance->Viewport);
 			pParticleRenderer->Render(World->GetActiveLevel(), GBuffer->GetCameraConstantBuffer(i)->GetBindlessIndex(), FinalRenderTarget, GBuffer->GetDepth(), ViewportInstance->Viewport);
@@ -1055,7 +1063,8 @@ void sRenderer::Render()
 			{
 				//to do : use global camera
 				FSR->Render(FinalRenderTarget, GBuffer->GetGBuffer()->GetRenderTarget(4), GBuffer->GetGBuffer()->GetRenderTarget(5), GBuffer->GetDepth(), ViewportInstance->pCamera.get());
-				FinalRenderTarget = FSR->GetOutputRenderTarget();
+				if (FSR->IsUpscalingActive())
+					FinalRenderTarget = FSR->GetOutputRenderTarget();
 			}
 		}
 	}
@@ -1075,6 +1084,7 @@ void sRenderer::Render()
 		FinalRenderTarget = PP->GetFrameBuffer();
 	}
 
+	//TAA->Render(FinalRenderTarget, GBuffer->GetMotionVector(), GBuffer->GetDepth(), InternalBaseRenderResolution);
 	if (bIsTonmapperEnabled)
 	{
 		PostProcessRenderer->Render(ToneMapping.get(), FinalRenderTarget, std::nullopt);
@@ -1091,6 +1101,15 @@ void sRenderer::Render()
 	{
 		PostProcessRenderer->Render(PP.get(), FinalRenderTarget, std::nullopt);
 		FinalRenderTarget = PP->GetFrameBuffer();
+	}
+
+	if (UpscalerType == ERendererUpscalerType::FSR && GPU::GetGIType() == EGITypes::D3D12 && FSR && (GPU::GetDeviceType() != EGPUDeviceType::Software || bSoftwareDeviceUpscallerSupport))
+	{
+		if (FSR->IsFrameGenActive() && FSR->GetUICompositionMode() == UICompositionMode::PreUiBackbuffer)
+		{
+			FSR->CopyHudlessTexture(FinalRenderTarget);
+			FinalRenderTarget = FSR->GetHudlessTextures();
+		}
 	}
 
 	if (PlayerCount > 0)
@@ -1146,8 +1165,15 @@ void sRenderer::Render()
 	CanvasRenderer->Render(World->GetCanvases(), FinalRenderTarget, std::nullopt);
 	{
 		auto CommandContext = CanvasRenderer->GetCommandContext();
-		CommandContext->EndProfile();
 
+		if (UpscalerType == ERendererUpscalerType::FSR && GPU::GetGIType() == EGITypes::D3D12 && FSR && (GPU::GetDeviceType() != EGPUDeviceType::Software || bSoftwareDeviceUpscallerSupport))
+		{
+			if (FSR->IsFrameGenActive() && FSR->GetUICompositionMode() == UICompositionMode::PreUiBackbuffer)
+			{
+				FinalRenderTarget->AsResource(EResourceState::NonPixelShaderResource, CommandContext);
+			}
+		}
+		CommandContext->EndProfile();
 		CommandContext->FinishRecordCommandList();
 		CommandContext->ExecuteCommandList(ECommandContextExecuteType::Deferred, 40);
 
@@ -1213,7 +1239,7 @@ void sRenderer::OnInputProcess(const GMouseInput& MouseInput, const GKeyboardCha
 	}
 	else if (KeyboardChar.KeyCode == 13 && KeyboardChar.bIsPressed /*&& KeyboardChar.bIsChar*/)
 	{
-		if (GPU::GetGIType() == EGITypes::D3D12)
+		if (GPU::GetGIType() == EGITypes::D3D12 && (GPU::GetDeviceType() != EGPUDeviceType::Software || bSoftwareDeviceUpscallerSupport))
 		{
 			GPU::WaitForGPU();
 			SetUpscalerType(ERendererUpscalerType::FSR);
@@ -1250,11 +1276,14 @@ void sRenderer::SetInternalBaseRenderResolution(std::size_t Width, std::size_t H
 
 void sRenderer::SetUpscalerType(ERendererUpscalerType NewUpscalerType)
 {
+	if (NewUpscalerType == ERendererUpscalerType::FSR && GPU::GetGIType() != EGITypes::D3D12)
+		return;
+
 	UpscalerType = NewUpscalerType;
 
 	if (UpscalerType == ERendererUpscalerType::FSR && FSR && (GPU::GetDeviceType() != EGPUDeviceType::Software || bSoftwareDeviceUpscallerSupport))
 	{
-		FSR->OnEnabled(true, false);
+		FSR->OnEnabled(true, true);
 		FSR->OnUpdatePreset = std::bind(&sGBuffer::OnUpdateUpscalerPreset, GBuffer.get(), std::placeholders::_1, std::placeholders::_2);
 	}
 	else

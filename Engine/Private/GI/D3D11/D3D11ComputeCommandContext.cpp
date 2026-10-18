@@ -228,78 +228,78 @@ void D3D11ComputeCommandContext::SetRenderTargetsAsResource(std::vector<IRenderT
 		throw std::runtime_error("Pipeline is not set.");
 	}
 }
-
-void D3D11ComputeCommandContext::SetUnorderedAccessTarget(IUnorderedAccessTarget* pST, std::uint32_t InRootParameterIndex)
-{
-	if (!pST)
-		return;
-
-	if (ActivePipeline)
-	{
-		const auto& RootParameterIndex = InRootParameterIndex;
-
-		if (RootParameterIndex >= ActivePipeline->GetDescriptorSetLayoutBindingSize())
-			return;
-
-		const auto& Binding = ActivePipeline->GetDescriptorSetLayoutBinding(RootParameterIndex);
-
-#if _DEBUG
-		if (Binding.GetDescriptorType() != EDescriptorType::UAV)
-			throw std::runtime_error("Wrong Root Parameter Index.");
-#endif
-		const int i = Binding.Location;
-
-		D3D11UnorderedAccessTarget* RT = static_cast<D3D11UnorderedAccessTarget*>(pST);
-		UINT Count = 1;
-
-		if (const auto& UAV = RT->GetD3D11UAV())
-		{
-			DeferredCTX->CSSetUnorderedAccessViews(i, 1, &UAV, &Count);
-		}
-	}
-	else
-	{
-		throw std::runtime_error("Pipeline is not set.");
-	}
-}
-
-void D3D11ComputeCommandContext::SetUnorderedAccessTargets(std::vector<IUnorderedAccessTarget*> pSTs, std::uint32_t InRootParameterIndex)
-{
-	if (pSTs.size() == 0)
-		return;
-
-	if (ActivePipeline)
-	{
-		const auto& RootParameterIndex = InRootParameterIndex;
-
-		if (RootParameterIndex >= ActivePipeline->GetDescriptorSetLayoutBindingSize())
-			return;
-
-		const auto& Binding = ActivePipeline->GetDescriptorSetLayoutBinding(RootParameterIndex);
-
-#if _DEBUG
-		if (Binding.GetDescriptorType() != EDescriptorType::UAV)
-			throw std::runtime_error("Wrong Root Parameter Index.");
-#endif
-
-		int i = Binding.Location;
-		for (IUnorderedAccessTarget* pRT : pSTs)
-		{
-			D3D11UnorderedAccessTarget* RT = static_cast<D3D11UnorderedAccessTarget*>(pRT);
-			UINT Count = 1;
-
-			if (const auto& UAV = RT->GetD3D11UAV())
-			{
-				DeferredCTX->CSSetUnorderedAccessViews(i, 1, &UAV, &Count);
-			}
-			i++;
-		}
-	}
-	else
-	{
-		throw std::runtime_error("Pipeline is not set.");
-	}
-}
+//
+//void D3D11ComputeCommandContext::SetUnorderedAccessTarget(IUnorderedAccessTarget* pST, std::uint32_t InRootParameterIndex)
+//{
+//	if (!pST)
+//		return;
+//
+//	if (ActivePipeline)
+//	{
+//		const auto& RootParameterIndex = InRootParameterIndex;
+//
+//		if (RootParameterIndex >= ActivePipeline->GetDescriptorSetLayoutBindingSize())
+//			return;
+//
+//		const auto& Binding = ActivePipeline->GetDescriptorSetLayoutBinding(RootParameterIndex);
+//
+//#if _DEBUG
+//		if (Binding.GetDescriptorType() != EDescriptorType::UAV)
+//			throw std::runtime_error("Wrong Root Parameter Index.");
+//#endif
+//		const int i = Binding.Location;
+//
+//		D3D11UnorderedAccessTarget* RT = static_cast<D3D11UnorderedAccessTarget*>(pST);
+//		UINT Count = 1;
+//
+//		if (const auto& UAV = RT->GetD3D11UAV())
+//		{
+//			DeferredCTX->CSSetUnorderedAccessViews(i, 1, &UAV, &Count);
+//		}
+//	}
+//	else
+//	{
+//		throw std::runtime_error("Pipeline is not set.");
+//	}
+//}
+//
+//void D3D11ComputeCommandContext::SetUnorderedAccessTargets(std::vector<IUnorderedAccessTarget*> pSTs, std::uint32_t InRootParameterIndex)
+//{
+//	if (pSTs.size() == 0)
+//		return;
+//
+//	if (ActivePipeline)
+//	{
+//		const auto& RootParameterIndex = InRootParameterIndex;
+//
+//		if (RootParameterIndex >= ActivePipeline->GetDescriptorSetLayoutBindingSize())
+//			return;
+//
+//		const auto& Binding = ActivePipeline->GetDescriptorSetLayoutBinding(RootParameterIndex);
+//
+//#if _DEBUG
+//		if (Binding.GetDescriptorType() != EDescriptorType::UAV)
+//			throw std::runtime_error("Wrong Root Parameter Index.");
+//#endif
+//
+//		int i = Binding.Location;
+//		for (IUnorderedAccessTarget* pRT : pSTs)
+//		{
+//			D3D11UnorderedAccessTarget* RT = static_cast<D3D11UnorderedAccessTarget*>(pRT);
+//			UINT Count = 1;
+//
+//			if (const auto& UAV = RT->GetD3D11UAV())
+//			{
+//				DeferredCTX->CSSetUnorderedAccessViews(i, 1, &UAV, &Count);
+//			}
+//			i++;
+//		}
+//	}
+//	else
+//	{
+//		throw std::runtime_error("Pipeline is not set.");
+//	}
+//}
 
 void D3D11ComputeCommandContext::SetRenderTargetAsUAV(IRenderTarget* pRT, std::uint32_t InRootParameterIndex)
 {
@@ -385,74 +385,74 @@ void D3D11ComputeCommandContext::SetRenderTargetsAsUAV(std::vector<IRenderTarget
 	}
 }
 
-void D3D11ComputeCommandContext::SetUnorderedAccessTargetAsSRV(IUnorderedAccessTarget* pST, std::uint32_t InRootParameterIndex)
-{
-	if (!pST)
-		return;
-
-	if (ActivePipeline)
-	{
-		const auto& RootParameterIndex = InRootParameterIndex;
-
-		if (RootParameterIndex >= ActivePipeline->GetDescriptorSetLayoutBindingSize())
-			return;
-
-		const auto& Binding = ActivePipeline->GetDescriptorSetLayoutBinding(RootParameterIndex);
-
-#if _DEBUG
-		if (Binding.GetDescriptorType() != EDescriptorType::Texture)
-			throw std::runtime_error("Wrong Root Parameter Index.");
-#endif
-		const int i = Binding.Location;
-
-		D3D11UnorderedAccessTarget* RT = static_cast<D3D11UnorderedAccessTarget*>(pST);
-
-		if (const auto& SRV = RT->GetD3D11SRV())
-		{
-			DeferredCTX->CSSetShaderResources(i, 1, &SRV);
-		}
-	}
-	else
-	{
-		throw std::runtime_error("Pipeline is not set.");
-	}
-}
-
-void D3D11ComputeCommandContext::SetUnorderedAccessTargetsAsSRV(std::vector<IUnorderedAccessTarget*> pSTs, std::uint32_t InRootParameterIndex)
-{
-	if (pSTs.size() == 0)
-		return;
-
-	if (ActivePipeline)
-	{
-		const auto& RootParameterIndex = InRootParameterIndex;
-
-		if (RootParameterIndex >= ActivePipeline->GetDescriptorSetLayoutBindingSize())
-			return;
-
-		const auto& Binding = ActivePipeline->GetDescriptorSetLayoutBinding(RootParameterIndex);
-
-#if _DEBUG
-		if (Binding.GetDescriptorType() != EDescriptorType::Texture)
-			throw std::runtime_error("Wrong Root Parameter Index.");
-#endif
-
-		int i = Binding.Location;
-		for (IUnorderedAccessTarget* pRT : pSTs)
-		{
-			D3D11UnorderedAccessTarget* RT = static_cast<D3D11UnorderedAccessTarget*>(pRT);
-			if (const auto& SRV = RT->GetD3D11SRV())
-			{
-				DeferredCTX->CSSetShaderResources(i, 1, &SRV);
-			}
-			i++;
-		}
-	}
-	else
-	{
-		throw std::runtime_error("Pipeline is not set.");
-	}
-}
+//void D3D11ComputeCommandContext::SetUnorderedAccessTargetAsSRV(IUnorderedAccessTarget* pST, std::uint32_t InRootParameterIndex)
+//{
+//	if (!pST)
+//		return;
+//
+//	if (ActivePipeline)
+//	{
+//		const auto& RootParameterIndex = InRootParameterIndex;
+//
+//		if (RootParameterIndex >= ActivePipeline->GetDescriptorSetLayoutBindingSize())
+//			return;
+//
+//		const auto& Binding = ActivePipeline->GetDescriptorSetLayoutBinding(RootParameterIndex);
+//
+//#if _DEBUG
+//		if (Binding.GetDescriptorType() != EDescriptorType::Texture)
+//			throw std::runtime_error("Wrong Root Parameter Index.");
+//#endif
+//		const int i = Binding.Location;
+//
+//		D3D11UnorderedAccessTarget* RT = static_cast<D3D11UnorderedAccessTarget*>(pST);
+//
+//		if (const auto& SRV = RT->GetD3D11SRV())
+//		{
+//			DeferredCTX->CSSetShaderResources(i, 1, &SRV);
+//		}
+//	}
+//	else
+//	{
+//		throw std::runtime_error("Pipeline is not set.");
+//	}
+//}
+//
+//void D3D11ComputeCommandContext::SetUnorderedAccessTargetsAsSRV(std::vector<IUnorderedAccessTarget*> pSTs, std::uint32_t InRootParameterIndex)
+//{
+//	if (pSTs.size() == 0)
+//		return;
+//
+//	if (ActivePipeline)
+//	{
+//		const auto& RootParameterIndex = InRootParameterIndex;
+//
+//		if (RootParameterIndex >= ActivePipeline->GetDescriptorSetLayoutBindingSize())
+//			return;
+//
+//		const auto& Binding = ActivePipeline->GetDescriptorSetLayoutBinding(RootParameterIndex);
+//
+//#if _DEBUG
+//		if (Binding.GetDescriptorType() != EDescriptorType::Texture)
+//			throw std::runtime_error("Wrong Root Parameter Index.");
+//#endif
+//
+//		int i = Binding.Location;
+//		for (IUnorderedAccessTarget* pRT : pSTs)
+//		{
+//			D3D11UnorderedAccessTarget* RT = static_cast<D3D11UnorderedAccessTarget*>(pRT);
+//			if (const auto& SRV = RT->GetD3D11SRV())
+//			{
+//				DeferredCTX->CSSetShaderResources(i, 1, &SRV);
+//			}
+//			i++;
+//		}
+//	}
+//	else
+//	{
+//		throw std::runtime_error("Pipeline is not set.");
+//	}
+//}
 
 void D3D11ComputeCommandContext::SetUnorderedAccessBuffer(IStructuredBuffer* pUAV, std::uint32_t RootParameterIndex)
 {

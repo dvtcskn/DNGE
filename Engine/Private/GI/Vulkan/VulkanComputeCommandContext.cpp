@@ -76,13 +76,13 @@ void VulkanComputeCommandContext::SetRenderTargetsAsResource(std::vector<IRender
 {
 }
 
-void VulkanComputeCommandContext::SetUnorderedAccessTarget(IUnorderedAccessTarget* pST, std::uint32_t RootParameterIndex)
-{
-}
-
-void VulkanComputeCommandContext::SetUnorderedAccessTargets(std::vector<IUnorderedAccessTarget*> pSTs, std::uint32_t RootParameterIndex)
-{
-}
+//void VulkanComputeCommandContext::SetUnorderedAccessTarget(IUnorderedAccessTarget* pST, std::uint32_t RootParameterIndex)
+//{
+//}
+//
+//void VulkanComputeCommandContext::SetUnorderedAccessTargets(std::vector<IUnorderedAccessTarget*> pSTs, std::uint32_t RootParameterIndex)
+//{
+//}
 
 void VulkanComputeCommandContext::SetRenderTargetAsUAV(IRenderTarget* pRT, std::uint32_t RootParameterIndex)
 {
@@ -92,13 +92,13 @@ void VulkanComputeCommandContext::SetRenderTargetsAsUAV(std::vector<IRenderTarge
 {
 }
 
-void VulkanComputeCommandContext::SetUnorderedAccessTargetAsSRV(IUnorderedAccessTarget* pST, std::uint32_t RootParameterIndex)
-{
-}
-
-void VulkanComputeCommandContext::SetUnorderedAccessTargetsAsSRV(std::vector<IUnorderedAccessTarget*> pSTs, std::uint32_t RootParameterIndex)
-{
-}
+//void VulkanComputeCommandContext::SetUnorderedAccessTargetAsSRV(IUnorderedAccessTarget* pST, std::uint32_t RootParameterIndex)
+//{
+//}
+//
+//void VulkanComputeCommandContext::SetUnorderedAccessTargetsAsSRV(std::vector<IUnorderedAccessTarget*> pSTs, std::uint32_t RootParameterIndex)
+//{
+//}
 
 void VulkanComputeCommandContext::SetUnorderedAccessBuffer(IStructuredBuffer* pUAV, std::uint32_t RootParameterIndex)
 {

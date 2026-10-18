@@ -1921,16 +1921,6 @@ IDepthTarget::UniquePtr VulkanDevice::CreateUniqueDepthTarget(const std::string 
 	return VulkanDepthTarget::CreateUnique(this, InName, Format, Desc);
 }
 
-IUnorderedAccessTarget::SharedPtr VulkanDevice::CreateUnorderedAccessTarget(const std::string InName, const EFormat Format, const sFBODesc& Desc, bool InEnableSRV)
-{
-	return VulkanUnorderedAccessTarget::Create(this, InName, Format, Desc, InEnableSRV);
-}
-
-IUnorderedAccessTarget::UniquePtr VulkanDevice::CreateUniqueUnorderedAccessTarget(const std::string InName, const EFormat Format, const sFBODesc& Desc, bool InEnableSRV)
-{
-	return VulkanUnorderedAccessTarget::CreateUnique(this, InName, Format, Desc, InEnableSRV);
-}
-
 IPipeline::SharedPtr VulkanDevice::CreatePipeline(const std::string& InName, const sPipelineDesc& InDesc)
 {
 	return VulkanPipeline::Create(this, InName, InDesc);

@@ -266,7 +266,7 @@ void D3D12Pipeline::CompilePipeline()
     PSODesc.NodeMask = 0; 
     auto BlendState = D3D12BlendState(Desc.BlendAttribute);
     PSODesc.BlendState = BlendState.Get();
-    auto RasterState = D3D12Rasterizer(Desc.RasterizerAttribute/*, !Owner->IsSoftwareDevice() && PrimitiveTopologyType == D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST*/);
+    auto RasterState = D3D12Rasterizer(Desc.RasterizerAttribute);
     PSODesc.RasterizerState = RasterState.Get();
     PSODesc.SampleMask = 0xFFFFFFFFu;
     PSODesc.SampleDesc.Count = 1;

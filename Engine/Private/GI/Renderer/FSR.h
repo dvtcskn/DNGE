@@ -100,6 +100,10 @@ public:
     {
         return Output.get();
     }
+    inline IRenderTarget* GetHudlessTextures() const
+    {
+        return HudlessTextures.Get();
+    }
 
     virtual void SetRenderSize(std::size_t Width, std::size_t Height) override final;
     virtual void OnInputProcess(const GMouseInput& MouseInput, const GKeyboardChar& KeyboardChar) override final;
@@ -112,36 +116,42 @@ public:
 
     std::function<void(sScreenDimension, float)> OnUpdatePreset;
 
+    void CopyHudlessTexture(IRenderTarget* HudlessTexture);
+
+    UICompositionMode GetUICompositionMode() const
+    {
+        return UIRenderMode;
+    }
+
+    bool IsUpscalingActive() const
+    {
+        return bUpscalingActive;
+    }
+
+    bool IsFrameGenActive() const
+    {
+        return bFrameInterpolationActive;
+    }
+
 private:
+    ffxReturnCode_t UiCompositionCallback(ffxCallbackDescFrameGenerationPresent* Params);
     void SetUpscaleConstantBuffer(uint64_t key, float value);
     float GetUpscaleBaseRenderRatio() const;
 
     static void FfxMsgCallback(uint32_t type, const wchar_t* message);
 
-    /**
-     * @brief   Returns whether or not FSR requires sample-side re-initialization.
-     */
-    inline bool NeedsReInit() const
-    {
-        return bNeedReInit;
-    }
-
-    /**
-     * @brief   Clears FSR re-initialization flag.
-     */
-    inline void ClearReInit()
-    {
-        bNeedReInit = false;
-    }
-
 private:
     IGraphicsCommandContext::SharedPtr GraphicsCommandContext;
-    IGraphicsCommandContext::SharedPtr CMD;
+    IGraphicsCommandContext::SharedPtr FrameGenCommandContext;
+    IGraphicsCommandContext::SharedPtr FSRCopyCommandContext;
     sRenderDimension RenderDimension;
     IRenderTarget::SharedPtr Output;
     IRenderTarget::SharedPtr GeneratedReactiveMask;
+    IRenderTarget::SharedPtr InterpolationOutput;
     bool bGenerateReactiveMask = false;
     std::mutex Mutex;
+
+    TDoubleBuffer<IRenderTarget> HudlessTextures;
 
 private:
     // FSR
@@ -173,7 +183,6 @@ private:
         Auto
     };
 
-    bool bNeedReInit = false;
     uint32_t JitterFrame = 0;
     uint64_t FrameID = 0;
     //FSRMaskMode MaskMode = FSRMaskMode::Manual;
@@ -189,14 +198,14 @@ private:
     int32_t FgVersionIndex = 0;
     std::vector<const char*> FgVersionNames;
     Version currentFgContextVersion = {};
-    bool bEnableAsyncCompute = false;
+    bool bEnableAsyncCompute = true;
     bool bInvertedDepth = true;
     float MipBias = cMipBias[static_cast<uint32_t>(ERendererUpscaleMode::Quality)];
     FSRColorSpace ColorSpace = FSRColorSpace::DefaultLinearColorSpace;
 
 private:
     // FSR Upscale
-    bool bUpscalingActive = true;
+    bool bUpscalingActive = false;
     ffx::Context UpscalingContext = nullptr;
     bool bReset = true;
     float DT = 0.0f;
@@ -213,14 +222,27 @@ private:
 private:
     // FSR FrameGen
     bool bFrameInterpolationActive = false;
-    UICompositionMode UIRenderMode = UICompositionMode::No_UI_Handling;
+    UICompositionMode UIRenderMode;
     ffx::Context FrameGenContext = nullptr;
     ffx::Context SwapChainContext = nullptr;
     ffx::ConfigureDescFrameGeneration FrameGenerationConfig;
+    bool bSimulatePresentSkip = false;
+    bool bResetFrameInterpolation = true;
+    std::mutex FGContextMutex;
 
     bool bEnableFrameInterpolationSwapchain = false;
     void EnableFrameInterpolationSwapchain(bool enabled);
 
     bool   bGetLatencyWaitableObject = false;
     HANDLE LatencyWaitableObj = 0;
+
+    bool bUseCallback = false; // ??
+    bool bUseDistortionField = false; // ??
+    bool bDoublebufferInSwapchain = true;
+    bool bPresentInterpolatedOnly = false;
+
+    bool bDrawFrameGenerationDebugTearLines = true;
+    bool bDrawFrameGenerationDebugResetIndicators = true;
+    bool bDrawFrameGenerationDebugPacingLines = true;
+    bool bDrawFrameGenerationDebugView = true;
 };

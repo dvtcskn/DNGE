@@ -39,7 +39,15 @@
 #endif
 
 #ifndef FSR_DEBUG
-#define FSR_DEBUG 0
+#define FSR_DEBUG 1
+#endif
+
+#ifndef FSR_Upscale_DEBUG
+#define FSR_Upscale_DEBUG 0
+#endif
+
+#ifndef FSR_FrameGen_DEBUG
+#define FSR_FrameGen_DEBUG 0
 #endif
 
 namespace
@@ -150,6 +158,7 @@ namespace
         default:
             Engine::Assert(AssertLevel::ASSERT_CRITICAL, false, L"FFXInterface: Cauldron: Unsupported display mode requested. Please implement.");
         }
+        return FfxApiBackbufferTransferFunction();
     }
 }
 
@@ -159,11 +168,22 @@ sFSR::sFSR(std::size_t Width, std::size_t Height)
 	, GraphicsCommandContext(IGraphicsCommandContext::Create())
     , UpscaleMode(ERendererUpscaleMode::NativeAA)
     , bGenerateReactiveMask(false)
-    , CMD(IGraphicsCommandContext::Create())
+    , FSRCopyCommandContext(IGraphicsCommandContext::Create())
+    , FrameGenCommandContext(IGraphicsCommandContext::Create())
+    , UIRenderMode(UICompositionMode::No_UI_Handling)
 {
     Output = IRenderTarget::Create("FSR Output", sFrameBuffer(GPU::GetBackBufferFormat(), EFrameBufferAttachmentType::RT_SRV_UAV), sFBODesc(sFBODesc::sFBODimension((std::uint32_t)Width, (std::uint32_t)Height)));
     if (bGenerateReactiveMask)
         GeneratedReactiveMask = IRenderTarget::Create("FSR GeneratedReactiveMask", sFrameBuffer(GPU::GetBackBufferFormat(), EFrameBufferAttachmentType::RT_SRV_UAV), sFBODesc(sFBODesc::sFBODimension((std::uint32_t)Width, (std::uint32_t)Height)));
+
+    HudlessTextures.First = IRenderTarget::Create("HudlessTextures_First", sFrameBuffer(GPU::GetBackBufferFormat(), EFrameBufferAttachmentType::RT_SRV_UAV), sFBODesc(sFBODesc::sFBODimension((std::uint32_t)Width, (std::uint32_t)Height)));
+    HudlessTextures.Second = IRenderTarget::Create("HudlessTextures_Second", sFrameBuffer(GPU::GetBackBufferFormat(), EFrameBufferAttachmentType::RT_SRV_UAV), sFBODesc(sFBODesc::sFBODimension((std::uint32_t)Width, (std::uint32_t)Height)));
+
+    InterpolationOutput = IRenderTarget::Create("FSR Interpolation Output", sFrameBuffer(GPU::GetBackBufferFormat(), EFrameBufferAttachmentType::RT_SRV_UAV), sFBODesc(sFBODesc::sFBODimension((std::uint32_t)Width, (std::uint32_t)Height)));
+
+    GraphicsCommandContext->SetName("GraphicsCommandContext_FSR_Upscale");
+    FrameGenCommandContext->SetName("FrameGenCommandContext");
+    FSRCopyCommandContext->SetName("FSRCopyCommandContext");
 
     {
         struct ffxQueryDescGetVersions versionQuery = { 0 };
@@ -220,6 +240,7 @@ sFSR::sFSR(std::size_t Width, std::size_t Height)
 
 sFSR::~sFSR()
 {
+    HudlessTextures.Release();
 	GraphicsCommandContext = nullptr;
 
     Output = nullptr;
@@ -278,6 +299,10 @@ void sFSR::SetUpscaleEnabled(bool bEnabled)
         Engine::WriteToConsole("FSR 3/4 does not support Vulkan or D3D11.");
         return;
     }
+
+    if (bUpscalingActive == bEnabled)
+        return;
+
     if (bEnabled)
     {
         bUpscalingActive = true;
@@ -305,7 +330,7 @@ void sFSR::SetUpscaleEnabled(bool bEnabled)
         createFsr.flags |= ColorSpace == FSRColorSpace::NonLinearColorSpace ? FFX_UPSCALE_ENABLE_NON_LINEAR_COLORSPACE : 0;
         createFsr.fpMessage = nullptr;
 
-#if FSR_DEBUG
+#if FSR_DEBUG && FSR_Upscale_DEBUG
         createFsr.flags |= FFX_UPSCALE_ENABLE_DEBUG_CHECKING;
         createFsr.flags |= FFX_UPSCALE_ENABLE_DEBUG_VISUALIZATION;
 #endif
@@ -421,40 +446,45 @@ void sFSR::SetFrameGenerationEnabled(bool bEnabled)
         Engine::WriteToConsole("FSR 3/4 does not support Vulkan or D3D11.");
         return;
     }
-    /*{
-        ffx::ReturnCode retCode;
-        FfxApiEffectMemoryUsage gpuMemoryUsageSwapChainV2;
-        ffxQueryFrameGenerationSwapChainGetGPUMemoryUsageDX12V2 swapChainGetGPUMemoryUsageV2{};
-        D3D12Device* Device = (D3D12Device*)GPU::GetDevice();
-        D3D12Viewport* Viewport = (D3D12Viewport*)Device->GetD3D12Viewport();
-        swapChainGetGPUMemoryUsageV2.device = GPU::GetInternalDevice();
-        IDXGISwapChain4* dxgiSwapchain = Viewport->GetSwapChainPtr();
-        DXGI_SWAP_CHAIN_DESC1 desc1;
-        dxgiSwapchain->GetDesc1(&desc1);
-        FfxApiDimensions2D swapChainDescDisplaySize;
-        swapChainDescDisplaySize.width = desc1.Width;
-        swapChainDescDisplaySize.height = desc1.Height;
-        swapChainGetGPUMemoryUsageV2.displaySize = swapChainDescDisplaySize;
-        swapChainGetGPUMemoryUsageV2.backBufferFormat = ffxApiGetSurfaceFormatDX12(desc1.Format);
-        swapChainGetGPUMemoryUsageV2.backBufferCount = desc1.BufferCount;
 
-        FfxApiResource uiColor = SDKWrapper::ffxGetResourceApi(m_pUiTexture[0]->GetResource(), FFX_API_RESOURCE_STATE_PIXEL_COMPUTE_READ);
-        FfxApiDimensions2D uiResourceSize;
-        uiResourceSize.width = (s_uiRenderMode == UICompositionMode::UiTexture) ? uiColor.description.width : 0;
-        uiResourceSize.height = (s_uiRenderMode == UICompositionMode::UiTexture) ? uiColor.description.height : 0;
-        swapChainGetGPUMemoryUsageV2.uiResourceSize = uiResourceSize;
-        swapChainGetGPUMemoryUsageV2.uiResourceFormat = (s_uiRenderMode == UICompositionMode::UiTexture) ? uiColor.description.format : FFX_API_SURFACE_FORMAT_UNKNOWN;
-        swapChainGetGPUMemoryUsageV2.flags = m_DoublebufferInSwapchain ? FFX_FRAMEGENERATION_UI_COMPOSITION_FLAG_ENABLE_INTERNAL_UI_DOUBLE_BUFFERING : 0;
-        swapChainGetGPUMemoryUsageV2.gpuMemoryUsageFrameGenerationSwapchain = &gpuMemoryUsageSwapChainV2;
+    if (bFrameInterpolationActive == bEnabled)
+        return;
 
-        retCode = ffx::Query(swapChainGetGPUMemoryUsageV2);
-        Engine::Assert(AssertLevel::ASSERT_WARNING, retCode == ffx::ReturnCode::Ok,
-            L"ffxQuery(nullptr,SwapChainGetGPUMemoryUsageDX12V2) returned %d", (uint32_t)retCode);
-        Engine::Print(L"Swapchain Query GPUMemoryUsageV2 VRAM totalUsageInBytes %f MB aliasableUsageInBytes %f MB", gpuMemoryUsageSwapChainV2.totalUsageInBytes / 1048576.f, gpuMemoryUsageSwapChainV2.aliasableUsageInBytes / 1048576.f);
-    }*/
+    //{
+    //    ffx::ReturnCode retCode;
+    //    FfxApiEffectMemoryUsage gpuMemoryUsageSwapChainV2{};
+    //    ffxQueryFrameGenerationSwapChainGetGPUMemoryUsageDX12V2 swapChainGetGPUMemoryUsageV2{};
+    //    D3D12Device* Device = (D3D12Device*)GPU::GetDevice();
+    //    D3D12Viewport* Viewport = (D3D12Viewport*)Device->GetD3D12Viewport();
+    //    swapChainGetGPUMemoryUsageV2.device = GPU::GetInternalDevice();
+    //    IDXGISwapChain4* dxgiSwapchain = Viewport->GetSwapChainPtr();
+    //    DXGI_SWAP_CHAIN_DESC1 desc1;
+    //    dxgiSwapchain->GetDesc1(&desc1);
+    //    FfxApiDimensions2D swapChainDescDisplaySize;
+    //    swapChainDescDisplaySize.width = desc1.Width;
+    //    swapChainDescDisplaySize.height = desc1.Height;
+    //    swapChainGetGPUMemoryUsageV2.displaySize = swapChainDescDisplaySize;
+    //    swapChainGetGPUMemoryUsageV2.backBufferFormat = ffxApiGetSurfaceFormatDX12(desc1.Format);
+    //    swapChainGetGPUMemoryUsageV2.backBufferCount = desc1.BufferCount;
+
+    //    //FfxApiResource uiColor = SDKWrapper::ffxGetResourceApi(m_pUiTexture[0]->GetResource(), FFX_API_RESOURCE_STATE_PIXEL_COMPUTE_READ);
+    //    FfxApiDimensions2D uiResourceSize;
+    //    uiResourceSize.width = /*(UIRenderMode == UICompositionMode::UiTexture) ? uiColor.description.width :*/ 0;
+    //    uiResourceSize.height = /*(UIRenderMode == UICompositionMode::UiTexture) ? uiColor.description.height :*/ 0;
+    //    swapChainGetGPUMemoryUsageV2.uiResourceSize = uiResourceSize;
+    //    swapChainGetGPUMemoryUsageV2.uiResourceFormat = /*(UIRenderMode == UICompositionMode::UiTexture) ? uiColor.description.format :*/ FFX_API_SURFACE_FORMAT_UNKNOWN;
+    //    swapChainGetGPUMemoryUsageV2.flags = bDoublebufferInSwapchain ? FFX_FRAMEGENERATION_UI_COMPOSITION_FLAG_ENABLE_INTERNAL_UI_DOUBLE_BUFFERING : 0;
+    //    swapChainGetGPUMemoryUsageV2.gpuMemoryUsageFrameGenerationSwapchain = &gpuMemoryUsageSwapChainV2;
+
+    //    retCode = ffx::Query(swapChainGetGPUMemoryUsageV2);
+    //    Engine::Assert(AssertLevel::ASSERT_WARNING, retCode == ffx::ReturnCode::Ok,
+    //        L"ffxQuery(nullptr,SwapChainGetGPUMemoryUsageDX12V2) returned %d", (uint32_t)retCode);
+    //    Engine::Print(L"Swapchain Query GPUMemoryUsageV2 VRAM totalUsageInBytes %f MB aliasableUsageInBytes %f MB", gpuMemoryUsageSwapChainV2.totalUsageInBytes / 1048576.f, gpuMemoryUsageSwapChainV2.aliasableUsageInBytes / 1048576.f);
+    //}
 
     if (bEnabled)
     {
+        std::lock_guard<std::mutex> Lock(FGContextMutex);
         bFrameInterpolationActive = true;
         EnableFrameInterpolationSwapchain(true);
         ffx::CreateBackendDX12Desc backendDesc = {};
@@ -465,8 +495,8 @@ void sFSR::SetFrameGenerationEnabled(bool bEnabled)
         backendDesc.device = GPU::GetInternalDevice();
 #endif
         ffx::CreateContextDescFrameGeneration createFg{};
-        createFg.displaySize = { (std::uint32_t)RenderDimension.DisplayWidth, (std::uint32_t)RenderDimension.DisplayWidth };
-        createFg.maxRenderSize = { (std::uint32_t)RenderDimension.DisplayWidth, (std::uint32_t)RenderDimension.DisplayWidth };
+        createFg.displaySize = { (std::uint32_t)RenderDimension.DisplayWidth, (std::uint32_t)RenderDimension.DisplayHeight };
+        createFg.maxRenderSize = { (std::uint32_t)RenderDimension.DisplayWidth, (std::uint32_t)RenderDimension.DisplayHeight };
         if (bInvertedDepth)
             createFg.flags |= FFX_FRAMEGENERATION_ENABLE_DEPTH_INVERTED | FFX_FRAMEGENERATION_ENABLE_DEPTH_INFINITE;
         createFg.flags |= FFX_FRAMEGENERATION_ENABLE_HIGH_DYNAMIC_RANGE;
@@ -476,7 +506,7 @@ void sFSR::SetFrameGenerationEnabled(bool bEnabled)
             createFg.flags |= FFX_FRAMEGENERATION_ENABLE_ASYNC_WORKLOAD_SUPPORT;
         }
 
-#if FSR_DEBUG
+#if FSR_DEBUG && FSR_FrameGen_DEBUG
         createFg.flags |= FFX_FRAMEGENERATION_ENABLE_DEBUG_CHECKING;
 #endif
 
@@ -485,11 +515,11 @@ void sFSR::SetFrameGenerationEnabled(bool bEnabled)
 
         createFg.backBufferFormat = GetFfxSurfaceFormat(Viewport->GetBackBufferFormat());
         FrameGenerationConfig.flags = 0u;
-#if FSR_DEBUG
-        //FrameGenerationConfig.flags |= m_DrawFrameGenerationDebugTearLines ? FFX_FRAMEGENERATION_FLAG_DRAW_DEBUG_TEAR_LINES : 0;
-        //FrameGenerationConfig.flags |= m_DrawFrameGenerationDebugResetIndicators ? FFX_FRAMEGENERATION_FLAG_DRAW_DEBUG_RESET_INDICATORS : 0;
-        //FrameGenerationConfig.flags |= m_DrawFrameGenerationDebugPacingLines ? FFX_FRAMEGENERATION_FLAG_DRAW_DEBUG_PACING_LINES : 0;
-        //FrameGenerationConfig.flags |= m_DrawFrameGenerationDebugView ? FFX_FRAMEGENERATION_FLAG_DRAW_DEBUG_VIEW : 0;
+#if FSR_DEBUG && FSR_FrameGen_DEBUG
+        FrameGenerationConfig.flags |= bDrawFrameGenerationDebugTearLines ? FFX_FRAMEGENERATION_FLAG_DRAW_DEBUG_TEAR_LINES : 0;
+        FrameGenerationConfig.flags |= bDrawFrameGenerationDebugResetIndicators ? FFX_FRAMEGENERATION_FLAG_DRAW_DEBUG_RESET_INDICATORS : 0;
+        FrameGenerationConfig.flags |= bDrawFrameGenerationDebugPacingLines ? FFX_FRAMEGENERATION_FLAG_DRAW_DEBUG_PACING_LINES : 0;
+        FrameGenerationConfig.flags |= bDrawFrameGenerationDebugView ? FFX_FRAMEGENERATION_FLAG_DRAW_DEBUG_VIEW : 0;
 #endif
         FrameGenerationConfig.flags |= !SwapChainContext ? FFX_FRAMEGENERATION_FLAG_NO_SWAPCHAIN_CONTEXT_NOTIFY : 0;
 
@@ -509,8 +539,8 @@ void sFSR::SetFrameGenerationEnabled(bool bEnabled)
         ffx::ReturnCode retCode;
         if (UIRenderMode == UICompositionMode::PreUiBackbuffer)
         {
-            /*ffx::CreateContextDescFrameGenerationHudless createFgHudless{};
-            createFgHudless.hudlessBackBufferFormat = SDKWrapper::GetFfxSurfaceFormat(m_pHudLessTexture[0]->GetResource()->GetTextureResource()->GetFormat());
+            ffx::CreateContextDescFrameGenerationHudless createFgHudless{};
+            createFgHudless.hudlessBackBufferFormat = GetFfxSurfaceFormat(HudlessTextures.Get()->GetFormat());
             frameGenGetGPUMemoryUsageV2.backBufferFormat = createFgHudless.hudlessBackBufferFormat;
 
             if (FgVersionIndex < FgVersionIds.size() && bOverrideVersion)
@@ -527,7 +557,7 @@ void sFSR::SetFrameGenerationEnabled(bool bEnabled)
                 retCode = ffx::Query(frameGenGetGPUMemoryUsageV2);
                 Engine::Assert(AssertLevel::ASSERT_WARNING, retCode == ffx::ReturnCode::Ok, L"ffx::Query(FrameGenerationGetGPUMemoryUsageV2) returned %d", (uint32_t)retCode);
                 retCode = ffx::CreateContext(FrameGenContext, nullptr, createFg, backendDesc, headerVersion, createFgHudless);
-            }*/
+            }
         }
         else
         {
@@ -559,6 +589,7 @@ void sFSR::SetFrameGenerationEnabled(bool bEnabled)
 
         // Configure frame generation
         //FfxApiResource hudLessResource = SDKWrapper::ffxGetResourceApi(m_pHudLessTexture[m_curUiTextureIndex]->GetResource(), FFX_API_RESOURCE_STATE_PIXEL_COMPUTE_READ);
+        FfxApiResource hudLessResource = ffxApiGetResourceDX12((ID3D12Resource*)HudlessTextures.Get()->GetNativeTexture(), FFX_API_RESOURCE_STATE_PIXEL_COMPUTE_READ);
 
         FrameGenerationConfig.frameGenerationEnabled = false;
         FrameGenerationConfig.allowAsyncWorkloads = bEnableAsyncCompute;
@@ -569,10 +600,10 @@ void sFSR::SetFrameGenerationEnabled(bool bEnabled)
         FrameGenerationConfig.frameGenerationCallbackUserContext = &FrameGenContext;
         if (UIRenderMode == UICompositionMode::UiCallback)
         {
-            FrameGenerationConfig.presentCallback = nullptr;
-            FrameGenerationConfig.presentCallbackUserContext = nullptr;
-            //FrameGenerationConfig.presentCallback = [](ffxCallbackDescFrameGenerationPresent* params, void* self) -> auto { return reinterpret_cast<FSRRenderModule*>(self)->UiCompositionCallback(params); };
-            //FrameGenerationConfig.presentCallbackUserContext = this;
+            //FrameGenerationConfig.presentCallback = nullptr;
+            //FrameGenerationConfig.presentCallbackUserContext = nullptr;
+            FrameGenerationConfig.presentCallback = [](ffxCallbackDescFrameGenerationPresent* params, void* self) -> auto { return reinterpret_cast<sFSR*>(self)->UiCompositionCallback(params); };
+            FrameGenerationConfig.presentCallbackUserContext = this;
         }
         else
         {
@@ -580,7 +611,7 @@ void sFSR::SetFrameGenerationEnabled(bool bEnabled)
             FrameGenerationConfig.presentCallbackUserContext = nullptr;
         }
         FrameGenerationConfig.swapChain = ffxSwapChain;
-        FrameGenerationConfig.HUDLessColor = /*(UIRenderMode == UICompositionMode::PreUiBackbuffer) ? hudLessResource : */FfxApiResource({});
+        FrameGenerationConfig.HUDLessColor = (UIRenderMode == UICompositionMode::PreUiBackbuffer) ? hudLessResource : FfxApiResource({});
 
         FrameGenerationConfig.frameID = FrameID;
 
@@ -644,6 +675,8 @@ void sFSR::EnableFrameInterpolationSwapchain(bool enabled)
     }
     if (enabled)
     {
+        GPU::WaitForCPU();
+        GPU::WaitForGPU();
         bEnableFrameInterpolationSwapchain = true;
 #if FSR_D3D12
         D3D12Device* Device = (D3D12Device*)GPU::GetDevice();
@@ -672,6 +705,7 @@ void sFSR::EnableFrameInterpolationSwapchain(bool enabled)
             createSwapChainDesc.desc->Flags |= DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT;
         }
 
+        dxgiSwapchain->Release();
         dxgiSwapchain->Release();
         dxgiSwapchain = nullptr;
         createSwapChainDesc.swapchain = &dxgiSwapchain;
@@ -751,10 +785,10 @@ void sFSR::EnableFrameInterpolationSwapchain(bool enabled)
         frameInterpolationInfo.presentQueue = convertQueueInfo(createSwapChainDesc.presentQueue);
         frameInterpolationInfo.imageAcquireQueue = convertQueueInfo(createSwapChainDesc.imageAcquireQueue);
 
-        ffx::ReturnCode retCode = ffx::CreateContext(m_SwapChainContext, nullptr, createSwapChainDesc);
+        ffx::ReturnCode retCode = ffx::CreateContext(SwapChainContext, nullptr, createSwapChainDesc);
 
         ffx::QueryDescSwapchainReplacementFunctionsVK replacementFunctions{};
-        ffx::Query(m_SwapChainContext, replacementFunctions);
+        ffx::Query(SwapChainContext, replacementFunctions);
         cauldron::GetDevice()->GetImpl()->SetSwapchainMethodsAndContext(nullptr,
             nullptr,
             replacementFunctions.pOutGetSwapchainImagesKHR,
@@ -765,7 +799,7 @@ void sFSR::EnableFrameInterpolationSwapchain(bool enabled)
             replacementFunctions.pOutDestroySwapchainFFXAPI,
             nullptr,
             replacementFunctions.pOutGetLastPresentCountFFXAPI,
-            m_SwapChainContext,
+            SwapChainContext,
             &frameInterpolationInfo);
 
         // Set frameinterpolation swapchain to engine
@@ -869,117 +903,325 @@ void sFSR::Render(IRenderTarget* Color, IRenderTarget* MotionVectors, IRenderTar
         Engine::WriteToConsole("FSR 3/4 does not support Vulkan or D3D11.");
         return;
     }
-    if (pCamera)
+
+    if (bUpscalingActive && UpscalingContext)
     {
-        if (!pCamera->IsJitterEnabled())
+        if (pCamera)
         {
-            pCamera->SetEnableJitter(true);
-            pCamera->SetJitterCallBack(std::bind(&sFSR::SetJitter, this, std::placeholders::_1));
+            if (!pCamera->IsJitterEnabled())
+            {
+                pCamera->SetEnableJitter(true);
+                pCamera->SetJitterCallBack(std::bind(&sFSR::SetJitter, this, std::placeholders::_1));
+            }
+        }
+
+        GraphicsCommandContext->BeginRecordCommandList(ECommandContextBeginState::ApiRender);
+        GraphicsCommandContext->BeginProfile(ERenderPass::FSR, true);
+
+        Color->AsResource(EResourceState::NonPixelShaderResource, GraphicsCommandContext.get());
+        MotionVectors->AsResource(EResourceState::NonPixelShaderResource, GraphicsCommandContext.get());
+        //Depth->AsResource(EResourceState::NonPixelShaderResource, GraphicsCommandContext.get());
+        //Output->AsResource(EResourceState::UAV, GraphicsCommandContext.get());
+
+        ffx::DispatchDescUpscale DispatchUpscale{};
+        DispatchUpscale.commandList = (ID3D12GraphicsCommandList8*)GraphicsCommandContext->GetInternalCommandContext();
+        DispatchUpscale.color = ffxApiGetResourceDX12((ID3D12Resource*)Color->GetNativeTexture(), FFX_API_RESOURCE_STATE_COMPUTE_READ);
+        DispatchUpscale.depth = ffxApiGetResourceDX12((ID3D12Resource*)Depth->GetNativeTexture(), FFX_API_RESOURCE_STATE_COMPUTE_READ);
+        DispatchUpscale.motionVectors = ffxApiGetResourceDX12((ID3D12Resource*)MotionVectors->GetNativeTexture(), FFX_API_RESOURCE_STATE_COMPUTE_READ);
+        if (bGenerateReactiveMask)
+        {
+            GeneratedReactiveMask->AsResource(EResourceState::NonPixelShaderResource, GraphicsCommandContext.get());
+            DispatchUpscale.reactive = ffxApiGetResourceDX12((ID3D12Resource*)GeneratedReactiveMask->GetNativeTexture(), FFX_API_RESOURCE_STATE_COMPUTE_READ);
+        }
+        else
+        {
+            //Reactive->AsResource(EResourceState::NonPixelShaderResource, GraphicsCommandContext.get());
+            //DispatchUpscale.reactive = ffxApiGetResourceDX12((ID3D12Resource*)Reactive->GetNativeTexture(), FFX_API_RESOURCE_STATE_COMPUTE_READ);
+        }
+        DispatchUpscale.exposure = ffxApiGetResourceDX12(nullptr, FFX_API_RESOURCE_STATE_PIXEL_COMPUTE_READ);
+        DispatchUpscale.transparencyAndComposition = ffxApiGetResourceDX12(nullptr, FFX_API_RESOURCE_STATE_PIXEL_COMPUTE_READ);
+        DispatchUpscale.output = ffxApiGetResourceDX12((ID3D12Resource*)Output->GetNativeTexture(), FFX_API_RESOURCE_STATE_UNORDERED_ACCESS);
+        // exposure, reactive, transparencyAndComposition left empty: auto exposure,
+        // and FSR substitutes cleared 1x1 masks
+
+        DispatchUpscale.enableSharpening = true;
+        DispatchUpscale.sharpness = Sharpness; // 0.0 to 1.0
+        DispatchUpscale.jitterOffset.x = -JitterX;
+        DispatchUpscale.jitterOffset.y = -JitterY;
+        DispatchUpscale.motionVectorScale.x = RenderDimension.fRenderWidth();
+        DispatchUpscale.motionVectorScale.y = RenderDimension.fRenderHeight();
+        DispatchUpscale.renderSize = { RenderDimension.RenderWidth,  RenderDimension.RenderHeight };
+        DispatchUpscale.upscaleSize = { RenderDimension.UpscaleWidth, RenderDimension.UpscaleHeight };
+        DispatchUpscale.frameTimeDelta = DT * 1000.0f;   // MILLISECONDSf
+        DispatchUpscale.cameraNear = pCamera->GetNearClip(); // FLT_MAX
+        DispatchUpscale.cameraFar = pCamera->GetFarClip();        // GetFarClip // GetNearClip
+        DispatchUpscale.cameraFovAngleVertical = pCamera->GetFOV();
+        DispatchUpscale.preExposure = 1.0f;
+        DispatchUpscale.reset = bReset;
+        DispatchUpscale.flags = 0;
+#if FSR_DEBUG && FSR_Upscale_DEBUG
+        DispatchUpscale.flags |= FFX_UPSCALE_FLAG_DRAW_DEBUG_VIEW;
+#endif
+        DispatchUpscale.flags |= ColorSpace == FSRColorSpace::sRGBColorSpace ? FFX_UPSCALE_FLAG_NON_LINEAR_COLOR_SRGB : 0;
+        DispatchUpscale.flags |= ColorSpace == FSRColorSpace::PQColorSpace ? FFX_UPSCALE_FLAG_NON_LINEAR_COLOR_PQ : 0;
+        bReset = false;
+
+        auto Ret = ffx::Dispatch(UpscalingContext, DispatchUpscale);
+
+        //Color->AsRenderTarget(GraphicsCommandContext.get());
+        //MotionVectors->AsRenderTarget(GraphicsCommandContext.get());
+        //Depth->AsDepthTarget(GraphicsCommandContext.get());
+
+        //if (!bFrameInterpolationActive)
+        {
+            GraphicsCommandContext->EndProfile();
+
+            GraphicsCommandContext->FinishRecordCommandList();
+            GraphicsCommandContext->ExecuteCommandList(ECommandContextExecuteType::Deferred, 6);
         }
     }
 
-    GraphicsCommandContext->BeginRecordCommandList(ECommandContextBeginState::ApiRender);
-
-    GraphicsCommandContext->BeginProfile(ERenderPass::FSR, true);
-
-    Color->AsResource(EResourceState::NonPixelShaderResource, GraphicsCommandContext.get());
-    MotionVectors->AsResource(EResourceState::NonPixelShaderResource, GraphicsCommandContext.get());
-    //Depth->AsResource(EResourceState::NonPixelShaderResource, GraphicsCommandContext.get());
-    Output->AsResource(EResourceState::UAV, GraphicsCommandContext.get());
-
-    ffx::DispatchDescUpscale DispatchUpscale{};
-    DispatchUpscale.commandList = (ID3D12GraphicsCommandList8*)GraphicsCommandContext->GetInternalCommandContext();
-    DispatchUpscale.color = ffxApiGetResourceDX12((ID3D12Resource*)Color->GetNativeTexture(), FFX_API_RESOURCE_STATE_COMPUTE_READ);
-    DispatchUpscale.depth = ffxApiGetResourceDX12((ID3D12Resource*)Depth->GetNativeTexture(), FFX_API_RESOURCE_STATE_COMPUTE_READ);
-    DispatchUpscale.motionVectors = ffxApiGetResourceDX12((ID3D12Resource*)MotionVectors->GetNativeTexture(), FFX_API_RESOURCE_STATE_COMPUTE_READ);
-    if (bGenerateReactiveMask)
     {
-        GeneratedReactiveMask->AsResource(EResourceState::NonPixelShaderResource, GraphicsCommandContext.get());
-        DispatchUpscale.reactive = ffxApiGetResourceDX12((ID3D12Resource*)GeneratedReactiveMask->GetNativeTexture(), FFX_API_RESOURCE_STATE_COMPUTE_READ);
-    }
-    else
-    {
-        //Reactive->AsResource(EResourceState::NonPixelShaderResource, GraphicsCommandContext.get());
-        //DispatchUpscale.reactive = ffxApiGetResourceDX12((ID3D12Resource*)Reactive->GetNativeTexture(), FFX_API_RESOURCE_STATE_COMPUTE_READ);
-    }
-    DispatchUpscale.exposure = ffxApiGetResourceDX12(nullptr, FFX_API_RESOURCE_STATE_PIXEL_COMPUTE_READ);
-    DispatchUpscale.transparencyAndComposition = ffxApiGetResourceDX12(nullptr, FFX_API_RESOURCE_STATE_PIXEL_COMPUTE_READ);
-    DispatchUpscale.output = ffxApiGetResourceDX12((ID3D12Resource*)Output->GetNativeTexture(), FFX_API_RESOURCE_STATE_UNORDERED_ACCESS);
-    // exposure, reactive, transparencyAndComposition left empty: auto exposure,
-    // and FSR substitutes cleared 1x1 masks
+        if (FrameGenContext != nullptr)
+        {
+            /*if (!bUpscalingActive)
+            {
+                GraphicsCommandContext->BeginRecordCommandList(ECommandContextBeginState::ApiRender);
+                GraphicsCommandContext->BeginProfile(ERenderPass::FSR_FrameGen, true);
+            }*/
+            FrameGenCommandContext->BeginRecordCommandList(ECommandContextBeginState::ApiRender);
+            FrameGenCommandContext->BeginProfile(ERenderPass::FSR_FrameGen, true);
 
-    DispatchUpscale.enableSharpening = true;
-    DispatchUpscale.sharpness = Sharpness; // 0.0 to 1.0
-    DispatchUpscale.jitterOffset.x = -JitterX;
-    DispatchUpscale.jitterOffset.y = -JitterY;
-    DispatchUpscale.motionVectorScale.x = RenderDimension.fRenderWidth();
-    DispatchUpscale.motionVectorScale.y = RenderDimension.fRenderHeight();
-    DispatchUpscale.renderSize = { RenderDimension.RenderWidth,  RenderDimension.RenderHeight };
-    DispatchUpscale.upscaleSize = { RenderDimension.UpscaleWidth, RenderDimension.UpscaleHeight };
-    DispatchUpscale.frameTimeDelta = DT * 1000.0f;   // MILLISECONDSf
-    DispatchUpscale.cameraNear = pCamera->GetNearClip(); // FLT_MAX
-    DispatchUpscale.cameraFar = pCamera->GetFarClip();        // GetFarClip // GetNearClip
-    DispatchUpscale.cameraFovAngleVertical = pCamera->GetFOV();
-    DispatchUpscale.preExposure = 1.0f;
-    DispatchUpscale.reset = bReset;
-    DispatchUpscale.flags = 0;
-#if FSR_DEBUG
-    DispatchUpscale.flags |= FFX_UPSCALE_FLAG_DRAW_DEBUG_VIEW;
+            if (UIRenderMode == UICompositionMode::PreUiBackbuffer)
+                HudlessTextures.Get()->AsResource(EResourceState::NonPixelShaderResource, FrameGenCommandContext.get());
+
+            ffx::DispatchDescFrameGenerationPrepareV2 dispatchFgPrep{};
+            ffx::ReturnCode retCode;
+
+            dispatchFgPrep.commandList = (ID3D12GraphicsCommandList8*)FrameGenCommandContext->GetInternalCommandContext();
+            dispatchFgPrep.depth = ffxApiGetResourceDX12((ID3D12Resource*)Depth->GetNativeTexture(), FFX_API_RESOURCE_STATE_PIXEL_COMPUTE_READ);
+            dispatchFgPrep.motionVectors = ffxApiGetResourceDX12((ID3D12Resource*)MotionVectors->GetNativeTexture(), FFX_API_RESOURCE_STATE_PIXEL_COMPUTE_READ);
+            dispatchFgPrep.flags = 0;
+
+            dispatchFgPrep.jitterOffset.x = -JitterX;
+            dispatchFgPrep.jitterOffset.y = -JitterY;
+            dispatchFgPrep.motionVectorScale.x = RenderDimension.fRenderWidth();
+            dispatchFgPrep.motionVectorScale.y = RenderDimension.fRenderHeight();
+
+            // Cauldron keeps time in seconds, but FSR expects milliseconds
+            dispatchFgPrep.frameTimeDelta = static_cast<float>(DT * 1000.f);
+
+            dispatchFgPrep.renderSize.width = RenderDimension.RenderWidth;
+            dispatchFgPrep.renderSize.height = RenderDimension.RenderHeight;
+            dispatchFgPrep.cameraFovAngleVertical = pCamera->GetFOV();
+
+            dispatchFgPrep.cameraFar = pCamera->GetFarClip();
+            dispatchFgPrep.cameraNear = pCamera->GetNearClip();
+            dispatchFgPrep.viewSpaceToMetersFactor = 0.f;
+            dispatchFgPrep.frameID = FrameID;
+            dispatchFgPrep.reset = bResetFrameInterpolation;
+
+            // Update frame generation config
+            FfxApiResource hudLessResource = ffxApiGetResourceDX12((ID3D12Resource*)HudlessTextures.Get()->GetNativeTexture(), FFX_API_RESOURCE_STATE_COMPUTE_READ);
+
+            FrameGenerationConfig.frameGenerationEnabled = bFrameInterpolationActive;
+            FrameGenerationConfig.flags = 0u;
+#if FSR_DEBUG && FSR_FrameGen_DEBUG
+            FrameGenerationConfig.flags |= bDrawFrameGenerationDebugTearLines ? FFX_FRAMEGENERATION_FLAG_DRAW_DEBUG_TEAR_LINES : 0;
+            FrameGenerationConfig.flags |= bDrawFrameGenerationDebugResetIndicators ? FFX_FRAMEGENERATION_FLAG_DRAW_DEBUG_RESET_INDICATORS : 0;
+            FrameGenerationConfig.flags |= bDrawFrameGenerationDebugPacingLines ? FFX_FRAMEGENERATION_FLAG_DRAW_DEBUG_PACING_LINES : 0;
+            FrameGenerationConfig.flags |= bDrawFrameGenerationDebugView ? FFX_FRAMEGENERATION_FLAG_DRAW_DEBUG_VIEW : 0;
 #endif
-    DispatchUpscale.flags |= ColorSpace == FSRColorSpace::sRGBColorSpace ? FFX_UPSCALE_FLAG_NON_LINEAR_COLOR_SRGB : 0;
-    DispatchUpscale.flags |= ColorSpace == FSRColorSpace::PQColorSpace ? FFX_UPSCALE_FLAG_NON_LINEAR_COLOR_PQ : 0;
-    bReset = false;
+            if (!SwapChainContext)
+                FrameGenerationConfig.flags |= FFX_FRAMEGENERATION_FLAG_NO_SWAPCHAIN_CONTEXT_NOTIFY;
+            dispatchFgPrep.flags = FrameGenerationConfig.flags;  // TODO: maybe these should be distinct flags?
+            FrameGenerationConfig.HUDLessColor = (UIRenderMode == UICompositionMode::PreUiBackbuffer) ? hudLessResource : FfxApiResource({});
+            FrameGenerationConfig.allowAsyncWorkloads = bEnableAsyncCompute;
+            // assume symmetric letterbox
+            FrameGenerationConfig.generationRect.left = (RenderDimension.DisplayWidth - RenderDimension.UpscaleWidth) / 2;
+            FrameGenerationConfig.generationRect.top = (RenderDimension.DisplayHeight - RenderDimension.UpscaleHeight) / 2;
+            FrameGenerationConfig.generationRect.width = RenderDimension.UpscaleWidth;
+            FrameGenerationConfig.generationRect.height = RenderDimension.UpscaleHeight;
+            if (bUseCallback)
+            {
+                FrameGenerationConfig.frameGenerationCallback = [](ffxDispatchDescFrameGeneration* params, void* pUserCtx) -> ffxReturnCode_t
+                {
+                    return ffxDispatch(reinterpret_cast<ffxContext*>(pUserCtx), &params->header);
+                };
+                FrameGenerationConfig.frameGenerationCallbackUserContext = &FrameGenContext;
+            }
+            else
+            {
+                FrameGenerationConfig.frameGenerationCallback = nullptr;
+                FrameGenerationConfig.frameGenerationCallbackUserContext = nullptr;
+            }
+            FrameGenerationConfig.onlyPresentGenerated = bPresentInterpolatedOnly;
+            FrameGenerationConfig.frameID = FrameID;
 
-    auto Ret = ffx::Dispatch(UpscalingContext, DispatchUpscale);
+            void* ffxSwapChain;
+            ffxSwapChain = GPU::GetInternalSwapChain();
+            FrameGenerationConfig.swapChain = ffxSwapChain;
 
-    //Color->AsRenderTarget(GraphicsCommandContext.get());
-    //MotionVectors->AsRenderTarget(GraphicsCommandContext.get());
-    //Depth->AsDepthTarget(GraphicsCommandContext.get());
+            if (bUseDistortionField)
+            {
+                // ????
+                /*ffx::ConfigureDescFrameGenerationRegisterDistortionFieldResource dfConfig{};
+                dfConfig.distortionField = SDKWrapper::ffxGetResourceApi(m_pDistortionField[m_curUiTextureIndex]->GetResource(), FFX_API_RESOURCE_STATE_PIXEL_COMPUTE_READ);
+                retCode = ffx::Configure(FrameGenContext, FrameGenerationConfig, dfConfig);*/
+            }
+            else
+            {
+                retCode = ffx::Configure(FrameGenContext, FrameGenerationConfig);
+            }
+            Engine::Assert(AssertLevel::ASSERT_CRITICAL, !!retCode, L"Configuring FSR FG failed: %d", (uint32_t)retCode);
 
-    GraphicsCommandContext->EndProfile();
+            //only dispatch FG Prepare if frame interpolation is enabled
+            if (bFrameInterpolationActive)
+            {
+                //GPUScopedProfileCapture sampleMarker(pCmdList, L"FFX API FSR Frame Generation Prepare");
+                // Acquire lock before dispatch FG Prepare
+                std::lock_guard<std::mutex> Lock(FGContextMutex);
+                FVector vectorInfo = pCamera->GetPosition();
+                memcpy(dispatchFgPrep.cameraPosition, &vectorInfo, 3 * sizeof(float));
+                vectorInfo = pCamera->GetUp();
+                memcpy(dispatchFgPrep.cameraUp, &vectorInfo, 3 * sizeof(float));
+                vectorInfo = pCamera->GetRight();
+                memcpy(dispatchFgPrep.cameraRight, &vectorInfo, 3 * sizeof(float));
+                vectorInfo = Negate(pCamera->GetDirection());
+                memcpy(dispatchFgPrep.cameraForward, &vectorInfo, 3 * sizeof(float));
 
-    GraphicsCommandContext->FinishRecordCommandList();
-    GraphicsCommandContext->ExecuteCommandList(ECommandContextExecuteType::Deferred, 6);
+                retCode = ffx::Dispatch(FrameGenContext, dispatchFgPrep);
+                Engine::Assert(AssertLevel::ASSERT_CRITICAL, !!retCode, L"Dispatching FSR FG (upscaling data) failed: %d", (uint32_t)retCode);
+            }
 
-    auto Result = GraphicsCommandContext->GetProfileResult();
-    if (Result.IsValid())
-        Engine::GetActiveCanvas()->AddRendererProfileResult(Result);
+            if (SwapChainContext)
+            {
+                FfxApiResource uiColor = (UIRenderMode == UICompositionMode::UiTexture) ? FfxApiResource({}) /*SDKWrapper::ffxGetResourceApi(m_pUiTexture[m_curUiTextureIndex]->GetResource(), FFX_API_RESOURCE_STATE_PIXEL_COMPUTE_READ)*/ : FfxApiResource({});
+
+                ffx::ConfigureDescFrameGenerationSwapChainRegisterUiResourceDX12 uiConfig{};
+                uiConfig.uiResource = uiColor;
+                uiConfig.flags = bDoublebufferInSwapchain ? FFX_FRAMEGENERATION_UI_COMPOSITION_FLAG_ENABLE_INTERNAL_UI_DOUBLE_BUFFERING : 0;
+                ffx::Configure(SwapChainContext, uiConfig);
+            }
+
+            // Dispatch frame generation, if not using FG callback
+            if (bFrameInterpolationActive && !bUseCallback)
+            {
+                ffx::DispatchDescFrameGeneration dispatchFg{};
+                D3D12Device* Device = (D3D12Device*)GPU::GetDevice();
+                D3D12Viewport* Viewport = (D3D12Viewport*)Device->GetD3D12Viewport();
+                auto pSwapchainBackbuffer = Viewport->GetCurrentSwapchainTexture();
+
+                dispatchFg.numGeneratedFrames = 1;
+
+                // assume symmetric letterbox
+                dispatchFg.generationRect.left = (RenderDimension.DisplayWidth - RenderDimension.UpscaleWidth) / 2;
+                dispatchFg.generationRect.top = (RenderDimension.DisplayHeight - RenderDimension.UpscaleHeight) / 2;
+                dispatchFg.generationRect.width = RenderDimension.UpscaleWidth;
+                dispatchFg.generationRect.height = RenderDimension.UpscaleHeight;
+                if (SwapChainContext)
+                {
+                    FfxApiResource backbuffer = ffxApiGetResourceDX12(pSwapchainBackbuffer, FFX_API_RESOURCE_STATE_PRESENT);
+                    dispatchFg.presentColor = backbuffer;
+
+                    ffx::QueryDescFrameGenerationSwapChainInterpolationCommandListDX12 queryCmdList{};
+                    queryCmdList.pOutCommandList = &dispatchFg.commandList;
+                    retCode = ffx::Query(SwapChainContext, queryCmdList);
+                    Engine::Assert(AssertLevel::ASSERT_CRITICAL, retCode == ffx::ReturnCode::Ok,
+                        L"ffx::Query(SwapChainContext,InterpolationCommandList) returned %d", (uint32_t)retCode);
+                    ffx::QueryDescFrameGenerationSwapChainInterpolationTextureDX12 queryFiTexture{};
+                    queryFiTexture.pOutTexture = &dispatchFg.outputs[0];
+                    retCode = ffx::Query(SwapChainContext, queryFiTexture);
+                    Engine::Assert(AssertLevel::ASSERT_CRITICAL, retCode == ffx::ReturnCode::Ok,
+                        L"ffx::Query(SwapChainContext,InterpolationTexture) returned %d", (uint32_t)retCode);
+                }
+                else
+                {
+                    FfxApiResource backbuffer = ffxApiGetResourceDX12(pSwapchainBackbuffer, FFX_API_RESOURCE_STATE_PIXEL_COMPUTE_READ);
+                    dispatchFg.presentColor = backbuffer;
+
+                    dispatchFg.commandList = (ID3D12GraphicsCommandList8*)FrameGenCommandContext->GetInternalCommandContext();
+                    dispatchFg.outputs[0] = ffxApiGetResourceDX12((ID3D12Resource*)InterpolationOutput->GetNativeTexture(), FFX_API_RESOURCE_STATE_PIXEL_COMPUTE_READ);
+                }
+
+                dispatchFg.frameID = FrameID;
+                dispatchFg.reset = bResetFrameInterpolation;
+
+                dispatchFg.backbufferTransferFunction = GetFfxApiBackbufferTransferFunction(Viewport->GetDisplayMode());
+
+                const HDRMetadata& hdrMetaData = Viewport->GetHDRMetaData();
+                dispatchFg.minMaxLuminance[0] = hdrMetaData.MinLuminance;
+                dispatchFg.minMaxLuminance[1] = hdrMetaData.MaxLuminance;
+                {
+                    // Acquire lock if app dispatch frame generation directly
+                    std::lock_guard<std::mutex> Lock(FGContextMutex);
+                    retCode = ffx::Dispatch(FrameGenContext, dispatchFg);
+                    Engine::Assert(AssertLevel::ASSERT_CRITICAL, !!retCode, L"Dispatching Frame Generation failed: %d", (uint32_t)retCode);
+                }
+            }
+
+            FrameGenCommandContext->EndProfile();
+            FrameGenCommandContext->FinishRecordCommandList();
+            FrameGenCommandContext->ExecuteCommandList(ECommandContextExecuteType::Deferred, 7);
+        }
+    }
+
+    FrameID += uint64_t(1 + bSimulatePresentSkip);
+    bSimulatePresentSkip = false;
+    bResetFrameInterpolation = false;
+
+    {
+        auto Result = GraphicsCommandContext->GetProfileResult();
+        if (Result.IsValid())
+            Engine::GetActiveCanvas()->AddRendererProfileResult(Result);
+    }
+    {
+        auto Result = FrameGenCommandContext->GetProfileResult();
+        if (Result.IsValid())
+            Engine::GetActiveCanvas()->AddRendererProfileResult(Result);
+    }
     //CopyToFrameBuffer(Color);
 }
 
 void sFSR::GenerateReactiveMask(IRenderTarget* Color)
 {
-    if (GPU::GetGIType() == EGITypes::Vulkan || GPU::GetGIType() == EGITypes::D3D11)
-    {
-        Engine::WriteToConsole("FSR 3/4 does not support Vulkan or D3D11.");
-        return;
-    }
-    CMD->BeginRecordCommandList(ECommandContextBeginState::ApiRender);
+    //if (GPU::GetGIType() == EGITypes::Vulkan || GPU::GetGIType() == EGITypes::D3D11)
+    //{
+    //    Engine::WriteToConsole("FSR 3/4 does not support Vulkan or D3D11.");
+    //    return;
+    //}
+    //CMD->BeginRecordCommandList(ECommandContextBeginState::ApiRender);
 
-    GeneratedReactiveMask->AsResource(EResourceState::UAV, CMD.get());
+    //GeneratedReactiveMask->AsResource(EResourceState::UAV, CMD.get());
 
-    ffx::DispatchDescUpscaleGenerateReactiveMask dispatchDesc{};
-    dispatchDesc.commandList = (ID3D12GraphicsCommandList8*)CMD->GetInternalCommandContext();
-    dispatchDesc.colorOpaqueOnly = ffxApiGetResourceDX12((ID3D12Resource*)Color->GetNativeTexture(), FFX_API_RESOURCE_STATE_PIXEL_COMPUTE_READ);
-    dispatchDesc.colorPreUpscale = ffxApiGetResourceDX12((ID3D12Resource*)Output->GetNativeTexture(), FFX_API_RESOURCE_STATE_PIXEL_COMPUTE_READ);
-    dispatchDesc.outReactive = ffxApiGetResourceDX12((ID3D12Resource*)GeneratedReactiveMask->GetNativeTexture(), FFX_API_RESOURCE_STATE_PIXEL_COMPUTE_READ);
+    //ffx::DispatchDescUpscaleGenerateReactiveMask dispatchDesc{};
+    //dispatchDesc.commandList = (ID3D12GraphicsCommandList8*)CMD->GetInternalCommandContext();
+    //dispatchDesc.colorOpaqueOnly = ffxApiGetResourceDX12((ID3D12Resource*)Color->GetNativeTexture(), FFX_API_RESOURCE_STATE_PIXEL_COMPUTE_READ);
+    //dispatchDesc.colorPreUpscale = ffxApiGetResourceDX12((ID3D12Resource*)Output->GetNativeTexture(), FFX_API_RESOURCE_STATE_PIXEL_COMPUTE_READ);
+    //dispatchDesc.outReactive = ffxApiGetResourceDX12((ID3D12Resource*)GeneratedReactiveMask->GetNativeTexture(), FFX_API_RESOURCE_STATE_PIXEL_COMPUTE_READ);
 
-    dispatchDesc.renderSize.width = RenderDimension.RenderWidth;
-    dispatchDesc.renderSize.height = RenderDimension.RenderHeight;
+    //dispatchDesc.renderSize.width = RenderDimension.RenderWidth;
+    //dispatchDesc.renderSize.height = RenderDimension.RenderHeight;
 
-    // The following are all hard-coded in the original FSR2 sample. Should these be exposed?
-    dispatchDesc.scale = 1.f;
-    dispatchDesc.cutoffThreshold = 0.2f;
-    dispatchDesc.binaryValue = 0.9f;
-    dispatchDesc.flags = FFX_UPSCALE_AUTOREACTIVEFLAGS_APPLY_TONEMAP |
-        FFX_UPSCALE_AUTOREACTIVEFLAGS_APPLY_THRESHOLD |
-        FFX_UPSCALE_AUTOREACTIVEFLAGS_USE_COMPONENTS_MAX;
+    //// The following are all hard-coded in the original FSR2 sample. Should these be exposed?
+    //dispatchDesc.scale = 1.f;
+    //dispatchDesc.cutoffThreshold = 0.2f;
+    //dispatchDesc.binaryValue = 0.9f;
+    //dispatchDesc.flags = FFX_UPSCALE_AUTOREACTIVEFLAGS_APPLY_TONEMAP |
+    //    FFX_UPSCALE_AUTOREACTIVEFLAGS_APPLY_THRESHOLD |
+    //    FFX_UPSCALE_AUTOREACTIVEFLAGS_USE_COMPONENTS_MAX;
 
-    ffx::ReturnCode retCode = ffx::Dispatch(UpscalingContext, dispatchDesc);
-    Engine::Assert(AssertLevel::ASSERT_ERROR, retCode == ffx::ReturnCode::Ok, L"ffxDispatch(FSR_GENERATEREACTIVEMASK) failed with %d", (uint32_t)retCode);
+    //ffx::ReturnCode retCode = ffx::Dispatch(UpscalingContext, dispatchDesc);
+    //Engine::Assert(AssertLevel::ASSERT_ERROR, retCode == ffx::ReturnCode::Ok, L"ffxDispatch(FSR_GENERATEREACTIVEMASK) failed with %d", (uint32_t)retCode);
 
-    CMD->FinishRecordCommandList();
-    CMD->ExecuteCommandList(/*ECommandContextExecuteType::Deferred, 5*/);
+    //CMD->FinishRecordCommandList();
+    //CMD->ExecuteCommandList(/*ECommandContextExecuteType::Deferred, 5*/);
+}
+
+ffxReturnCode_t sFSR::UiCompositionCallback(ffxCallbackDescFrameGenerationPresent* Params)
+{
+    Engine::WriteToConsole("sFSR::UiCompositionCallback CALLED!");
+    return ffxReturnCode_t();
 }
 
 void sFSR::CopyToFrameBuffer(IRenderTarget* Target)
@@ -988,6 +1230,14 @@ void sFSR::CopyToFrameBuffer(IRenderTarget* Target)
     GraphicsCommandContext->CopyRenderTarget(Target, Output.get());
     GraphicsCommandContext->FinishRecordCommandList();
     GraphicsCommandContext->ExecuteCommandList(ECommandContextExecuteType::Deferred, 4);
+}
+
+void sFSR::CopyHudlessTexture(IRenderTarget* HudlessTexture)
+{
+    FSRCopyCommandContext->BeginRecordCommandList();
+    FSRCopyCommandContext->CopyRenderTarget(HudlessTextures.Get(), HudlessTexture);
+    FSRCopyCommandContext->FinishRecordCommandList();
+    FSRCopyCommandContext->ExecuteCommandList(ECommandContextExecuteType::Deferred, 31);
 }
 
 void sFSR::SetRenderSize(std::size_t InWidth, std::size_t InHeight)
@@ -1010,6 +1260,10 @@ void sFSR::SetRenderSize(std::size_t InWidth, std::size_t InHeight)
     if (bGenerateReactiveMask)
         GeneratedReactiveMask = IRenderTarget::Create("FSR GeneratedReactiveMask", sFrameBuffer(GPU::GetBackBufferFormat(), EFrameBufferAttachmentType::RT_SRV_UAV), sFBODesc(sFBODesc::sFBODimension((std::uint32_t)InWidth, (std::uint32_t)InHeight)));
 
+    HudlessTextures.First = IRenderTarget::Create("HudlessTextures_First", sFrameBuffer(GPU::GetBackBufferFormat(), EFrameBufferAttachmentType::RT_SRV_UAV), sFBODesc(sFBODesc::sFBODimension((std::uint32_t)InWidth, (std::uint32_t)InHeight)));
+    HudlessTextures.Second = IRenderTarget::Create("HudlessTextures_Second", sFrameBuffer(GPU::GetBackBufferFormat(), EFrameBufferAttachmentType::RT_SRV_UAV), sFBODesc(sFBODesc::sFBODimension((std::uint32_t)InWidth, (std::uint32_t)InHeight)));
+
+    InterpolationOutput = IRenderTarget::Create("FSR Interpolation Output", sFrameBuffer(GPU::GetBackBufferFormat(), EFrameBufferAttachmentType::RT_SRV_UAV), sFBODesc(sFBODesc::sFBODimension((std::uint32_t)InWidth, (std::uint32_t)InHeight)));
     JitterFrame = 0;
 
     if (bUpscalingActive)
@@ -1118,7 +1372,7 @@ void sFSR::SetGlobalDebugCheckerMode(FSRDebugCheckerMode mode, bool recreate)
         if (recreate)
         {
             // Ask main loop to re-initialize.
-            bNeedReInit = true;
+            //bNeedReInit = true;
         }
 
         ffx::ReturnCode retCode = ffx::Configure(UpscalingContext, GlobalDebugConfig);
@@ -1129,7 +1383,7 @@ void sFSR::SetGlobalDebugCheckerMode(FSRDebugCheckerMode mode, bool recreate)
         if (recreate)
         {
             // Ask main loop to re-initialize.
-            bNeedReInit = true;
+            //bNeedReInit = true;
         }
 
         ffx::ReturnCode retCode = ffx::Configure(FrameGenContext, GlobalDebugConfig);
@@ -1175,7 +1429,7 @@ void sFSR::UpdatePreset(const int32_t* pOldPreset)
     }
     if ((pOldPreset && *pOldPreset == static_cast<int32_t>(ERendererUpscaleMode::DynamicResolution)) || UpscaleMode == ERendererUpscaleMode::DynamicResolution)
     {
-        bNeedReInit = true;
+        //bNeedReInit = true;
     }
 
     switch (UpscaleMode)
@@ -1250,8 +1504,13 @@ void sFSR::UpdatePreset(const int32_t* pOldPreset)
 
     RenderDimension = UpdateResolution(RenderDimension.DisplayWidth, RenderDimension.DisplayHeight);
 
+    sScreenDimension GeometryPassViewport = sScreenDimension();
+    if (bUpscalingActive)
+    {
+        GeometryPassViewport = RenderDimension.GetRenderDimension();
+    }
     if (OnUpdatePreset)
-        OnUpdatePreset(RenderDimension.GetRenderDimension(), MipBias);
+        OnUpdatePreset(GeometryPassViewport, MipBias);
 }
 
 float sFSR::GetMipBias() const

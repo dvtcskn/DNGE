@@ -58,6 +58,11 @@ VulkanCommandBuffer::~VulkanCommandBuffer()
 	Owner = nullptr;
 }
 
+void VulkanCommandBuffer::SetName(std::string Name)
+{
+
+}
+
 ECommandContextBeginResult VulkanCommandBuffer::BeginRecordCommandList(const ECommandContextBeginState Begin)
 {
 	if (Owner->IsCommandBufferPendingForExecute(this))

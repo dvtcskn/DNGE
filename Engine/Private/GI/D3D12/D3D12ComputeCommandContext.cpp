@@ -228,87 +228,87 @@ void D3D12ComputeCommandContext::SetRenderTargetsAsUAV(std::vector<IRenderTarget
 	}
 }
 
-void D3D12ComputeCommandContext::SetUnorderedAccessTarget(IUnorderedAccessTarget* pST, std::uint32_t RootParameterIndex)
-{
-	if (pST)
-	{
-		D3D12UnorderedAccessTarget* FBuffer = static_cast<D3D12UnorderedAccessTarget*>(pST);
-
-		if (FBuffer->CurrentState != D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
-		{
-			D3D12_RESOURCE_BARRIER Barriers[1];
-			Barriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(FBuffer->GetD3D12Texture(), FBuffer->CurrentState, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-			CommandList->ResourceBarrier(ARRAYSIZE(Barriers), Barriers);
-			FBuffer->CurrentState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-		}
-
-		CommandList->SetComputeRootDescriptorTable(RootParameterIndex, FBuffer->GetUAVGPU());
-	}
-}
-
-void D3D12ComputeCommandContext::SetUnorderedAccessTargets(std::vector<IUnorderedAccessTarget*> pSTs, std::uint32_t RootParameterIndex)
-{
-	if (pSTs.size() > 0)
-	{
-		int i = RootParameterIndex;
-		for (IUnorderedAccessTarget* pRT : pSTs)
-		{
-			D3D12UnorderedAccessTarget* FBuffer = static_cast<D3D12UnorderedAccessTarget*>(pRT);
-			if (FBuffer->CurrentState != D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
-			{
-				D3D12_RESOURCE_BARRIER Barriers[1];
-				Barriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(FBuffer->GetD3D12Texture(), FBuffer->CurrentState, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-				CommandList->ResourceBarrier(ARRAYSIZE(Barriers), Barriers);
-				FBuffer->CurrentState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-			}
-
-			CommandList->SetComputeRootDescriptorTable(RootParameterIndex, FBuffer->GetUAVGPU());
-
-			i++;
-		}
-	}
-}
-
-void D3D12ComputeCommandContext::SetUnorderedAccessTargetAsSRV(IUnorderedAccessTarget* pST, std::uint32_t RootParameterIndex)
-{
-	if (pST)
-	{
-		D3D12UnorderedAccessTarget* FBuffer = static_cast<D3D12UnorderedAccessTarget*>(pST);
-
-		if (FBuffer->CurrentState != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
-		{
-			D3D12_RESOURCE_BARRIER Barriers[1];
-			Barriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(FBuffer->GetD3D12Texture(), FBuffer->CurrentState, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-			CommandList->ResourceBarrier(ARRAYSIZE(Barriers), Barriers);
-			FBuffer->CurrentState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-		}
-
-		CommandList->SetComputeRootDescriptorTable(RootParameterIndex, FBuffer->GetSRVGPU());
-	}
-}
-
-void D3D12ComputeCommandContext::SetUnorderedAccessTargetsAsSRV(std::vector<IUnorderedAccessTarget*> pSTs, std::uint32_t RootParameterIndex)
-{
-	if (pSTs.size() > 0)
-	{
-		int i = RootParameterIndex;
-		for (IUnorderedAccessTarget* pRT : pSTs)
-		{
-			D3D12UnorderedAccessTarget* FBuffer = static_cast<D3D12UnorderedAccessTarget*>(pRT);
-			if (FBuffer->CurrentState != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
-			{
-				D3D12_RESOURCE_BARRIER Barriers[1];
-				Barriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(FBuffer->GetD3D12Texture(), FBuffer->CurrentState, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-				CommandList->ResourceBarrier(ARRAYSIZE(Barriers), Barriers);
-				FBuffer->CurrentState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-			}
-
-			CommandList->SetComputeRootDescriptorTable(RootParameterIndex, FBuffer->GetSRVGPU());
-
-			i++;
-		}
-	}
-}
+//void D3D12ComputeCommandContext::SetUnorderedAccessTarget(IUnorderedAccessTarget* pST, std::uint32_t RootParameterIndex)
+//{
+//	if (pST)
+//	{
+//		D3D12UnorderedAccessTarget* FBuffer = static_cast<D3D12UnorderedAccessTarget*>(pST);
+//
+//		if (FBuffer->CurrentState != D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
+//		{
+//			D3D12_RESOURCE_BARRIER Barriers[1];
+//			Barriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(FBuffer->GetD3D12Texture(), FBuffer->CurrentState, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+//			CommandList->ResourceBarrier(ARRAYSIZE(Barriers), Barriers);
+//			FBuffer->CurrentState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+//		}
+//
+//		CommandList->SetComputeRootDescriptorTable(RootParameterIndex, FBuffer->GetUAVGPU());
+//	}
+//}
+//
+//void D3D12ComputeCommandContext::SetUnorderedAccessTargets(std::vector<IUnorderedAccessTarget*> pSTs, std::uint32_t RootParameterIndex)
+//{
+//	if (pSTs.size() > 0)
+//	{
+//		int i = RootParameterIndex;
+//		for (IUnorderedAccessTarget* pRT : pSTs)
+//		{
+//			D3D12UnorderedAccessTarget* FBuffer = static_cast<D3D12UnorderedAccessTarget*>(pRT);
+//			if (FBuffer->CurrentState != D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
+//			{
+//				D3D12_RESOURCE_BARRIER Barriers[1];
+//				Barriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(FBuffer->GetD3D12Texture(), FBuffer->CurrentState, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+//				CommandList->ResourceBarrier(ARRAYSIZE(Barriers), Barriers);
+//				FBuffer->CurrentState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+//			}
+//
+//			CommandList->SetComputeRootDescriptorTable(RootParameterIndex, FBuffer->GetUAVGPU());
+//
+//			i++;
+//		}
+//	}
+//}
+//
+//void D3D12ComputeCommandContext::SetUnorderedAccessTargetAsSRV(IUnorderedAccessTarget* pST, std::uint32_t RootParameterIndex)
+//{
+//	if (pST)
+//	{
+//		D3D12UnorderedAccessTarget* FBuffer = static_cast<D3D12UnorderedAccessTarget*>(pST);
+//
+//		if (FBuffer->CurrentState != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
+//		{
+//			D3D12_RESOURCE_BARRIER Barriers[1];
+//			Barriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(FBuffer->GetD3D12Texture(), FBuffer->CurrentState, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+//			CommandList->ResourceBarrier(ARRAYSIZE(Barriers), Barriers);
+//			FBuffer->CurrentState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+//		}
+//
+//		CommandList->SetComputeRootDescriptorTable(RootParameterIndex, FBuffer->GetSRVGPU());
+//	}
+//}
+//
+//void D3D12ComputeCommandContext::SetUnorderedAccessTargetsAsSRV(std::vector<IUnorderedAccessTarget*> pSTs, std::uint32_t RootParameterIndex)
+//{
+//	if (pSTs.size() > 0)
+//	{
+//		int i = RootParameterIndex;
+//		for (IUnorderedAccessTarget* pRT : pSTs)
+//		{
+//			D3D12UnorderedAccessTarget* FBuffer = static_cast<D3D12UnorderedAccessTarget*>(pRT);
+//			if (FBuffer->CurrentState != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
+//			{
+//				D3D12_RESOURCE_BARRIER Barriers[1];
+//				Barriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(FBuffer->GetD3D12Texture(), FBuffer->CurrentState, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+//				CommandList->ResourceBarrier(ARRAYSIZE(Barriers), Barriers);
+//				FBuffer->CurrentState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+//			}
+//
+//			CommandList->SetComputeRootDescriptorTable(RootParameterIndex, FBuffer->GetSRVGPU());
+//
+//			i++;
+//		}
+//	}
+//}
 
 void D3D12ComputeCommandContext::SetUnorderedAccessBuffer(IStructuredBuffer* pUAV, std::uint32_t RootParameterIndex)
 {

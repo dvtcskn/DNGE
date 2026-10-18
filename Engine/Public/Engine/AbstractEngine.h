@@ -51,6 +51,7 @@ enum class ERenderPass
 	Line,
 	Particle,
 	FSR,
+	FSR_FrameGen,
 	Tonemapper,
 	PostProcess,
 	UI,
@@ -192,6 +193,7 @@ namespace
 		case ERenderPass::Line:			return "Line";
 		case ERenderPass::Particle:		return "Particle";
 		case ERenderPass::FSR:			return "FSR";
+		case ERenderPass::FSR_FrameGen:	return "FSR_FrameGen";
 		case ERenderPass::Tonemapper:	return "Tonemapper";
 		case ERenderPass::PostProcess:	return "PostProcess";
 		case ERenderPass::UI:			return "UI";
@@ -1318,7 +1320,7 @@ enum class EResourceState
 	UAV,
 };
 
-class IUnorderedAccessTarget;
+//class IUnorderedAccessTarget;
 class IRenderTarget
 {
 	sBaseClassBody(sClassDefaultProtectedConstructor, IRenderTarget)
@@ -1328,6 +1330,8 @@ public:
 
 public:
 	virtual void AsResource(EResourceState ResourceState, IGraphicsCommandContext* GraphicsCommandContext) = 0;
+
+	virtual EFormat GetFormat() const = 0;
 
 	virtual bool IsSRV_Allowed() const = 0;
 	virtual bool IsUAV_Allowed() const = 0;
@@ -1353,6 +1357,8 @@ public:
 public:
 	virtual void AsResource(EResourceState ResourceState, IGraphicsCommandContext* GraphicsCommandContext) = 0;
 
+	virtual EFormat GetFormat() const = 0;
+
 	virtual bool IsSRV_Allowed() const = 0;
 	virtual bool IsUAV_Allowed() const = 0;
 
@@ -1363,29 +1369,6 @@ public:
 
 	virtual ResourceSharedHandle* GetSharedHandle() const = 0;
 	virtual bool CopyFrom(IDepthTarget* DepthTarget) = 0;
-};
-
-class IUnorderedAccessTarget
-{
-	sBaseClassBody(sClassDefaultProtectedConstructor, IUnorderedAccessTarget)
-public:
-	static IUnorderedAccessTarget::SharedPtr Create(const std::string InName, const EFormat Format, const sFBODesc& Desc, bool InEnableSRV = true, std::uint32_t GPUIndex = 0);
-	static IUnorderedAccessTarget::UniquePtr CreateUnique(const std::string InName, const EFormat Format, const sFBODesc& Desc, bool InEnableSRV = true, std::uint32_t GPUIndex = 0);
-
-public:
-	//virtual void AsResource(EResourceState ResourceState, IGraphicsCommandContext* GraphicsCommandContext) = 0;
-
-	virtual bool IsSRV_Allowed() const = 0;
-	virtual std::uint32_t GetSRVBindlessIndex() const = 0;
-	virtual std::uint32_t GetUAVBindlessIndex() const = 0;
-
-	virtual void* GetNativeTexture() const = 0;
-
-	virtual void SetDefaultRootParameterIndex(std::uint32_t RootParameterIndex) = 0;
-	virtual std::uint32_t GetDefaultRootParameterIndex() const = 0;
-
-	virtual ResourceSharedHandle* GetSharedHandle() const = 0;
-	virtual bool CopyFrom(IUnorderedAccessTarget* UnorderedAccessTarget) = 0;
 };
 
 class IFrameBuffer
@@ -1403,9 +1386,9 @@ public:
 	virtual IRenderTarget* GetRenderTarget(std::size_t Index) const = 0;
 	virtual void AttachRenderTarget(const IRenderTarget::SharedPtr& RenderTarget, std::optional<std::size_t> Index = std::nullopt) = 0;
 
-	virtual std::vector<IUnorderedAccessTarget*> GetUnorderedAccessTargets() const = 0;
+	/*virtual std::vector<IUnorderedAccessTarget*> GetUnorderedAccessTargets() const = 0;
 	virtual IUnorderedAccessTarget* GetUnorderedAccessTarget(std::size_t Index) const = 0;
-	virtual void AttachUnorderedAccessTarget(const IUnorderedAccessTarget::SharedPtr& UnorderedAccessTarget, std::optional<std::size_t> Index = std::nullopt) = 0;
+	virtual void AttachUnorderedAccessTarget(const IUnorderedAccessTarget::SharedPtr& UnorderedAccessTarget, std::optional<std::size_t> Index = std::nullopt) = 0;*/
 
 	virtual IDepthTarget* GetDepthTarget() const = 0;
 	virtual void SetDepthTarget(const IDepthTarget::SharedPtr& DepthTarget) = 0;
@@ -1442,6 +1425,7 @@ struct sRasterizerAttributeDesc
 	bool bEnableLineAA;
 
 	bool FrontCounterClockwise;
+	bool bConservativeRasterization;
 
 	sRasterizerAttributeDesc(ERasterizerCullMode InMode = ERasterizerCullMode::CW)
 		: FillMode(ERasterizerFillMode::Solid)
@@ -1453,6 +1437,7 @@ struct sRasterizerAttributeDesc
 		, bAllowMSAA(false)
 		, bEnableLineAA(false)
 		, FrontCounterClockwise(false)
+		, bConservativeRasterization(false)
 	{}
 
 	sRasterizerAttributeDesc(ERasterizerFillMode InMode)
@@ -1465,6 +1450,7 @@ struct sRasterizerAttributeDesc
 		, bAllowMSAA(false)
 		, bEnableLineAA(false)
 		, FrontCounterClockwise(false)
+		, bConservativeRasterization(false)
 	{}
 };
 
@@ -2462,6 +2448,8 @@ public:
 		return ECommandContextType::Graphics;
 	}
 
+	virtual void SetName(std::string Name) = 0;
+
 	virtual ECommandContextBeginResult BeginRecordCommandList(const ECommandContextBeginState Begin = ECommandContextBeginState::Default) = 0;
 	virtual bool FinishRecordCommandList() = 0;
 	virtual bool ExecuteCommandList(ECommandContextExecuteType ExecuteType = ECommandContextExecuteType::Immediate, std::uint32_t Order = std::uint32_t(-1)) = 0;
@@ -2544,12 +2532,8 @@ public:
 	virtual void SetRenderTargetsAsResource(std::vector<IRenderTarget*> RTs, std::uint32_t RootParameterIndex) = 0;
 	virtual void SetDepthTargetAsResource(IDepthTarget* pDT, std::uint32_t RootParameterIndex) = 0;
 	virtual void SetDepthTargetsAsResource(std::vector<IDepthTarget*> DTs, std::uint32_t RootParameterIndex) = 0;
-	virtual void SetUnorderedAccessTarget(IUnorderedAccessTarget* pST, std::uint32_t RootParameterIndex) = 0;
-	virtual void SetUnorderedAccessTargets(std::vector<IUnorderedAccessTarget*> pSTs, std::uint32_t RootParameterIndex) = 0;
 	virtual void SetRenderTargetAsUAV(IRenderTarget* pRT, std::uint32_t RootParameterIndex) = 0;
 	virtual void SetRenderTargetsAsUAV(std::vector<IRenderTarget*> RTs, std::uint32_t RootParameterIndex) = 0;
-	virtual void SetUnorderedAccessTargetAsSRV(IUnorderedAccessTarget* pST, std::uint32_t RootParameterIndex) = 0;
-	virtual void SetUnorderedAccessTargetsAsSRV(std::vector<IUnorderedAccessTarget*> pSTs, std::uint32_t RootParameterIndex) = 0;
 	virtual void SetUnorderedAccessBuffer(IStructuredBuffer* pUAV, std::uint32_t RootParameterIndex) = 0;
 	virtual void SetUnorderedAccessBuffers(std::vector<IStructuredBuffer*> UAVs, std::uint32_t RootParameterIndex) = 0;
 	virtual void SetUnorderedAccessBufferAsResource(IStructuredBuffer* pUAV, std::uint32_t RootParameterIndex) = 0;

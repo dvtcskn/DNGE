@@ -33,8 +33,10 @@
 
 D3D12RenderTarget::D3D12RenderTarget(D3D12Device* InOwner, const std::string InName, const sFrameBuffer& InDesc, const sFBODesc& FBODesc)
 	: Super()
+	, Owner(InOwner)
 	, Name(InName)
 	, Desc(InDesc)
+	, FBODesc(FBODesc)
 	, RTV(D3D12DescriptorHandle(D3D12_DESCRIPTOR_HEAP_TYPE_RTV))
 	, SRV(D3D12DescriptorHandle(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV))
 	, UAV(D3D12DescriptorHandle(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV))
@@ -214,6 +216,7 @@ D3D12RenderTarget::D3D12RenderTarget(D3D12Device* InOwner, const std::string InN
 D3D12RenderTarget::~D3D12RenderTarget()
 {
 	Texture = nullptr;
+	Owner = nullptr;
 }
 
 void D3D12RenderTarget::AsResource(EResourceState ResourceState, IGraphicsCommandContext* GraphicsCommandContext)
@@ -224,12 +227,31 @@ void D3D12RenderTarget::AsResource(EResourceState ResourceState, IGraphicsComman
 	CommandContext->FinishRecordCommandList();
 	CommandContext->ExecuteCommandList(); */
 
+	bool bUseIM = false;
+	if (!GraphicsCommandContext)
+	{
+		bUseIM = true;
+		GraphicsCommandContext = Owner->GetIMCommandList();
+		GraphicsCommandContext->BeginRecordCommandList();
+	}
+
 	switch (ResourceState)
 	{
 	case EResourceState::Common:
 	{
 		D3D12CommandBuffer* CommandContext = static_cast<D3D12CommandBuffer*>(GraphicsCommandContext);
-		CommandContext->TransitionTo(this, D3D12_RESOURCE_STATE_COMMON);
+		//CommandContext->TransitionTo(this, D3D12_RESOURCE_STATE_COMMON);
+		CurrentState = D3D12_RESOURCE_STATE_PRESENT;
+
+		//if (CurrentState != D3D12_RESOURCE_STATE_PRESENT)
+		//{
+		//	D3D12_RESOURCE_BARRIER Barriers[1];
+		//	Barriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(GetD3D12Texture(), CurrentState, D3D12_RESOURCE_STATE_PRESENT);
+		//	//RT_ToTransition[State].push_back(RT);
+		//	CommandContext->Get()->ResourceBarrier(ARRAYSIZE(Barriers), Barriers);
+		//	CurrentState = D3D12_RESOURCE_STATE_PRESENT;
+		//}
+		
 	}
 		break;
 	case EResourceState::RenderTarget:
@@ -252,15 +274,21 @@ void D3D12RenderTarget::AsResource(EResourceState ResourceState, IGraphicsComman
 	case EResourceState::NonPixelShaderResource:
 	{
 		D3D12CommandBuffer* CommandContext = static_cast<D3D12CommandBuffer*>(GraphicsCommandContext);
-		CommandContext->TransitionTo(this, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		CommandContext->TransitionTo(this, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE/* | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE*/);
 	}
 		break;
 	case EResourceState::UAV:
 	{
 		D3D12CommandBuffer* CommandContext = static_cast<D3D12CommandBuffer*>(GraphicsCommandContext);
-		CommandContext->TransitionTo(this, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		CommandContext->TransitionTo(this, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 	}
 		break;
+	}
+
+	if (bUseIM)
+	{
+		GraphicsCommandContext->FinishRecordCommandList();
+		GraphicsCommandContext->ExecuteCommandList();
 	}
 }
 
@@ -268,6 +296,7 @@ D3D12DepthTarget::D3D12DepthTarget(D3D12Device* InOwner, const std::string InNam
 	: Super()
 	, Name(InName)
 	, Format(InFormat)
+	, FBODesc(FBODesc)
 	, DSV(D3D12DescriptorHandle(D3D12_DESCRIPTOR_HEAP_TYPE_DSV))
 	, SRV(D3D12DescriptorHandle(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV))
 	, CurrentState(D3D12_RESOURCE_STATES::D3D12_RESOURCE_STATE_DEPTH_WRITE)
@@ -466,130 +495,130 @@ void D3D12DepthTarget::AsResource(EResourceState ResourceState, IGraphicsCommand
 	}
 }
 
-D3D12UnorderedAccessTarget::D3D12UnorderedAccessTarget(D3D12Device* InOwner, const std::string InName, const EFormat InFormat, const sFBODesc& Desc, bool InEnableSRV)
-	: Super()
-	, Name(InName)
-	, Format(InFormat)
-	, UAV(D3D12DescriptorHandle(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV))
-	, SRV(D3D12DescriptorHandle(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV))
-	, CurrentState(D3D12_RESOURCE_STATES::D3D12_RESOURCE_STATE_COMMON)
-	, bIsSRVSupported(InEnableSRV)
-	, CurrentBarrierLayout(D3D12_BARRIER_LAYOUT_UNDEFINED)
-	, CurrentSyncState(D3D12_BARRIER_SYNC_NONE)
-	, CurrentAccessState(D3D12_BARRIER_ACCESS_NO_ACCESS)
-{
-	const DXGI_FORMAT DXGIFormat = ConvertFormat_Format_To_DXGI(Format);
-	CD3DX12_RESOURCE_DESC resourceDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGIFormat, Desc.Dimensions.X, Desc.Dimensions.Y, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-
-	const std::uint32_t mipLevel = -1;
-	const std::uint32_t arraySize = -1;
-	const std::uint32_t firstArraySlice = -1;
-
-	{
-		D3D12_RESOURCE_STATES states = D3D12_RESOURCE_STATE_COMMON;
-
-		if (!bIsSRVSupported)
-			states |= D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-
-		//states |= D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-
-		auto HeapDesc = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-
-		const bool IsEnhancedBarriersSupported = InOwner->IsEnhancedBarriersSupported();
-		if (IsEnhancedBarriersSupported)
-		{
-			auto Desc1 = CD3DX12_RESOURCE_DESC1(resourceDesc);
-			ThrowIfFailed(InOwner->GetDevice()->CreateCommittedResource3(
-				&HeapDesc,
-				D3D12_HEAP_FLAG_NONE,
-				&Desc1,
-				D3D12_BARRIER_LAYOUT_UNDEFINED,
-				nullptr,
-				nullptr,
-				0,
-				nullptr,
-				IID_PPV_ARGS(&Texture)));
-		}
-		else
-		{
-			HRESULT hr = InOwner->Get()->CreateCommittedResource(
-				&HeapDesc,
-				D3D12_HEAP_FLAG_NONE,
-				&resourceDesc,
-				states,
-				0,
-				IID_PPV_ARGS(&Texture));
-
-			assert(hr == S_OK);
-		}
-
-#if _DEBUG
-		Texture->SetName(FileManager::StringToWstring(InName).c_str());
-#endif
-	}
-
-	{
-		D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
-		uavDesc.Format = resourceDesc.Format;
-
-		uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-		uavDesc.Texture2D.MipSlice = (mipLevel == -1) ? 0 : mipLevel;
-
-		InOwner->AllocateDescriptor(&UAV);
-		InOwner->Get()->CreateUnorderedAccessView(Texture.Get(), NULL, & uavDesc, UAV.GetCPU());
-	}
-
-	if (bIsSRVSupported)
-	{
-		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-
-		srvDesc.Format = resourceDesc.Format;
-
-		if (resourceDesc.SampleDesc.Count == 1)
-		{
-			if (resourceDesc.DepthOrArraySize == 1)
-			{
-				srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-
-				srvDesc.Texture2D.MostDetailedMip = (mipLevel == -1) ? 0 : mipLevel;
-				srvDesc.Texture2D.MipLevels = 1;
-			}
-			else
-			{
-				srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
-
-				srvDesc.Texture2DArray.MostDetailedMip = (mipLevel == -1) ? 0 : mipLevel;
-				srvDesc.Texture2DArray.MipLevels = 1;
-
-				srvDesc.Texture2DArray.FirstArraySlice = (firstArraySlice == -1) ? 0 : firstArraySlice;
-				srvDesc.Texture2DArray.ArraySize = (arraySize == -1) ? resourceDesc.DepthOrArraySize : arraySize;
-			}
-		}
-		else
-		{
-			if (resourceDesc.DepthOrArraySize == 1)
-			{
-				srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DMS;
-			}
-			else
-			{
-				srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DMSARRAY;
-				srvDesc.Texture2DMSArray.FirstArraySlice = (firstArraySlice == -1) ? 0 : firstArraySlice;
-				srvDesc.Texture2DMSArray.ArraySize = (arraySize == -1) ? resourceDesc.DepthOrArraySize : arraySize;
-			}
-		}
-
-		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-
-		InOwner->AllocateDescriptor(&SRV);
-		InOwner->Get()->CreateShaderResourceView(Texture.Get(), &srvDesc, SRV.GetCPU());
-	}
-}
-
-D3D12UnorderedAccessTarget::~D3D12UnorderedAccessTarget()
-{
-	Texture = nullptr;
-}
+//D3D12UnorderedAccessTarget::D3D12UnorderedAccessTarget(D3D12Device* InOwner, const std::string InName, const EFormat InFormat, const sFBODesc& Desc, bool InEnableSRV)
+//	: Super()
+//	, Name(InName)
+//	, Format(InFormat)
+//	, UAV(D3D12DescriptorHandle(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV))
+//	, SRV(D3D12DescriptorHandle(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV))
+//	, CurrentState(D3D12_RESOURCE_STATES::D3D12_RESOURCE_STATE_COMMON)
+//	, bIsSRVSupported(InEnableSRV)
+//	, CurrentBarrierLayout(D3D12_BARRIER_LAYOUT_UNDEFINED)
+//	, CurrentSyncState(D3D12_BARRIER_SYNC_NONE)
+//	, CurrentAccessState(D3D12_BARRIER_ACCESS_NO_ACCESS)
+//{
+//	const DXGI_FORMAT DXGIFormat = ConvertFormat_Format_To_DXGI(Format);
+//	CD3DX12_RESOURCE_DESC resourceDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGIFormat, Desc.Dimensions.X, Desc.Dimensions.Y, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+//
+//	const std::uint32_t mipLevel = -1;
+//	const std::uint32_t arraySize = -1;
+//	const std::uint32_t firstArraySlice = -1;
+//
+//	{
+//		D3D12_RESOURCE_STATES states = D3D12_RESOURCE_STATE_COMMON;
+//
+//		if (!bIsSRVSupported)
+//			states |= D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+//
+//		//states |= D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+//
+//		auto HeapDesc = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+//
+//		const bool IsEnhancedBarriersSupported = InOwner->IsEnhancedBarriersSupported();
+//		if (IsEnhancedBarriersSupported)
+//		{
+//			auto Desc1 = CD3DX12_RESOURCE_DESC1(resourceDesc);
+//			ThrowIfFailed(InOwner->GetDevice()->CreateCommittedResource3(
+//				&HeapDesc,
+//				D3D12_HEAP_FLAG_NONE,
+//				&Desc1,
+//				D3D12_BARRIER_LAYOUT_UNDEFINED,
+//				nullptr,
+//				nullptr,
+//				0,
+//				nullptr,
+//				IID_PPV_ARGS(&Texture)));
+//		}
+//		else
+//		{
+//			HRESULT hr = InOwner->Get()->CreateCommittedResource(
+//				&HeapDesc,
+//				D3D12_HEAP_FLAG_NONE,
+//				&resourceDesc,
+//				states,
+//				0,
+//				IID_PPV_ARGS(&Texture));
+//
+//			assert(hr == S_OK);
+//		}
+//
+//#if _DEBUG
+//		Texture->SetName(FileManager::StringToWstring(InName).c_str());
+//#endif
+//	}
+//
+//	{
+//		D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+//		uavDesc.Format = resourceDesc.Format;
+//
+//		uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+//		uavDesc.Texture2D.MipSlice = (mipLevel == -1) ? 0 : mipLevel;
+//
+//		InOwner->AllocateDescriptor(&UAV);
+//		InOwner->Get()->CreateUnorderedAccessView(Texture.Get(), NULL, & uavDesc, UAV.GetCPU());
+//	}
+//
+//	if (bIsSRVSupported)
+//	{
+//		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+//
+//		srvDesc.Format = resourceDesc.Format;
+//
+//		if (resourceDesc.SampleDesc.Count == 1)
+//		{
+//			if (resourceDesc.DepthOrArraySize == 1)
+//			{
+//				srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+//
+//				srvDesc.Texture2D.MostDetailedMip = (mipLevel == -1) ? 0 : mipLevel;
+//				srvDesc.Texture2D.MipLevels = 1;
+//			}
+//			else
+//			{
+//				srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
+//
+//				srvDesc.Texture2DArray.MostDetailedMip = (mipLevel == -1) ? 0 : mipLevel;
+//				srvDesc.Texture2DArray.MipLevels = 1;
+//
+//				srvDesc.Texture2DArray.FirstArraySlice = (firstArraySlice == -1) ? 0 : firstArraySlice;
+//				srvDesc.Texture2DArray.ArraySize = (arraySize == -1) ? resourceDesc.DepthOrArraySize : arraySize;
+//			}
+//		}
+//		else
+//		{
+//			if (resourceDesc.DepthOrArraySize == 1)
+//			{
+//				srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DMS;
+//			}
+//			else
+//			{
+//				srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DMSARRAY;
+//				srvDesc.Texture2DMSArray.FirstArraySlice = (firstArraySlice == -1) ? 0 : firstArraySlice;
+//				srvDesc.Texture2DMSArray.ArraySize = (arraySize == -1) ? resourceDesc.DepthOrArraySize : arraySize;
+//			}
+//		}
+//
+//		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+//
+//		InOwner->AllocateDescriptor(&SRV);
+//		InOwner->Get()->CreateShaderResourceView(Texture.Get(), &srvDesc, SRV.GetCPU());
+//	}
+//}
+//
+//D3D12UnorderedAccessTarget::~D3D12UnorderedAccessTarget()
+//{
+//	Texture = nullptr;
+//}
 
 D3D12FrameBuffer::D3D12FrameBuffer(D3D12Device* InOwner, std::string InName, const sFrameBufferAttachmentInfo& InAttachments)
 	: Owner(InOwner)
@@ -602,7 +631,7 @@ D3D12FrameBuffer::D3D12FrameBuffer(D3D12Device* InOwner, std::string InName, con
 	{
 		const auto& FB = AttachmentInfo.FrameBuffer[i];
 
-		if (FB.AttachmentType == EFrameBufferAttachmentType::UAV)
+		/*if (FB.AttachmentType == EFrameBufferAttachmentType::UAV)
 		{
 			UnorderedAccessTargets.push_back(D3D12UnorderedAccessTarget::Create(Owner, Name + "_UAV_" + std::to_string(UnorderedAccessTargets.size()), FB.Format, FDesc, false));
 		}
@@ -610,7 +639,7 @@ D3D12FrameBuffer::D3D12FrameBuffer(D3D12Device* InOwner, std::string InName, con
 		{
 			UnorderedAccessTargets.push_back(D3D12UnorderedAccessTarget::Create(Owner, Name + "_UAV_" + std::to_string(UnorderedAccessTargets.size()), FB.Format, FDesc, true));
 		}
-		else if (FB.AttachmentType == EFrameBufferAttachmentType::RT)
+		else*/ if (FB.AttachmentType == EFrameBufferAttachmentType::RT)
 		{
 			RenderTargets.push_back(D3D12RenderTarget::Create(Owner, Name + "_RenderTarget_" + std::to_string(RenderTargets.size()), sFrameBuffer(FB.Format, FB.AttachmentType), FDesc));
 		}
@@ -684,31 +713,31 @@ void D3D12FrameBuffer::AttachRenderTarget(const IRenderTarget::SharedPtr& Render
 	}
 }
 
-void D3D12FrameBuffer::AttachUnorderedAccessTarget(const IUnorderedAccessTarget::SharedPtr& UnorderedAccessTarget, std::optional<std::size_t> Index)
-{
-	if (auto ST = std::dynamic_pointer_cast<D3D12UnorderedAccessTarget>(UnorderedAccessTarget))
-	{
-		EFrameBufferAttachmentType AttachmentType;
-		if (!ST->IsSRV_Allowed())
-		{
-			AttachmentType = EFrameBufferAttachmentType::UAV;
-		}
-		else if (ST->IsSRV_Allowed())
-		{
-			AttachmentType = EFrameBufferAttachmentType::UAV_SRV;
-		}
-
-		if (Index.has_value())
-			UnorderedAccessTargets.insert(UnorderedAccessTargets.begin() + Index.value(), ST);
-		else
-			UnorderedAccessTargets.push_back(ST);
-
-		if (Index.has_value())
-			AttachmentInfo.FrameBuffer.insert(AttachmentInfo.FrameBuffer.begin() + Index.value(), sFrameBuffer(ST->GetFormat(), AttachmentType));
-		else
-			AttachmentInfo.AddFrameBuffer(ST->GetFormat(), AttachmentType);
-	}
-}
+//void D3D12FrameBuffer::AttachUnorderedAccessTarget(const IUnorderedAccessTarget::SharedPtr& UnorderedAccessTarget, std::optional<std::size_t> Index)
+//{
+//	if (auto ST = std::dynamic_pointer_cast<D3D12UnorderedAccessTarget>(UnorderedAccessTarget))
+//	{
+//		EFrameBufferAttachmentType AttachmentType;
+//		if (!ST->IsSRV_Allowed())
+//		{
+//			AttachmentType = EFrameBufferAttachmentType::UAV;
+//		}
+//		else if (ST->IsSRV_Allowed())
+//		{
+//			AttachmentType = EFrameBufferAttachmentType::UAV_SRV;
+//		}
+//
+//		if (Index.has_value())
+//			UnorderedAccessTargets.insert(UnorderedAccessTargets.begin() + Index.value(), ST);
+//		else
+//			UnorderedAccessTargets.push_back(ST);
+//
+//		if (Index.has_value())
+//			AttachmentInfo.FrameBuffer.insert(AttachmentInfo.FrameBuffer.begin() + Index.value(), sFrameBuffer(ST->GetFormat(), AttachmentType));
+//		else
+//			AttachmentInfo.AddFrameBuffer(ST->GetFormat(), AttachmentType);
+//	}
+//}
 
 void D3D12FrameBuffer::SetDepthTarget(const IDepthTarget::SharedPtr& InDepthTarget)
 {

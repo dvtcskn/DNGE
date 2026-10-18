@@ -665,16 +665,6 @@ IDepthTarget::UniquePtr D3D11Device::CreateUniqueDepthTarget(const std::string I
 	return D3D11DepthTarget::CreateUnique(this, InName, Format, Desc);
 }
 
-IUnorderedAccessTarget::SharedPtr D3D11Device::CreateUnorderedAccessTarget(const std::string InName, const EFormat Format, const sFBODesc& Desc, bool InEnableSRV)
-{
-	return D3D11UnorderedAccessTarget::Create(this, InName, Format, Desc, InEnableSRV);
-}
-
-IUnorderedAccessTarget::UniquePtr D3D11Device::CreateUniqueUnorderedAccessTarget(const std::string InName, const EFormat Format, const sFBODesc& Desc, bool InEnableSRV)
-{
-	return D3D11UnorderedAccessTarget::CreateUnique(this, InName, Format, Desc, InEnableSRV);
-}
-
 IPipeline::SharedPtr D3D11Device::CreatePipeline(const std::string& InName, const sPipelineDesc& InDesc)
 {
 	return D3D11Pipeline::Create(this, InName, InDesc);

@@ -32,6 +32,7 @@
 #include "D3D12Viewport.h"
 #include "D3D12Texture.h"
 #include "GI/D3DShared/D3DShared.h"
+#include "Utilities/FileManager.h"
 
 #if Pix3_Enabled && _DEBUG
 #include <pix3.h>
@@ -111,6 +112,12 @@ D3D12CommandBuffer::~D3D12CommandBuffer()
 	CommandList = nullptr;
 	CommandAllocator = nullptr;
 	Owner = nullptr;
+}
+
+void D3D12CommandBuffer::SetName(std::string Name)
+{
+	std::wstring WName = FileManager::StringToWstring(Name);
+	CommandList->SetName(WName.c_str());
 }
 
 ECommandContextBeginResult D3D12CommandBuffer::BeginRecordCommandList(const ECommandContextBeginState Begin)
@@ -366,8 +373,8 @@ void D3D12CommandBuffer::CopyResource(ID3D12Resource* pDstResource, D3D12_RESOUR
 	//CD3DX12_BARRIER_GROUP BarrierGroup(2, Barrier);
 	//CMDList->Get()->Barrier(1, &BarrierGroup);
 
-	if (pSrcResource->GetDesc() != pDstResource->GetDesc())
-		return;
+	//if (pSrcResource->GetDesc() != pDstResource->GetDesc())
+	//	return;
 
 	{
 		std::vector<D3D12_RESOURCE_BARRIER> preCopyBarriers;
@@ -638,7 +645,7 @@ void D3D12CommandBuffer::SetRenderTarget(IRenderTarget* pRT, IDepthTarget* Depth
 				CommandList->OMSetRenderTargets(1, &RT, FALSE, nullptr);
 			}
 
-			TransitionTo(FBuffer, D3D12_RESOURCE_STATE_COMMON);
+			//TransitionTo(FBuffer, D3D12_RESOURCE_STATE_COMMON);
 		}
 	}
 }

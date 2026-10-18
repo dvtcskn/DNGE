@@ -249,7 +249,7 @@ void VulkanVertexBuffer::UpdateSubresource(BufferSubresource* Subresource, IGrap
 	if (!Subresource)
 		return;
 
-	MapEx(Subresource->pSysMem, Subresource->Location, Subresource->Size);
+	MapEx(Subresource->pSysMem, (std::uint32_t)Subresource->Location, (std::uint32_t)Subresource->Size);
 }
 
 void VulkanVertexBuffer::MapEx(const void* Ptr, std::uint32_t Location, std::uint32_t Size)
@@ -349,7 +349,7 @@ void VulkanIndexBuffer::UpdateSubresource(BufferSubresource* Subresource, IGraph
 	if (!Subresource)
 		return;
 
-	MapEx(Subresource->pSysMem, Subresource->Location, Subresource->Size);
+	MapEx(Subresource->pSysMem, (std::uint32_t)Subresource->Location, (std::uint32_t)Subresource->Size);
 }
 
 void VulkanIndexBuffer::MapEx(const void* Ptr, std::uint32_t Location, std::uint32_t Size)

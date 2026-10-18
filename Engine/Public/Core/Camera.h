@@ -60,6 +60,9 @@ public:
     virtual float GetClearDepth() const = 0;
     virtual bool IsZInfinite() const = 0;
 
+    inline virtual FVector GetUp() const = 0;
+    inline virtual FVector GetRight() const = 0;
+    inline virtual FVector GetDirection() const = 0;
     virtual FVector GetPosition() const = 0;
     virtual FVector GetRotation() const = 0;
     virtual FVector GetFocus() const = 0;
@@ -409,6 +412,9 @@ public:
     }
 
 
+    inline virtual FVector GetUp() const override { return CameraWorld.Up(); }
+    inline virtual FVector GetRight() const override { return CameraWorld.Right(); }
+    inline virtual FVector GetDirection() const override { return CameraWorld.Forward(); }
     inline virtual FVector GetPosition() const override { return Eye; }
     inline virtual FVector GetRotation() const override { return Rotation; }
     inline virtual FVector GetFocus() const override { return LookAt; }

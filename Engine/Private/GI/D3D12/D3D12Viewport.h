@@ -98,6 +98,8 @@ public:
 
 	FORCEINLINE std::uint32_t GetBackBufferCount() const { return 2; }
 	FORCEINLINE std::uint32_t GetCurrentBackBufferIndex() const { return CurrentBackBuffer; }
+	FORCEINLINE ID3D12Resource* GetCurrentSwapchainTexture() const { return RTV[CurrentBackBuffer].renderTarget.Get(); }
+	FORCEINLINE HDRMetadata GetHDRMetaData() const { return HDR; }
 
 	DXGI_FORMAT GetDXGIFormat() const;
 

@@ -40,6 +40,8 @@ public:
 
 	virtual void* GetInternalCommandContext() override final { return CommandBuffer; }
 
+	virtual void SetName(std::string Name) override final;
+
 	virtual ECommandContextBeginResult BeginRecordCommandList(const ECommandContextBeginState Begin = ECommandContextBeginState::Render) override final;
 	virtual bool FinishRecordCommandList() override final;
 	virtual bool ExecuteCommandList(ECommandContextExecuteType ExecuteType = ECommandContextExecuteType::Immediate, std::uint32_t Order = std::uint32_t(-1)) override final;

@@ -63,10 +63,10 @@ bool VulkanPipeline::Compile(IFrameBuffer* InFrameBuffer)
 		//	attachments.push_back(FrameBufferAttachment->GetUAV_View());
 		RenderTargetAttachmentCount++;
 	}
-	for (auto& FrameBufferAttachment : FB->UnorderedAccessTargets)
+	/*for (auto& FrameBufferAttachment : FB->UnorderedAccessTargets)
 	{
 		attachments.push_back(FrameBufferAttachment->GetView());
-	}
+	}*/
 	attachments.push_back(FB->DepthTarget->GetView());
 
 	RenderPass = VulkanRenderpass::Create(Owner, Name + "_RenderPass", FB->GetAttachmentInfo());

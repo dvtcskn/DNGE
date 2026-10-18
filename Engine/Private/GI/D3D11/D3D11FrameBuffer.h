@@ -40,6 +40,7 @@ public:
 	virtual ~D3D11RenderTarget();
 
 	virtual void AsResource(EResourceState ResourceState, IGraphicsCommandContext* GraphicsCommandContext = nullptr) override final {}
+	virtual EFormat GetFormat() const override final { return Desc.Format; }
 	virtual void* GetNativeTexture() const override final { return Texture.Get(); }
 
 	virtual void SetDefaultRootParameterIndex(std::uint32_t RootParameterIndex) override final {}
@@ -55,8 +56,6 @@ public:
 
 	virtual std::uint32_t GetSRVBindlessIndex() const override final { return std::uint32_t(-1); }
 	virtual std::uint32_t GetUAVBindlessIndex() const override final { return std::uint32_t(-1); }
-
-	EFormat GetFormat() const { return Desc.Format; }
 
 	virtual ResourceSharedHandle* GetSharedHandle() const override final { return nullptr; }
 	virtual bool CopyFrom(IRenderTarget* RenderTarget) override final { return false; }
@@ -79,6 +78,7 @@ public:
 	virtual ~D3D11DepthTarget();
 
 	virtual void AsResource(EResourceState ResourceState, IGraphicsCommandContext* GraphicsCommandContext = nullptr) override final {}
+	virtual EFormat GetFormat() const override final { return Format; }
 	virtual void* GetNativeTexture() const override final { return Texture.Get(); }
 
 	virtual void SetDefaultRootParameterIndex(std::uint32_t RootParameterIndex) override final {}
@@ -91,8 +91,6 @@ public:
 	bool IsSRVSupported() const { return bIsSRVSupported; }
 	virtual bool IsSRV_Allowed() const override final { return bIsSRVSupported; }
 	virtual bool IsUAV_Allowed() const override final { return false; }
-
-	EFormat GetFormat() const { return Format; }
 
 	virtual ResourceSharedHandle* GetSharedHandle() const override final { return nullptr; }
 	virtual bool CopyFrom(IDepthTarget* DepthTarget) override final { return false; }
@@ -108,43 +106,43 @@ private:
 	bool bIsSRVSupported;
 };
 
-class D3D11UnorderedAccessTarget final : public IUnorderedAccessTarget
-{
-	sClassBody(sClassConstructor, D3D11UnorderedAccessTarget, IUnorderedAccessTarget)
-public:
-	D3D11UnorderedAccessTarget(D3D11Device* InDevice, const std::string InName, const EFormat Format, const sFBODesc& Desc, bool InEnableSRV = true);
-	virtual ~D3D11UnorderedAccessTarget();
-
-	virtual void* GetNativeTexture() const override final { return Texture.Get(); }
-
-	virtual void SetDefaultRootParameterIndex(std::uint32_t RootParameterIndex) override final {}
-	virtual std::uint32_t GetDefaultRootParameterIndex() const override final { return 0; }
-
-	ID3D11Texture2D* GetD3D11Texture() const { return Texture.Get(); }
-	ID3D11UnorderedAccessView* GetD3D11UAV() const { return UnorderedAccessView.Get(); }
-	ID3D11ShaderResourceView* GetD3D11SRV() const { return ShaderResource.Get(); }
-
-	bool IsSRVSupported() const { return bIsSRVSupported; }
-	virtual bool IsSRV_Allowed() const override final { return bIsSRVSupported; }
-
-	virtual std::uint32_t GetSRVBindlessIndex() const override final { return std::uint32_t(-1); }
-	virtual std::uint32_t GetUAVBindlessIndex() const override final { return std::uint32_t(-1); }
-
-	EFormat GetFormat() const { return Format; }
-
-	virtual ResourceSharedHandle* GetSharedHandle() const override final { return nullptr; }
-	virtual bool CopyFrom(IUnorderedAccessTarget* UnorderedAccessTarget) override final { return false; }
-
-private:
-	std::string Name;
-	EFormat Format;
-
-	ComPtr<ID3D11Texture2D> Texture;
-	ComPtr<ID3D11UnorderedAccessView> UnorderedAccessView;
-	ComPtr<ID3D11ShaderResourceView> ShaderResource;
-
-	bool bIsSRVSupported;
-};
+//class D3D11UnorderedAccessTarget final : public IUnorderedAccessTarget
+//{
+//	sClassBody(sClassConstructor, D3D11UnorderedAccessTarget, IUnorderedAccessTarget)
+//public:
+//	D3D11UnorderedAccessTarget(D3D11Device* InDevice, const std::string InName, const EFormat Format, const sFBODesc& Desc, bool InEnableSRV = true);
+//	virtual ~D3D11UnorderedAccessTarget();
+//
+//	virtual void* GetNativeTexture() const override final { return Texture.Get(); }
+//
+//	virtual void SetDefaultRootParameterIndex(std::uint32_t RootParameterIndex) override final {}
+//	virtual std::uint32_t GetDefaultRootParameterIndex() const override final { return 0; }
+//
+//	ID3D11Texture2D* GetD3D11Texture() const { return Texture.Get(); }
+//	ID3D11UnorderedAccessView* GetD3D11UAV() const { return UnorderedAccessView.Get(); }
+//	ID3D11ShaderResourceView* GetD3D11SRV() const { return ShaderResource.Get(); }
+//
+//	bool IsSRVSupported() const { return bIsSRVSupported; }
+//	virtual bool IsSRV_Allowed() const override final { return bIsSRVSupported; }
+//
+//	virtual std::uint32_t GetSRVBindlessIndex() const override final { return std::uint32_t(-1); }
+//	virtual std::uint32_t GetUAVBindlessIndex() const override final { return std::uint32_t(-1); }
+//
+//	EFormat GetFormat() const { return Format; }
+//
+//	virtual ResourceSharedHandle* GetSharedHandle() const override final { return nullptr; }
+//	virtual bool CopyFrom(IUnorderedAccessTarget* UnorderedAccessTarget) override final { return false; }
+//
+//private:
+//	std::string Name;
+//	EFormat Format;
+//
+//	ComPtr<ID3D11Texture2D> Texture;
+//	ComPtr<ID3D11UnorderedAccessView> UnorderedAccessView;
+//	ComPtr<ID3D11ShaderResourceView> ShaderResource;
+//
+//	bool bIsSRVSupported;
+//};
 
 class D3D11FrameBuffer final : public IFrameBuffer
 {
@@ -157,7 +155,7 @@ private:
 
 public:
 	std::vector<D3D11RenderTarget::SharedPtr> RenderTargets;
-	std::vector<D3D11UnorderedAccessTarget::SharedPtr> UAVs;
+	//std::vector<D3D11UnorderedAccessTarget::SharedPtr> UAVs;
 	D3D11DepthTarget::SharedPtr DepthTarget;
 
 public:
@@ -171,9 +169,9 @@ public:
 			RT = nullptr;
 		RenderTargets.clear();
 
-		for (auto& UAV : UAVs)
-			UAV = nullptr;
-		UAVs.clear();
+		//for (auto& UAV : UAVs)
+		//	UAV = nullptr;
+		//UAVs.clear();
 
 		DepthTarget = nullptr;
 	}
@@ -209,15 +207,15 @@ public:
 	virtual IRenderTarget* GetRenderTarget(std::size_t Index) const override final { return RenderTargets.at(Index).get(); }
 	virtual void AttachRenderTarget(const IRenderTarget::SharedPtr& RenderTarget, std::optional<std::size_t> Index = std::nullopt) override final;
 
-	virtual std::vector<IUnorderedAccessTarget*> GetUnorderedAccessTargets() const override final 
+	/*virtual std::vector<IUnorderedAccessTarget*> GetUnorderedAccessTargets() const override final 
 	{
 		std::vector<IUnorderedAccessTarget*> Result;
 		Result.reserve(UAVs.size());
 		std::transform(UAVs.cbegin(), UAVs.cend(), std::back_inserter(Result), [](auto& ptr) { return ptr.get(); });
 		return Result;
-	}
-	virtual IUnorderedAccessTarget* GetUnorderedAccessTarget(std::size_t Index) const override final { return UAVs.at(Index).get(); }
-	virtual void AttachUnorderedAccessTarget(const IUnorderedAccessTarget::SharedPtr& UnorderedAccessTarget, std::optional<std::size_t> Index = std::nullopt) override final;
+	}*/
+	//virtual IUnorderedAccessTarget* GetUnorderedAccessTarget(std::size_t Index) const override final { return UAVs.at(Index).get(); }
+	//virtual void AttachUnorderedAccessTarget(const IUnorderedAccessTarget::SharedPtr& UnorderedAccessTarget, std::optional<std::size_t> Index = std::nullopt) override final;
 
 	virtual IDepthTarget* GetDepthTarget() const override final { return DepthTarget.get(); }
 	virtual void SetDepthTarget(const IDepthTarget::SharedPtr& DepthTarget) override final;

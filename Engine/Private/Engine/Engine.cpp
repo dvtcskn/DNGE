@@ -78,6 +78,7 @@ namespace
 #if Renderdoc_Enabled && _DEBUG
 	RENDERDOC_API_1_7_0* rdoc_api = nullptr;
 
+	static bool bRenderdocSnapshot = false;
 	void InitializeRenderDoc()
 	{
 		// At init, on windows
@@ -1157,16 +1158,6 @@ IDepthTarget::UniquePtr IDepthTarget::CreateUnique(const std::string InName, con
 	return GPU == 0 || GPU > SecondaryGPUs.size() ? Device->CreateUniqueDepthTarget(InName, Format, Desc) : SecondaryGPUs[GPU - 1]->CreateUniqueDepthTarget(InName, Format, Desc);
 }
 
-IUnorderedAccessTarget::SharedPtr IUnorderedAccessTarget::Create(const std::string InName, const EFormat Format, const sFBODesc& Desc, bool InEnableSRV, std::uint32_t GPU)
-{
-	return GPU == 0 || GPU > SecondaryGPUs.size() ? Device->CreateUnorderedAccessTarget(InName, Format, Desc, InEnableSRV) : SecondaryGPUs[GPU - 1]->CreateUnorderedAccessTarget(InName, Format, Desc, InEnableSRV);
-}
-
-IUnorderedAccessTarget::UniquePtr IUnorderedAccessTarget::CreateUnique(const std::string InName, const EFormat Format, const sFBODesc& Desc, bool InEnableSRV, std::uint32_t GPU)
-{
-	return GPU == 0 || GPU > SecondaryGPUs.size() ? Device->CreateUniqueUnorderedAccessTarget(InName, Format, Desc, InEnableSRV) : SecondaryGPUs[GPU - 1]->CreateUniqueUnorderedAccessTarget(InName, Format, Desc, InEnableSRV);
-}
-
 IFrameBuffer::SharedPtr IFrameBuffer::Create(const std::string InName, const sFrameBufferAttachmentInfo& InAttachments, std::uint32_t GPU)
 {
 	return GPU == 0 || GPU > SecondaryGPUs.size() ? Device->CreateFrameBuffer(InName, InAttachments) : SecondaryGPUs[GPU - 1]->CreateFrameBuffer(InName, InAttachments);
@@ -1585,7 +1576,8 @@ void sEngine::Tick(const double DeltaTime)
 void sEngine::BeginFrame()
 {
 #if Renderdoc_Enabled && _DEBUG
-	if (rdoc_api) {
+	if (bRenderdocSnapshot && rdoc_api)
+	{
 		rdoc_api->StartFrameCapture(nullptr, nullptr);
 	}
 #endif
@@ -1611,9 +1603,11 @@ void sEngine::Present()
 	PIXEndEvent();
 #endif
 #if Renderdoc_Enabled && _DEBUG
-	if (rdoc_api) {
+	if (bRenderdocSnapshot && rdoc_api) 
+	{
 		rdoc_api->EndFrameCapture(nullptr, nullptr);
 	}
+	bRenderdocSnapshot = false;
 #endif
 }
 
@@ -1718,6 +1712,13 @@ void sEngine::InputProcess(const GMouseInput& MouseInput, const GKeyboardChar& K
 		//Server->DestroySession();
 		//Client->Disconnect();
 	}
+
+#if Renderdoc_Enabled && _DEBUG
+	if (!bRenderdocSnapshot && KeyboardChar.KeyCode == 'r' && KeyboardChar.bIsPressed && KeyboardChar.bIsChar)
+	{
+		bRenderdocSnapshot = true;
+	}
+#endif
 
 	if (MetaWorld)
 		MetaWorld->InputProcess(MouseInput, KeyboardChar);

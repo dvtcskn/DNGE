@@ -2165,6 +2165,16 @@ FORCEINLINE constexpr FVector4 operator /(const DirectX::XMVECTOR& value1, const
 };
 #endif
 
+FORCEINLINE constexpr FVector Normalize(const FVector& v)
+{
+	return FVector(DirectX::XMVector3Normalize(v));
+}
+
+FORCEINLINE constexpr FVector Cross(FVector v1, FVector v2)
+{
+	return v1.CrossProduct(v2);
+}
+
 __declspec(align(16)) class FColor
 {
 	typedef FColor Class;
@@ -2685,6 +2695,18 @@ public:
 			0.0f, 0.0f, 0.0f, 1.0f);
 	}
 
+	/*FORCEINLINE static FMatrix LookAt(const FVector& eyePos, const FVector& lookAtPos, const FVector& upVec)
+	{
+		FMatrix m4EyeFrame;
+		FVector v3X, v3Y, v3Z;
+		v3Y = Normalize(upVec);
+		v3Z = Normalize((eyePos - lookAtPos));
+		v3X = Normalize(Cross(v3Y, v3Z));
+		v3Y = Cross(v3Z, v3X);
+		m4EyeFrame = FMatrix(FVector4(v3X), FVector4(v3Y), FVector4(v3Z), FVector4(eyePos));
+		return orthoInverse(m4EyeFrame);
+	}*/
+
 	FORCEINLINE static FMatrix Identity3x3()
 	{
 		TMatrix3x3<float> Matrix3x3 = TMatrix3x3<float>::Identity();
@@ -2781,41 +2803,6 @@ public:
 		ret._44 = matrix._44;
 
 		return ret;
-	}
-
-	FORCEINLINE constexpr FVector Backward()
-	{
-		return FVector(_31, _32, _33);
-	}
-
-	FORCEINLINE constexpr FVector Down()
-	{
-		return FVector(-_21, -_22, -_23);
-	}
-
-	FORCEINLINE constexpr FVector Forward()
-	{
-		return FVector(-_31, -_32, -_33);
-	}
-
-	FORCEINLINE constexpr FVector Left()
-	{
-		return FVector(-_11, -_12, -_13);
-	}
-
-	FORCEINLINE constexpr FVector Right()
-	{
-		return FVector(_11, _12, _13);
-	}
-
-	FORCEINLINE constexpr FVector Translation()
-	{
-		return FVector(_41, _42, _43);
-	}
-
-	FORCEINLINE constexpr FVector Up()
-	{
-		return FVector(_21, _22, _23);
 	}
 
 public:
@@ -3063,6 +3050,41 @@ public:
 	inline constexpr FVector GetOrigin() const
 	{
 		return FVector(m[3][0], m[3][1], m[3][2]);
+	}
+
+	FORCEINLINE constexpr FVector Backward() const
+	{
+		return FVector(_31, _32, _33);
+	}
+
+	FORCEINLINE constexpr FVector Down() const
+	{
+		return FVector(-_21, -_22, -_23);
+	}
+
+	FORCEINLINE constexpr FVector Forward() const
+	{
+		return FVector(-_31, -_32, -_33);
+	}
+
+	FORCEINLINE constexpr FVector Left() const
+	{
+		return FVector(-_11, -_12, -_13);
+	}
+
+	FORCEINLINE constexpr FVector Right() const
+	{
+		return FVector(_11, _12, _13);
+	}
+
+	FORCEINLINE constexpr FVector Translation() const
+	{
+		return FVector(_41, _42, _43);
+	}
+
+	FORCEINLINE constexpr FVector Up() const
+	{
+		return FVector(_21, _22, _23);
 	}
 
 	// casting operators
@@ -4483,11 +4505,6 @@ FORCEINLINE constexpr FBoundingBox operator -(const FBoundingBox& Rect, const FV
 	return FBoundingBox(Rect.Min - V, Rect.Max - V);
 }
 
-FORCEINLINE constexpr FVector Normalize(const FVector& v)
-{
-	return FVector(DirectX::XMVector3Normalize(v));
-}
-
 template<typename T, typename = typename std::enable_if<std::is_arithmetic<T>::value>::type>
 struct TDimension2D
 {
@@ -4993,11 +5010,6 @@ FORCEINLINE constexpr float Dot(const TVector3<T>& v1, const TVector3<T>& v2)
 FORCEINLINE constexpr float Dot(const FVector4& v1, const FVector4& v2)
 {
 	return (v1.X * v2.X) + (v1.Y * v2.Y) + (v1.Z * v2.Z) + (v1.W * v2.W);
-}
-
-FORCEINLINE constexpr FVector Cross(FVector v1, FVector v2)
-{
-	return v1.CrossProduct(v2);
 }
 
 template<typename T>
