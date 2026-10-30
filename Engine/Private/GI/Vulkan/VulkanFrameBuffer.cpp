@@ -47,7 +47,6 @@ VulkanRenderTarget::VulkanRenderTarget(VulkanDevice* InOwner, const std::string 
 	VkFormat VulkanFormat = ConvertFormat_Format_To_VkFormat(Desc.Format);
 
 	// Create VkImage
-	VkImageCreateInfo imageInfo{};
 	imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 	imageInfo.imageType = VK_IMAGE_TYPE_2D;
 	imageInfo.extent = { InFBODesc.Dimensions.X, InFBODesc.Dimensions.Y, 1 };
@@ -151,6 +150,80 @@ VulkanRenderTarget::~VulkanRenderTarget()
 	Owner = nullptr;
 }
 
+void VulkanRenderTarget::AsResource(EResourceState ResourceState, IGraphicsCommandContext* GraphicsCommandContext)
+{
+	/*VulkanCommandBuffer* CommandContext = Owner->GetIMCommandList();
+	CommandContext->BeginRecordCommandList();
+	CommandContext->TransitionTo(this, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+	CommandContext->FinishRecordCommandList();
+	CommandContext->ExecuteCommandList(); */
+
+	VkImageSubresourceRange COLOR_Range{};
+	COLOR_Range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	COLOR_Range.baseMipLevel = 0;
+	COLOR_Range.levelCount = 1;
+	COLOR_Range.baseArrayLayer = 0;
+	COLOR_Range.layerCount = 1;
+
+	/*bool bUseIM = false;
+	if (!GraphicsCommandContext)
+	{
+		bUseIM = true;
+		GraphicsCommandContext = Owner->GetIMCommandList();
+		GraphicsCommandContext->BeginRecordCommandList();
+	}*/
+
+	switch (ResourceState)
+	{
+	case EResourceState::Common:
+	{
+		VulkanCommandBuffer* CommandContext = static_cast<VulkanCommandBuffer*>(GraphicsCommandContext);
+		//CommandContext->TransitionTo(this, D3D12_RESOURCE_STATE_COMMON);
+		CurrentLayout = VK_IMAGE_LAYOUT_GENERAL;
+	}
+	break;
+	case EResourceState::RenderTarget:
+	{
+		VulkanCommandBuffer* CommandContext = static_cast<VulkanCommandBuffer*>(GraphicsCommandContext);
+		CommandContext->TransitionImageLayout(Image, CurrentLayout, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, COLOR_Range);
+		CurrentLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	}
+	break;
+	case EResourceState::Depth:
+	{
+
+	}
+	break;
+	case EResourceState::ShaderResource:
+	{
+		VulkanCommandBuffer* CommandContext = static_cast<VulkanCommandBuffer*>(GraphicsCommandContext);
+		CommandContext->TransitionImageLayout(Image, CurrentLayout, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, COLOR_Range);
+		CurrentLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	}
+	break;
+	case EResourceState::NonPixelShaderResource:
+	{
+		VulkanCommandBuffer* CommandContext = static_cast<VulkanCommandBuffer*>(GraphicsCommandContext);
+		CommandContext->TransitionImageLayout(Image, CurrentLayout, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL /* | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE*/, COLOR_Range);
+		CurrentLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	}
+	break;
+	case EResourceState::UAV:
+	{
+		VulkanCommandBuffer* CommandContext = static_cast<VulkanCommandBuffer*>(GraphicsCommandContext);
+		CommandContext->TransitionImageLayout(Image, CurrentLayout, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, COLOR_Range);
+		CurrentLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	}
+	break;
+	}
+
+	/*if (bUseIM)
+	{
+		GraphicsCommandContext->FinishRecordCommandList();
+		GraphicsCommandContext->ExecuteCommandList();
+	}*/
+}
+
 VulkanDepthTarget::VulkanDepthTarget(VulkanDevice* InOwner, const std::string InName, const EFormat InFormat, const sFBODesc& InDesc)
 	: Super()
 	, Owner(InOwner)
@@ -182,7 +255,6 @@ VulkanDepthTarget::VulkanDepthTarget(VulkanDevice* InOwner, const std::string In
 	//formatListInfo.viewFormatCount = 2;
 	//formatListInfo.pViewFormats = compatibleFormats;
 
-	VkImageCreateInfo image_create_info{};
 	image_create_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 	image_create_info.imageType = VK_IMAGE_TYPE_2D;
 	image_create_info.format = DepthFormat;
@@ -257,6 +329,56 @@ VulkanDepthTarget::~VulkanDepthTarget()
 	Image = nullptr;
 	View = nullptr;
 	Owner = nullptr;
+}
+
+void VulkanDepthTarget::AsResource(EResourceState ResourceState, IGraphicsCommandContext* GraphicsCommandContext)
+{
+	/*VulkanCommandBuffer* CommandContext = Owner->GetIMCommandList();
+	CommandContext->BeginRecordCommandList();
+	CommandContext->TransitionTo(this, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+	CommandContext->FinishRecordCommandList();
+	CommandContext->ExecuteCommandList(); */
+
+	VkImageSubresourceRange DEPTH_Range{};
+	DEPTH_Range.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+	DEPTH_Range.baseMipLevel = 0;
+	DEPTH_Range.levelCount = 1;
+	DEPTH_Range.baseArrayLayer = 0;
+	DEPTH_Range.layerCount = 1;
+
+	switch (ResourceState)
+	{
+	case EResourceState::Common:
+	{
+		VulkanCommandBuffer* CommandContext = static_cast<VulkanCommandBuffer*>(GraphicsCommandContext);
+		CommandContext->TransitionImageLayout(Image, CurrentLayout, VK_IMAGE_LAYOUT_GENERAL, DEPTH_Range);
+		CurrentLayout = VK_IMAGE_LAYOUT_GENERAL;
+	}
+	break;
+	case EResourceState::RenderTarget:
+	{
+
+	}
+	break;
+	case EResourceState::Depth:
+	{
+		VulkanCommandBuffer* CommandContext = static_cast<VulkanCommandBuffer*>(GraphicsCommandContext);
+		CommandContext->TransitionImageLayout(Image, CurrentLayout, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, DEPTH_Range);
+		CurrentLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+	}
+	break;
+	case EResourceState::ShaderResource:
+	{
+		VulkanCommandBuffer* CommandContext = static_cast<VulkanCommandBuffer*>(GraphicsCommandContext);
+		CommandContext->TransitionImageLayout(Image, CurrentLayout, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, DEPTH_Range);
+		CurrentLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	}
+	break;
+	case EResourceState::NonPixelShaderResource:
+		break;
+	case EResourceState::UAV:
+		break;
+	}
 }
 
 //VulkanUnorderedAccessTarget::VulkanUnorderedAccessTarget(VulkanDevice* InOwner, const std::string InName, const EFormat InFormat, const sFBODesc& InDesc, bool InEnableSRV)

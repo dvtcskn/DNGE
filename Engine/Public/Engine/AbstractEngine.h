@@ -615,21 +615,38 @@ public:
 
 struct GPUCreateInfo
 {
-	struct DeviceCreateInfo
-	{
-		EGITypes Type = EGITypes::Undefined;
-		std::uint32_t GPUIndex = 0;
-		EGPUDeviceType DeviceType;
-	};
-	DeviceCreateInfo PrimaryGPU;
-	/*
-	* WIP
-	*/
-	DeviceCreateInfo SecondaryGPU;
+	EGITypes Type = EGITypes::Undefined;
+	std::optional<std::uint32_t> GPUIndex = std::nullopt;
+	EGPUDeviceType DeviceType;
+
+	GPUCreateInfo(bool bPrimary)
+		: bIsPrimary(bPrimary)
+	{}
+
+	bool IsPrimaryGPU() const { return bIsPrimary; }
+
+private:
+	bool bIsPrimary = false;
+};
+
+struct ViewportCreateInfo
+{
 	void* pHWND = nullptr;
 	std::uint32_t Width = 0;
 	std::uint32_t Height = 0;
-	bool Fullscreen = false;
+	bool bFullscreen = false;
+	std::optional<EFormat> SwapChainFormat = std::nullopt;
+};
+
+struct EngineCreateInfo
+{
+	GPUCreateInfo PrimaryGPU = GPUCreateInfo(true);
+	/*
+	* WIP
+	*/
+	GPUCreateInfo SecondaryGPU = GPUCreateInfo(false);
+
+	ViewportCreateInfo Viewport;
 };
 
 struct sScreenDimension
@@ -3032,6 +3049,7 @@ namespace GPU
 	std::uint32_t GetVsyncInterval();
 	std::vector<sDisplayDesc> GetAllSupportedResolutions();
 	DisplayMode GetDisplayMode();
+	HDRMetadata GetHDRMetaData();
 
 	void RecreateSwapChain();
 	std::uint32_t GetBackBufferSize();

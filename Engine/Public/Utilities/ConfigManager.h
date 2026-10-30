@@ -30,6 +30,7 @@
 #include <sstream>
 #include <string>
 #include "Engine/ClassBody.h"
+#include "Engine/AbstractEngine.h"
 #include "Core/Math/CoreMath.h"
 #include "FileManager.h"
 #include "..//Engine/AbstractEngine.h"
@@ -42,15 +43,54 @@ struct GameConfig
 		, Dimensions(sScreenDimension())
 		, IP("")
 		, Port(0)
+		, RendererAPI("")
+		, DeviceType("")
+		, GPUIndex(0)
 	{}
 	std::string Name;
 
 	bool Fullscreen;
 	sScreenDimension Dimensions;
 
+	std::string RendererAPI;
+	std::string DeviceType;
+	std::uint32_t GPUIndex;
+
 	std::string NetworkRole;
 	std::string IP;
 	std::uint16_t Port;
+
+	EGITypes GetRendererAPI() const
+	{
+		std::string TempRendererAPI = RendererAPI;
+		std::transform(TempRendererAPI.begin(), TempRendererAPI.end(), TempRendererAPI.begin(), [](unsigned char c) {
+			return std::tolower(c);
+			});
+
+		if (TempRendererAPI == "d3d11")
+			return EGITypes::D3D11;
+		else if (TempRendererAPI == "d3d12")
+			return EGITypes::D3D12;
+		else if (TempRendererAPI == "vulkan")
+			return EGITypes::Vulkan;
+
+		return EGITypes::D3D12;
+	}
+
+	EGPUDeviceType GetDeviceType() const
+	{
+		std::string TempDeviceType = DeviceType;
+		std::transform(TempDeviceType.begin(), TempDeviceType.end(), TempDeviceType.begin(), [](unsigned char c) {
+			return std::tolower(c);
+			});
+
+		if (TempDeviceType == "hardware")
+			return EGPUDeviceType::Hardware;
+		else if (TempDeviceType == "software")
+			return EGPUDeviceType::Software;
+
+		return EGPUDeviceType::Hardware;
+	}
 };
 
 class ConfigManager
@@ -98,6 +138,16 @@ public:
 
 	bool ReadGameConfig()
 	{
+		/*
+		bütün satýrlarý std::vector<std::string> containerýna koy
+		sonra her satýrý for loop ile araþtýr
+		[] -> her zaman baþlýk
+		baþlýk bulununca baþlýk tipini çöz
+		sonra alt satýra in 
+		alt satýrý for loop ile harf harf çözümle
+		hangi deðiþken olduðunu bul sonra "=" bul ve gameCFG.deðiþken set et
+		*/
+
 		std::ifstream fin(ConfigPath + gameCFG.Name);
 		if (fin.is_open())
 		{
@@ -105,6 +155,12 @@ public:
 			while (getline(fin, line))
 			{
 				std::istringstream sin(line.substr(line.find("=") + 1));
+				if (line.find("API") != -1)
+					sin >> gameCFG.RendererAPI;
+				if (line.find("DeviceType") != -1)
+					sin >> gameCFG.DeviceType;
+				if (line.find("GPUIndex") != -1)
+					sin >> gameCFG.GPUIndex;
 				if (line.find("WindowWidth") != -1)
 					sin >> gameCFG.Dimensions.Width;
 				if (line.find("WindowHeight") != -1)
@@ -133,6 +189,12 @@ public:
 
 			ConfigFile << "\n";
 			ConfigFile << "[Renderer]";
+			ConfigFile << "\n";
+			ConfigFile << "API = D3D12";
+			ConfigFile << "\n";
+			ConfigFile << "DeviceType = Hardware";
+			ConfigFile << "\n";
+			ConfigFile << "GPUIndex = 0";
 			ConfigFile << "\n";
 			ConfigFile << "WindowWidth = 1366";
 			ConfigFile << "\n";

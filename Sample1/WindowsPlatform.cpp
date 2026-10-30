@@ -162,13 +162,15 @@ WindowsPlatform::WindowsPlatform()
 	RECT rect = ArrangeWindow(RECT({ 0, 0, static_cast<LONG>(WindowWidth), static_cast<LONG>(WindowHeight) }));
 	CreateViewport(L"Sample1", rect, WindowFullscreen);
 
-	GPUCreateInfo CreateInfo;
-	CreateInfo.PrimaryGPU.Type = EGITypes::D3D12;
-	CreateInfo.PrimaryGPU.DeviceType = EGPUDeviceType::Software;
-	CreateInfo.Width = WindowWidth;
-	CreateInfo.Height = WindowHeight;
-	CreateInfo.Fullscreen = WindowFullscreen;
-	CreateInfo.pHWND = GetHWND();
+	EngineCreateInfo CreateInfo;
+	CreateInfo.PrimaryGPU.Type = ConfigManager::Get().GetGameConfig().GetRendererAPI();
+	CreateInfo.PrimaryGPU.DeviceType = ConfigManager::Get().GetGameConfig().GetDeviceType();
+	CreateInfo.PrimaryGPU.GPUIndex = ConfigManager::Get().GetGameConfig().GPUIndex;
+	CreateInfo.Viewport.SwapChainFormat = EFormat::BGRA8_UNORM;
+	CreateInfo.Viewport.Width = WindowWidth;
+	CreateInfo.Viewport.Height = WindowHeight;
+	CreateInfo.Viewport.bFullscreen = WindowFullscreen;
+	CreateInfo.Viewport.pHWND = GetHWND();
 
 	Engine = sEngine::CreateUnique(CreateInfo,
 #if BulletPhysics

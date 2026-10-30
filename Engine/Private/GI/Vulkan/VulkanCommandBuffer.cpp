@@ -76,11 +76,12 @@ ECommandContextBeginResult VulkanCommandBuffer::BeginRecordCommandList(const ECo
 	}
 	if (State == ECommandContextState::Begin)
 	{
-		if (bIsRenderPassActive)
+		/*if (bIsRenderPassActive)
 		{
 			vkCmdEndRendering(CommandBuffer);
 			//vkCmdEndRenderPass(CommandBuffer);
-		}
+			bIsRenderPassActive = false;
+		}*/
 		return ECommandContextBeginResult::AlreadyStarted;
 	}
 	if (State == ECommandContextState::WaitingForExecute)
@@ -141,6 +142,7 @@ void VulkanCommandBuffer::Close()
 	{
 		vkCmdEndRendering(CommandBuffer);
 		//vkCmdEndRenderPass(CommandBuffer);
+		bIsRenderPassActive = false;
 	}
 
 	auto Result = vkEndCommandBuffer(CommandBuffer); 
@@ -151,7 +153,6 @@ void VulkanCommandBuffer::Close()
 
 	Pipeline = nullptr;
 	State = ECommandContextState::End;
-	bIsRenderPassActive = false;
 	Sets.clear();
 }
 

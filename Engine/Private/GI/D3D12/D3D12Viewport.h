@@ -48,9 +48,9 @@ class D3D12Viewport final
 {
 	sBaseClassBody(sClassConstructor, D3D12Viewport)
 public:
-	static SharedPtr Create(D3D12Device* InOwner, ComPtr<IDXGIFactory7> InFactory, std::uint32_t InSizeX, std::uint32_t InSizeY, bool IsFullscreen, HWND InHandle);
+	static SharedPtr Create(D3D12Device* InOwner, ComPtr<IDXGIFactory7> InFactory, ViewportCreateInfo CreateInfo);
 
-	D3D12Viewport(class D3D12Device* InOwner, ComPtr<IDXGIFactory7> InFactory, std::uint32_t InSizeX, std::uint32_t InSizeY, bool IsFullscreen, HWND InHandle);
+	D3D12Viewport(class D3D12Device* InOwner, ComPtr<IDXGIFactory7> InFactory, ViewportCreateInfo CreateInfo);
 	~D3D12Viewport();
 
 	void CreateSwapChain(IDXGIFactory7* InFactory);

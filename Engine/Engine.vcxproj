@@ -190,6 +190,8 @@
     <ClInclude Include="Private\GI\D3D12\D3D12Device.h" />
     <ClInclude Include="Private\GI\D3DShared\D3DShared.h" />
     <ClInclude Include="Private\GI\Renderer\CanvasRenderer.h" />
+    <ClInclude Include="Private\GI\Renderer\FSR.h" />
+    <ClInclude Include="Private\GI\Renderer\FSRVulkanContext.h" />
     <ClInclude Include="Private\GI\Renderer\IRenderer.h" />
     <ClInclude Include="Private\GI\Renderer\LineRenderer.h" />
     <ClInclude Include="Private\GI\Renderer\ParticleRenderer.h" />
@@ -203,6 +205,7 @@
     <ClInclude Include="Private\GI\Vulkan\VulkanDescriptorHeapManager.h" />
     <ClInclude Include="Private\GI\Vulkan\VulkanDevice.h" />
     <ClInclude Include="Private\GI\Vulkan\VulkanException.h" />
+    <ClInclude Include="Private\GI\Vulkan\VulkanFence.h" />
     <ClInclude Include="Private\GI\Vulkan\VulkanFormat.h" />
     <ClInclude Include="Private\GI\Vulkan\VulkanFrameBuffer.h" />
     <ClInclude Include="Private\GI\Vulkan\VulkanPipeline.h" />
@@ -344,6 +347,8 @@
     <ClCompile Include="Private\GI\D3D12\WICTextureLoader12.cpp" />
     <ClCompile Include="Private\GI\D3D12\D3D12Device.cpp" />
     <ClCompile Include="Private\GI\Renderer\CanvasRenderer.cpp" />
+    <ClCompile Include="Private\GI\Renderer\FSR.cpp" />
+    <ClCompile Include="Private\GI\Renderer\FSRVulkanContext.cpp" />
     <ClCompile Include="Private\GI\Renderer\LineRenderer.cpp" />
     <ClCompile Include="Private\GI\Renderer\ParticleRenderer.cpp" />
     <ClCompile Include="Private\GI\Renderer\PostProcessRenderer.cpp" />
@@ -356,6 +361,7 @@
     <ClCompile Include="Private\GI\Vulkan\VulkanDescriptorHeapManager.cpp" />
     <ClCompile Include="Private\GI\Vulkan\VulkanDevice.cpp" />
     <ClCompile Include="Private\GI\Vulkan\VulkanException.cpp" />
+    <ClCompile Include="Private\GI\Vulkan\VulkanFence.cpp" />
     <ClCompile Include="Private\GI\Vulkan\VulkanFrameBuffer.cpp" />
     <ClCompile Include="Private\GI\Vulkan\VulkanPipeline.cpp" />
     <ClCompile Include="Private\GI\Vulkan\VulkanRenderPass.cpp" />

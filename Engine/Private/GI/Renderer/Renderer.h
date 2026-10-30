@@ -29,8 +29,11 @@
 #include "Engine/AbstractEngine.h"
 #include "CanvasRenderer.h"
 #include "PostProcessRenderer.h"
+#include "AbstractGI/SkyDomeProc.h"
 #include "AbstractGI/ToneMapping.h"
+#include "TAA.h"
 #include "FSR.h"
+#include "BasicUpscale.h"
 #include "LineRenderer.h"
 #include "ParticleRenderer.h"
 
@@ -104,7 +107,9 @@ private:
 	sScreenDimension InternalBaseRenderResolution;
 	sCanvasRenderer::SharedPtr CanvasRenderer;
 	sPostProcessRenderer::UniquePtr PostProcessRenderer;
+	SkyDomeProc::UniquePtr SkyDome;
 	sToneMapping::UniquePtr ToneMapping;
+	sTAA::UniquePtr TAA;
 	sLineRenderer::SharedPtr LineRenderer;
 	ERendererClear GBufferClearMode;
 	ParticleRenderer::SharedPtr pParticleRenderer;

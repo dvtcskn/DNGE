@@ -37,8 +37,10 @@ public:
 	VulkanViewport(VulkanDevice* Device, HWND* Handle);
 	~VulkanViewport();
 
-	void InitWindow(HWND* Handle, std::uint32_t InWidth, std::uint32_t InHeight, bool bFullscreen);
+	void InitWindow(ViewportCreateInfo CreateInfo);
 	void RecreateSwapChain();
+	void CreateBackBufferTexture();
+	void SetSwapChain(VkSwapchainKHR NewSwapchain);
 
 	void BeginFrame();
 	void Present(IRenderTarget* pRT);
@@ -57,11 +59,17 @@ public:
 	FORCEINLINE std::uint32_t GetBackBufferCount() const { return (std::uint32_t)SwapchainImages.size(); }
 	FORCEINLINE std::uint32_t GetCurrentBackBufferIndex() const { return FrameIndex; }
 
+	FORCEINLINE VkSwapchainKHR GetSwapchain() const { return Swapchain; }
+	FORCEINLINE VkSwapchainCreateInfoKHR GetSwapChainCreateInfo() const { return SwapchainCreateInfo; }
 	FORCEINLINE const sViewport& GetViewport() { return Viewport; }
 	FORCEINLINE std::uint32_t GetViewportWidth() const { return SizeX; }
 	FORCEINLINE std::uint32_t GetViewportHeight() const { return SizeY; }
 	FORCEINLINE sScreenDimension GetScreenDimension() const { return sScreenDimension(SizeX, SizeY); }
 	FORCEINLINE DisplayMode GetCurrentDisplayMode() const { return CurrentDisplayMode; }
+	FORCEINLINE HDRMetadata GetHDRMetaData() const { return HDR; }
+
+	VkImage GetCurrentBackBufferImage() const;
+	VkImageCreateInfo GetCurrentBackBufferImageCreateInfo() const;
 
 	const VkSurfaceKHR& GetSurface() const { return Surface; }
 
@@ -98,16 +106,19 @@ private:
 private:
 	VulkanDevice* Device;
 	VkSurfaceKHR Surface;
-	VkSwapchainKHR Swapchain;
+	VkSwapchainKHR Swapchain; 
+	VkSwapchainCreateInfoKHR SwapchainCreateInfo;
 
 	struct SwapchainImage
 	{
 		VkImage Image;
+		VkImageCreateInfo ImageCreateInfo;
 		VkImageView View;
 		VkImageLayout CurrentImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-		SwapchainImage(VkImage image = VK_NULL_HANDLE, VkImageView view = VK_NULL_HANDLE, VkImageLayout currentImageLayout = VK_IMAGE_LAYOUT_UNDEFINED)
+		SwapchainImage(VkImage image = VK_NULL_HANDLE, VkImageCreateInfo Info = VkImageCreateInfo(), VkImageView view = VK_NULL_HANDLE, VkImageLayout currentImageLayout = VK_IMAGE_LAYOUT_UNDEFINED)
 			: Image(image)
+			, ImageCreateInfo(Info)
 			, View(view)
 			, CurrentImageLayout(currentImageLayout)
 		{}
@@ -138,6 +149,7 @@ private:
 	std::uint32_t FrameIndex;
 
 	EFormat Format;
+	VkSurfaceFormatKHR SurfaceFormat;
 	std::uint32_t SizeX;
 	std::uint32_t SizeY;
 	sViewport Viewport;

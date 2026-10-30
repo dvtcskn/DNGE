@@ -32,6 +32,7 @@ sPostProcessRenderer::sPostProcessRenderer(std::size_t Width, std::size_t Height
 	, GraphicsCommandContext(IGraphicsCommandContext::Create())
 	, ScreenDimension(sScreenDimension(Width, Height))
 {
+	GraphicsCommandContext->SetName("GraphicsCommandContext::sPostProcessRenderer");
 }
 
 sPostProcessRenderer::~sPostProcessRenderer()
@@ -80,6 +81,8 @@ void sPostProcessRenderer::Render(sPostProcess* PostProcess, IRenderTarget* Back
 
 	GraphicsCommandContext->SetScissorRect(0, 0, (std::uint32_t)ScreenDimension.Height, (std::uint32_t)ScreenDimension.Width);
 
+	//if (PostProcess->HasFrameBuffer())
+	//	BackBuffer->AsResource(EResourceState::ShaderResource, GraphicsCommandContext.get());
 	PostProcess->SetPostProcessResources(GraphicsCommandContext.get(), PostProcess->HasFrameBuffer() ? BackBuffer : nullptr);
 
 	GraphicsCommandContext->DrawInstanced(3, 1, 0, 0);

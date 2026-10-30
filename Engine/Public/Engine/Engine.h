@@ -37,7 +37,7 @@ class sEngine final
 {
 	sBaseClassBody(sClassConstructor, sEngine);
 public:
-	sEngine(const GPUCreateInfo& CreateInfo, const IPhysicalWorld::SharedPtr& PhysicalWorld);
+	sEngine(const EngineCreateInfo& CreateInfo, const IPhysicalWorld::SharedPtr& PhysicalWorld);
 	//sEngine(const EGITypes GIType, const IPhysicalWorld::SharedPtr& PhysicalWorld, std::optional<short> GPUIndex = std::nullopt, void* InHWND = nullptr);
 	~sEngine();
 

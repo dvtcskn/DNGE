@@ -39,27 +39,12 @@
 #include <ffx_framegeneration_api_types.h>
 #include <ffx_radiancecache.hpp>
 
-#ifndef FSR_D3D12
-#define FSR_D3D12 1
-#endif
-#ifndef FSR_VULKAN
-#define FSR_VULKAN 0
-#endif
-
-#if FSR_D3D12
-#include <dx12/ffx_api_dx12.hpp>
-#include <dx12/ffx_api_framegeneration_dx12.hpp>
-#include <ffx_dx12.h>
-#elif FSR_VULKAN
-//#include <ffx_api/vk/ffx_api_vk.hpp>
-#endif
-
 enum UICompositionMode : std::uint32_t
 {
     No_UI_Handling = 0,
     UiTexture = 1,
     UiCallback = 2,
-    PreUiBackbuffer = 3,
+    PreUiBackbuffer = 3, // HudLess
 };
 
 enum class FSRColorSpace
@@ -68,6 +53,30 @@ enum class FSRColorSpace
     NonLinearColorSpace,
     sRGBColorSpace,
     PQColorSpace
+};
+
+class IFSRContext
+{
+    sBaseClassBody(sClassDefaultProtectedConstructor, IFSRContext)
+public:
+    virtual void* GetDevice() const = 0;
+    virtual const wchar_t* GetVersionQueryName(ffxStructType_t createDescType) const = 0;
+    virtual void QueryVersionNames(ffxStructType_t createDescType, std::vector<uint64_t>& versionIds, std::vector<std::string>& versionNames) const = 0;
+    virtual FfxApiResource GetResource(IRenderTarget* RT, FfxApiResourceState State) = 0;
+    virtual FfxApiResource GetDepthResource(IDepthTarget* Depth, FfxApiResourceState State) = 0;
+    virtual FfxApiResource GetCurrentBackBuffer(FfxApiResourceState State) = 0;
+    virtual ffx::ReturnCode Query(ffx::QueryDescUpscaleGetResourceRequirements& ResourceRequirements, ffx::CreateContextDescOverrideVersion OverrideVersion) = 0;
+    virtual ffx::ReturnCode QueryUpscaleMode(ffx::QueryDescUpscaleGetUpscaleRatioFromQualityMode UpscaleRatioFromQualityMode, std::optional<ffx::CreateContextDescOverrideVersion> OverrideVersion = std::nullopt) = 0;
+    virtual ffx::ReturnCode CreateUpscalingContext(ffx::Context& UpscalingContext, ffx::CreateContextDescUpscale Desc, ffxCreateContextDescUpscaleVersion Version, std::optional<ffxOverrideVersion> OverrideVersion = std::nullopt) = 0;
+    virtual ffx::ReturnCode CreateFrameGenContext(ffx::Context& UpscalingContext, ffx::CreateContextDescFrameGeneration Desc, ffx::CreateContextDescFrameGenerationVersion Version, std::optional<ffxOverrideVersion> OverrideVersion = std::nullopt) = 0;
+    virtual ffx::ReturnCode CreateHudlessFrameGenContext(ffx::Context& UpscalingContext, ffx::CreateContextDescFrameGeneration Desc, ffx::CreateContextDescFrameGenerationHudless FgHudless, ffx::CreateContextDescFrameGenerationVersion Version, std::optional<ffxOverrideVersion> OverrideVersion = std::nullopt) = 0;
+    virtual ffx::ReturnCode GetSwapChainGPUMemoryUsage(FfxApiEffectMemoryUsage* MemoryUsage, FfxApiDimensions2D Dimension, uint32_t Format, uint32_t Flags) = 0;
+
+    virtual void CreateSwapChainContext(ffx::Context& SwapChainContext, bool bGetLatencyWaitableObject = false, HANDLE LatencyWaitableObj = 0) = 0;
+    virtual ffx::ReturnCode GetSwapChainGetGPUMemoryUsage(ffx::Context SwapChainContext, FfxApiEffectMemoryUsage& gpuMemoryUsageFrameGenerationSwapchain) = 0;
+    virtual void ConfigureSwapChain(ffx::Context& SwapChainContext, FfxApiResource uiColor, bool bDoublebufferInSwapchain) = 0;
+    virtual ffx::ReturnCode QuerySwapChainCommandList(ffx::Context& SwapChainContext, void** CommandList) = 0;
+    virtual ffx::ReturnCode QuerySwapChainInterpolationTexture(ffx::Context& SwapChainContext, FfxApiResource* Texture) = 0;
 };
 
 class sFSR : public IRenderPass
@@ -141,6 +150,7 @@ private:
     static void FfxMsgCallback(uint32_t type, const wchar_t* message);
 
 private:
+    IFSRContext::UniquePtr FSRContext;
     IGraphicsCommandContext::SharedPtr GraphicsCommandContext;
     IGraphicsCommandContext::SharedPtr FrameGenCommandContext;
     IGraphicsCommandContext::SharedPtr FSRCopyCommandContext;
@@ -190,13 +200,6 @@ private:
     ERendererUpscaleMode UpscaleMode = ERendererUpscaleMode::Balanced;
     std::uint64_t CurrentUpscaleContextVersionId = 0;
     const char* CurrentUpscaleContextVersionName = nullptr;
-    std::vector<uint64_t> FsrVersionIds;
-    std::uint32_t FsrVersionIndex = 0;
-    std::vector<const char*> FsrVersionNames;
-    bool bOverrideVersion = false;
-    std::vector<uint64_t> FgVersionIds;
-    int32_t FgVersionIndex = 0;
-    std::vector<const char*> FgVersionNames;
     Version currentFgContextVersion = {};
     bool bEnableAsyncCompute = true;
     bool bInvertedDepth = true;
@@ -216,6 +219,10 @@ private:
     float LetterboxRatio = 1.f;
     float CustomUpscaleRatio = 2.f;
     bool CustomUpscaleRatioEnabled = false;
+    bool bOverrideFSRUpscaleVersion = false;
+    std::uint32_t FsrVersionIndex = 0;
+    std::vector<uint64_t> FsrVersionIds;
+    std::vector<std::string> FsrVersionNames;
 
     void UpdateUpscaleRatio();
 
@@ -229,6 +236,11 @@ private:
     bool bSimulatePresentSkip = false;
     bool bResetFrameInterpolation = true;
     std::mutex FGContextMutex;
+
+    bool bOverrideFSRFrameGenVersion = false;
+    int32_t FgVersionIndex = 0;
+    std::vector<uint64_t> FgVersionIds;
+    std::vector<std::string> FgVersionNames;
 
     bool bEnableFrameInterpolationSwapchain = false;
     void EnableFrameInterpolationSwapchain(bool enabled);
@@ -245,4 +257,21 @@ private:
     bool bDrawFrameGenerationDebugResetIndicators = true;
     bool bDrawFrameGenerationDebugPacingLines = true;
     bool bDrawFrameGenerationDebugView = true;
+
+
+
+
+
+
+    //////////////////////////
+    /*
+    * New variables
+    */
+    float           m_LetterboxRatioX = 1.0f;
+    float           m_LetterboxRatioY = 1.0f;
+    float           m_GenerationRectRatioX = 1.0f;
+    float           m_GenerationRectRatioY = 1.0f;
+    bool  m_AnimateGenerationRect = false;
+    float m_GenRectAnimationT = 0.0f;   // current animation parameter [0..1]
+    bool  m_GenRectAnimationForward = true;    // true = animating toward upscalerOutputRect
 };

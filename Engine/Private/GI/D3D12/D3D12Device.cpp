@@ -222,16 +222,16 @@ private:
 
 #define CheckD3DFeature(FeatureLevel, var) Direct3DDevice->CheckFeatureSupport(FeatureLevel, &var, sizeof(var))
 
-D3D12Device::D3D12Device(const GPUCreateInfo& DeviceCreateInfo, std::uint32_t InDeviceIndex)
+D3D12Device::D3D12Device(const GPUCreateInfo& DeviceCreateInfo, std::optional<ViewportCreateInfo> WindowCreateInfo)
 	: bTypedUAVLoadSupport_R11G11B10_FLOAT(false)
 	, bTypedUAVLoadSupport_R16G16B16A16_FLOAT(false)
 	, useGPUBasedValidation(false)
-	, GPUIndex(DeviceCreateInfo.PrimaryGPU.GPUIndex)
-	, DeviceType(DeviceCreateInfo.PrimaryGPU.DeviceType)
+	, DeviceType(DeviceCreateInfo.DeviceType)
 	, VendorId(0)
-	, DeviceIndex(InDeviceIndex)
+	, GPUAdapterIndex(DeviceCreateInfo.GPUIndex)
 	, bIsEnhancedBarriersSupported(false)
 	, FeatureLevel(D3D_FEATURE_LEVEL_1_0_GENERIC)
+	, bIsPrimary(DeviceCreateInfo.IsPrimaryGPU())
 {
 	HRESULT HR = E_FAIL;
 	bool useDebugLayers = false;
@@ -266,7 +266,7 @@ D3D12Device::D3D12Device(const GPUCreateInfo& DeviceCreateInfo, std::uint32_t In
 
 	CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(DxgiFactory.GetAddressOf()));
 
-	Adapter = FindAndGetAdapter(DeviceType == EGPUDeviceType::Software ? -1 : GPUIndex);
+	Adapter = FindAndGetAdapter(GPUAdapterIndex);
 
 	DXGI_ADAPTER_DESC1 AdapterDesc;
 	Adapter->GetDesc1(&AdapterDesc);
@@ -623,7 +623,8 @@ D3D12Device::D3D12Device(const GPUCreateInfo& DeviceCreateInfo, std::uint32_t In
 
 	DescriptorHeapManager = std::make_unique<D3D12DescriptorHeapManager>(this);
 
-	InitWindow(DeviceCreateInfo.pHWND, DeviceCreateInfo.Width, DeviceCreateInfo.Height, DeviceCreateInfo.Fullscreen);
+	if (IsPrimaryGPU() && WindowCreateInfo.has_value())
+		InitWindow(WindowCreateInfo.value());
 }
 
 D3D12Device::~D3D12Device()
@@ -704,18 +705,18 @@ D3D12Device::~D3D12Device()
 	Direct3DDevice = nullptr;
 }
 
-void D3D12Device::InitWindow(void* InHWND, std::uint32_t InWidth, std::uint32_t InHeight, bool bFullscreen)
+void D3D12Device::InitWindow(ViewportCreateInfo CreateInfo)
 {
 	if (IsPrimaryGPU())
 	{
 		if (!Viewport)
-			Viewport = std::make_unique<D3D12Viewport>(this, DxgiFactory, InWidth, InHeight, bFullscreen, (HWND)InHWND);
+			Viewport = std::make_unique<D3D12Viewport>(this, DxgiFactory, CreateInfo);
 	}
 }
 
 void D3D12Device::BeginFrame()
 {
-	if (IsPrimaryGPU())
+	if (IsPrimaryGPU() && Viewport)
 		Viewport->BeginFrame();
 }
 
@@ -727,7 +728,7 @@ void D3D12Device::RecreateSwapChain()
 
 void D3D12Device::Present(IRenderTarget* pRT)
 {
-	if (IsPrimaryGPU())
+	if (IsPrimaryGPU() && Viewport)
 	{
 		Viewport->OnPresent(pRT);
 	}
@@ -800,7 +801,7 @@ void D3D12Device::Present(IRenderTarget* pRT)
 #if Pix3_Enabled && _DEBUG
 	PIXBeginEvent(GraphicsQueue.Get(), 0, L"D3D12Device::Present");
 #endif
-	if (IsPrimaryGPU())
+	if (IsPrimaryGPU() && Viewport)
 	{
 		Viewport->Present();
 	}
@@ -815,22 +816,26 @@ void D3D12Device::Present(IRenderTarget* pRT)
 
 void* D3D12Device::GetInternalSwapChain()
 {
-	return (void*)Viewport->GetSwapChain().Get();
+	return Viewport ? (void*)Viewport->GetSwapChain().Get() : nullptr;
 }
 
 std::uint64_t D3D12Device::GetFrameIndex() const
 {
-	return Viewport->GetFrameIndex();
+	return Viewport ? Viewport->GetFrameIndex() : std::uint64_t(-1);
 }
 
 void D3D12Device::ResizeWindow(std::size_t Width, std::size_t Height)
 {
+	if (!Viewport)
+		return;
 	GPUFlush();
 	Viewport->ResizeSwapChain(Width, Height);
 }
 
 void D3D12Device::FullScreen(const bool value)
 {
+	if (!Viewport)
+		return;
 	GPUFlush();
 	if (IsPrimaryGPU())
 		Viewport->FullScreen(value);
@@ -838,68 +843,79 @@ void D3D12Device::FullScreen(const bool value)
 
 void D3D12Device::Vsync(const bool value)
 {
+	if (!Viewport)
+		return;
 	if (IsPrimaryGPU())
 		Viewport->Vsync(value);
 }
 
 void D3D12Device::VsyncInterval(const std::uint32_t value)
 {
+	if (!Viewport)
+		return;
 	if (IsPrimaryGPU())
 		Viewport->VsyncInterval(value);
 }
 
 DisplayMode D3D12Device::GetDisplayMode() const
 {
-	if (IsPrimaryGPU())
+	if (IsPrimaryGPU() && Viewport)
 		return Viewport->GetDisplayMode();
 	return DisplayMode();
 }
 
+HDRMetadata D3D12Device::GetHDRMetaData() const
+{
+	if (IsPrimaryGPU() && Viewport)
+		return Viewport->GetHDRMetaData();
+	return HDRMetadata();
+}
+
 bool D3D12Device::IsFullScreen() const
 {
-	if (IsPrimaryGPU())
+	if (IsPrimaryGPU() && Viewport)
 		return Viewport->IsFullScreen();
 	return false;
 }
 
 bool D3D12Device::IsVsyncEnabled() const
 {
-	if (IsPrimaryGPU())
+	if (IsPrimaryGPU() && Viewport)
 		return Viewport->IsVsyncEnabled();
 	return false;
 }
 
 std::uint32_t D3D12Device::GetVsyncInterval() const
 {
-	if (IsPrimaryGPU())
+	if (IsPrimaryGPU() && Viewport)
 		return Viewport->GetVsyncInterval();
 	return -1;
 }
 
 std::vector<sDisplayDesc> D3D12Device::GetAllSupportedResolutions() const
 {
-	if (IsPrimaryGPU())
+	if (IsPrimaryGPU() && Viewport)
 		return Viewport->GetAllSupportedResolutions();
 	return std::vector<sDisplayDesc>();
 }
 
 sScreenDimension D3D12Device::GetBackBufferDimension() const
 {
-	if (IsPrimaryGPU())
+	if (IsPrimaryGPU() && Viewport)
 		return Viewport->GetScreenDimension();
 	return sScreenDimension();
 }
 
 EFormat D3D12Device::GetBackBufferFormat() const
 {
-	if (IsPrimaryGPU())
+	if (IsPrimaryGPU() && Viewport)
 		return Viewport->GetBackBufferFormat();
 	return EFormat::UNKNOWN;
 }
 
 sViewport D3D12Device::GetViewport() const
 {
-	if (IsPrimaryGPU())
+	if (IsPrimaryGPU() && Viewport)
 		return Viewport->GetViewport();
 	return sViewport();
 }
@@ -1384,18 +1400,15 @@ IDXGIAdapter* D3D12Device::FindAdapter(const WCHAR* InTargetName) const
 	return targetAdapter;
 }
 
-IDXGIAdapter1* D3D12Device::FindAndGetAdapter(std::optional<short> Index) const
+IDXGIAdapter1* D3D12Device::FindAndGetAdapter(std::optional<std::uint32_t> Index) const
 {
 	IDXGIAdapter1* pAdapter;
 	std::vector<IDXGIAdapter1*> vAdapters;
 
-	if (Index.has_value())
+	if (DeviceType == EGPUDeviceType::Software)
 	{
-		if (Index <= -1)
-		{
-			DxgiFactory->EnumWarpAdapter(IID_PPV_ARGS(&pAdapter));
-			return pAdapter;
-		}
+		DxgiFactory->EnumWarpAdapter(IID_PPV_ARGS(&pAdapter));
+		return pAdapter;
 	}
 
 	for (std::uint32_t i = 0; DxgiFactory->EnumAdapters1(i, &pAdapter) != DXGI_ERROR_NOT_FOUND; ++i)
@@ -1407,7 +1420,7 @@ IDXGIAdapter1* D3D12Device::FindAndGetAdapter(std::optional<short> Index) const
 		vAdapters.push_back(pAdapter);
 	}
 
-	if (Index != std::nullopt)
+	if (Index.has_value())
 	{
 		return vAdapters.at(Index.value() >= vAdapters.size() ? vAdapters.size() - 1 : Index.value());
 	}

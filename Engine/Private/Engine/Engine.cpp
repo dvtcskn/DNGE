@@ -250,7 +250,12 @@ namespace GPU
 	{
 		return Device->GetDisplayMode();
 	}
-		
+
+	HDRMetadata GetHDRMetaData()
+	{
+		return Device->GetHDRMetaData();
+	}
+
 	void RecreateSwapChain()
 	{
 		Device->RecreateSwapChain();
@@ -1318,7 +1323,7 @@ IRigidBody::SharedPtr IRigidBody::CreateTriangleMesh(sPhysicalComponent* Owner, 
 	return PhysicalWorld ? PhysicalWorld->CreateTriangleMesh(Owner, Desc, Origin, points, numPoints, indices, numIndices) : nullptr;
 }
 
-sEngine::sEngine(const GPUCreateInfo& CreateInfo, const IPhysicalWorld::SharedPtr& InPhysicalWorld)
+sEngine::sEngine(const EngineCreateInfo& CreateInfo, const IPhysicalWorld::SharedPtr& InPhysicalWorld)
 	: MetaWorld(nullptr)
 	, ScreenDimension(sScreenDimension())
 	, bWindowInitialized(false)
@@ -1338,13 +1343,13 @@ sEngine::sEngine(const GPUCreateInfo& CreateInfo, const IPhysicalWorld::SharedPt
 	switch (CreateInfo.PrimaryGPU.Type)
 	{
 	case EGITypes::D3D11:
-		Device = D3D11Device::CreateUnique(CreateInfo, 0);
+		Device = D3D11Device::CreateUnique(CreateInfo.PrimaryGPU, CreateInfo.Viewport);
 		break;
 	case EGITypes::D3D12:
-		Device = D3D12Device::CreateUnique(CreateInfo, 0);
+		Device = D3D12Device::CreateUnique(CreateInfo.PrimaryGPU, CreateInfo.Viewport);
 		break;
 	case EGITypes::Vulkan:
-		Device = VulkanDevice::CreateUnique(CreateInfo, 0);
+		Device = VulkanDevice::CreateUnique(CreateInfo.PrimaryGPU, CreateInfo.Viewport);
 		break;
 	//case EGITypes::eOpenGL46:
 		//	break;
@@ -1352,7 +1357,7 @@ sEngine::sEngine(const GPUCreateInfo& CreateInfo, const IPhysicalWorld::SharedPt
 		throw std::runtime_error("Undefined GPU Type");
 		break;
 	default:
-		Device = D3D12Device::CreateUnique(CreateInfo, 0);
+		Device = D3D12Device::CreateUnique(CreateInfo.PrimaryGPU, CreateInfo.Viewport);
 		break;
 	}
 
@@ -1361,13 +1366,13 @@ sEngine::sEngine(const GPUCreateInfo& CreateInfo, const IPhysicalWorld::SharedPt
 		switch (CreateInfo.SecondaryGPU.Type)
 		{
 		case EGITypes::D3D11:
-			SecondaryGPUs.push_back(D3D11Device::Create(CreateInfo, 1));
+			SecondaryGPUs.push_back(D3D11Device::Create(CreateInfo.SecondaryGPU, std::nullopt));
 			break;
 		case EGITypes::D3D12:
-			SecondaryGPUs.push_back(D3D12Device::Create(CreateInfo, 1));
+			SecondaryGPUs.push_back(D3D12Device::Create(CreateInfo.SecondaryGPU, std::nullopt));
 			break;
 		case EGITypes::Vulkan:
-			SecondaryGPUs.push_back(VulkanDevice::Create(CreateInfo, 1));
+			SecondaryGPUs.push_back(VulkanDevice::Create(CreateInfo.SecondaryGPU, std::nullopt));
 			break;
 		//case EGITypes::eOpenGL46:
 			//	break;
@@ -1380,10 +1385,10 @@ sEngine::sEngine(const GPUCreateInfo& CreateInfo, const IPhysicalWorld::SharedPt
 
 	bWindowInitialized = true;
 
-	ScreenDimension.Width = (std::size_t)CreateInfo.Width;
-	ScreenDimension.Height = (std::size_t)CreateInfo.Height;
+	ScreenDimension.Width = (std::size_t)CreateInfo.Viewport.Width;
+	ScreenDimension.Height = (std::size_t)CreateInfo.Viewport.Height;
 
-	InputController = sInputController::CreateUnique((HWND)CreateInfo.pHWND);
+	InputController = sInputController::CreateUnique((HWND)CreateInfo.Viewport.pHWND);
 	Renderer = sRenderer::CreateUnique(ScreenDimension.Width, ScreenDimension.Height);
 }
 

@@ -36,16 +36,16 @@
 	#pragma comment(lib, "dxguid.lib")
 #endif
 
-D3D11Viewport::D3D11Viewport(D3D11Device* InOwner, ComPtr<IDXGIFactory4> InFactory, std::uint32_t InSizeX, std::uint32_t InSizeY, bool IsFullscreen, HWND InHandle)
+D3D11Viewport::D3D11Viewport(D3D11Device* InOwner, ComPtr<IDXGIFactory4> InFactory, ViewportCreateInfo CreateInfo)
 	: Owner(InOwner)
-	, SizeX(InSizeX)
-	, SizeY(InSizeY)
-	, BackBufferFormat(EFormat::BGRA8_UNORM)
-	, WindowHandle(InHandle)
+	, SizeX(CreateInfo.Width)
+	, SizeY(CreateInfo.Height)
+	, BackBufferFormat(CreateInfo.SwapChainFormat.has_value() ? CreateInfo.SwapChainFormat.value() : EFormat::BGRA8_UNORM)
+	, WindowHandle((HWND)CreateInfo.pHWND)
 	, BackBufferCount(2)
 	, CurrentBackBuffer(0)
 	, SyncInterval(1)
-	, bIsFullScreen(IsFullscreen)
+	, bIsFullScreen(CreateInfo.bFullscreen)
 	, bIsVSYNCEnabled(false)
 {
 	PresentParams.DirtyRectsCount = 0;
@@ -55,8 +55,8 @@ D3D11Viewport::D3D11Viewport(D3D11Device* InOwner, ComPtr<IDXGIFactory4> InFacto
 
 	DXGI_SWAP_CHAIN_DESC1 m_SwapChainDesc;
 	SecureZeroMemory(&m_SwapChainDesc, sizeof(m_SwapChainDesc));
-	m_SwapChainDesc.Width = InSizeX;
-	m_SwapChainDesc.Height = InSizeY;
+	m_SwapChainDesc.Width = SizeX;
+	m_SwapChainDesc.Height = SizeY;
 	m_SwapChainDesc.Format = ConvertFormat_Format_To_DXGI(BackBufferFormat);
 	m_SwapChainDesc.BufferUsage = DXGI_USAGE_SHADER_INPUT | DXGI_USAGE_RENDER_TARGET_OUTPUT;
 	m_SwapChainDesc.BufferCount = BackBufferCount;
@@ -75,12 +75,12 @@ D3D11Viewport::D3D11Viewport(D3D11Device* InOwner, ComPtr<IDXGIFactory4> InFacto
 	// Create a SwapChain from a Win32 window.
 	HRESULT HR = InFactory->CreateSwapChainForHwnd(
 		Owner->GetDevice(),
-		InHandle,
+		WindowHandle,
 		&m_SwapChainDesc,
 		&fsSwapChainDesc, nullptr, swapChain1.ReleaseAndGetAddressOf()
 	);
 
-	InFactory->MakeWindowAssociation(InHandle, DXGI_MWA_VALID);
+	InFactory->MakeWindowAssociation(WindowHandle, DXGI_MWA_VALID);
 
 	swapChain1.As(&SwapChain);
 	//SwapChain->GetBuffer(0, IID_PPV_ARGS(&DXGIBackBuffer));
@@ -88,9 +88,9 @@ D3D11Viewport::D3D11Viewport(D3D11Device* InOwner, ComPtr<IDXGIFactory4> InFacto
 
 	CreateRenderTarget();
 
-	viewport = { 0.0f, 0.0f, (float)InSizeX,  (float)InSizeY, 0.0f, 1.0f };
+	viewport = { 0.0f, 0.0f, (float)SizeX,  (float)SizeY, 0.0f, 1.0f };
 
-	GetClientRect(InHandle, &Rect);
+	GetClientRect(WindowHandle, &Rect);
 }
 
 D3D11Viewport::~D3D11Viewport()

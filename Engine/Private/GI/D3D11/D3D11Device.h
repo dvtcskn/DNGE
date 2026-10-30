@@ -43,14 +43,14 @@ class D3D11Device final : public IAbstractGIDevice
 {
 	sClassBody(sClassConstructor, D3D11Device, IAbstractGIDevice)
 public:
-	D3D11Device(const GPUCreateInfo& DeviceCreateInfo, std::uint32_t InDeviceIndex);
+	D3D11Device(const GPUCreateInfo& DeviceCreateInfo, std::optional<ViewportCreateInfo> WindowCreateInfo = std::nullopt);
 	virtual ~D3D11Device();
-	virtual void InitWindow(void* HWND, std::uint32_t Width, std::uint32_t Height, bool Fullscreen) override final;
+	void InitWindow(ViewportCreateInfo CreateInfo);
 	virtual void BeginFrame() override final;
 	virtual void RecreateSwapChain() override final;
 	virtual void Present(IRenderTarget* pRT) override final;
 	bool GetDeviceIdentification(std::wstring& InVendorID, std::wstring& InDeviceID);
-	IDXGIAdapter1* GetAdapter(std::optional<short> Index = std::nullopt);
+	IDXGIAdapter1* GetAdapter(std::optional<std::uint32_t> Index = std::nullopt);
 
 	virtual EGPUDeviceType GetDeviceType() override final { return DeviceType; }
 	virtual void* GetInternalDevice() override final { return Direct3DDevice.Get(); }
@@ -63,6 +63,7 @@ public:
 	virtual void VsyncInterval(const std::uint32_t value) override final;
 	virtual std::vector<sDisplayDesc> GetAllSupportedResolutions() const override final;
 	virtual DisplayMode GetDisplayMode() const override final;
+	virtual HDRMetadata GetHDRMetaData() const override final;
 
 	virtual bool IsFullScreen() const override final;
 	virtual bool IsVsyncEnabled() const override final;
@@ -148,9 +149,9 @@ public:
 	//virtual ITiledTexture::UniquePtr CreateUniqueTiledTexture(const std::string InName, const std::uint32_t InTileX, const std::uint32_t InTileY, const sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex = 0) override final;
 
 private:
-	std::optional<std::uint32_t> GPUIndex;
 	EGPUDeviceType DeviceType;
-	std::uint32_t DeviceIndex;
+	std::optional<std::uint32_t> GPUAdapterIndex;
+	bool bIsPrimary;
 
 	ComPtr<ID3D11Device1> Direct3DDevice;
 	ComPtr<ID3D11DeviceContext1> Direct3DDeviceIMContext;
@@ -176,12 +177,12 @@ public:
 
 	FORCEINLINE bool IsPrimaryGPU() const
 	{
-		return DeviceIndex == 0;
+		return bIsPrimary;
 	}
 
-	FORCEINLINE std::uint32_t GetDeviceIndex() const
+	FORCEINLINE std::uint32_t GetGPUAdapterIndex() const
 	{
-		return DeviceIndex;
+		return GPUAdapterIndex.has_value() ? GPUAdapterIndex.value() : std::uint32_t(-1);
 	}
 
 	FORCEINLINE bool IsNvDeviceID() const

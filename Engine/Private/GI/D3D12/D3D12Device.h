@@ -73,15 +73,15 @@ class D3D12Device final : public IAbstractGIDevice
 {
 	sClassBody(sClassConstructor, D3D12Device, IAbstractGIDevice)
 public:
-	D3D12Device(const GPUCreateInfo& DeviceCreateInfo, std::uint32_t InDeviceIndex);
+	D3D12Device(const GPUCreateInfo& DeviceCreateInfo, std::optional<ViewportCreateInfo> WindowCreateInfo = std::nullopt);
 	virtual ~D3D12Device();
-	virtual void InitWindow(void* HWND, std::uint32_t Width, std::uint32_t Height, bool Fullscreen) override final;
+	void InitWindow(ViewportCreateInfo CreateInfo);
 	virtual void BeginFrame() override final;
 	virtual void RecreateSwapChain() override final;
 	virtual void Present(IRenderTarget* pRT) override final;
 	bool GetDeviceIdentification(std::wstring& InVendorID, std::wstring& InDeviceID) const;
 	IDXGIAdapter* FindAdapter(const WCHAR* InTargetName) const;
-	IDXGIAdapter1* FindAndGetAdapter(std::optional<short> Index = std::nullopt) const;
+	IDXGIAdapter1* FindAndGetAdapter(std::optional<std::uint32_t> Index = std::nullopt) const;
 
 	bool IsCommandBufferPendingForExecute(ICommandContext* CommandContext) const;
 	void OnCommandBufferDestroyed(ICommandContext* CommandContext);
@@ -118,6 +118,7 @@ public:
 	virtual void VsyncInterval(const std::uint32_t value) override final;
 	virtual std::vector<sDisplayDesc> GetAllSupportedResolutions() const override final;
 	virtual DisplayMode GetDisplayMode() const override final;
+	virtual HDRMetadata GetHDRMetaData() const override final;
 
 	virtual void GPUFlush();
 	virtual void WaitForGPU() override final;
@@ -205,9 +206,9 @@ public:
 	//virtual ITiledTexture::UniquePtr CreateUniqueTiledTexture(const std::string InName, const std::uint32_t InTileX, const std::uint32_t InTileY, const sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex = 0) override final;
 
 private:
-	std::optional<std::uint32_t> GPUIndex;
 	EGPUDeviceType DeviceType;
-	std::uint32_t DeviceIndex;
+	std::optional<std::uint32_t> GPUAdapterIndex;
+	bool bIsPrimary;
 
 	ComPtr<ID3D12Device> Direct3DDevice;
 	ComPtr<IDXGIFactory7> DxgiFactory;
@@ -302,12 +303,12 @@ public:
 
 	FORCEINLINE bool IsPrimaryGPU() const
 	{
-		return DeviceIndex == 0;
+		return bIsPrimary;
 	}
 
-	FORCEINLINE std::uint32_t GetDeviceIndex() const
+	FORCEINLINE std::uint32_t GetGPUAdapterIndex() const
 	{
-		return DeviceIndex;
+		return GPUAdapterIndex.has_value() ? GPUAdapterIndex.value() : std::uint32_t(-1);
 	}
 
 	FORCEINLINE ID3D12CommandQueue* GetGraphicsQueue() const

@@ -580,14 +580,245 @@ uint32_t GetQueueFamilyIndex(std::vector<VkQueueFamilyProperties> queue_family_p
 	throw std::runtime_error("Could not find a matching queue family index");
 }
 
-VulkanDevice::VulkanDevice(const GPUCreateInfo& DeviceCreateInfo, std::uint32_t InDeviceIndex)
+enum class CommandQueue : int32_t
+{
+	// Single threaded (for now)
+	Graphics = 0,                   ///< Graphics command queue (single threaded).
+	Compute,                        ///< Compute command queue (single threaded).
+
+	// Multi-threaded
+	Copy,                           ///< Copy command queue (multi threaded).
+
+	Count                           ///< CommandQueue type count.
+};
+
+struct FIQueue
+{
+	VkQueue        queue = VK_NULL_HANDLE;
+	uint32_t       family = 0;
+	uint32_t       index = 0;
+};
+
+enum RequestedQueue : uint32_t
+{
+	Graphics = 0,
+	Compute,
+	Copy,
+
+	// frame interpolation
+	FIAsyncCompute,
+	FIPresent,
+	FIImageAcquire,
+
+	Count
+};
+struct QueueFamilies
+{
+	struct
+	{
+		uint32_t family = 0;
+		uint32_t index = 0;
+	} queues[RequestedQueue::Count];
+};
+
+#define HAS_QUEUE_FAMILY_FLAG(flag) ((queueProps[i].queueFlags & flag) == flag)
+
+QueueFamilies GetQueues(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface)
+{
+	// Get queue/memory/device properties
+	uint32_t queueFamilyCount;
+	vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, nullptr);
+	Engine::Assert(AssertLevel::ASSERT_CRITICAL, queueFamilyCount >= 1, L"Unable to get physical device queue family properties");
+
+	std::vector<VkQueueFamilyProperties> queueProps;
+	queueProps.resize(queueFamilyCount);
+	vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, queueProps.data());
+	Engine::Assert(AssertLevel::ASSERT_CRITICAL, queueFamilyCount >= 1, L"Unable to get physical device queue family properties");
+
+	std::vector<VkQueueFamilyProperties> queueAvailability = queueProps;
+
+	QueueFamilies families;
+
+	// init
+	for (uint32_t i = 0; i < RequestedQueue::Count; ++i)
+		families.queues[i].family = UINT32_MAX;
+
+	// Find a graphics device and a queue that can present to the above surface
+	// We only support device where the graphics queue can present
+	for (uint32_t i = 0; i < queueFamilyCount; ++i)
+	{
+		if (queueProps[i].queueCount == 0)
+			continue;
+		VkBool32 supportsPresent;
+		VkResult res = vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, i, surface, &supportsPresent);
+
+		if (HAS_QUEUE_FAMILY_FLAG((VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT))  // VK_QUEUE_TRANSFER_BIT is implied
+			&& res == VK_SUCCESS && supportsPresent && queueAvailability[i].queueCount > 0)
+		{
+			families.queues[RequestedQueue::Graphics].family = i;
+			--queueAvailability[i].queueCount;
+			break;
+		}
+	}
+	Engine::Assert(AssertLevel::ASSERT_CRITICAL, families.queues[RequestedQueue::Graphics].family != UINT32_MAX, L"Unable to get a graphics queue that supports Present.");
+
+	// Get an async compute queue
+	for (uint32_t i = 0; i < queueFamilyCount; ++i)
+	{
+		if (HAS_QUEUE_FAMILY_FLAG(VK_QUEUE_COMPUTE_BIT) && !HAS_QUEUE_FAMILY_FLAG(VK_QUEUE_GRAPHICS_BIT) && (queueAvailability[i].queueCount > 0))  // VK_QUEUE_TRANSFER_BIT is implied
+		{
+			families.queues[RequestedQueue::Compute].family = i;
+			--queueAvailability[i].queueCount;
+			break;
+		}
+	}
+	//Engine::Assert(AssertLevel::ASSERT_CRITICAL, families.queues[RequestedQueue::Compute].family != UINT32_MAX, L"Unable to get an async compute queue.");
+
+	// Get a copy queue
+	for (uint32_t i = 0; i < queueFamilyCount; ++i)
+	{
+		if (HAS_QUEUE_FAMILY_FLAG(VK_QUEUE_TRANSFER_BIT) && !HAS_QUEUE_FAMILY_FLAG(VK_QUEUE_COMPUTE_BIT) &&
+			!HAS_QUEUE_FAMILY_FLAG(VK_QUEUE_GRAPHICS_BIT) &&
+			(queueAvailability[i].queueCount > 0))
+		{
+			families.queues[RequestedQueue::Copy].family = i;
+			--queueAvailability[i].queueCount;
+			break;
+		}
+	}
+	if (families.queues[RequestedQueue::Copy].family == UINT32_MAX)
+	{
+		// no dedicated copy queue was found, look for a more general queue
+		for (uint32_t i = 0; i < queueFamilyCount; ++i)
+		{
+			if (HAS_QUEUE_FAMILY_FLAG(VK_QUEUE_TRANSFER_BIT) && (queueAvailability[i].queueCount > 0))
+			{
+				families.queues[RequestedQueue::Copy].family = i;
+				--queueAvailability[i].queueCount;
+				break;
+			}
+		}
+	}
+	//Engine::Assert(AssertLevel::ASSERT_CRITICAL, families.queues[RequestedQueue::Copy].family != UINT32_MAX, L"Unable to get a copy queue.");
+
+	// Queues for frame interpolation
+
+	// frame interpolation present queue should have transfer capabilities and support present
+	for (uint32_t i = 0; i < queueFamilyCount; ++i)
+	{
+		if (queueProps[i].queueCount == 0)
+			continue;
+		VkBool32 supportsPresent;
+		VkResult res = vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, i, surface, &supportsPresent);
+
+		if (HAS_QUEUE_FAMILY_FLAG((VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT)) &&  // VK_QUEUE_TRANSFER_BIT is implied
+			res == VK_SUCCESS && supportsPresent && queueAvailability[i].queueCount > 0)
+		{
+			families.queues[RequestedQueue::FIPresent].family = i;
+			--queueAvailability[i].queueCount;
+			break;
+		}
+	}
+	if (families.queues[RequestedQueue::FIPresent].family == UINT32_MAX)
+	{
+		// no graphics present queue was found, look for a more general queue
+		for (uint32_t i = 0; i < queueFamilyCount; ++i)
+		{
+			if (queueProps[i].queueCount == 0)
+				continue;
+			VkBool32 supportsPresent;
+			VkResult res = vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, i, surface, &supportsPresent);
+
+			if (HAS_QUEUE_FAMILY_FLAG(VK_QUEUE_TRANSFER_BIT) &&
+				res == VK_SUCCESS && supportsPresent && queueAvailability[i].queueCount > 0)
+			{
+				families.queues[RequestedQueue::FIPresent].family = i;
+				--queueAvailability[i].queueCount;
+				break;
+			}
+		}
+	}
+
+	// image acquire queue doesn't need any capability
+	for (uint32_t i = 0; i < queueFamilyCount; ++i)
+	{
+		if (!HAS_QUEUE_FAMILY_FLAG(VK_QUEUE_COMPUTE_BIT) && !HAS_QUEUE_FAMILY_FLAG(VK_QUEUE_GRAPHICS_BIT) &&
+			!HAS_QUEUE_FAMILY_FLAG(VK_QUEUE_TRANSFER_BIT) &&
+			(queueAvailability[i].queueCount > 0))
+		{
+			families.queues[RequestedQueue::FIImageAcquire].family = i;
+			--queueAvailability[i].queueCount;
+			break;
+		}
+	}
+	if (families.queues[RequestedQueue::FIImageAcquire].family == UINT32_MAX)
+	{
+		// no image acquire queue was found, look for a more general queue
+		for (uint32_t i = 0; i < queueFamilyCount; ++i)
+		{
+			if (!HAS_QUEUE_FAMILY_FLAG(VK_QUEUE_COMPUTE_BIT) && !HAS_QUEUE_FAMILY_FLAG(VK_QUEUE_GRAPHICS_BIT) &&
+				(queueAvailability[i].queueCount > 0))
+			{
+				families.queues[RequestedQueue::FIImageAcquire].family = i;
+				--queueAvailability[i].queueCount;
+				break;
+			}
+		}
+	}
+	if (families.queues[RequestedQueue::FIImageAcquire].family == UINT32_MAX)
+	{
+		// no image acquire queue was found, look for a more general queue
+		for (uint32_t i = 0; i < queueFamilyCount; ++i)
+		{
+			if (!HAS_QUEUE_FAMILY_FLAG(VK_QUEUE_GRAPHICS_BIT) && (queueAvailability[i].queueCount > 0))
+			{
+				families.queues[RequestedQueue::FIImageAcquire].family = i;
+				--queueAvailability[i].queueCount;
+				break;
+			}
+		}
+	}
+
+	// frame interpolation async compute queue should have compute capabilities
+	for (uint32_t i = 0; i < queueFamilyCount; ++i)
+	{
+		if (HAS_QUEUE_FAMILY_FLAG(VK_QUEUE_COMPUTE_BIT) && !HAS_QUEUE_FAMILY_FLAG(VK_QUEUE_GRAPHICS_BIT) &&
+			(queueAvailability[i].queueCount > 0))  // VK_QUEUE_TRANSFER_BIT is implied
+		{
+			families.queues[RequestedQueue::FIAsyncCompute].family = i;
+			--queueAvailability[i].queueCount;
+			break;
+		}
+	}
+	if (families.queues[RequestedQueue::FIAsyncCompute].family == UINT32_MAX)
+	{
+		// no async compute was found, look for a more general queue
+		for (uint32_t i = 0; i < queueFamilyCount; ++i)
+		{
+			if (HAS_QUEUE_FAMILY_FLAG(VK_QUEUE_COMPUTE_BIT) && (queueAvailability[i].queueCount > 0))  // VK_QUEUE_TRANSFER_BIT is implied
+			{
+				families.queues[RequestedQueue::FIAsyncCompute].family = i;
+				--queueAvailability[i].queueCount;
+				break;
+			}
+		}
+	}
+
+	//Engine::Assert(AssertLevel::ASSERT_WARNING, families.queues[RequestedQueue::FIPresent].family != UINT32_MAX, L"Couldn't find a present queue for frame interpolation. Please update your driver.");
+	//Engine::Assert(AssertLevel::ASSERT_WARNING, families.queues[RequestedQueue::FIAsyncCompute].family != UINT32_MAX, L"Couldn't find an async compute queue for frame interpolation. Please update your driver.");
+	//Engine::Assert(AssertLevel::ASSERT_WARNING, families.queues[RequestedQueue::FIImageAcquire].family != UINT32_MAX, L"Couldn't find an image acquire queue for frame interpolation. Please update your driver.");
+
+	return families;
+}
+
+VulkanDevice::VulkanDevice(const GPUCreateInfo& DeviceCreateInfo, std::optional<ViewportCreateInfo> WindowCreateInfo)
 	: Super()
-	, GPUIndex(DeviceCreateInfo.PrimaryGPU.GPUIndex)
-	, DeviceType(DeviceCreateInfo.PrimaryGPU.DeviceType)
-	, DeviceIndex(InDeviceIndex)
+	, DeviceType(DeviceCreateInfo.DeviceType)
+	, GPUAdapterIndex(DeviceCreateInfo.GPUIndex)
 	, InstanceApiVersion(1)
 	, deviceProperties2Available(false)
 	, deviceFormatProperties2Available(false)
+	, bIsPrimary(DeviceCreateInfo.IsPrimaryGPU())
 {
 	Engine::WriteToConsole("Initializing Vulkan instance.");
 
@@ -769,10 +1000,10 @@ VulkanDevice::VulkanDevice(const GPUCreateInfo& DeviceCreateInfo, std::uint32_t 
 
 	VK_CHECK(vkCreateInstance(&instance_info, nullptr, &instance));
 
-	//if (bIsPrimaryGPU)
-		Viewport = VulkanViewport::CreateUnique(this, static_cast<HWND*>(DeviceCreateInfo.pHWND));
+	if (IsPrimaryGPU())
+		Viewport = VulkanViewport::CreateUnique(this, static_cast<HWND*>(WindowCreateInfo->pHWND));
 
-	bool Result = GetAdapter(DeviceCreateInfo.PrimaryGPU.GPUIndex, PhysicalDevice, FamilyProperties, DeviceProperties);
+	bool Result = GetAdapter(GPUAdapterIndex, PhysicalDevice, FamilyProperties, DeviceProperties);
 	if (!Result)
 	{
 		std::uint32_t gpu_count = 0;
@@ -903,7 +1134,7 @@ VulkanDevice::VulkanDevice(const GPUCreateInfo& DeviceCreateInfo, std::uint32_t 
 
 	std::vector<VkDeviceQueueCreateInfo> DeviceQueueCreateInfos;
 
-	float queue_priority = 1.0f;
+	/*float queue_priority = 1.0f;
 
 	VkDeviceQueueCreateInfo queue_info{
 		.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
@@ -930,13 +1161,66 @@ VulkanDevice::VulkanDevice(const GPUCreateInfo& DeviceCreateInfo, std::uint32_t 
 			.queueCount = 1,
 			.pQueuePriorities = &queue_priority };
 		DeviceQueueCreateInfos.push_back(copy_queue_info);
+	}*/
+
+	// Get all the queues we need
+	QueueFamilies queueFamilies = GetQueues(PhysicalDevice, Viewport->GetSurface());
+
+	float                   queuePriorities[RequestedQueue::Count][RequestedQueue::Count];
+	VkDeviceQueueCreateInfo queueCreateInfos[RequestedQueue::Count];
+	uint32_t                queueCreateInfoCount = 0;
+
+	for (uint32_t i = 0; i < RequestedQueue::Count; ++i)
+	{
+		queueCreateInfos[i] = {};
+		queueCreateInfos[i].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+		queueCreateInfos[i].pNext = nullptr;
+		queueCreateInfos[i].flags = 0;
+		queueCreateInfos[i].queueFamilyIndex = 0;
+		queueCreateInfos[i].queueCount = 0;
+		queueCreateInfos[i].pQueuePriorities = queuePriorities[i];
 	}
+
+	// helper
+	auto addQueueToCreateInfo = [this, &queueCreateInfos, &queueCreateInfoCount, &queuePriorities, &queueFamilies](RequestedQueue requestedQueue,
+		const float    priority) {
+			if (queueFamilies.queues[requestedQueue].family == UINT32_MAX)
+				return;
+
+			// find the index of the VkDeviceQueueCreateInfo
+			uint32_t infoIndex = 0;
+			for (; infoIndex < queueCreateInfoCount; ++infoIndex)
+			{
+				if (queueCreateInfos[infoIndex].queueFamilyIndex == queueFamilies.queues[requestedQueue].family &&
+					queueCreateInfos[infoIndex].queueCount > 0)
+					break;
+			}
+
+			if (infoIndex == queueCreateInfoCount)
+			{
+				// first queue, initialize
+				++queueCreateInfoCount;
+				queueCreateInfos[infoIndex].queueFamilyIndex = queueFamilies.queues[requestedQueue].family;
+			}
+
+			queuePriorities[infoIndex][queueCreateInfos[infoIndex].queueCount] = priority;
+			queueFamilies.queues[requestedQueue].index = queueCreateInfos[infoIndex].queueCount;
+			++queueCreateInfos[infoIndex].queueCount;
+		};
+
+	addQueueToCreateInfo(RequestedQueue::Graphics, 1.0f);
+	addQueueToCreateInfo(RequestedQueue::Compute, 1.0f);
+	addQueueToCreateInfo(RequestedQueue::Copy, 0.5f);
+
+	addQueueToCreateInfo(RequestedQueue::FIPresent, 1.0f);
+	addQueueToCreateInfo(RequestedQueue::FIImageAcquire, 0.9f);
+	addQueueToCreateInfo(RequestedQueue::FIAsyncCompute, 1.0f);
 
 	VkDeviceCreateInfo device_info{
 		.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
 		.pNext = &enable_device_features2,
-		.queueCreateInfoCount = (std::uint32_t)DeviceQueueCreateInfos.size(),
-		.pQueueCreateInfos = DeviceQueueCreateInfos.data(),
+		.queueCreateInfoCount = queueCreateInfoCount,
+		.pQueueCreateInfos = queueCreateInfos,
 		.enabledExtensionCount = (std::uint32_t)(required_device_extensions.size()),
 		.ppEnabledExtensionNames = required_device_extensions.data(),
 		//.pEnabledFeatures = &PhysicalDeviceFeatures
@@ -944,9 +1228,25 @@ VulkanDevice::VulkanDevice(const GPUCreateInfo& DeviceCreateInfo, std::uint32_t 
 
 	VkResult DeviceCreate_Result = vkCreateDevice(PhysicalDevice, &device_info, nullptr, &Device);
 
+	FamilyProperties.graphicsQueueFamilyIndex = queueFamilies.queues[RequestedQueue::Graphics].family;
+	FamilyProperties.computeQueueFamilyIndex = queueFamilies.queues[RequestedQueue::Compute].family;
+	FamilyProperties.copyQueueFamilyIndex = queueFamilies.queues[RequestedQueue::Copy].family;
+	FamilyProperties.ImageAcquireQueueFamilyIndex = queueFamilies.queues[RequestedQueue::FIImageAcquire].family;
+	FamilyProperties.presentQueueFamilyIndex = queueFamilies.queues[RequestedQueue::FIPresent].family;
+	FamilyProperties.AsyncComputeQueueFamilyIndex = queueFamilies.queues[RequestedQueue::FIAsyncCompute].family;
+
 	vkGetDeviceQueue(Device, FamilyProperties.graphicsQueueFamilyIndex, 0, &GraphicsQueue);
 	if (FamilyProperties.computeQueueFamilyIndex >= 0)
 		vkGetDeviceQueue(Device, FamilyProperties.computeQueueFamilyIndex, 0, &ComputeQueue);
+	if (FamilyProperties.copyQueueFamilyIndex >= 0)
+		vkGetDeviceQueue(Device, FamilyProperties.copyQueueFamilyIndex, 0, &CopyQueue);
+
+	if (FamilyProperties.presentQueueFamilyIndex >= 0)
+		vkGetDeviceQueue(Device, FamilyProperties.presentQueueFamilyIndex, 0, &PresentQueue);
+	if (FamilyProperties.ImageAcquireQueueFamilyIndex >= 0)
+		vkGetDeviceQueue(Device, FamilyProperties.ImageAcquireQueueFamilyIndex, 0, &ImageAcquireQueue);
+	if (FamilyProperties.AsyncComputeQueueFamilyIndex >= 0)
+		vkGetDeviceQueue(Device, FamilyProperties.AsyncComputeQueueFamilyIndex, 0, &AsyncComputeQueue);
 
 #if defined(VK_DEBUG) || defined(VK_VALIDATION_LAYERS)
 	PFN_vkVoidFunction temp_fp;
@@ -962,7 +1262,8 @@ VulkanDevice::VulkanDevice(const GPUCreateInfo& DeviceCreateInfo, std::uint32_t 
 	s_vkCmdEndDebugUtilsLabel = (PFN_vkCmdEndDebugUtilsLabelEXT)vkGetDeviceProcAddr(Device, "vkCmdEndDebugUtilsLabelEXT");
 #endif
 
-	InitWindow(DeviceCreateInfo.pHWND, DeviceCreateInfo.Width, DeviceCreateInfo.Height, DeviceCreateInfo.Fullscreen);
+	if (IsPrimaryGPU() && Viewport && WindowCreateInfo.has_value())
+		InitWindow(WindowCreateInfo.value());
 
 	{
 		BindlessDescriptorPool = VulkanBindlessDescriptorPool::CreateUnique(this);
@@ -1018,19 +1319,21 @@ VulkanDevice::~VulkanDevice()
 	vkDestroyInstance(instance, nullptr);
 }
 
-void VulkanDevice::InitWindow(void* InHWND, std::uint32_t InWidth, std::uint32_t InHeight, bool bFullscreen)
+void VulkanDevice::InitWindow(ViewportCreateInfo CreateInfo)
 {
-	if (IsPrimaryGPU())
-		Viewport->InitWindow(static_cast<HWND*>(InHWND), InWidth, InHeight, bFullscreen);
+	if (IsPrimaryGPU() && Viewport)
+	{
+		Viewport->InitWindow(CreateInfo);
+	}
 }
 
 void VulkanDevice::BeginFrame()
 {
-	if (IsPrimaryGPU())
+	if (IsPrimaryGPU() && Viewport)
 		Viewport->BeginFrame();
 }
 
-bool VulkanDevice::GetAdapter(std::optional<short> Index, VkPhysicalDevice& GPU, QueueFamilyProperties& FamilyProperties, VkPhysicalDeviceProperties& properties) const
+bool VulkanDevice::GetAdapter(std::optional<std::uint32_t> Index, VkPhysicalDevice& GPU, QueueFamilyProperties& FamilyProperties, VkPhysicalDeviceProperties& properties) const
 {
 	VkPhysicalDevice* OutGPU = nullptr;
 	QueueFamilyProperties OutFamilyProperties;
@@ -1047,12 +1350,6 @@ bool VulkanDevice::GetAdapter(std::optional<short> Index, VkPhysicalDevice& GPU,
 
 	std::vector<VkPhysicalDevice> gpus(gpu_count);
 	VK_CHECK(vkEnumeratePhysicalDevices(instance, &gpu_count, gpus.data()));
-
-	if (Index.has_value())
-	{
-		if (Index.value() < 0)
-			return false;
-	}
 
 	for (std::size_t i = 0; i < gpus.size(); i++)
 	{
@@ -1089,24 +1386,36 @@ bool VulkanDevice::GetAdapter(std::optional<short> Index, VkPhysicalDevice& GPU,
 		for (std::uint32_t i = 0; i < queue_family_count; i++)
 		{
 			VkBool32 supports_present = VK_FALSE;
-			vkGetPhysicalDeviceSurfaceSupportKHR(physical_device, i, Viewport->GetSurface(), &supports_present);
+			if (IsPrimaryGPU() && Viewport)
+				vkGetPhysicalDeviceSurfaceSupportKHR(physical_device, i, Viewport->GetSurface(), &supports_present);
 
-			if ((queue_family_properties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) && supports_present)
+			if ((queue_family_properties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT))
 			{
-				OutFamilyProperties.graphicsQueueFamilyIndex = i;
-				OutFamilyProperties.presentQueueFamilyIndex = i;
+				if (IsPrimaryGPU() && supports_present)
+				{
+					OutFamilyProperties.graphicsQueueFamilyIndex = i;
+					OutFamilyProperties.presentQueueFamilyIndex = i;
+				}
+				else if (!IsPrimaryGPU())
+				{
+					OutFamilyProperties.graphicsQueueFamilyIndex = i;
+				}
 			}
 
-			if (queue_family_properties[i].queueFlags & VK_QUEUE_COMPUTE_BIT &&
-				!(queue_family_properties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)) {
+			if (queue_family_properties[i].queueFlags & VK_QUEUE_COMPUTE_BIT && !(queue_family_properties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)) 
+			{
 				OutFamilyProperties.computeQueueFamilyIndex = i;
 			}
 
-			if (queue_family_properties[i].queueFlags & VK_QUEUE_TRANSFER_BIT &&
-				!(queue_family_properties[i].queueFlags & VK_QUEUE_TRANSFER_BIT)) {
+			if (queue_family_properties[i].queueFlags & VK_QUEUE_TRANSFER_BIT && !(queue_family_properties[i].queueFlags & VK_QUEUE_TRANSFER_BIT)) 
+			{
 				OutFamilyProperties.copyQueueFamilyIndex = i;
 			}
 
+			if (!(queue_family_properties[i].queueFlags & VK_QUEUE_COMPUTE_BIT) && !(queue_family_properties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) && !(queue_family_properties[i].queueFlags & VK_QUEUE_TRANSFER_BIT))
+			{
+				OutFamilyProperties.ImageAcquireQueueFamilyIndex = i;
+			}
 		}
 
 		if (OutFamilyProperties.graphicsQueueFamilyIndex >= 0)
@@ -1161,13 +1470,20 @@ void VulkanDevice::CancelPendingCommandBuffer(VulkanCommandBuffer* CommandBuffer
 
 void VulkanDevice::RecreateSwapChain()
 {
-	if (IsPrimaryGPU())
+	if (IsPrimaryGPU() && Viewport)
 		Viewport->RecreateSwapChain();
+}
+
+void* VulkanDevice::GetInternalSwapChain()
+{
+	if (Viewport)
+		return Viewport->GetSwapchain();
+	return nullptr;
 }
 
 void VulkanDevice::Present(IRenderTarget* pRT)
 {
-	if (IsPrimaryGPU())
+	if (IsPrimaryGPU() && Viewport)
 	{
 		Viewport->CopyToBackBuffer(pRT);
 	}
@@ -1204,36 +1520,43 @@ void VulkanDevice::Present(IRenderTarget* pRT)
 		}
 	}
 
-	if (IsPrimaryGPU())
+	if (IsPrimaryGPU() && Viewport)
 		Viewport->Present(pRT);
 }
 
 bool VulkanDevice::IsFullScreen() const
 {
-	if (IsPrimaryGPU())
+	if (IsPrimaryGPU() && Viewport)
 		return Viewport->IsFullScreen();
 	return false;
 }
 
 bool VulkanDevice::IsVsyncEnabled() const
 {
-	if (IsPrimaryGPU())
+	if (IsPrimaryGPU() && Viewport)
 		return Viewport->IsVsyncEnabled();
 	return false;
 }
 
 std::uint32_t VulkanDevice::GetVsyncInterval() const
 {
-	if (IsPrimaryGPU())
+	if (IsPrimaryGPU() && Viewport)
 		return Viewport->GetVsyncInterval();
 	return -1;
 }
 
 DisplayMode VulkanDevice::GetDisplayMode() const
 {
-	if (IsPrimaryGPU())
+	if (IsPrimaryGPU() && Viewport)
 		return Viewport->GetCurrentDisplayMode();
 	return DisplayMode();
+}
+
+HDRMetadata VulkanDevice::GetHDRMetaData() const
+{
+	if (IsPrimaryGPU() && Viewport)
+		return Viewport->GetHDRMetaData();
+	return HDRMetadata();
 }
 
 void VulkanDevice::GPUFlush()
@@ -1304,25 +1627,25 @@ uint32_t VulkanDevice::GetMemoryType(uint32_t type_filter, VkMemoryPropertyFlags
 
 void VulkanDevice::ResizeWindow(std::size_t Width, std::size_t Height)
 {
-	if (IsPrimaryGPU())
+	if (IsPrimaryGPU() && Viewport)
 		Viewport->ResizeSwapChain(Width, Height);
 }
 
 void VulkanDevice::FullScreen(const bool value)
 {
-	if (IsPrimaryGPU())
+	if (IsPrimaryGPU() && Viewport)
 		Viewport->FullScreen(value);
 }
 
 void VulkanDevice::Vsync(const bool value)
 {
-	if (IsPrimaryGPU())
+	if (IsPrimaryGPU() && Viewport)
 		Viewport->Vsync(value);
 }
 
 void VulkanDevice::VsyncInterval(const std::uint32_t value)
 {
-	if (IsPrimaryGPU())
+	if (IsPrimaryGPU() && Viewport)
 		Viewport->VsyncInterval(value);
 }
 
@@ -1374,21 +1697,21 @@ std::vector<sDisplayDesc> VulkanDevice::GetAllSupportedResolutions() const
 
 sScreenDimension VulkanDevice::GetBackBufferDimension() const
 {
-	if (IsPrimaryGPU())
+	if (IsPrimaryGPU() && Viewport)
 		return Viewport->GetScreenDimension();
 	return sScreenDimension();
 }
 
 EFormat VulkanDevice::GetBackBufferFormat() const
 {
-	if (IsPrimaryGPU())
+	if (IsPrimaryGPU() && Viewport)
 		return Viewport->GetFormat();
 	return EFormat::UNKNOWN;
 }
 
 sViewport VulkanDevice::GetViewport() const
 {
-	if (IsPrimaryGPU())
+	if (IsPrimaryGPU() && Viewport)
 		return Viewport->GetViewport();
 	return sViewport();
 }

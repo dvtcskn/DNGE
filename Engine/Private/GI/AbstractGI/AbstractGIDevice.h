@@ -32,7 +32,7 @@ class IAbstractGIDevice
 {
 	sBaseClassBody(sClassDefaultProtectedConstructor, IAbstractGIDevice)
 public:
-	virtual void InitWindow(void* HWND, std::uint32_t Width, std::uint32_t Height, bool Fullscreen) = 0;
+	//virtual void InitWindow(void* HWND, std::uint32_t Width, std::uint32_t Height, bool Fullscreen, std::optional<EFormat> SwapChainFormat = std::nullopt) = 0;
 
 	virtual void BeginFrame() = 0;
 
@@ -55,6 +55,7 @@ public:
 	virtual std::uint32_t GetVsyncInterval() const = 0;
 	virtual std::vector<sDisplayDesc> GetAllSupportedResolutions() const = 0;
 	virtual DisplayMode GetDisplayMode() const = 0;
+	virtual HDRMetadata GetHDRMetaData() const = 0;
 
 	virtual void WaitForGPU() = 0;
 	virtual void WaitForCPU() = 0;

@@ -71,8 +71,13 @@ D3D11Pipeline::D3D11Pipeline(D3D11Device* InDevice, const std::string& InName, c
 	if (ShaderAttachments.size() == 0)
 		throw std::runtime_error("No Shader attached.");
 
-	for (const auto& Attachment : ShaderAttachments)
+	for (auto& Attachment : ShaderAttachments)
 	{
+		if (Desc.RenderPass != ERenderPass::NONE)
+		{
+			std::string Define = RenderPassToString(Desc.RenderPass);
+			Attachment.ShaderDefines.push_back(sShaderDefines(Define, "1"));
+		}
 		auto Shader = Cast<D3D11CompiledShader>(Owner->CompileD3D11Shader(Attachment));
 
 		if (InDesc.VertexLayout.size() > 0 && Attachment.Type == eShaderType::Vertex && !VertexAttribute)

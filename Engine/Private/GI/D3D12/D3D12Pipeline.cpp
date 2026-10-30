@@ -161,8 +161,13 @@ void D3D12Pipeline::CompilePipeline()
     {
         CompiledShader* pCShader = Cast<CompiledShader>(sShaderManager::Get().GetShader(Attachment.FunctionName));*/
 
-    for (const auto& Attachment : ShaderAttachments)
+    for (auto& Attachment : ShaderAttachments)
     {
+        if (Desc.RenderPass != ERenderPass::NONE)
+        {
+            std::string Define = RenderPassToString(Desc.RenderPass);
+            Attachment.ShaderDefines.push_back(sShaderDefines(Define, "1"));
+        }
         auto pShader = Owner->CompileD3D12Shader(Attachment);
         //Blobs.push_back(pShader);
 

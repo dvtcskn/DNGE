@@ -105,22 +105,22 @@ void D3D12Viewport::BackBufferRTV::Release()
 	}
 }
 
-D3D12Viewport::SharedPtr D3D12Viewport::Create(D3D12Device* InOwner, ComPtr<IDXGIFactory7> InFactory, std::uint32_t InSizeX, std::uint32_t InSizeY, bool bInIsFullscreen, HWND InHandle)
+D3D12Viewport::SharedPtr D3D12Viewport::Create(D3D12Device* InOwner, ComPtr<IDXGIFactory7> InFactory, ViewportCreateInfo CreateInfo)
 {
-	return std::make_shared<D3D12Viewport>(InOwner, InFactory, InSizeX, InSizeY, bInIsFullscreen, InHandle);
+	return std::make_shared<D3D12Viewport>(InOwner, InFactory, CreateInfo);
 }
 
-D3D12Viewport::D3D12Viewport(D3D12Device* InOwner, ComPtr<IDXGIFactory7> InFactory, std::uint32_t InSizeX, std::uint32_t InSizeY, bool IsFullscreen, HWND InHandle)
+D3D12Viewport::D3D12Viewport(D3D12Device* InOwner, ComPtr<IDXGIFactory7> InFactory, ViewportCreateInfo CreateInfo)
 	: Owner(InOwner)
-	, SizeX(InSizeX)
-	, SizeY(InSizeY)
-	, BackBufferFormat(EFormat::BGRA8_UNORM)
-	, WindowHandle(InHandle)
+	, SizeX(CreateInfo.Width)
+	, SizeY(CreateInfo.Height)
+	, BackBufferFormat(CreateInfo.SwapChainFormat.has_value() ? CreateInfo.SwapChainFormat.value() : EFormat::BGRA8_UNORM) // RGBA8_UNORM
+	, WindowHandle((HWND)CreateInfo.pHWND)
 	, SwapChainBufferCount(2)
 	, CurrentBackBuffer(0)
 	, m_rtvDescriptorSize(0)
 	, SyncInterval(1)
-	, bIsFullScreen(IsFullscreen)
+	, bIsFullScreen(CreateInfo.bFullscreen)
 	, bIsVSYNCEnabled(false)
 	, FrameIndex(0)
 {
@@ -145,7 +145,7 @@ D3D12Viewport::D3D12Viewport(D3D12Device* InOwner, ComPtr<IDXGIFactory7> InFacto
 
 	m_rtvDescriptorSize = Owner->GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
-	viewport = { 0.0f, 0.0f, (float)InSizeX,  (float)InSizeY, 0.0f, 1.0f };
+	viewport = { 0.0f, 0.0f, (float)SizeX,  (float)SizeY, 0.0f, 1.0f };
 
 	PresentParams.DirtyRectsCount = 0;
 	PresentParams.pDirtyRects = 0;
@@ -153,8 +153,8 @@ D3D12Viewport::D3D12Viewport(D3D12Device* InOwner, ComPtr<IDXGIFactory7> InFacto
 	PresentParams.pScrollOffset = 0;
 
 	SecureZeroMemory(&SwapChainDesc, sizeof(SwapChainDesc));
-	SwapChainDesc.Width = InSizeX;
-	SwapChainDesc.Height = InSizeY;
+	SwapChainDesc.Width = SizeX;
+	SwapChainDesc.Height = SizeY;
 	SwapChainDesc.Format = ConvertFormat_Format_To_DXGI(BackBufferFormat);
 	SwapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 	SwapChainDesc.BufferCount = SwapChainBufferCount;

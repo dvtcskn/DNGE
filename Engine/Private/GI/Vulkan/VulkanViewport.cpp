@@ -38,6 +38,7 @@
 VulkanViewport::VulkanViewport(VulkanDevice* InDevice, HWND* InHandle)
 	: Device(InDevice)
 	, bRecreateSurface(false)
+	, bIsFullScreen(false)
 	, bVSYNC(false)
 	, Vsync_Interval(0)
 	, Format(EFormat::UNKNOWN)
@@ -63,17 +64,28 @@ VulkanViewport::VulkanViewport(VulkanDevice* InDevice, HWND* InHandle)
 
 VulkanViewport::~VulkanViewport()
 {
+	vkDestroySwapchainKHR(Device->Get(), Swapchain, nullptr);
+	for (auto& Image : SwapchainImages)
+		Image.Destroy(Device->Get());
+	SwapchainImages.clear();
 	vkDestroySurfaceKHR(Device->GetInstance(), Surface, nullptr);
+
+	vkSetHdrMetadataEXT = nullptr;
+	vkGetPhysicalDeviceSurfaceCapabilities2KHR = nullptr;
+	vkGetPhysicalDeviceSurfaceFormats2KHR = nullptr;
+
+	Handle = nullptr;
+	Device = nullptr;
 }
 
-void VulkanViewport::InitWindow(HWND* InHandle, std::uint32_t InWidth, std::uint32_t InHeight, bool bFullscreen)
+void VulkanViewport::InitWindow(ViewportCreateInfo CreateInfo)
 {
-	SizeX = InWidth;
-	SizeY = InHeight;
+	SizeX = CreateInfo.Width;
+	SizeY = CreateInfo.Height;
 
 	Viewport = { SizeX, SizeY, 0, 0, 0.0f, 1.0f };
 
-	Handle = InHandle;
+	Handle = (HWND*)CreateInfo.pHWND;
 
 	if (bRecreateSurface)
 	{
@@ -83,12 +95,12 @@ void VulkanViewport::InitWindow(HWND* InHandle, std::uint32_t InWidth, std::uint
 
 		bRecreateSurface = false;
 
-		VkWin32SurfaceCreateInfoKHR createInfo{};
-		createInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
-		createInfo.hwnd = (HWND)Handle;
-		createInfo.hinstance = GetModuleHandle(nullptr);
+		VkWin32SurfaceCreateInfoKHR SurfaceCreateInfo{};
+		SurfaceCreateInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
+		SurfaceCreateInfo.hwnd = (HWND)Handle;
+		SurfaceCreateInfo.hinstance = GetModuleHandle(nullptr);
 
-		if (vkCreateWin32SurfaceKHR(Device->GetInstance(), &createInfo, nullptr, &Surface) != VK_SUCCESS) {
+		if (vkCreateWin32SurfaceKHR(Device->GetInstance(), &SurfaceCreateInfo, nullptr, &Surface) != VK_SUCCESS) {
 			Engine::WriteToConsole("failed to create window surface!");
 		}
 	}
@@ -96,9 +108,8 @@ void VulkanViewport::InitWindow(HWND* InHandle, std::uint32_t InWidth, std::uint
 	VkSurfaceCapabilitiesKHR surface_properties;
 	VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(Device->GetPhysicalDevice(), Surface, &surface_properties));
 
-	std::vector<VkFormat> const& preferred_formats = { VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_R8G8B8A8_SRGB, VK_FORMAT_B8G8R8A8_SRGB, VK_FORMAT_A8B8G8R8_SRGB_PACK32 };
+	std::vector<VkFormat> const& preferred_formats = { VK_FORMAT_B8G8R8A8_UNORM/*2D Render only*/, VK_FORMAT_R8G8B8A8_SRGB, VK_FORMAT_B8G8R8A8_SRGB, VK_FORMAT_A8B8G8R8_SRGB_PACK32};
 
-	VkSurfaceFormatKHR format;
 	{
 		uint32_t surface_format_count;
 		vkGetPhysicalDeviceSurfaceFormatsKHR(Device->GetPhysicalDevice(), Surface, &surface_format_count, nullptr);
@@ -106,15 +117,20 @@ void VulkanViewport::InitWindow(HWND* InHandle, std::uint32_t InWidth, std::uint
 		std::vector<VkSurfaceFormatKHR> supported_surface_formats(surface_format_count);
 		vkGetPhysicalDeviceSurfaceFormatsKHR(Device->GetPhysicalDevice(), Surface, &surface_format_count, supported_surface_formats.data());
 
-		auto it = std::find_if(supported_surface_formats.begin(),
-			supported_surface_formats.end(),
-			[&preferred_formats](VkSurfaceFormatKHR surface_format) {
-				return std::any_of(preferred_formats.begin(),
-					preferred_formats.end(),
-					[&surface_format](VkFormat format) { return format == surface_format.format; });
-			});
+		auto it = std::find_if(supported_surface_formats.begin(), supported_surface_formats.end(), [&](VkSurfaceFormatKHR surface_format)
+			{
+				if (CreateInfo.SwapChainFormat.has_value())
+				{
+					return surface_format.format == ConvertFormat_Format_To_VkFormat(CreateInfo.SwapChainFormat.value());
+				}
+				else
+				{
+					return std::any_of(preferred_formats.begin(), preferred_formats.end(), [&surface_format](VkFormat format) { return format == surface_format.format; });
+				}
+			}
+		);
 
-		format = it != supported_surface_formats.end() ? *it : supported_surface_formats[0];
+		SurfaceFormat = it != supported_surface_formats.end() ? *it : supported_surface_formats[0];
 	}
 
 	GET_INSTANCE_PROC_ADDR(vkGetPhysicalDeviceSurfaceFormats2KHR);
@@ -128,8 +144,8 @@ void VulkanViewport::InitWindow(HWND* InHandle, std::uint32_t InWidth, std::uint
 	VkExtent2D swapchain_size;
 	if (surface_properties.currentExtent.width == 0xFFFFFFFF)
 	{
-		swapchain_size.width = InWidth;
-		swapchain_size.height = InHeight;
+		swapchain_size.width = SizeX;
+		swapchain_size.height = SizeY;
 	}
 	else
 	{
@@ -207,8 +223,8 @@ void VulkanViewport::InitWindow(HWND* InHandle, std::uint32_t InWidth, std::uint
 		.pNext = &surface_full_screen_exclusive_info_EXT,
 		.surface = Surface,                            // The surface onto which images will be presented
 		.minImageCount = desired_swapchain_images,                   // Minimum number of images in the swapchain (number of buffers)
-		.imageFormat = format.format,                              // Format of the swapchain images (e.g., VK_FORMAT_B8G8R8A8_SRGB)
-		.imageColorSpace = format.colorSpace,                          // Color space of the images (e.g., VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+		.imageFormat = SurfaceFormat.format,                              // Format of the swapchain images (e.g., VK_FORMAT_B8G8R8A8_SRGB)
+		.imageColorSpace = SurfaceFormat.colorSpace,                          // Color space of the images (e.g., VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
 		.imageExtent = swapchain_size,                             // Resolution of the swapchain images (width and height)
 		.imageArrayLayers = 1,                                          // Number of layers in each image (usually 1 unless stereoscopic)
 		.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,        // How the images will be used (as color attachments)
@@ -220,9 +236,10 @@ void VulkanViewport::InitWindow(HWND* InHandle, std::uint32_t InWidth, std::uint
 		.oldSwapchain = old_swapchain                               // Handle to the old swapchain, if replacing an existing one
 	};
 
-	Format = ConvertFormat_VkFormat_To_Format(format.format);
+	SwapchainCreateInfo = info;
+	Format = ConvertFormat_VkFormat_To_Format(SurfaceFormat.format);
 
-	VK_CHECK(vkCreateSwapchainKHR(Device->Get(), &info, nullptr, &Swapchain));
+	VK_CHECK(vkCreateSwapchainKHR(Device->Get(), &SwapchainCreateInfo, nullptr, &Swapchain));
 
 	if (old_swapchain != VK_NULL_HANDLE)
 	{
@@ -235,28 +252,7 @@ void VulkanViewport::InitWindow(HWND* InHandle, std::uint32_t InWidth, std::uint
 		vkDestroySwapchainKHR(Device->Get(), old_swapchain, nullptr);
 	}
 
-	uint32_t image_count;
-	VK_CHECK(vkGetSwapchainImagesKHR(Device->Get(), Swapchain, &image_count, nullptr));
-
-	std::vector<VkImage> Images(image_count);
-	VK_CHECK(vkGetSwapchainImagesKHR(Device->Get(), Swapchain, &image_count, Images.data()));
-
-	for (size_t i = 0; i < image_count; i++)
-	{
-		VkImageViewCreateInfo view_info{
-			.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-			.pNext = nullptr,
-			.flags = 0,
-			.image = Images[i],
-			.viewType = VK_IMAGE_VIEW_TYPE_2D,
-			.format = format.format,
-			.subresourceRange = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1} };
-
-		VkImageView image_view;
-		VK_CHECK(vkCreateImageView(Device->Get(), &view_info, nullptr, &image_view));
-
-		SwapchainImages.push_back(SwapchainImage(Images[i], image_view, VK_IMAGE_LAYOUT_UNDEFINED));
-	}
+	CreateBackBufferTexture();
 
 	// Can only do this for Freesync Premium Pro HDR display on AMD hardware
 	if (strstr(Device->GetDeviceName().c_str(), "AMD") != nullptr)
@@ -268,11 +264,81 @@ void VulkanViewport::InitWindow(HWND* InHandle, std::uint32_t InWidth, std::uint
 	PopulateHDRMetadataBasedOnDisplayMode();
 
 	SetHDRMetadataAndColorspace();
+
+	if (CreateInfo.bFullscreen)
+		FullScreen(true);
+}
+
+VkImage VulkanViewport::GetCurrentBackBufferImage() const
+{
+	return SwapchainImages[FrameIndex].Image;
+}
+
+VkImageCreateInfo VulkanViewport::GetCurrentBackBufferImageCreateInfo() const
+{
+	return SwapchainImages[FrameIndex].ImageCreateInfo;
 }
 
 void VulkanViewport::RecreateSwapChain()
 {
+}
 
+void VulkanViewport::CreateBackBufferTexture()
+{
+	uint32_t image_count;
+	VK_CHECK(vkGetSwapchainImagesKHR(Device->Get(), Swapchain, &image_count, nullptr));
+
+	std::vector<VkImage> Images(image_count);
+	VK_CHECK(vkGetSwapchainImagesKHR(Device->Get(), Swapchain, &image_count, Images.data()));
+
+	for (size_t i = 0; i < image_count; i++)
+	{
+		VkImageCreateInfo ImageInfo = {};
+		ImageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		ImageInfo.pNext = nullptr;
+		ImageInfo.flags = 0;
+		ImageInfo.imageType = VK_IMAGE_TYPE_2D;
+		ImageInfo.format = SurfaceFormat.format;
+		ImageInfo.extent.width = SizeX;
+		ImageInfo.extent.height = SizeY;
+		ImageInfo.extent.depth = 1;
+		ImageInfo.mipLevels = 1;
+		ImageInfo.arrayLayers = 1;
+		ImageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+		ImageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+		ImageInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+		VkImageViewCreateInfo view_info{
+			.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+			.pNext = nullptr,
+			.flags = 0,
+			.image = Images[i],
+			.viewType = VK_IMAGE_VIEW_TYPE_2D,
+			.format = SurfaceFormat.format,
+			.subresourceRange = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1} };
+
+		VkImageView image_view;
+		VK_CHECK(vkCreateImageView(Device->Get(), &view_info, nullptr, &image_view));
+
+		SwapchainImages.push_back(SwapchainImage(Images[i], ImageInfo, image_view, VK_IMAGE_LAYOUT_UNDEFINED));
+	}
+}
+
+void VulkanViewport::SetSwapChain(VkSwapchainKHR NewSwapchain)
+{
+	if (NewSwapchain != VK_NULL_HANDLE)
+	{
+		Swapchain = NewSwapchain;
+		CreateBackBufferTexture();
+	}
+	else
+	{
+		for (auto& Image : SwapchainImages)
+			Image.Destroy(Device->Get());
+		SwapchainImages.clear();
+		//vkDestroySwapchainKHR(Device->Get(), Swapchain, nullptr);
+		Swapchain = NewSwapchain;
+	}
 }
 
 VkResult VulkanViewport::AcquireNextImageIndex(uint32_t* image)
@@ -441,8 +507,13 @@ void VulkanViewport::FullScreen(const bool value)
 
 	// basically destroy everything swapchain related
 	//teardown_framebuffers();                 
-
-	InitWindow(Handle, SizeX, SizeY, value);
+	ViewportCreateInfo Viewport;
+	Viewport.SwapChainFormat = Format;
+	Viewport.Width = SizeX;
+	Viewport.Height = SizeY;
+	Viewport.bFullscreen = value;
+	Viewport.pHWND = Handle;
+	InitWindow(Viewport);
 	// Step: 2) recreate the frame buffers using the newly created swapchain
 	//init_framebuffers();
 
@@ -487,7 +558,13 @@ bool VulkanViewport::ResizeSwapChain(std::size_t Width, std::size_t Height)
 
 	vkDeviceWaitIdle(Device->Get());
 
-	InitWindow(Handle, (std::uint32_t)Width, (std::uint32_t)Width, IsFullScreen());
+	ViewportCreateInfo Viewport;
+	Viewport.SwapChainFormat = Format;
+	Viewport.Width = (std::uint32_t)Width;
+	Viewport.Height = (std::uint32_t)Width;
+	Viewport.bFullscreen = IsFullScreen();
+	Viewport.pHWND = Handle;
+	InitWindow(Viewport);
 
 	return true;
 }

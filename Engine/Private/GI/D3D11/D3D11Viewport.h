@@ -40,12 +40,12 @@ class D3D11Viewport final
 {
 	sBaseClassBody(sClassConstructor, D3D11Viewport)
 public:
-	static std::shared_ptr<D3D11Viewport> CreateD3D11Viewport(D3D11Device* InOwner, ComPtr<IDXGIFactory4> InFactory, std::uint32_t InSizeX, std::uint32_t InSizeY, bool IsFullscreen, HWND InHandle)
+	static std::shared_ptr<D3D11Viewport> CreateD3D11Viewport(D3D11Device* InOwner, ComPtr<IDXGIFactory4> InFactory, ViewportCreateInfo CreateInfo)
 	{
-		return std::make_shared<D3D11Viewport>(InOwner, InFactory, InSizeX, InSizeY, IsFullscreen, InHandle);
+		return std::make_shared<D3D11Viewport>(InOwner, InFactory, CreateInfo);
 	}
 
-	D3D11Viewport(class D3D11Device* InOwner, ComPtr<IDXGIFactory4> InFactory, std::uint32_t InSizeX, std::uint32_t InSizeY, bool IsFullscreen, HWND InHandle);
+	D3D11Viewport(class D3D11Device* InOwner, ComPtr<IDXGIFactory4> InFactory, ViewportCreateInfo CreateInfo);
 	~D3D11Viewport();
 
 	void BeginFrame();

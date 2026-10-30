@@ -117,6 +117,7 @@ public:
 		, MipBias(-1.0f)
 		, bForceRecompileMaterials(false)
 	{
+		GraphicsCommandContext->SetName("GraphicsCommandContext::GBuffer");
 		BufferLayout BufferDesc;
 		BufferDesc.Size = sizeof(sTimeBuffer);
 		TimeCB.First = IConstantBuffer::Create("TimeCB_First", BufferDesc, 2);
@@ -127,6 +128,12 @@ public:
 			AttachmentInfo.Desc.Dimensions.X = (std::uint32_t)ScreenDimension.Width;
 			AttachmentInfo.Desc.Dimensions.Y = (std::uint32_t)ScreenDimension.Height;
 			AttachmentInfo.AddFrameBuffer(GPU::GetBackBufferFormat()/*, EFrameBufferAttachmentType::RT_SRV_UAV*/); // finalColor
+			//AttachmentInfo.AddFrameBuffer(GPU::GetBackBufferFormat()); // Albedo
+			//AttachmentInfo.AddFrameBuffer(GPU::GetBackBufferFormat()); // Normal
+			//AttachmentInfo.AddFrameBuffer(GPU::GetBackBufferFormat()); // SPEC
+			//AttachmentInfo.AddFrameBuffer(EFormat::RGBA16_FLOAT); // motion vectors
+			//AttachmentInfo.AddFrameBuffer(EFormat::R8_UNORM); // reactiveMask
+			//AttachmentInfo.AddFrameBuffer(EFormat::R8_UNORM); // upscaleTransparencyAndComposition
 			AttachmentInfo.DepthFormat = GPU::GetDefaultDepthFormat();
 			GBuffer = IFrameBuffer::Create("GBuffer", AttachmentInfo);
 		}
@@ -583,7 +590,7 @@ public:
 		GraphicsCommandContext->BeginRecordCommandList(ECommandContextBeginState::Render);
 		GraphicsCommandContext->BeginProfile(ERenderPass::GBuffer, true);
 
-		UpdateCameraBuffer(pCamera, index, GraphicsCommandContext.get());
+		//UpdateCameraBuffer(pCamera, index, GraphicsCommandContext.get());
 		GraphicsCommandContext->SetFrameBuffer(GBuffer.get());
 
 		if (CustomScreenDimension.IsValid())
@@ -660,7 +667,6 @@ public:
 		CameraBuffer.PrevJitter = CameraBuffer.CurrJitter;
 		const FVector4& Vector = pCamera->GetJitteredProjMatrix().r[2];
 		CameraBuffer.CurrJitter = FVector2(Vector.X, Vector.Y);
-		//Engine::WriteToConsole("Prev : " + CameraBuffer.PrevJitter.ToString() + " | Current : " + CameraBuffer.CurrJitter.ToString());
 
 		CameraBuffer.MipBias = MipBias;
 		CameraCBs[index].Get()->Map(&CameraBuffer, CMD);
@@ -709,6 +715,12 @@ public:
 		AttachmentInfo.Desc.Dimensions.X = (std::uint32_t)ScreenDimension.Width;
 		AttachmentInfo.Desc.Dimensions.Y = (std::uint32_t)ScreenDimension.Height;
 		AttachmentInfo.AddFrameBuffer(GPU::GetBackBufferFormat()/*, EFrameBufferAttachmentType::RT_SRV_UAV*/); // finalColor
+		//AttachmentInfo.AddFrameBuffer(GPU::GetBackBufferFormat()); // Albedo
+		//AttachmentInfo.AddFrameBuffer(GPU::GetBackBufferFormat()); // Normal
+		//AttachmentInfo.AddFrameBuffer(GPU::GetBackBufferFormat()); // SPEC
+		//AttachmentInfo.AddFrameBuffer(EFormat::RG16_FLOAT); // motion vectors
+		//AttachmentInfo.AddFrameBuffer(EFormat::R8_UNORM); // reactiveMask
+		//AttachmentInfo.AddFrameBuffer(EFormat::R8_UNORM); // upscaleTransparencyAndComposition
 		AttachmentInfo.DepthFormat = GPU::GetDefaultDepthFormat();
 		GBuffer = IFrameBuffer::Create("GBuffer", AttachmentInfo);
 	}
@@ -843,6 +855,36 @@ void sRenderer::Tick(const double DeltaTime)
 	if (FSR)
 	{
 		FSR->Tick(DeltaTime);
+	}
+
+	auto GameInstance = World->GetGameInstance();
+	std::size_t PlayerCount = 0;
+	if (GameInstance)
+	{
+		PlayerCount = GameInstance->GetPlayerCount();
+
+		if ((PlayerCount + ViewportInstances.size()) != GBuffer->GetCameraConstantBufferSize())
+		{
+			GBuffer->DestroyAllCameraConstantBuffers();
+			GBuffer->AddCameraConstantBuffer(PlayerCount + ViewportInstances.size());
+		}
+	}
+	std::size_t Count = GameInstance->IsSplitScreenEnabled() ? PlayerCount : PlayerCount > 0 ? 1 : 0;
+	for (std::size_t i = 0; i < Count; i++)
+	{
+		auto Player = GameInstance->GetPlayer(i, false);
+		sViewportInstance* ViewportInstance = Player->GetViewportInstance();
+		if (!ViewportInstance)
+			continue;
+		if (!ViewportInstance->bIsEnabled)
+			continue;
+
+		if (GBufferClearMode == ERendererClear::Sky)
+		{
+			//SkyDome->UpdateCameraBuffer(ViewportInstance->pCamera->GetViewProjMatrix());
+		}
+
+		GBuffer->UpdateCameraBuffer(ViewportInstance->pCamera.get(), i);
 	}
 }
 
@@ -1059,10 +1101,10 @@ void sRenderer::Render()
 			FinalRenderTarget = GBuffer->Render(World->GetActiveLevel(), i, ViewportInstance->pCamera.get(), ViewportInstance->Viewport);
 			LineRenderer->Render(FinalRenderTarget, GBuffer->GetCameraConstantBuffer(i)->GetBindlessIndex(), ViewportInstance->Viewport);
 			pParticleRenderer->Render(World->GetActiveLevel(), GBuffer->GetCameraConstantBuffer(i)->GetBindlessIndex(), FinalRenderTarget, GBuffer->GetDepth(), ViewportInstance->Viewport);
-			if (UpscalerType == ERendererUpscalerType::FSR && GPU::GetGIType() == EGITypes::D3D12 && FSR && (GPU::GetDeviceType() != EGPUDeviceType::Software || bSoftwareDeviceUpscallerSupport))
+			if (UpscalerType == ERendererUpscalerType::FSR && GPU::GetGIType() != EGITypes::D3D11 && FSR && (GPU::GetDeviceType() != EGPUDeviceType::Software || bSoftwareDeviceUpscallerSupport))
 			{
 				//to do : use global camera
-				FSR->Render(FinalRenderTarget, GBuffer->GetGBuffer()->GetRenderTarget(4), GBuffer->GetGBuffer()->GetRenderTarget(5), GBuffer->GetDepth(), ViewportInstance->pCamera.get());
+				FSR->Render(FinalRenderTarget, GBuffer->GetGBuffer()->GetRenderTarget(4), nullptr/*GBuffer->GetGBuffer()->GetRenderTarget(5)*/, GBuffer->GetDepth(), ViewportInstance->pCamera.get());
 				if (FSR->IsUpscalingActive())
 					FinalRenderTarget = FSR->GetOutputRenderTarget();
 			}
@@ -1084,7 +1126,6 @@ void sRenderer::Render()
 		FinalRenderTarget = PP->GetFrameBuffer();
 	}
 
-	//TAA->Render(FinalRenderTarget, GBuffer->GetMotionVector(), GBuffer->GetDepth(), InternalBaseRenderResolution);
 	if (bIsTonmapperEnabled)
 	{
 		PostProcessRenderer->Render(ToneMapping.get(), FinalRenderTarget, std::nullopt);
@@ -1103,7 +1144,7 @@ void sRenderer::Render()
 		FinalRenderTarget = PP->GetFrameBuffer();
 	}
 
-	if (UpscalerType == ERendererUpscalerType::FSR && GPU::GetGIType() == EGITypes::D3D12 && FSR && (GPU::GetDeviceType() != EGPUDeviceType::Software || bSoftwareDeviceUpscallerSupport))
+	if (UpscalerType == ERendererUpscalerType::FSR && GPU::GetGIType() != EGITypes::D3D11 && FSR && (GPU::GetDeviceType() != EGPUDeviceType::Software || bSoftwareDeviceUpscallerSupport))
 	{
 		if (FSR->IsFrameGenActive() && FSR->GetUICompositionMode() == UICompositionMode::PreUiBackbuffer)
 		{
@@ -1166,7 +1207,7 @@ void sRenderer::Render()
 	{
 		auto CommandContext = CanvasRenderer->GetCommandContext();
 
-		if (UpscalerType == ERendererUpscalerType::FSR && GPU::GetGIType() == EGITypes::D3D12 && FSR && (GPU::GetDeviceType() != EGPUDeviceType::Software || bSoftwareDeviceUpscallerSupport))
+		if (UpscalerType == ERendererUpscalerType::FSR && GPU::GetGIType() != EGITypes::D3D11 && FSR && (GPU::GetDeviceType() != EGPUDeviceType::Software || bSoftwareDeviceUpscallerSupport))
 		{
 			if (FSR->IsFrameGenActive() && FSR->GetUICompositionMode() == UICompositionMode::PreUiBackbuffer)
 			{
@@ -1239,7 +1280,7 @@ void sRenderer::OnInputProcess(const GMouseInput& MouseInput, const GKeyboardCha
 	}
 	else if (KeyboardChar.KeyCode == 13 && KeyboardChar.bIsPressed /*&& KeyboardChar.bIsChar*/)
 	{
-		if (GPU::GetGIType() == EGITypes::D3D12 && (GPU::GetDeviceType() != EGPUDeviceType::Software || bSoftwareDeviceUpscallerSupport))
+		if (GPU::GetGIType() != EGITypes::D3D11 && (GPU::GetDeviceType() != EGPUDeviceType::Software || bSoftwareDeviceUpscallerSupport))
 		{
 			GPU::WaitForGPU();
 			SetUpscalerType(ERendererUpscalerType::FSR);
@@ -1247,7 +1288,7 @@ void sRenderer::OnInputProcess(const GMouseInput& MouseInput, const GKeyboardCha
 		}
 		else
 		{
-			Engine::WriteToConsole("FSR 3/4 does not support Vulkan or D3D11.");
+			Engine::WriteToConsole("FSR 3/4 does not support D3D11.");
 		}
 	}
 }
@@ -1276,7 +1317,7 @@ void sRenderer::SetInternalBaseRenderResolution(std::size_t Width, std::size_t H
 
 void sRenderer::SetUpscalerType(ERendererUpscalerType NewUpscalerType)
 {
-	if (NewUpscalerType == ERendererUpscalerType::FSR && GPU::GetGIType() != EGITypes::D3D12)
+	if (UpscalerType == NewUpscalerType || GPU::GetGIType() == EGITypes::D3D11)
 		return;
 
 	UpscalerType = NewUpscalerType;

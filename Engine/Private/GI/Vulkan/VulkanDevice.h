@@ -67,15 +67,20 @@ private:
 	struct QueueFamilyProperties
 	{
 		std::int32_t graphicsQueueFamilyIndex = -1;
-		std::int32_t presentQueueFamilyIndex = -1;
 		std::int32_t computeQueueFamilyIndex = -1;
 		std::int32_t copyQueueFamilyIndex = -1;
+
+		// frame interpolation
+		std::int32_t ImageAcquireQueueFamilyIndex = -1;
+		std::int32_t presentQueueFamilyIndex = -1;
+		std::int32_t AsyncComputeQueueFamilyIndex = -1;
 	};
 
 public:
-	VulkanDevice(const GPUCreateInfo& DeviceCreateInfo, std::uint32_t InDeviceIndex);
+	VulkanDevice(const GPUCreateInfo& DeviceCreateInfo, std::optional<ViewportCreateInfo> WindowCreateInfo = std::nullopt);
 	virtual ~VulkanDevice();
-	virtual void InitWindow(void* HWND, std::uint32_t Width, std::uint32_t Height, bool Fullscreen) override final;
+	void InitWindow(ViewportCreateInfo CreateInfo);
+
 	virtual void BeginFrame() override final;
 	virtual void RecreateSwapChain() override final;
 	virtual void Present(IRenderTarget* pRT) override final;
@@ -108,11 +113,11 @@ public:
 	//void ReturnCommandBuffer(VkCommandBuffer commandBuffer);
 	//bool IsCommandBufferAvailable(VkCommandBuffer commandBuffer) const;
 
-	bool GetAdapter(std::optional<short> Index, VkPhysicalDevice& GPU, QueueFamilyProperties& FamilyProperties, VkPhysicalDeviceProperties& properties) const;
+	bool GetAdapter(std::optional<std::uint32_t> Index, VkPhysicalDevice& GPU, QueueFamilyProperties& FamilyProperties, VkPhysicalDeviceProperties& properties) const;
 
 	virtual EGPUDeviceType GetDeviceType() override final {	return EGPUDeviceType::Hardware; }
-	virtual void* GetInternalDevice() override final { return nullptr; }
-	virtual void* GetInternalSwapChain() override final { return nullptr; }
+	virtual void* GetInternalDevice() override final { return Device; }
+	virtual void* GetInternalSwapChain() override final;
 
 	const VkInstance& GetInstance() const { return instance; }
 
@@ -132,6 +137,7 @@ public:
 	virtual void Vsync(const bool value) override final;
 	virtual void VsyncInterval(const std::uint32_t value) override final;
 	virtual DisplayMode GetDisplayMode() const override final;
+	virtual HDRMetadata GetHDRMetaData() const override final;
 
 	virtual bool IsFullScreen() const override final;
 	virtual bool IsVsyncEnabled() const override final;
@@ -228,6 +234,11 @@ public:
 	//virtual ITiledTexture::UniquePtr CreateUniqueTiledTexture(const std::string InName, const std::uint32_t InTileX, const std::uint32_t InTileY, const sTextureDesc& InDesc, std::uint32_t DefaultRootParameterIndex = 0) override final;
 
 public:
+	FORCEINLINE VulkanViewport* GetVulkanViewport() const
+	{
+		return Viewport.get();
+	}
+
 	FORCEINLINE bool IsNvDeviceID() const
 	{
 		return DeviceProperties.vendorID == 0x10DE;
@@ -255,12 +266,12 @@ public:
 
 	FORCEINLINE bool IsPrimaryGPU() const
 	{
-		return DeviceIndex == 0;
+		return bIsPrimary;
 	}
 
-	FORCEINLINE std::uint32_t GetDeviceIndex() const
+	FORCEINLINE std::uint32_t GetGPUAdapterIndex() const
 	{
-		return DeviceIndex;
+		return GPUAdapterIndex.has_value() ? GPUAdapterIndex.value() : std::uint32_t(-1);
 	}
 
 	FORCEINLINE std::string GetDeviceName() const
@@ -285,6 +296,51 @@ public:
 		return CmdExecuteGeneratedCommands;
 	}
 
+	VkQueue GetComputeQueue() const 
+	{
+		return ComputeQueue;
+	}
+	std::int32_t GetComputeQueueIndex() const
+	{
+		return FamilyProperties.computeQueueFamilyIndex;
+	}
+
+	VkQueue GetCopyQueue() const
+	{
+		return CopyQueue;
+	}
+	std::int32_t GetCopyQueueIndex() const
+	{
+		return FamilyProperties.copyQueueFamilyIndex;
+	}
+
+	VkQueue GetPresentQueue() const 
+	{
+		return PresentQueue;
+	}
+	std::int32_t GetPresentQueueIndex() const
+	{
+		return FamilyProperties.presentQueueFamilyIndex;
+	}
+
+	VkQueue GetImageAcquireQueue() const 
+	{
+		return ImageAcquireQueue;
+	}
+	std::int32_t GetImageAcquireQueueIndex() const
+	{
+		return FamilyProperties.ImageAcquireQueueFamilyIndex;
+	}
+	VkQueue GetAsyncComputeQueue() const
+	{
+		return AsyncComputeQueue;
+	}
+	std::int32_t GetAsyncComputeQueueIndex() const
+	{
+		return FamilyProperties.AsyncComputeQueueFamilyIndex;
+	}
+
+
 private:
 	std::string DeviceName;
 	std::uint32_t InstanceApiVersion;
@@ -297,14 +353,20 @@ private:
 	VkPhysicalDeviceLimits deviceLimits;
 	VkDebugUtilsMessengerEXT debug_callback = VK_NULL_HANDLE;
 
-	std::optional<std::uint32_t> GPUIndex;
 	EGPUDeviceType DeviceType;
-	std::uint32_t DeviceIndex;
+	std::optional<std::uint32_t> GPUAdapterIndex;
+	bool bIsPrimary;
 
 	std::unique_ptr<VulkanCommandBuffer> IMCommandBuffer;
 
 	VkQueue GraphicsQueue;
 	VkQueue ComputeQueue;
+	VkQueue CopyQueue;
+
+	// frame interpolation
+	VkQueue PresentQueue;
+	VkQueue ImageAcquireQueue;
+	VkQueue AsyncComputeQueue;
 
 	std::map<std::uint64_t, std::unique_ptr<VulkanFence>> SubmissionFences;
 	std::uint64_t NextFenceValue = 0;

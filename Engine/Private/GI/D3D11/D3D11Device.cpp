@@ -42,11 +42,11 @@
 
 #define DEBUG_D3DDEVICE 1
 
-D3D11Device::D3D11Device(const GPUCreateInfo& DeviceCreateInfo, std::uint32_t InDeviceIndex)
+D3D11Device::D3D11Device(const GPUCreateInfo& DeviceCreateInfo, std::optional<ViewportCreateInfo> WindowCreateInfo)
 	: VendorId(0)
-	, GPUIndex(DeviceCreateInfo.PrimaryGPU.GPUIndex)
-	, DeviceType(DeviceCreateInfo.PrimaryGPU.DeviceType)
-	, DeviceIndex(InDeviceIndex)
+	, GPUAdapterIndex(DeviceCreateInfo.GPUIndex)
+	, DeviceType(DeviceCreateInfo.DeviceType)
+	, bIsPrimary(DeviceCreateInfo.IsPrimaryGPU())
 {
 	auto WideStringToString = [](const std::wstring& utf16) -> std::string
 		{
@@ -87,7 +87,7 @@ D3D11Device::D3D11Device(const GPUCreateInfo& DeviceCreateInfo, std::uint32_t In
 	createFlags |= D3D11_CREATE_DEVICE_DEBUG;
 #endif
 
-	IDXGIAdapter1* pAdapter = GetAdapter(GPUIndex);
+	IDXGIAdapter1* pAdapter = GetAdapter(GPUAdapterIndex);
 	DXGI_ADAPTER_DESC1 AdapterDesc;
 	pAdapter->GetDesc1(&AdapterDesc);
 
@@ -210,7 +210,8 @@ D3D11Device::D3D11Device(const GPUCreateInfo& DeviceCreateInfo, std::uint32_t In
 	if (pAdapter)
 		pAdapter->Release();
 
-	InitWindow(DeviceCreateInfo.pHWND, DeviceCreateInfo.Width, DeviceCreateInfo.Height, DeviceCreateInfo.Fullscreen);
+	if (IsPrimaryGPU() && WindowCreateInfo.has_value())
+		InitWindow(WindowCreateInfo.value());
 }
 
 D3D11Device::~D3D11Device()
@@ -239,18 +240,18 @@ D3D11Device::~D3D11Device()
 #endif
 }
 
-void D3D11Device::InitWindow(void* InHWND, std::uint32_t InWidth, std::uint32_t InHeight, bool bFullscreen)
+void D3D11Device::InitWindow(ViewportCreateInfo CreateInfo)
 {
 	if (IsPrimaryGPU())
 	{
 		if (!Viewport)
-			Viewport = std::make_unique<D3D11Viewport>(this, DXGIFactory, InWidth, InHeight, bFullscreen, (HWND)InHWND);
+			Viewport = std::make_unique<D3D11Viewport>(this, DXGIFactory, CreateInfo);
 	}
 }
 
 void D3D11Device::BeginFrame()
 {
-	if (IsPrimaryGPU())
+	if (IsPrimaryGPU() && Viewport)
 		Viewport->BeginFrame();
 }
 
@@ -261,8 +262,10 @@ void D3D11Device::RecreateSwapChain()
 
 void D3D11Device::Present(IRenderTarget* pRT)
 {
-	if (IsPrimaryGPU())
-		Viewport->Present(pRT);
+	if (!IsPrimaryGPU() || !Viewport)
+		return;
+
+	Viewport->Present(pRT);
 
 	Direct3DDeviceIMContext->DiscardView(Viewport->GetCurrentBackBufferRT());
 	Direct3DDeviceIMContext->ClearState();
@@ -270,21 +273,21 @@ void D3D11Device::Present(IRenderTarget* pRT)
 
 bool D3D11Device::IsFullScreen() const
 {
-	if (IsPrimaryGPU())
+	if (IsPrimaryGPU() && Viewport)
 		return Viewport->IsFullScreen();
 	return false;
 }
 
 bool D3D11Device::IsVsyncEnabled() const
 {
-	if (IsPrimaryGPU())
+	if (IsPrimaryGPU() && Viewport)
 		return Viewport->IsVsyncEnabled();
 	return false;
 }
 
 std::uint32_t D3D11Device::GetVsyncInterval() const
 {
-	if (IsPrimaryGPU())
+	if (IsPrimaryGPU() && Viewport)
 		return Viewport->GetVsyncInterval();
 	return -1;
 }
@@ -294,54 +297,59 @@ DisplayMode D3D11Device::GetDisplayMode() const
 	return DisplayMode();
 }
 
+HDRMetadata D3D11Device::GetHDRMetaData() const
+{
+	return HDRMetadata();
+}
+
 void D3D11Device::ResizeWindow(std::size_t Width, std::size_t Height)
 {
-	if (IsPrimaryGPU())
+	if (IsPrimaryGPU() && Viewport)
 		Viewport->ResizeSwapChain(Width, Height);
 }
 
 void D3D11Device::FullScreen(const bool value)
 {
-	if (IsPrimaryGPU())
+	if (IsPrimaryGPU() && Viewport)
 		Viewport->FullScreen(value);
 }
 
 void D3D11Device::Vsync(const bool value)
 {
-	if (IsPrimaryGPU())
+	if (IsPrimaryGPU() && Viewport)
 		Viewport->Vsync(value);
 }
 
 void D3D11Device::VsyncInterval(const std::uint32_t value)
 {
-	if (IsPrimaryGPU())
+	if (IsPrimaryGPU() && Viewport)
 		Viewport->VsyncInterval(value);
 }
 
 std::vector<sDisplayDesc> D3D11Device::GetAllSupportedResolutions() const
 {
-	if (IsPrimaryGPU())
+	if (IsPrimaryGPU() && Viewport)
 		return Viewport->GetAllSupportedResolutions();
 	return std::vector<sDisplayDesc>();
 }
 
 sScreenDimension D3D11Device::GetBackBufferDimension() const
 {
-	if (IsPrimaryGPU())
+	if (IsPrimaryGPU() && Viewport)
 		return Viewport->GetScreenDimension();
 	return sScreenDimension();
 }
 
 EFormat D3D11Device::GetBackBufferFormat() const
 {
-	if (IsPrimaryGPU())
+	if (IsPrimaryGPU() && Viewport)
 		return Viewport->GetBackBufferFormat();
 	return EFormat::UNKNOWN;
 }
 
 sViewport D3D11Device::GetViewport() const
 {
-	if (IsPrimaryGPU())
+	if (IsPrimaryGPU() && Viewport)
 		return Viewport->GetViewport();
 	return sViewport();
 }
@@ -387,18 +395,15 @@ std::uint64_t D3D11Device::GPUFenceSignal()
 	return 0;
 }
 
-IDXGIAdapter1* D3D11Device::GetAdapter(std::optional<short> Index)
+IDXGIAdapter1* D3D11Device::GetAdapter(std::optional<std::uint32_t> Index)
 {
 	IDXGIAdapter1* pAdapter;
 	std::vector<IDXGIAdapter1*> vAdapters;
 
-	if (Index.has_value())
+	if (DeviceType == EGPUDeviceType::Software)
 	{
-		if (Index <= -1)
-		{
-			DXGIFactory->EnumWarpAdapter(IID_PPV_ARGS(&pAdapter));
-			return pAdapter;
-		}
+		DXGIFactory->EnumWarpAdapter(IID_PPV_ARGS(&pAdapter));
+		return pAdapter;
 	}
 
 	for (std::uint32_t i = 0; DXGIFactory->EnumAdapters1(i, &pAdapter) != DXGI_ERROR_NOT_FOUND; ++i)
@@ -410,7 +415,7 @@ IDXGIAdapter1* D3D11Device::GetAdapter(std::optional<short> Index)
 		vAdapters.push_back(pAdapter);
 	}
 
-	if (Index != std::nullopt)
+	if (Index.has_value())
 	{
 		return vAdapters.at(Index.value() >= vAdapters.size() ? vAdapters.size() - 1 : Index.value());
 	}
