@@ -5,7 +5,7 @@ DNGE is a free and open source Game Engine.
 * D3D11(Deprecated), D3D12, Vulkan
 * Audio
 * Bindless (D3D12, Vulkan Only)
-* FSR 3/4
+* FSR 3/4 - Frame Gen.
 * Component Based
 * Gameplay Framework
 * Particle System
