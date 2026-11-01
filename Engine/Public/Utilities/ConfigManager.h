@@ -1,7 +1,7 @@
 /* ---------------------------------------------------------------------------------------
 * MIT License
 *
-* Copyright (c) 2023 Davut Coþkun.
+* Copyright (c) 2023 Davut CoÅŸkun.
 * All rights reserved.
 *
 * Permission is hereby granted, free of charge, to any person obtaining
@@ -138,16 +138,6 @@ public:
 
 	bool ReadGameConfig()
 	{
-		/*
-		bütün satýrlarý std::vector<std::string> containerýna koy
-		sonra her satýrý for loop ile araþtýr
-		[] -> her zaman baþlýk
-		baþlýk bulununca baþlýk tipini çöz
-		sonra alt satýra in 
-		alt satýrý for loop ile harf harf çözümle
-		hangi deðiþken olduðunu bul sonra "=" bul ve gameCFG.deðiþken set et
-		*/
-
 		std::ifstream fin(ConfigPath + gameCFG.Name);
 		if (fin.is_open())
 		{

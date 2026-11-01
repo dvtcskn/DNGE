@@ -1,7 +1,7 @@
 #pragma once
 
 #ifndef assimp_Enabled
-#define assimp_Enabled 1
+#define assimp_Enabled 0
 #endif
 
 #if assimp_Enabled
@@ -59,11 +59,6 @@ public:
 public:
 	ModelImporter() = default;
 	~ModelImporter();
-
-	/*
-	* TO DO :
-	* array veya tek olmak üzere ayrý ayrý import ettiðimiz fonksiyonlar yap
-	*/
 
 	std::vector<ModelImporter::ModelImportAttributes> ImportOBJ(const char* Path, const char* FileName, EImportType InImportType = EImportType::Single,
 		bool MakeLeftHanded = true, std::uint32_t flags = 0);
