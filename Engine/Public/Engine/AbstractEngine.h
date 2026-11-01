@@ -3263,8 +3263,7 @@ namespace Engine
 template <typename T>
 inline constexpr bool IsComInterfaceV = std::is_base_of_v<IUnknown, T>;
 
-// to do : Use Fence
-template<typename T, bool bUseFence = false>
+template<typename T, bool bUseFence = true>
 struct TDoubleBuffer
 {
 	TDoubleBuffer() = default;
@@ -3275,6 +3274,16 @@ struct TDoubleBuffer
 
 	void Release()
 	{
+		if constexpr (bUseFence)
+		{
+			for (std::uint64_t& Value : FenceValues)
+			{
+				if (Value != 0)
+					GPU::WaitForCPUFence(Value);
+				Value = 0;
+			}
+		}
+
 		if constexpr (IsComInterfaceV<T>)
 		{
 			First.Reset();
@@ -3291,34 +3300,39 @@ struct TDoubleBuffer
 
 	Type First = nullptr;
 	Type Second = nullptr;
-	std::uint64_t FenceValue = 0;
+	std::uint64_t FenceValues[2] = {};
 
 	T* Get() const
 	{
-		/*if (bUseFence)
-		{
+		const std::uint32_t Index = GPU::GetCurrentBackBufferIndex();
+		const std::uint32_t BufferIndex = Index > 0 ? 0 : 1;
 
+		if constexpr (bUseFence)
+		{
+			if (FenceValues[BufferIndex] != 0)
+				GPU::WaitForCPUFence(FenceValues[BufferIndex]);
 		}
-		else*/
+
+		if constexpr (IsComInterfaceV<T>)
 		{
-			//std::uint32_t FrameIndex = GPU::GetFrameIndex();
-			//std::uint32_t BackBufferSize = GPU::GetBackBufferSize();
-			//std::uint32_t Index = FrameIndex % BackBufferSize;
+			if (Index > 0)
+				return First.Get();
+			return Second.Get();
+		}
+		else
+		{
+			if (Index > 0)
+				return First.get();
+			return Second.get();
+		}
+	}
 
-			std::uint32_t Index = GPU::GetCurrentBackBufferIndex();
-
-			if constexpr (IsComInterfaceV<T>)
-			{
-				if (Index > 0)
-					return First.Get();
-				return Second.Get();
-			}
-			else
-			{
-				if (Index > 0)
-					return First.get();
-				return Second.get();
-			}
+	void SignalFence()
+	{
+		if constexpr (bUseFence)
+		{
+			const std::uint32_t Index = GPU::GetCurrentBackBufferIndex();
+			FenceValues[Index > 0 ? 0 : 1] = GPU::GPUFenceSignal();
 		}
 	}
 };

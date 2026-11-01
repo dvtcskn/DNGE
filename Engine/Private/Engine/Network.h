@@ -35,10 +35,6 @@
 #include "Gameplay/GameInstance.h"
 #include "Engine/StepTimer.h"
 
-#if Enable_ENET
-#include <enet/enet.h>
-#endif
-
 /*
 * Be ready for weird memory leaks during shutdown.
 * Because it has little and incomplete documentation.
@@ -48,11 +44,15 @@
 /*
 * TCP Only, UDP WIP
 */
-#define Enable_Winsock 1
+#define Enable_Winsock 0
 /*
 * WIP
 */
 #define Enable_ENET 0
+
+#if Enable_ENET
+#include <enet/enet.h>
+#endif
 
 #if Enable_Winsock
 #include <windows.h>
@@ -809,6 +809,119 @@ private:
 
 #endif
 
+#if !Enable_GameNetworkingSockets && !Enable_Winsock && !Enable_ENET
+class NullServer : public IServer
+{
+	sClassBody(sClassConstructor, NullServer, IServer)
+public:
+	NullServer()
+	{}
+	virtual ~NullServer()
+	{}
+
+	virtual void Tick(const double DeltaTime) override final
+	{}
+
+	virtual sGameInstance* GetGameInstance() const override final 
+	{
+		return nullptr;
+	}
+
+	virtual bool CreateSession(std::string Name, sGameInstance* Instance, std::string Level, std::uint16_t Port = 27020, std::size_t PlayerCount = 8) override
+	{
+		return false;
+	}
+	virtual bool DestroySession() override
+	{
+		return false;
+	}
+
+	virtual bool IsServerRunning() const override
+	{
+		return false;
+	}
+
+	virtual std::size_t GetPlayerSize() const override
+	{
+		return 0;
+	}
+
+	virtual std::string GetLevel() const override
+	{
+		return "";
+	}
+	virtual bool ChangeLevel(std::string Level) override
+	{
+		return false;
+	}
+
+	virtual void SetServerName(std::string Name) override
+	{
+	}
+
+	virtual void SetMaximumMessagePerTick(std::size_t Size) override
+	{
+	}
+	virtual std::size_t GetMaximumMessagePerTick() const override
+	{
+		return 0;
+	}
+
+	virtual void CallRPC(std::string Address, std::string ClassName, std::string Name, const sArchive& Params, std::optional<bool> reliable = std::nullopt) override
+	{
+	}
+};
+
+class NullClient : public IClient
+{
+	sClassBody(sClassConstructor, NullClient, IClient)
+public:
+	NullClient()
+	{}
+	virtual ~NullClient()
+	{}
+
+	virtual void Tick(const double DeltaTime) override final
+	{}
+
+	virtual sGameInstance* GetGameInstance() const override final
+	{
+		return nullptr;
+	}
+
+	virtual bool Connect(sGameInstance* Instance, std::string ip = "127.0.0.1", std::uint16_t Port = 27020) override
+	{
+		return false;
+	}
+	virtual bool Disconnect() override
+	{
+		return false;
+	}
+
+	virtual bool IsConnected() const override
+	{
+		return false;
+	}
+
+	virtual void SetMaximumMessagePerTick(std::size_t Size) override
+	{
+	}
+	virtual std::size_t GetMaximumMessagePerTick() const override 
+	{
+		return 0;
+	}
+
+	virtual void CallRPC(std::string Address, std::string ClassName, std::string Name, const sArchive& Params, std::optional<bool> reliable = std::nullopt) override
+	{
+	}
+
+	virtual std::uint64_t GetLatency() const override final 
+	{
+		return 0;
+	}
+};
+#endif
+
 namespace
 {
 	IServer::UniquePtr CreateServer()
@@ -817,18 +930,23 @@ namespace
 		return GNSServer::CreateUnique();
 #elif Enable_ENET
 		return ENetServer::CreateUnique();
-#else
+#elif Enable_Winsock
 		return WSServer::CreateUnique();
+#else
+		return NullServer::CreateUnique();
 #endif
 	}
+
 	IClient::UniquePtr CreateClient()
 	{
 #if Enable_GameNetworkingSockets
 		return GNSClient::CreateUnique();
 #elif Enable_ENET
 		return ENetClient::CreateUnique();
-#else
+#elif Enable_Winsock
 		return WSClient::CreateUnique();
+#else
+		return NullClient::CreateUnique();
 #endif
 	}
 }

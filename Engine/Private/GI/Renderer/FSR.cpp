@@ -1147,7 +1147,8 @@ void sFSR::Render(IRenderTarget* Color, IRenderTarget* MotionVectors, IRenderTar
 
         Color->AsResource(EResourceState::NonPixelShaderResource, GraphicsCommandContext.get());
         MotionVectors->AsResource(EResourceState::NonPixelShaderResource, GraphicsCommandContext.get());
-        //Depth->AsResource(EResourceState::NonPixelShaderResource, GraphicsCommandContext.get());
+        //if (Depth)
+        //    Depth->AsResource(EResourceState::ShaderResource, GraphicsCommandContext.get());
         //Output->AsResource(EResourceState::UAV, GraphicsCommandContext.get());
 
         ffx::DispatchDescUpscale DispatchUpscale{};
@@ -1194,6 +1195,8 @@ void sFSR::Render(IRenderTarget* Color, IRenderTarget* MotionVectors, IRenderTar
         bReset = false;
 
         auto Ret = ffx::Dispatch(UpscalingContext, DispatchUpscale);
+
+        //Output->AsResource(EResourceState::ShaderResource, GraphicsCommandContext.get());
 
         //Color->AsRenderTarget(GraphicsCommandContext.get());
         //MotionVectors->AsRenderTarget(GraphicsCommandContext.get());
@@ -1466,6 +1469,7 @@ void sFSR::CopyHudlessTexture(IRenderTarget* HudlessTexture)
     FSRCopyCommandContext->CopyRenderTarget(HudlessTextures.Get(), HudlessTexture);
     FSRCopyCommandContext->FinishRecordCommandList();
     FSRCopyCommandContext->ExecuteCommandList(ECommandContextExecuteType::Deferred, 31);
+    HudlessTextures.SignalFence();
 }
 
 void sFSR::SetRenderSize(std::size_t InWidth, std::size_t InHeight)

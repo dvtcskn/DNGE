@@ -69,7 +69,7 @@ bool VulkanPipeline::Compile(IFrameBuffer* InFrameBuffer)
 	}*/
 	attachments.push_back(FB->DepthTarget->GetView());
 
-	RenderPass = VulkanRenderpass::Create(Owner, Name + "_RenderPass", FB->GetAttachmentInfo());
+	//RenderPass = VulkanRenderpass::Create(Owner, Name + "_RenderPass", FB->GetAttachmentInfo());
 
 	std::vector<VkFormat> colorFormats;
 	VkFormat DepthFormat = static_cast<VulkanDepthTarget*>(FB->GetDepthTarget())->GetVkFormat();
@@ -86,7 +86,7 @@ bool VulkanPipeline::Compile(IFrameBuffer* InFrameBuffer)
 			Info.clearValue = clear;
 			Info.imageView = static_cast<VulkanRenderTarget*>(FB->GetRenderTarget(i))->View;						// The target image view to render into
 			Info.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;	// Expected layout during rendering
-			Info.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;						// Action at the start of the pass
+			Info.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;						// Action at the start of the pass
 			Info.storeOp = VK_ATTACHMENT_STORE_OP_STORE;					// Action at the end of the pass
 			Info.pNext = nullptr;
 			colorFormats.push_back(static_cast<VulkanRenderTarget*>(FB->GetRenderTarget(i))->GetVkFormat());
@@ -100,7 +100,7 @@ bool VulkanPipeline::Compile(IFrameBuffer* InFrameBuffer)
 		Info.clearValue = clearDepth;
 		Info.imageView = static_cast<VulkanDepthTarget*>(FB->GetDepthTarget())->View;                      // The target depth image view
 		Info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;	// Expected layout during rendering
-		Info.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;						// Action at the start of the pass
+		Info.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;						// Action at the start of the pass // VK_ATTACHMENT_LOAD_OP_CLEAR
 		Info.storeOp = VK_ATTACHMENT_STORE_OP_STORE;					// Use DONT_CARE if you don't need it later
 		Info.pNext = nullptr;
 		pDepthAttachment.push_back(Info);
@@ -122,23 +122,22 @@ bool VulkanPipeline::Compile(IFrameBuffer* InFrameBuffer)
 		RenderingInfo.flags = 0;
 	}
 
-	VkFramebufferCreateInfo FramebufferCreateInfo = {};
-	FramebufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-	FramebufferCreateInfo.pNext = NULL;
-	FramebufferCreateInfo.renderPass = RenderPass->Get();
-	FramebufferCreateInfo.pAttachments = attachments.data();
-	FramebufferCreateInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
-	FramebufferCreateInfo.width = FB->GetAttachmentInfo().Desc.Dimensions.X;
-	FramebufferCreateInfo.height = FB->GetAttachmentInfo().Desc.Dimensions.Y;
-	FramebufferCreateInfo.layers = 1;
-	FramebufferCreateInfo.flags = 0;// VK_FRAMEBUFFER_CREATE_IMAGELESS_BIT_KHR;
+	//VkFramebufferCreateInfo FramebufferCreateInfo = {};
+	//FramebufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+	//FramebufferCreateInfo.pNext = NULL;
+	////FramebufferCreateInfo.renderPass = RenderPass->Get();
+	//FramebufferCreateInfo.pAttachments = attachments.data();
+	//FramebufferCreateInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+	//FramebufferCreateInfo.width = FB->GetAttachmentInfo().Desc.Dimensions.X;
+	//FramebufferCreateInfo.height = FB->GetAttachmentInfo().Desc.Dimensions.Y;
+	//FramebufferCreateInfo.layers = 1;
+	//FramebufferCreateInfo.flags = 0;// VK_FRAMEBUFFER_CREATE_IMAGELESS_BIT_KHR;
 
-	FrameBufferDimension.Width = FB->GetAttachmentInfo().Desc.Dimensions.X;
-	FrameBufferDimension.Height = FB->GetAttachmentInfo().Desc.Dimensions.Y;
+	//FrameBufferDimension.Width = FB->GetAttachmentInfo().Desc.Dimensions.X;
+	//FrameBufferDimension.Height = FB->GetAttachmentInfo().Desc.Dimensions.Y;
 
-	vkCreateFramebuffer(Owner->Get(), &FramebufferCreateInfo, nullptr, &FrameBuffer);
+	//vkCreateFramebuffer(Owner->Get(), &FramebufferCreateInfo, nullptr, &FrameBuffer);
 
-	// 2. Create the Dynamic Rendering pipeline extension struct
 	VkPipelineRenderingCreateInfo pipelineRenderingInfo {};
 	pipelineRenderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
 	pipelineRenderingInfo.colorAttachmentCount = (uint32_t)colorFormats.size(); // Matches pColorBlendState->attachmentCount!
@@ -149,7 +148,7 @@ bool VulkanPipeline::Compile(IFrameBuffer* InFrameBuffer)
 	VulkanBlendState BlendState(Desc.BlendAttribute, RenderTargetAttachmentCount);
 	auto Blend = BlendState.Get();
 	PipelineCreateInfo.pColorBlendState = &Blend;
-	PipelineCreateInfo.pNext = &pipelineRenderingInfo; // <--- CRITICAL: This links the missing info
+	PipelineCreateInfo.pNext = &pipelineRenderingInfo;
 
 	CompilePipeline();
 
@@ -178,7 +177,7 @@ bool VulkanPipeline::Compile(IRenderTarget* InRT, IDepthTarget* Depth)
 		AttachmentInfo.DepthFormat = Cast<VulkanDepthTarget>(Depth)->GetFormat();
 	}
 
-	RenderPass = VulkanRenderpass::Create(Owner, Name + "_RenderPass", AttachmentInfo);
+	//RenderPass = VulkanRenderpass::Create(Owner, Name + "_RenderPass", AttachmentInfo);
 
 	std::vector<VkFormat> colorFormats;
 	VkFormat DepthFormat = Depth ? static_cast<VulkanDepthTarget*>(Depth)->GetVkFormat() : VkFormat::VK_FORMAT_UNDEFINED;
@@ -233,7 +232,7 @@ bool VulkanPipeline::Compile(IRenderTarget* InRT, IDepthTarget* Depth)
 		RenderingInfo.flags = 0;
 	}
 
-	VkFramebufferCreateInfo FramebufferCreateInfo = {};
+	/*VkFramebufferCreateInfo FramebufferCreateInfo = {};
 	FramebufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 	FramebufferCreateInfo.pNext = NULL;
 	FramebufferCreateInfo.renderPass = RenderPass->Get();
@@ -241,14 +240,13 @@ bool VulkanPipeline::Compile(IRenderTarget* InRT, IDepthTarget* Depth)
 	FramebufferCreateInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
 	FramebufferCreateInfo.width = RT->GetDesc().Dimensions.X;
 	FramebufferCreateInfo.height = RT->GetDesc().Dimensions.Y;
-	FramebufferCreateInfo.layers = 1;
+	FramebufferCreateInfo.layers = 1;*/
 
-	FrameBufferDimension.Width = RT->GetDesc().Dimensions.X;
-	FrameBufferDimension.Height = RT->GetDesc().Dimensions.Y;
+	//FrameBufferDimension.Width = RT->GetDesc().Dimensions.X;
+	//FrameBufferDimension.Height = RT->GetDesc().Dimensions.Y;
 
-	vkCreateFramebuffer(Owner->Get(), &FramebufferCreateInfo, nullptr, &FrameBuffer);
+	//vkCreateFramebuffer(Owner->Get(), &FramebufferCreateInfo, nullptr, &FrameBuffer);
 
-	// 2. Create the Dynamic Rendering pipeline extension struct
 	VkPipelineRenderingCreateInfo pipelineRenderingInfo{};
 	pipelineRenderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
 	pipelineRenderingInfo.colorAttachmentCount = (uint32_t)colorFormats.size(); // Matches pColorBlendState->attachmentCount!
@@ -259,7 +257,7 @@ bool VulkanPipeline::Compile(IRenderTarget* InRT, IDepthTarget* Depth)
 	VulkanBlendState BlendState(Desc.BlendAttribute, 1);
 	auto Blend = BlendState.Get();
 	PipelineCreateInfo.pColorBlendState = &Blend;
-	PipelineCreateInfo.pNext = &pipelineRenderingInfo; // <--- CRITICAL: This links the missing info
+	PipelineCreateInfo.pNext = &pipelineRenderingInfo;
 
 	CompilePipeline();
 
@@ -290,9 +288,9 @@ bool VulkanPipeline::Compile(std::vector<IRenderTarget*> RTs, IDepthTarget* Dept
 		AttachmentInfo.DepthFormat = Cast<VulkanDepthTarget>(Depth)->GetFormat();
 	}
 
-	RenderPass = VulkanRenderpass::Create(Owner, Name + "_RenderPass", AttachmentInfo);
+	//RenderPass = VulkanRenderpass::Create(Owner, Name + "_RenderPass", AttachmentInfo);
 
-	VkFramebufferCreateInfo FramebufferCreateInfo = {};
+	/*VkFramebufferCreateInfo FramebufferCreateInfo = {};
 	FramebufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 	FramebufferCreateInfo.pNext = NULL;
 	FramebufferCreateInfo.renderPass = RenderPass->Get();
@@ -300,12 +298,12 @@ bool VulkanPipeline::Compile(std::vector<IRenderTarget*> RTs, IDepthTarget* Dept
 	FramebufferCreateInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
 	FramebufferCreateInfo.width = AttachmentInfo.Desc.Dimensions.X;
 	FramebufferCreateInfo.height = AttachmentInfo.Desc.Dimensions.Y;
-	FramebufferCreateInfo.layers = 1;
+	FramebufferCreateInfo.layers = 1;*/
 
-	FrameBufferDimension.Width = AttachmentInfo.Desc.Dimensions.X;
-	FrameBufferDimension.Height = AttachmentInfo.Desc.Dimensions.Y;
+	//FrameBufferDimension.Width = AttachmentInfo.Desc.Dimensions.X;
+	//FrameBufferDimension.Height = AttachmentInfo.Desc.Dimensions.Y;
 
-	vkCreateFramebuffer(Owner->Get(), &FramebufferCreateInfo, nullptr, &FrameBuffer);
+	//vkCreateFramebuffer(Owner->Get(), &FramebufferCreateInfo, nullptr, &FrameBuffer);
 
 	VulkanBlendState BlendState(Desc.BlendAttribute, RTs.size());
 	auto Blend = BlendState.Get();
@@ -673,3 +671,153 @@ bool VulkanComputePipeline::Recompile()
 {
 	return false;
 }
+
+//VulkanRenderpass::VulkanRenderpass(VulkanDevice* InDevice, std::string InName, const sFrameBufferAttachmentInfo& InInfos)
+//	: Name(InName)
+//	, Device(InDevice)
+//	, Info(InInfos)
+//{
+//	auto GetAttachmentInfos = [](std::vector<sFrameBuffer> FrameBuffer) -> std::vector<VkAttachmentDescription>
+//		{
+//			std::vector<VkAttachmentDescription> attachmentDescs;
+//			for (uint32_t i = 0; i < FrameBuffer.size(); i++)
+//			{
+//				attachmentDescs.push_back(VkAttachmentDescription());
+//				attachmentDescs[i].format = ConvertFormat_Format_To_VkFormat(FrameBuffer[i].Format);
+//				attachmentDescs[i].samples = VkSampleCountFlagBits::VK_SAMPLE_COUNT_1_BIT;
+//				attachmentDescs[i].loadOp = VkAttachmentLoadOp::VK_ATTACHMENT_LOAD_OP_CLEAR;
+//				attachmentDescs[i].storeOp = VkAttachmentStoreOp::VK_ATTACHMENT_STORE_OP_STORE;
+//
+//				if (FrameBuffer[i].AttachmentType == EFrameBufferAttachmentType::Depth)
+//				{
+//					attachmentDescs[i].stencilLoadOp = VkAttachmentLoadOp::VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+//					attachmentDescs[i].stencilStoreOp = VkAttachmentStoreOp::VK_ATTACHMENT_STORE_OP_DONT_CARE;
+//
+//					attachmentDescs[i].initialLayout = VkImageLayout::VK_IMAGE_LAYOUT_UNDEFINED;
+//					attachmentDescs[i].finalLayout = VkImageLayout::VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+//				}
+//				else
+//				{
+//					attachmentDescs[i].stencilLoadOp = VkAttachmentLoadOp::VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+//					attachmentDescs[i].stencilStoreOp = VkAttachmentStoreOp::VK_ATTACHMENT_STORE_OP_DONT_CARE;
+//
+//					attachmentDescs[i].initialLayout = VkImageLayout::VK_IMAGE_LAYOUT_UNDEFINED;
+//					attachmentDescs[i].finalLayout = VkImageLayout::VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+//				}
+//			}
+//
+//			return attachmentDescs;
+//		};
+//
+//	std::vector<VkAttachmentDescription> attachmentDescs = GetAttachmentInfos(InInfos.GetAttachments(true));
+//
+//	std::vector<VkAttachmentReference> colorReferences;
+//	VkAttachmentReference depthReference = {};
+//	{
+//		uint32_t AttachmentIndex = 0;
+//		for (const auto& Info : InInfos.FrameBuffer)
+//		{
+//			colorReferences.push_back({ AttachmentIndex, VkImageLayout::VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL });
+//			AttachmentIndex++;
+//		}
+//		if (InInfos.DepthFormat != EFormat::UNKNOWN)
+//		{
+//			depthReference.attachment = AttachmentIndex;
+//			depthReference.layout = VkImageLayout::VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+//		}
+//	}
+//
+//	VkSubpassDescription subpass = {};
+//	subpass.pipelineBindPoint = VkPipelineBindPoint::VK_PIPELINE_BIND_POINT_GRAPHICS;
+//	subpass.pColorAttachments = colorReferences.data();
+//	subpass.colorAttachmentCount = static_cast<uint32_t>(colorReferences.size());
+//
+//	if (InInfos.DepthFormat != EFormat::UNKNOWN)
+//		subpass.pDepthStencilAttachment = &depthReference;
+//
+//	// Use subpass dependencies for attachment layout transitions
+//	/*std::array<vk::SubpassDependency, 2> dependencies;
+//
+//	dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+//	dependencies[0].dstSubpass = 0;
+//	dependencies[0].srcStageMask = vk::PipelineStageFlagBits::eBottomOfPipe;
+//	dependencies[0].dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+//	dependencies[0].srcAccessMask = vk::AccessFlagBits::eMemoryRead;
+//	dependencies[0].dstAccessMask = vk::AccessFlagBits::eColorAttachmentRead | vk::AccessFlagBits::eColorAttachmentWrite;
+//	dependencies[0].dependencyFlags = vk::DependencyFlagBits::eByRegion;
+//
+//	dependencies[1].srcSubpass = 0;
+//	dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+//	dependencies[1].srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+//	dependencies[1].dstStageMask = vk::PipelineStageFlagBits::eBottomOfPipe;
+//	dependencies[1].srcAccessMask = vk::AccessFlagBits::eColorAttachmentRead | vk::AccessFlagBits::eColorAttachmentWrite;
+//	dependencies[1].dstAccessMask = vk::AccessFlagBits::eMemoryRead;
+//	dependencies[1].dependencyFlags = vk::DependencyFlagBits::eByRegion;*/
+//
+//	std::uint32_t NumDependencies = 0;
+//	//VkSubpassDependency SubpassDependencies[2];
+//
+//	// DepthReadSubpass
+//	//{
+//	//	vk::SubpassDependency& SubpassDep = SubpassDependencies[NumDependencies++];
+//	//	SubpassDep.srcSubpass = 0;
+//	//	SubpassDep.dstSubpass = 1;
+//	//	SubpassDep.srcStageMask = vk::PipelineStageFlagBits::eEarlyFragmentTests | vk::PipelineStageFlagBits::eLateFragmentTests; // VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+//	//	SubpassDep.dstStageMask = vk::PipelineStageFlagBits::eFragmentShader; // VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+//	//	SubpassDep.srcAccessMask = vk::AccessFlagBits::eDepthStencilAttachmentWrite; // VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+//	//	SubpassDep.dstAccessMask = vk::AccessFlagBits::eInputAttachmentRead; //VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
+//	//	SubpassDep.dependencyFlags = vk::DependencyFlagBits::eByRegion; 
+//	//}
+//
+//	// Subpass dependencies
+//
+//	std::array<VkSubpassDependency, 2> dependencies;
+//
+//	dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+//	dependencies[0].dstSubpass = 0;
+//	dependencies[0].srcStageMask = VkPipelineStageFlagBits::VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+//	dependencies[0].dstStageMask = VkPipelineStageFlagBits::VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+//	dependencies[0].srcAccessMask = VkAccessFlagBits::VK_ACCESS_MEMORY_READ_BIT;
+//	dependencies[0].dstAccessMask = VkAccessFlagBits::VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VkAccessFlagBits::VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+//	dependencies[0].dependencyFlags = VkDependencyFlagBits::VK_DEPENDENCY_BY_REGION_BIT;
+//
+//	dependencies[1].srcSubpass = 0;
+//	dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+//	dependencies[1].srcStageMask = VkPipelineStageFlagBits::VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+//	dependencies[1].dstStageMask = VkPipelineStageFlagBits::VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+//	dependencies[1].srcAccessMask = VkAccessFlagBits::VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VkAccessFlagBits::VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+//	dependencies[1].dstAccessMask = VkAccessFlagBits::VK_ACCESS_MEMORY_READ_BIT;
+//	dependencies[1].dependencyFlags = VkDependencyFlagBits::VK_DEPENDENCY_BY_REGION_BIT;
+//
+//	//VkSubpassDependency dependency{};
+//	//dependency.srcSubpass = 0;// VK_SUBPASS_EXTERNAL;
+//	//dependency.dstSubpass = 0;
+//	//dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+//	//dependency.srcAccessMask = 0;
+//	//dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+//	//dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+//	//dependency.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT | VK_DEPENDENCY_VIEW_LOCAL_BIT;
+//
+//	VkRenderPassCreateInfo renderPassInfo = {};
+//	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+//	renderPassInfo.pAttachments = attachmentDescs.data();
+//	renderPassInfo.attachmentCount = static_cast<uint32_t>(attachmentDescs.size());
+//	renderPassInfo.subpassCount = 1;
+//	renderPassInfo.pSubpasses = &subpass;
+//	renderPassInfo.dependencyCount = 2;
+//	renderPassInfo.pDependencies = dependencies.data();
+//
+//	//renderPassInfo.dependencyCount = 0;// static_cast<uint32_t>(dependencies.size());
+//	//renderPassInfo.pDependencies = dependencies.data();
+//
+//	vkCreateRenderPass(Device->Get(), &renderPassInfo, nullptr, &RenderPass);
+//}
+//
+//VulkanRenderpass::~VulkanRenderpass()
+//{
+//	if (Device && RenderPass)
+//	{
+//		//vkDestroyRenderPass(Device->Get(), RenderPass, nullptr);
+//	}
+//	Device = nullptr;
+//}

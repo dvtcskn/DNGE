@@ -154,7 +154,7 @@ void sSpriteSheetComponent::Flip(bool value)
 
 	if (bFlip)
 	{
-		SetRelativeRotation(FQuaternion(FAngles(180.0f, 0.0f, 0.0f)));
+		SetRelativeRotation(FQuaternion(FAngles(0.0f, 180.0f, 0.0f)));
 	}
 	else
 	{

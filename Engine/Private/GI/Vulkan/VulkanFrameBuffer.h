@@ -29,7 +29,6 @@
 #include <vector>
 #include "Engine/AbstractEngine.h"
 #include "VulkanDevice.h"
-#include "VulkanRenderPass.h"
 #include "VulkanShaderStates.h"
 #include "VulkanFormat.h"
 
@@ -56,7 +55,7 @@ public:
 	virtual bool IsUAV_Allowed() const override final { return bIsUAVSupported; }
 
 	virtual std::uint32_t GetSRVBindlessIndex() const override final { return HeapIndex; }
-	virtual std::uint32_t GetUAVBindlessIndex() const override final { return std::uint32_t(-1); }
+	virtual std::uint32_t GetUAVBindlessIndex() const override final { return UAVHeapIndex; }
 
 	virtual ResourceSharedHandle* GetSharedHandle() const override final { return nullptr; }
 	virtual bool CopyFrom(IRenderTarget* RenderTarget) override final { return false; }
@@ -79,6 +78,7 @@ private:
 	bool bIsUAVSupported;
 
 	std::uint32_t HeapIndex;
+	std::uint32_t UAVHeapIndex;
 };
 
 class VulkanDepthTarget final : public IDepthTarget

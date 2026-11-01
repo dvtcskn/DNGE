@@ -51,6 +51,7 @@ sCameraManager::sCameraManager(sPlayerController* InOwner)
 	, bCameraFocused(false)
 	, CameraPitchAngle(0.0f)
 	, CameraYawAngle(0.0f)
+	, CameraRollAngle(0.0f)
 	//, MouseSensitivityX(1.0f)
 	//, MouseSensitivityY(1.0f)
 	, ViewportInstance(sViewportInstance::Create())
@@ -312,7 +313,7 @@ void sCameraManager::UpdateCamera(float DeltaTime)
 
 		//Utilities::WriteToConsole(Location.ToString());
 
-		pCamera->SetPosition(Location);
+		pCamera->SetTransform(Location, 0.0f, 0.0f, 0.0f);
 		pCamera->Update();
 	}
 	else
@@ -374,7 +375,7 @@ void sCameraManager::UpdateCamera(float DeltaTime)
 			CameraPitchAngle = std::min(+fPI / 2.0f, CameraPitchAngle);
 		}
 
-		pCamera->SetTransform(vPosDelta, CameraPitchAngle, CameraYawAngle, 0);
+		pCamera->SetTransform(vPosDelta, CameraPitchAngle, CameraYawAngle, CameraRollAngle);
 		pCamera->Update();
 	}
 }
@@ -444,8 +445,17 @@ void sCameraManager::SetViewport(std::optional<sViewport> Viewport)
 
 void sCameraManager::SetRollPitchYaw(const float Roll, const float InPitch, const float InYaw)
 {
+	CameraRollAngle = Roll;
 	CameraPitchAngle = InPitch;
 	CameraYawAngle = InYaw;
+}
+
+void sCameraManager::SetPositionAndRotation(const FVector& Position, const FVector& Rotation)
+{
+	CameraRollAngle = Rotation.X;
+	CameraPitchAngle = Rotation.Y;
+	CameraYawAngle = Rotation.Z;
+	pCamera->SetPositionAndRotation(Position, Rotation);
 }
 
 void sCameraManager::SetMousePosition(FVector2 InLastMousePosition)

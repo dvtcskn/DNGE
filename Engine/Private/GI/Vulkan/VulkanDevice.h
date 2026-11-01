@@ -100,6 +100,7 @@ public:
 	VkDescriptorSetLayout GetBindlessDescriptorSetLayout() const;
 	VkDescriptorSet GetBindlessDescriptorSet() const;
 	void UpdateBindlessImageDescriptor(uint32_t& HeapIndex, VkDescriptorImageInfo* imageInfo);
+	void UpdateBindlessStorageImageDescriptor(uint32_t& HeapIndex, VkDescriptorImageInfo* imageInfo);
 	void UpdateBindlessSamplerDescriptor(uint32_t& HeapIndex, VkDescriptorImageInfo* imageInfo);
 	void UpdateBindlessBufferDescriptor(uint32_t& HeapIndex, VkDescriptorBufferInfo* bufferInfo);
 

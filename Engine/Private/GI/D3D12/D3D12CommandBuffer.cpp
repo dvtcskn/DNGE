@@ -290,6 +290,8 @@ void D3D12CommandBuffer::EndProfile()
 
 		readbackBuffer.Get()->Unmap(0, nullptr);
 
+		readbackBuffer.SignalFence();
+
 		UINT64 deltaTicks = endTime - startTime;
 		double milliseconds = (static_cast<double>(deltaTicks) * 1000.0) / static_cast<double>(timestampFrequency);
 

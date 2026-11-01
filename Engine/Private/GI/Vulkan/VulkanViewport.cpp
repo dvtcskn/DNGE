@@ -156,7 +156,7 @@ void VulkanViewport::InitWindow(ViewportCreateInfo CreateInfo)
 	// NO VSYNC = VSYNC VK_PRESENT_MODE_IMMEDIATE_KHR 
 	// Half VSYNC ? = VK_PRESENT_MODE_FIFO_RELAXED_KHR
 	// FIFO must be supported by all implementations.
-	VkPresentModeKHR swapchain_present_mode = VK_PRESENT_MODE_FIFO_KHR;
+	VkPresentModeKHR swapchain_present_mode = VK_PRESENT_MODE_IMMEDIATE_KHR;
 
 	// Determine the number of VkImage's to use in the swapchain.
 	// Ideally, we desire to own 1 image at a time, the rest of the images can

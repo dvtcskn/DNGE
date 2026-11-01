@@ -313,7 +313,21 @@ public:
 
     inline void SetPosition(const FVector Position, const float Pitch = 0.0f, const float Yaw = 0.0f, const float Roll = 0.0f)
     {
+        SetPositionAndRotation(Position, Pitch, Yaw, Roll);
+    }
+
+    inline void SetPositionAndRotation(const FVector& Position, const FVector& InRotation)
+    {
+        SetPositionAndRotation(Position, InRotation.Y, InRotation.Z, InRotation.X);
+    }
+
+    inline void SetPositionAndRotation(const FVector& Position, const float Pitch, const float Yaw, const float Roll)
+    {
         using namespace DirectX;
+
+        Rotation.X = Roll;
+        Rotation.Y = Pitch;
+        Rotation.Z = Yaw;
 
         // Make a rotation matrix based on the camera's yaw & pitch
         XMMATRIX mCameraRot = XMMatrixRotationRollPitchYaw(Pitch, Yaw, Roll);
@@ -322,10 +336,7 @@ public:
         XMVECTOR vWorldUp = XMVector3TransformCoord(g_XMIdentityR1, mCameraRot);
         XMVECTOR vWorldAhead = XMVector3TransformCoord(g_XMIdentityR2, mCameraRot);
 
-        XMVECTOR vPosDeltaWorld = XMVector3TransformCoord(Position, mCameraRot);
-
-        // Move the eye position 
-        Eye = vPosDeltaWorld;
+        Eye = Position;
 
         // Update the lookAt position based on the eye position
         LookAt = Eye + vWorldAhead;

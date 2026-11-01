@@ -67,6 +67,7 @@ public:
 
 	void SetWorldScale(double sceneScaling, bool zAxisUp = false);
 	void SetRollPitchYaw(const float Roll, const float InPitch, const float InYaw);
+	void SetPositionAndRotation(const FVector& Position, const FVector& Rotation);
 
 	void SetMousePosition(FVector2 LastMousePosition);
 
@@ -166,6 +167,7 @@ private:
 
 	float CameraPitchAngle;
 	float CameraYawAngle;
+	float CameraRollAngle;
 
 	FVector Velocity;
 	FVector Direction;

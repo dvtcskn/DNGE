@@ -247,6 +247,11 @@ D3D12Device::D3D12Device(const GPUCreateInfo& DeviceCreateInfo, std::optional<Vi
 		{
 			debugInterface->EnableDebugLayer();
 
+			ComPtr<ID3D12DeviceRemovedExtendedDataSettings1> dred;
+			D3D12GetDebugInterface(IID_PPV_ARGS(&dred));
+			dred->SetAutoBreadcrumbsEnablement(D3D12_DRED_ENABLEMENT_FORCED_ON);
+			dred->SetPageFaultEnablement(D3D12_DRED_ENABLEMENT_FORCED_ON);
+
 			if (useGPUBasedValidation)
 			{
 				Microsoft::WRL::ComPtr<ID3D12Debug1> debugInterface1;

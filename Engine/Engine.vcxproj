@@ -209,7 +209,6 @@
     <ClInclude Include="Private\GI\Vulkan\VulkanFormat.h" />
     <ClInclude Include="Private\GI\Vulkan\VulkanFrameBuffer.h" />
     <ClInclude Include="Private\GI\Vulkan\VulkanPipeline.h" />
-    <ClInclude Include="Private\GI\Vulkan\VulkanRenderPass.h" />
     <ClInclude Include="Private\GI\Vulkan\VulkanShader.h" />
     <ClInclude Include="Private\GI\Vulkan\VulkanShaderStates.h" />
     <ClInclude Include="Private\GI\Vulkan\VulkanTexture.h" />
@@ -364,7 +363,6 @@
     <ClCompile Include="Private\GI\Vulkan\VulkanFence.cpp" />
     <ClCompile Include="Private\GI\Vulkan\VulkanFrameBuffer.cpp" />
     <ClCompile Include="Private\GI\Vulkan\VulkanPipeline.cpp" />
-    <ClCompile Include="Private\GI\Vulkan\VulkanRenderPass.cpp" />
     <ClCompile Include="Private\GI\Vulkan\VulkanShader.cpp" />
     <ClCompile Include="Private\GI\Vulkan\VulkanTexture.cpp" />
     <ClCompile Include="Private\GI\Vulkan\VulkanViewport.cpp" />

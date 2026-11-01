@@ -29,7 +29,30 @@
 #include "Engine/ClassBody.h"
 #include "Engine/AbstractEngine.h"
 #include "VulkanDevice.h"
-#include "VulkanRenderPass.h"
+
+//class VulkanRenderpass
+//{
+//	sBaseClassBody(sClassConstructor, VulkanRenderpass)
+//public:
+//	VulkanRenderpass(VulkanDevice* InDevice, std::string InName, const sFrameBufferAttachmentInfo& InInfos);
+//
+//public:
+//	virtual ~VulkanRenderpass();
+//
+//	FORCEINLINE const VkRenderPass& Get() {
+//		return RenderPass;
+//	};
+//	FORCEINLINE std::uint32_t SubpassIndex() {
+//		return 0;
+//	};
+//
+//	sFrameBufferAttachmentInfo Info;
+//
+//private:
+//	VulkanDevice* Device;
+//	VkRenderPass RenderPass;
+//	std::string Name;
+//};
 
 class VulkanPipeline final : public IPipeline
 {
@@ -39,11 +62,11 @@ public:
 
 	virtual ~VulkanPipeline()
 	{
-		vkDestroyFramebuffer(Owner->Get(), FrameBuffer, nullptr);
+		//vkDestroyFramebuffer(Owner->Get(), FrameBuffer, nullptr);
 		vkDestroyPipeline(Owner->Get(), Pipeline, nullptr);
 		if (PipelineCache != VK_NULL_HANDLE)
 			vkDestroyPipelineCache(Owner->Get(), PipelineCache, nullptr);
-		RenderPass = nullptr;
+		//RenderPass = nullptr;
 		Compiled = false;
 		Owner = nullptr;
 	}
@@ -67,9 +90,9 @@ public:
 
 	virtual bool Recompile() override final;
 
-	VkFramebuffer FrameBuffer;
-	VulkanRenderpass::SharedPtr RenderPass;
-	sDimension2D FrameBufferDimension;
+	//VkFramebuffer FrameBuffer;
+	//VulkanRenderpass::SharedPtr RenderPass;
+	//sDimension2D FrameBufferDimension;
 
 	VkRenderingInfo RenderingInfo;
 

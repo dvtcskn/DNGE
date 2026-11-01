@@ -76,12 +76,12 @@ ECommandContextBeginResult VulkanCommandBuffer::BeginRecordCommandList(const ECo
 	}
 	if (State == ECommandContextState::Begin)
 	{
-		/*if (bIsRenderPassActive)
+		if (bIsRenderPassActive)
 		{
 			vkCmdEndRendering(CommandBuffer);
 			//vkCmdEndRenderPass(CommandBuffer);
 			bIsRenderPassActive = false;
-		}*/
+		}
 		return ECommandContextBeginResult::AlreadyStarted;
 	}
 	if (State == ECommandContextState::WaitingForExecute)
@@ -205,6 +205,9 @@ void VulkanCommandBuffer::OnExecuteCommandList(std::uint64_t FenceValue)
 
 void VulkanCommandBuffer::TransitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, VkImageSubresourceRange subresourceRange)
 {
+	if (oldLayout == newLayout)
+		return;
+
 	VkImageMemoryBarrier2 barrier{};
 	barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
 	barrier.pNext = nullptr;
@@ -215,20 +218,54 @@ void VulkanCommandBuffer::TransitionImageLayout(VkImage image, VkImageLayout old
 	barrier.image = image;
 	barrier.subresourceRange = subresourceRange;
 
-	// Configure 64-bit stages and access masks for synchronization2
-	if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL) {
-		barrier.srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
-		barrier.srcAccessMask = VK_ACCESS_2_NONE;
-		barrier.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-		barrier.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
-	}
-	else if (oldLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
-		barrier.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-		barrier.srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
-		barrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
-		barrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
-	}
-	// Add additional transitions (e.g., General -> Shader Read, etc.) as your engine expands
+	auto GetStageMask = [](VkImageLayout layout) -> VkPipelineStageFlags2
+	{
+		switch (layout)
+		{
+		case VK_IMAGE_LAYOUT_UNDEFINED:
+			return VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
+		case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+			return VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+		case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+			return VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
+		case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+			return VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+		case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+		case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+			return VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+		case VK_IMAGE_LAYOUT_GENERAL:
+			return VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+		default:
+			return VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+		}
+	};
+	auto GetAccessMask = [](VkImageLayout layout) -> VkAccessFlags2
+	{
+		switch (layout)
+		{
+		case VK_IMAGE_LAYOUT_UNDEFINED:
+			return VK_ACCESS_2_NONE;
+		case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+			return VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+		case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+			return VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+		case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+			return VK_ACCESS_2_SHADER_READ_BIT;
+		case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+			return VK_ACCESS_2_TRANSFER_READ_BIT;
+		case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+			return VK_ACCESS_2_TRANSFER_WRITE_BIT;
+		case VK_IMAGE_LAYOUT_GENERAL:
+			return VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT;
+		default:
+			return VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT;
+		}
+	};
+
+	barrier.srcStageMask = GetStageMask(oldLayout);
+	barrier.srcAccessMask = GetAccessMask(oldLayout);
+	barrier.dstStageMask = GetStageMask(newLayout);
+	barrier.dstAccessMask = GetAccessMask(newLayout);
 
 	// Package the barrier into a VkDependencyInfo structure
 	VkDependencyInfo dependencyInfo{};
@@ -324,6 +361,9 @@ void VulkanCommandBuffer::Set32BitConstant(std::uint32_t RootParameterIndex, std
 
 void VulkanCommandBuffer::Set32BitConstants(std::uint32_t RootParameterIndex, const void* pSrcData, std::uint32_t Num32BitValuesToSet, std::uint32_t DestOffsetIn32BitValues)
 {
+	// Wrong
+	// to do fix
+	return;
 	vkCmdPushConstants(CommandBuffer, Pipeline->GetLayout(), VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, DestOffsetIn32BitValues, Num32BitValuesToSet * sizeof(std::uint32_t), &pSrcData);
 }
 
@@ -410,28 +450,162 @@ void VulkanCommandBuffer::SetScissorRect(std::uint32_t X, std::uint32_t Y, std::
 void VulkanCommandBuffer::SetStencilRef(std::uint32_t Ref)
 {
 	StencilRef = Ref;
-	//CommandBuffer.setStencilReference(vk::StencilFaceFlagBits::eVkStencilFrontAndBack, StencilRef);
+	vkCmdSetStencilReference(CommandBuffer, VK_STENCIL_FACE_FRONT_AND_BACK, StencilRef);
 }
 
 void VulkanCommandBuffer::ClearFrameBuffer(IFrameBuffer* pFB)
 {
-	//CommandBuffer.clearAttachments();
+	if (bIsRenderPassActive)
+	{
+		std::vector<VkClearAttachment> ClearAttachments;
+		for (auto& RT : pFB->GetRenderTargets())
+		{
+			VkClearAttachment clearAttachment{};
+			clearAttachment.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;		// Use VK_IMAGE_ASPECT_COLOR_BIT for color
+			clearAttachment.colorAttachment = 0;						// Ignored for depth/stencil; index of color attachment if clearing color
+			clearAttachment.clearValue.color = { 0.0f, 0.0f, 0.0f, 1.0f };		// RGBA clear value
+			ClearAttachments.push_back(clearAttachment);
+		}
+
+		if (pFB->GetDepthTarget())
+		{
+			VkClearAttachment clearAttachment{};
+			clearAttachment.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;		// Use VK_IMAGE_ASPECT_DEPTH_BIT for depth
+			clearAttachment.colorAttachment = 0;						// Ignored for depth/stencil; index of color attachment if clearing color
+			clearAttachment.clearValue.depthStencil = { 0.0f, 0 };		// 0.0f for Reverse-Z depth clear
+			ClearAttachments.push_back(clearAttachment);
+		}
+
+		auto Info = pFB->GetAttachmentInfo();
+		VkClearRect clearRect{};
+		clearRect.rect.offset = { 0, 0 };
+		clearRect.rect.extent = { Info.Desc.Dimensions.X, Info.Desc.Dimensions.Y };
+		clearRect.baseArrayLayer = 0;
+		clearRect.layerCount = 1;									// Covers single layer (or all layers in a cubemap/array)
+
+		vkCmdClearAttachments(
+			CommandBuffer,
+			(std::uint32_t)ClearAttachments.size(),         // attachmentCount
+			ClearAttachments.data(),						// pAttachments
+			1,												// rectCount
+			&clearRect										// pRects
+		);
+	}
+	else
+	{
+		VkClearColorValue clearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
+
+		VkImageSubresourceRange COLOR_Range{};
+		COLOR_Range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		COLOR_Range.baseMipLevel = 0;
+		COLOR_Range.levelCount = 1;
+		COLOR_Range.baseArrayLayer = 0;
+		COLOR_Range.layerCount = 1;
+
+		for (auto& RT : pFB->GetRenderTargets())
+		{
+			VulkanRenderTarget* Texture = static_cast<VulkanRenderTarget*>(RT);
+			Texture->AsResource(EResourceState::Common, this);
+			vkCmdClearColorImage(CommandBuffer, Texture->Image, Texture->CurrentLayout, &clearColor, 1, &COLOR_Range);
+		}
+
+		if (pFB->GetDepthTarget())
+		{
+			VkImageSubresourceRange DEPTH_Range{};
+			DEPTH_Range.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+			DEPTH_Range.baseMipLevel = 0;
+			DEPTH_Range.levelCount = 1;
+			DEPTH_Range.baseArrayLayer = 0;
+			DEPTH_Range.layerCount = 1;
+			VkClearDepthStencilValue ClearDepthStencilValue = { 0.0f, 0 };
+			VulkanDepthTarget* Depth = static_cast<VulkanDepthTarget*>(pFB->GetDepthTarget());
+			TransitionImageLayout(Depth->Image, Depth->CurrentLayout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, DEPTH_Range);
+			Depth->CurrentLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+			vkCmdClearDepthStencilImage(CommandBuffer, Depth->Image, Depth->CurrentLayout, &ClearDepthStencilValue, 1, &DEPTH_Range);
+		}
+	}
 }
 
-void VulkanCommandBuffer::ClearRenderTarget(IRenderTarget* pFB, IDepthTarget* DepthTarget)
+void VulkanCommandBuffer::ClearRenderTarget(IRenderTarget* pRT, IDepthTarget* DepthTarget)
 {
-	//CommandBuffer.clearColorImage();
+	VkClearColorValue clearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
+
+	VkImageSubresourceRange COLOR_Range{};
+	COLOR_Range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	COLOR_Range.baseMipLevel = 0;
+	COLOR_Range.levelCount = 1;
+	COLOR_Range.baseArrayLayer = 0;
+	COLOR_Range.layerCount = 1;
+
+	VulkanRenderTarget* Texture = static_cast<VulkanRenderTarget*>(pRT);
+	Texture->AsResource(EResourceState::Common, this);
+	vkCmdClearColorImage(CommandBuffer, Texture->Image, Texture->CurrentLayout, &clearColor, 1, &COLOR_Range);
+
+	if (DepthTarget)
+	{
+		VkImageSubresourceRange DEPTH_Range{};
+		DEPTH_Range.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+		DEPTH_Range.baseMipLevel = 0;
+		DEPTH_Range.levelCount = 1;
+		DEPTH_Range.baseArrayLayer = 0;
+		DEPTH_Range.layerCount = 1;
+		VkClearDepthStencilValue ClearDepthStencilValue = { 0.0f, 0 };
+		VulkanDepthTarget* Depth = static_cast<VulkanDepthTarget*>(DepthTarget);
+		TransitionImageLayout(Depth->Image, Depth->CurrentLayout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, DEPTH_Range);
+		Depth->CurrentLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+		vkCmdClearDepthStencilImage(CommandBuffer, Depth->Image, Depth->CurrentLayout, &ClearDepthStencilValue, 1, &DEPTH_Range);
+	}
 }
 
 void VulkanCommandBuffer::ClearRenderTargets(std::vector<IRenderTarget*> pRTs, IDepthTarget* DepthTarget)
 {
-	Engine::WriteToConsole("Unimplemented VulkanCommandBuffer::ClearRenderTargets");
-	//CommandBuffer.clearColorImage();
+	VkClearColorValue clearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
+
+	VkImageSubresourceRange COLOR_Range{};
+	COLOR_Range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	COLOR_Range.baseMipLevel = 0;
+	COLOR_Range.levelCount = 1;
+	COLOR_Range.baseArrayLayer = 0;
+	COLOR_Range.layerCount = 1;
+
+	for (auto& RT : pRTs)
+	{
+		VulkanRenderTarget* Texture = static_cast<VulkanRenderTarget*>(RT);
+		Texture->AsResource(EResourceState::Common, this);
+		vkCmdClearColorImage(CommandBuffer, Texture->Image, Texture->CurrentLayout, &clearColor, 1, &COLOR_Range);
+	}
+
+	if (DepthTarget)
+	{
+		VkImageSubresourceRange DEPTH_Range{};
+		DEPTH_Range.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+		DEPTH_Range.baseMipLevel = 0;
+		DEPTH_Range.levelCount = 1;
+		DEPTH_Range.baseArrayLayer = 0;
+		DEPTH_Range.layerCount = 1;
+		VkClearDepthStencilValue ClearDepthStencilValue = { 0.0f, 0 };
+		VulkanDepthTarget* Depth = static_cast<VulkanDepthTarget*>(DepthTarget);
+		TransitionImageLayout(Depth->Image, Depth->CurrentLayout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, DEPTH_Range);
+		Depth->CurrentLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+		vkCmdClearDepthStencilImage(CommandBuffer, Depth->Image, Depth->CurrentLayout, &ClearDepthStencilValue, 1, &DEPTH_Range);
+	}
 }
 
 void VulkanCommandBuffer::ClearDepthTarget(IDepthTarget* DepthTarget)
 {
-	//CommandBuffer.clearDepthStencilImage();
+	VkClearColorValue clearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
+
+	VkImageSubresourceRange DEPTH_Range{};
+	DEPTH_Range.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+	DEPTH_Range.baseMipLevel = 0;
+	DEPTH_Range.levelCount = 1;
+	DEPTH_Range.baseArrayLayer = 0;
+	DEPTH_Range.layerCount = 1;
+	VkClearDepthStencilValue ClearDepthStencilValue = { 0.0f, 0 };
+	VulkanDepthTarget* Depth = static_cast<VulkanDepthTarget*>(DepthTarget);
+	TransitionImageLayout(Depth->Image, Depth->CurrentLayout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, DEPTH_Range);
+	Depth->CurrentLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+	vkCmdClearDepthStencilImage(CommandBuffer, Depth->Image, Depth->CurrentLayout, &ClearDepthStencilValue, 1, &DEPTH_Range);
 }
 
 void VulkanCommandBuffer::SetFrameBuffer(IFrameBuffer* pFB, std::optional<std::size_t> FBOIndex)

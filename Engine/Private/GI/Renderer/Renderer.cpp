@@ -202,6 +202,7 @@ public:
 	{
 		TimeBuffer.Time += (float)DeltaTime;
 		TimeCB.Get()->Map(&TimeBuffer);
+		TimeCB.SignalFence();
 	}
 
 	sIndirectLayoutBindingDesc GetIndirectLayoutBindingDesc() const
@@ -670,13 +671,14 @@ public:
 
 		CameraBuffer.MipBias = MipBias;
 		CameraCBs[index].Get()->Map(&CameraBuffer, CMD);
+		CameraCBs[index].SignalFence();
 	}
 	
 	void AddCameraConstantBuffer(std::size_t Count = 1)
 	{
 		for (std::size_t i = 0; i < Count; i++)
 		{
-			TDoubleBuffer<IConstantBuffer> DoubleBuffer;
+			TDoubleBuffer<IConstantBuffer, true> DoubleBuffer;
 			{
 				BufferLayout BufferDesc;
 				BufferDesc.Size = sizeof(sCameraBuffer);
@@ -755,7 +757,7 @@ private:
 	sMaterial::SharedPtr DefaultEngineMat;
 	sMaterialInstance::SharedPtr DefaultMatInstance;
 
-	std::vector<TDoubleBuffer<IConstantBuffer>> CameraCBs;
+	std::vector<TDoubleBuffer<IConstantBuffer, true>> CameraCBs;
 
 	bool bForceRecompileMaterials;
 	std::vector<sMaterialInstance*> MaterialsToRecompile;
@@ -777,7 +779,7 @@ private:
 		float Time;
 	};
 	sTimeBuffer TimeBuffer;
-	TDoubleBuffer<IConstantBuffer> TimeCB;
+	TDoubleBuffer<IConstantBuffer, true> TimeCB;
 	//static_assert((sizeof(sTimeBuffer) % 256) == 0, "Constant Buffer size must be 256-byte aligned");
 	sScreenDimension CustomScreenDimension;
 	float MipBias;
@@ -1090,7 +1092,7 @@ void sRenderer::Render()
 			if (!ViewportInstance->bIsEnabled)
 				continue;
 
-			if (GBufferClearMode == ERendererClear::Sky && GPU::GetGIType() == EGITypes::D3D12)
+			if (GBufferClearMode == ERendererClear::Sky)
 			{
 				//SkyDome->UpdateCameraBuffer(ViewportInstance->pCamera->GetViewProjMatrix());
 				//PostProcessRenderer->Render(GBuffer->GetCommandContext(), SkyDome.get(), FinalRenderTarget, ViewportInstance->Viewport);
@@ -1250,6 +1252,7 @@ void sRenderer::OnResizeWindow(std::size_t InWidth, std::size_t InHeight)
 	PostProcessRenderer->SetRenderSize(ScreenDimension.Width, ScreenDimension.Height);
 	CanvasRenderer->SetRenderSize(ScreenDimension.Width, ScreenDimension.Height);
 	ToneMapping->SetFrameBufferSize(ScreenDimension.Width, ScreenDimension.Height);
+	//SkyDome->SetFrameBufferSize(ScreenDimension.Width, ScreenDimension.Height);
 	if (FSR)
 	{
 		FSR->SetRenderSize(ScreenDimension.Width, ScreenDimension.Height);

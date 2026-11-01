@@ -40,6 +40,7 @@ VulkanRenderTarget::VulkanRenderTarget(VulkanDevice* InOwner, const std::string 
 	, bIsUAVSupported(false)
 	, CurrentLayout(VkImageLayout::VK_IMAGE_LAYOUT_UNDEFINED)
 	, HeapIndex(std::uint32_t(-1))
+	, UAVHeapIndex(std::uint32_t(-1))
 {
 	bIsSRVSupported = InDesc.AttachmentType == EFrameBufferAttachmentType::RT_SRV || InDesc.AttachmentType == EFrameBufferAttachmentType::RT_SRV_UAV;
 	bIsUAVSupported = InDesc.AttachmentType == EFrameBufferAttachmentType::RT_UAV || InDesc.AttachmentType == EFrameBufferAttachmentType::RT_SRV_UAV;
@@ -55,21 +56,14 @@ VulkanRenderTarget::VulkanRenderTarget(VulkanDevice* InOwner, const std::string 
 	imageInfo.format = VulkanFormat;
 	imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL; // Optimal tiling for GPU access
 	imageInfo.initialLayout = CurrentLayout; // Will transition later
-	imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT; // As render target and texture
+	imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 	imageInfo.samples = VK_SAMPLE_COUNT_1_BIT; // No MSAA
 	imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
 	if (bIsSRVSupported)
-	{
-		imageInfo.usage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-	}
-	/*if (bIsUAVSupported)
-	{
-		if (bIsSRVSupported)
-			imageInfo.usage |= VK_IMAGE_USAGE_STORAGE_BIT;
-		else
-			imageInfo.usage |= VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-	}*/
+		imageInfo.usage |= VK_IMAGE_USAGE_SAMPLED_BIT;
+	if (bIsUAVSupported)
+		imageInfo.usage |= VK_IMAGE_USAGE_STORAGE_BIT;
 
 	if (vkCreateImage(InOwner->Get(), &imageInfo, nullptr, &Image) != VK_SUCCESS)
 		throw std::runtime_error("Failed to create image!");
@@ -88,51 +82,36 @@ VulkanRenderTarget::VulkanRenderTarget(VulkanDevice* InOwner, const std::string 
 
 	vkBindImageMemory(InOwner->Get(), Image, Memory, 0);
 
+	VkImageViewCreateInfo viewInfo{};
+	viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	viewInfo.image = Image;
+	viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	viewInfo.format = VulkanFormat;
+	viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	viewInfo.subresourceRange.baseMipLevel = 0;
+	viewInfo.subresourceRange.levelCount = 1;
+	viewInfo.subresourceRange.baseArrayLayer = 0;
+	viewInfo.subresourceRange.layerCount = 1;
+
+	if (vkCreateImageView(InOwner->Get(), &viewInfo, nullptr, &View) != VK_SUCCESS)
+		throw std::runtime_error("Failed to create image view!");
+
 	if (bIsSRVSupported)
 	{
-		// Create VkImageView
-		VkImageViewCreateInfo viewInfo{};
-		viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-		viewInfo.image = Image;
-		viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D; // Assuming a 2D image
-		viewInfo.format = VulkanFormat;
-
-		// Specify how the image will be used
-		viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		viewInfo.subresourceRange.baseMipLevel = 0;
-		viewInfo.subresourceRange.levelCount = 1;
-		viewInfo.subresourceRange.baseArrayLayer = 0;
-		viewInfo.subresourceRange.layerCount = 1;
-
-		if (vkCreateImageView(InOwner->Get(), &viewInfo, nullptr, &View) != VK_SUCCESS)
-			throw std::runtime_error("Failed to create image view!");
-
-		{
-			DescriptorImageInfo.imageLayout = VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			DescriptorImageInfo.imageView = View;
-			VulkanStaticSamplerState Sampler = VulkanStaticSamplerState(sSamplerAttributeDesc(ESamplerStateMode::AnisotropicWrap));
-			DescriptorImageInfo.sampler = Sampler.Get(InOwner->Get());
-			Owner->UpdateBindlessImageDescriptor(HeapIndex, &DescriptorImageInfo);
-		}
+		DescriptorImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		DescriptorImageInfo.imageView = View;
+		VulkanStaticSamplerState Sampler = VulkanStaticSamplerState(sSamplerAttributeDesc(ESamplerStateMode::AnisotropicWrap));
+		DescriptorImageInfo.sampler = Sampler.Get(InOwner->Get());
+		Owner->UpdateBindlessImageDescriptor(HeapIndex, &DescriptorImageInfo);
 	}
 
-	/*if (bIsUAVSupported)
+	if (bIsUAVSupported)
 	{
-		// Create VkImageView
-		VkImageViewCreateInfo UAV_viewInfo{};
-		UAV_viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-		UAV_viewInfo.image = Image;
-		UAV_viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-		UAV_viewInfo.format = VulkanFormat;
-		UAV_viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		UAV_viewInfo.subresourceRange.baseMipLevel = 0;
-		UAV_viewInfo.subresourceRange.levelCount = 1;
-		UAV_viewInfo.subresourceRange.baseArrayLayer = 0;
-		UAV_viewInfo.subresourceRange.layerCount = 1;
-
-		if (vkCreateImageView(InOwner->Get(), &UAV_viewInfo, nullptr, &UAV_View) != VK_SUCCESS)
-			throw std::runtime_error("Failed to create UAV image view!");
-	}*/
+		VkDescriptorImageInfo UAVDescriptorImageInfo{};
+		UAVDescriptorImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+		UAVDescriptorImageInfo.imageView = View;
+		Owner->UpdateBindlessStorageImageDescriptor(UAVHeapIndex, &UAVDescriptorImageInfo);
+	}
 
 	{
 		std::string STR = std::string("VulkanRenderTarget::") + Name.c_str();
@@ -152,12 +131,6 @@ VulkanRenderTarget::~VulkanRenderTarget()
 
 void VulkanRenderTarget::AsResource(EResourceState ResourceState, IGraphicsCommandContext* GraphicsCommandContext)
 {
-	/*VulkanCommandBuffer* CommandContext = Owner->GetIMCommandList();
-	CommandContext->BeginRecordCommandList();
-	CommandContext->TransitionTo(this, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-	CommandContext->FinishRecordCommandList();
-	CommandContext->ExecuteCommandList(); */
-
 	VkImageSubresourceRange COLOR_Range{};
 	COLOR_Range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	COLOR_Range.baseMipLevel = 0;
@@ -165,20 +138,12 @@ void VulkanRenderTarget::AsResource(EResourceState ResourceState, IGraphicsComma
 	COLOR_Range.baseArrayLayer = 0;
 	COLOR_Range.layerCount = 1;
 
-	/*bool bUseIM = false;
-	if (!GraphicsCommandContext)
-	{
-		bUseIM = true;
-		GraphicsCommandContext = Owner->GetIMCommandList();
-		GraphicsCommandContext->BeginRecordCommandList();
-	}*/
-
 	switch (ResourceState)
 	{
 	case EResourceState::Common:
 	{
 		VulkanCommandBuffer* CommandContext = static_cast<VulkanCommandBuffer*>(GraphicsCommandContext);
-		//CommandContext->TransitionTo(this, D3D12_RESOURCE_STATE_COMMON);
+		CommandContext->TransitionImageLayout(Image, CurrentLayout, VK_IMAGE_LAYOUT_GENERAL, COLOR_Range);
 		CurrentLayout = VK_IMAGE_LAYOUT_GENERAL;
 	}
 	break;
@@ -204,24 +169,18 @@ void VulkanRenderTarget::AsResource(EResourceState ResourceState, IGraphicsComma
 	case EResourceState::NonPixelShaderResource:
 	{
 		VulkanCommandBuffer* CommandContext = static_cast<VulkanCommandBuffer*>(GraphicsCommandContext);
-		CommandContext->TransitionImageLayout(Image, CurrentLayout, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL /* | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE*/, COLOR_Range);
+		CommandContext->TransitionImageLayout(Image, CurrentLayout, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, COLOR_Range);
 		CurrentLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	}
 	break;
 	case EResourceState::UAV:
 	{
 		VulkanCommandBuffer* CommandContext = static_cast<VulkanCommandBuffer*>(GraphicsCommandContext);
-		CommandContext->TransitionImageLayout(Image, CurrentLayout, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, COLOR_Range);
-		CurrentLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		CommandContext->TransitionImageLayout(Image, CurrentLayout, VK_IMAGE_LAYOUT_GENERAL, COLOR_Range);
+		CurrentLayout = VK_IMAGE_LAYOUT_GENERAL;
 	}
 	break;
 	}
-
-	/*if (bUseIM)
-	{
-		GraphicsCommandContext->FinishRecordCommandList();
-		GraphicsCommandContext->ExecuteCommandList();
-	}*/
 }
 
 VulkanDepthTarget::VulkanDepthTarget(VulkanDevice* InOwner, const std::string InName, const EFormat InFormat, const sFBODesc& InDesc)
@@ -333,14 +292,10 @@ VulkanDepthTarget::~VulkanDepthTarget()
 
 void VulkanDepthTarget::AsResource(EResourceState ResourceState, IGraphicsCommandContext* GraphicsCommandContext)
 {
-	/*VulkanCommandBuffer* CommandContext = Owner->GetIMCommandList();
-	CommandContext->BeginRecordCommandList();
-	CommandContext->TransitionTo(this, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-	CommandContext->FinishRecordCommandList();
-	CommandContext->ExecuteCommandList(); */
-
 	VkImageSubresourceRange DEPTH_Range{};
 	DEPTH_Range.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+	if (IsValidVulkanDepthStencilFormat(GetVulkanDepthFormat(Format)))
+		DEPTH_Range.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
 	DEPTH_Range.baseMipLevel = 0;
 	DEPTH_Range.levelCount = 1;
 	DEPTH_Range.baseArrayLayer = 0;
@@ -368,14 +323,13 @@ void VulkanDepthTarget::AsResource(EResourceState ResourceState, IGraphicsComman
 	}
 	break;
 	case EResourceState::ShaderResource:
+	case EResourceState::NonPixelShaderResource:
 	{
 		VulkanCommandBuffer* CommandContext = static_cast<VulkanCommandBuffer*>(GraphicsCommandContext);
 		CommandContext->TransitionImageLayout(Image, CurrentLayout, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, DEPTH_Range);
 		CurrentLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	}
 	break;
-	case EResourceState::NonPixelShaderResource:
-		break;
 	case EResourceState::UAV:
 		break;
 	}

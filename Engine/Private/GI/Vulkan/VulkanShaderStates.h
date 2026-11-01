@@ -90,6 +90,7 @@ public:
 		RasterizationState.depthBiasClamp = InDesc.DepthBiasClamp;
 		RasterizationState.depthBiasSlopeFactor = InDesc.SlopeScaleDepthBias;
 		RasterizationState.lineWidth = 1.0f;
+		//RasterizationState.pNext = &PipelineRasterizationStateRasterizationOrderAMD;
 	}
 
 	VkPipelineRasterizationStateCreateInfo Get() const { return RasterizationState; }
@@ -662,6 +663,21 @@ public:
 		ImageHeapLocation++;
 	}
 
+	void WriteStorageImageDescriptor(uint32_t& HeapIndex, VkDescriptorImageInfo* imageInfo)
+	{
+		VkWriteDescriptorSet writeDescriptorSet{};
+		writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writeDescriptorSet.dstSet = globalBindlessSet;
+		writeDescriptorSet.dstBinding = 3;
+		writeDescriptorSet.dstArrayElement = StorageImageHeapLocation;
+		writeDescriptorSet.descriptorCount = 1;
+		writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+		writeDescriptorSet.pImageInfo = imageInfo;
+
+		vkUpdateDescriptorSets(Device->Get(), 1, &writeDescriptorSet, 0, nullptr);
+		HeapIndex = StorageImageHeapLocation++;
+	}
+
 	// SamplerState
 	void WriteSamplerDescriptor(uint32_t& HeapIndex, VkDescriptorImageInfo* imageInfo)
 	{
@@ -712,6 +728,7 @@ public:
 
 	//std::uint32_t HeapLocation = 0;
 	std::uint32_t ImageHeapLocation = 0;
+	std::uint32_t StorageImageHeapLocation = 0;
 	std::uint32_t SamplerHeapLocation = 0;
 	std::uint32_t BufferHeapLocation = 0;
 
@@ -755,6 +772,7 @@ private:
 			BindlessBinding(0, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,  n),   // Texture2D[]
 			BindlessBinding(1, VK_DESCRIPTOR_TYPE_SAMPLER,        n),   // SamplerState[]
 			BindlessBinding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, n),   // ByteAddressBuffer[]
+			BindlessBinding(3, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,  n),   // RWTexture2D[]
 		};
 	}
 
@@ -777,6 +795,8 @@ private:
 				return std::min(p12.maxDescriptorSetUpdateAfterBindSamplers, p12.maxPerStageDescriptorUpdateAfterBindSamplers);
 			case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
 				return std::min(p12.maxDescriptorSetUpdateAfterBindSampledImages, p12.maxPerStageDescriptorUpdateAfterBindSampledImages);
+			case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
+				return std::min(p12.maxDescriptorSetUpdateAfterBindStorageImages, p12.maxPerStageDescriptorUpdateAfterBindStorageImages);
 			case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:
 				return std::min(p12.maxDescriptorSetUpdateAfterBindStorageBuffers, p12.maxPerStageDescriptorUpdateAfterBindStorageBuffers);
 			case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:

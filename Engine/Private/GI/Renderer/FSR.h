@@ -161,7 +161,7 @@ private:
     bool bGenerateReactiveMask = false;
     std::mutex Mutex;
 
-    TDoubleBuffer<IRenderTarget> HudlessTextures;
+    TDoubleBuffer<IRenderTarget, true> HudlessTextures;
 
 private:
     // FSR

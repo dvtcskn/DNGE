@@ -466,9 +466,6 @@
     <ClInclude Include="Private\GI\Vulkan\VulkanFormat.h">
       <Filter>GI\Private\Vulkan</Filter>
     </ClInclude>
-    <ClInclude Include="Private\GI\Vulkan\VulkanRenderPass.h">
-      <Filter>GI\Private\Vulkan</Filter>
-    </ClInclude>
     <ClInclude Include="Private\GI\Shared\ShaderCompiler.h">
       <Filter>GI\Private\Shared</Filter>
     </ClInclude>
@@ -751,9 +748,6 @@
       <Filter>GI\Private\Vulkan</Filter>
     </ClCompile>
     <ClCompile Include="Private\GI\Vulkan\VulkanException.cpp">
-      <Filter>GI\Private\Vulkan</Filter>
-    </ClCompile>
-    <ClCompile Include="Private\GI\Vulkan\VulkanRenderPass.cpp">
       <Filter>GI\Private\Vulkan</Filter>
     </ClCompile>
     <ClCompile Include="Private\GI\Shared\ShaderCompiler.cpp">

@@ -1023,6 +1023,15 @@ VulkanDevice::VulkanDevice(const GPUCreateInfo& DeviceCreateInfo, std::optional<
 
 	Engine::WriteToConsole(DeviceName);
 
+	VkPhysicalDeviceConservativeRasterizationPropertiesEXT conservativeProps{};
+	conservativeProps.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_CONSERVATIVE_RASTERIZATION_PROPERTIES_EXT;
+	conservativeProps.pNext = nullptr;
+
+	VkPhysicalDeviceProperties2 deviceProps2{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2 };
+	deviceProps2.pNext = &conservativeProps;
+
+	vkGetPhysicalDeviceProperties2(PhysicalDevice, &deviceProps2);
+
 	//std::uint32_t device_extension_count;
 	//VK_CHECK(vkEnumerateDeviceExtensionProperties(PhysicalDevice, nullptr, &device_extension_count, nullptr));
 
@@ -1078,10 +1087,11 @@ VulkanDevice::VulkanDevice(const GPUCreateInfo& DeviceCreateInfo, std::optional<
 		} while (vkRes == VK_INCOMPLETE);
 		assert(!vkRes);
 	}
-	//for (const auto& ext : extensions)
-	//	required_device_extensions.push_back(ext.extensionName);
+	for (const auto& ext : extensions)
+		required_device_extensions.push_back(ext.extensionName);
 
 	required_device_extensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+	//required_device_extensions.push_back(VK_EXT_CONSERVATIVE_RASTERIZATION_EXTENSION_NAME);
 
 	VkPhysicalDeviceExtendedDynamicStateFeaturesEXT enable_extended_dynamic_state_features = {
 		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT,
@@ -1099,7 +1109,10 @@ VulkanDevice::VulkanDevice(const GPUCreateInfo& DeviceCreateInfo, std::optional<
 		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
 		.pNext = &enable_vulkan13_features,
 		.shaderSampledImageArrayNonUniformIndexing = TRUE,
+		.shaderStorageImageArrayNonUniformIndexing = TRUE,
 		.descriptorBindingSampledImageUpdateAfterBind = TRUE,
+		.descriptorBindingStorageImageUpdateAfterBind = TRUE,
+		.descriptorBindingStorageBufferUpdateAfterBind = TRUE,
 		.descriptorBindingPartiallyBound = TRUE,
 		.descriptorBindingVariableDescriptorCount = TRUE,
 	};
@@ -2018,6 +2031,11 @@ VkDescriptorSet VulkanDevice::GetBindlessDescriptorSet() const
 void VulkanDevice::UpdateBindlessImageDescriptor(uint32_t& HeapIndex, VkDescriptorImageInfo* imageInfo) 
 {
 	BindlessDescriptorPool->WriteImageDescriptor(HeapIndex, imageInfo);
+}
+
+void VulkanDevice::UpdateBindlessStorageImageDescriptor(uint32_t& HeapIndex, VkDescriptorImageInfo* imageInfo)
+{
+	BindlessDescriptorPool->WriteStorageImageDescriptor(HeapIndex, imageInfo);
 }
 
 void VulkanDevice::UpdateBindlessSamplerDescriptor(uint32_t& HeapIndex, VkDescriptorImageInfo* imageInfo) 

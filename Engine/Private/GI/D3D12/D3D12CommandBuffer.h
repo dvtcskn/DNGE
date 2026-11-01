@@ -168,7 +168,7 @@ private:
 
 	CPUProfiler CpuProfiler;
 	ComPtr<ID3D12QueryHeap> queryHeap;
-	TDoubleBuffer<ID3D12Resource> readbackBuffer;
+	TDoubleBuffer<ID3D12Resource, true> readbackBuffer;
 	UINT64 timestampFrequency = 0;
 	bool bProfile;
 	ProfileResult Result;

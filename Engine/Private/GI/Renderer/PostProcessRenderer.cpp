@@ -65,6 +65,9 @@ void sPostProcessRenderer::Render(sPostProcess* PostProcess, IRenderTarget* Back
 	GraphicsCommandContext->BeginProfile(ERenderPass::PostProcess, true);
 
 	if (PostProcess->HasFrameBuffer())
+		BackBuffer->AsResource(EResourceState::ShaderResource, GraphicsCommandContext.get());
+
+	if (PostProcess->HasFrameBuffer())
 		GraphicsCommandContext->ClearRenderTarget(PostProcess->GetFrameBuffer());
 
 	if (PostProcess->HasFrameBuffer())
@@ -81,8 +84,6 @@ void sPostProcessRenderer::Render(sPostProcess* PostProcess, IRenderTarget* Back
 
 	GraphicsCommandContext->SetScissorRect(0, 0, (std::uint32_t)ScreenDimension.Height, (std::uint32_t)ScreenDimension.Width);
 
-	//if (PostProcess->HasFrameBuffer())
-	//	BackBuffer->AsResource(EResourceState::ShaderResource, GraphicsCommandContext.get());
 	PostProcess->SetPostProcessResources(GraphicsCommandContext.get(), PostProcess->HasFrameBuffer() ? BackBuffer : nullptr);
 
 	GraphicsCommandContext->DrawInstanced(3, 1, 0, 0);
