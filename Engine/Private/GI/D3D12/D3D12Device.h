@@ -46,10 +46,10 @@
 using namespace Microsoft::WRL;
 
 #ifndef Pix3_Enabled
-#define Pix3_Enabled 1
+#define Pix3_Enabled 0
 #endif
 #ifndef AGS_Enable
-#define AGS_Enable 1
+#define AGS_Enable 0
 #endif
 
 #if AGS_Enable
