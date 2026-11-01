@@ -316,12 +316,6 @@ void D3D12CommandBuffer::ResourceBarrier(UINT NumBarriers, const D3D12_RESOURCE_
 
 void D3D12CommandBuffer::TransitionTo(D3D12RenderTarget* RT, D3D12_RESOURCE_STATES State)
 {
-	if (State == D3D12_RESOURCE_STATE_COMMON)
-	{
-		RT_ToTransition[State].push_back(RT);
-		return;
-	}
-
 	if (RT->CurrentState != State)
 	{
 		D3D12_RESOURCE_BARRIER Barriers[1];
@@ -334,12 +328,6 @@ void D3D12CommandBuffer::TransitionTo(D3D12RenderTarget* RT, D3D12_RESOURCE_STAT
 
 void D3D12CommandBuffer::TransitionTo(D3D12DepthTarget* Depth, D3D12_RESOURCE_STATES State)
 {
-	if (State == D3D12_RESOURCE_STATE_COMMON)
-	{
-		Depth_ToTransition[State].push_back(Depth);
-		return;
-	}
-
 	if (Depth->CurrentState != State)
 	{
 		D3D12_RESOURCE_BARRIER Barriers[1];
@@ -440,7 +428,8 @@ void D3D12CommandBuffer::ClearFrameBuffer(IFrameBuffer* pFB)
 			const float clearColor[] = { 0.0f, 0.0f, 0.0f, 1.0f };
 			CommandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 
-			TransitionTo(FBuffer.get(), D3D12_RESOURCE_STATE_COMMON);
+			//TransitionTo(FBuffer.get(), D3D12_RESOURCE_STATE_COMMON);
+			RT_ToTransition[D3D12_RESOURCE_STATE_COMMON].push_back(FBuffer.get());
 		}
 		const auto& DepthBuffer = FrameBuffer->DepthTarget;
 		if (DepthBuffer)
@@ -451,7 +440,8 @@ void D3D12CommandBuffer::ClearFrameBuffer(IFrameBuffer* pFB)
 			const FLOAT clearColor = 0.0f;
 			CommandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, clearColor, 0, 0, nullptr);
 
-			TransitionTo(DepthBuffer.get(), D3D12_RESOURCE_STATE_COMMON);
+			//TransitionTo(DepthBuffer.get(), D3D12_RESOURCE_STATE_COMMON);
+			Depth_ToTransition[D3D12_RESOURCE_STATE_COMMON].push_back(DepthBuffer.get());
 		}
 	}
 }
@@ -476,7 +466,8 @@ void D3D12CommandBuffer::ClearRenderTarget(IRenderTarget* pFB, IDepthTarget* Dep
 			const float clearColor[] = { 0.0f, 0.0f, 0.0f, 1.0f };
 			CommandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 
-			TransitionTo(FBuffer, D3D12_RESOURCE_STATE_COMMON);
+			//TransitionTo(FBuffer, D3D12_RESOURCE_STATE_COMMON);
+			RT_ToTransition[D3D12_RESOURCE_STATE_COMMON].push_back(FBuffer);
 		}
 	}
 	if (DepthTarget)
@@ -487,7 +478,8 @@ void D3D12CommandBuffer::ClearRenderTarget(IRenderTarget* pFB, IDepthTarget* Dep
 		const FLOAT clearColor = 0.0f;
 		CommandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, clearColor, 0, 0, nullptr);
 
-		TransitionTo((D3D12DepthTarget*)DepthTarget, D3D12_RESOURCE_STATE_COMMON);
+		//TransitionTo((D3D12DepthTarget*)DepthTarget, D3D12_RESOURCE_STATE_COMMON);
+		Depth_ToTransition[D3D12_RESOURCE_STATE_COMMON].push_back((D3D12DepthTarget*)DepthTarget);
 	}
 }
 
@@ -512,7 +504,8 @@ void D3D12CommandBuffer::ClearRenderTargets(std::vector<IRenderTarget*> pRTs, ID
 			const float clearColor[] = { 0.0f, 0.0f, 0.0f, 1.0f };
 			CommandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 
-			TransitionTo(FBuffer, D3D12_RESOURCE_STATE_COMMON);
+			//TransitionTo(FBuffer, D3D12_RESOURCE_STATE_COMMON);
+			RT_ToTransition[D3D12_RESOURCE_STATE_COMMON].push_back(FBuffer);
 		}
 	}
 	if (DepthTarget)
@@ -523,7 +516,8 @@ void D3D12CommandBuffer::ClearRenderTargets(std::vector<IRenderTarget*> pRTs, ID
 		const FLOAT clearColor = 0.0f;
 		CommandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, clearColor, 0, 0, nullptr);
 
-		TransitionTo((D3D12DepthTarget*)DepthTarget, D3D12_RESOURCE_STATE_COMMON);
+		//TransitionTo((D3D12DepthTarget*)DepthTarget, D3D12_RESOURCE_STATE_COMMON);
+		Depth_ToTransition[D3D12_RESOURCE_STATE_COMMON].push_back((D3D12DepthTarget*)DepthTarget);
 	}
 }
 
@@ -537,7 +531,8 @@ void D3D12CommandBuffer::ClearDepthTarget(IDepthTarget* DepthTarget)
 		const FLOAT clearColor = 0.0f;
 		CommandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, clearColor, 0, 0, nullptr);
 
-		TransitionTo((D3D12DepthTarget*)DepthTarget, D3D12_RESOURCE_STATE_COMMON);
+		//TransitionTo((D3D12DepthTarget*)DepthTarget, D3D12_RESOURCE_STATE_COMMON);
+		Depth_ToTransition[D3D12_RESOURCE_STATE_COMMON].push_back((D3D12DepthTarget*)DepthTarget);
 	}
 }
 
@@ -592,7 +587,8 @@ void D3D12CommandBuffer::SetFrameBuffer(IFrameBuffer* pFB, std::optional<std::si
 				CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(DepthBuffer->GetDSVCPU());
 				CommandList->OMSetRenderTargets((UINT)RTs.size(), &RTs[0], FALSE, &dsvHandle);
 
-				TransitionTo(DepthBuffer.get(), D3D12_RESOURCE_STATE_COMMON);
+				//TransitionTo(DepthBuffer.get(), D3D12_RESOURCE_STATE_COMMON);
+				Depth_ToTransition[D3D12_RESOURCE_STATE_COMMON].push_back((D3D12DepthTarget*)DepthBuffer.get());
 			}
 			else
 			{
@@ -602,13 +598,15 @@ void D3D12CommandBuffer::SetFrameBuffer(IFrameBuffer* pFB, std::optional<std::si
 			if (FBOIndex.has_value())
 			{
 				const auto& FBuffer = FrameBuffers[*FBOIndex];
-				TransitionTo(FBuffer.get(), D3D12_RESOURCE_STATE_COMMON);
+				//TransitionTo(FBuffer.get(), D3D12_RESOURCE_STATE_COMMON);
+				RT_ToTransition[D3D12_RESOURCE_STATE_COMMON].push_back(FBuffer.get());
 			}
 			else
 			{
 				for (const auto& FBuffer : FrameBuffers)
 				{
-					TransitionTo(FBuffer.get(), D3D12_RESOURCE_STATE_COMMON);
+					//TransitionTo(FBuffer.get(), D3D12_RESOURCE_STATE_COMMON);
+					RT_ToTransition[D3D12_RESOURCE_STATE_COMMON].push_back(FBuffer.get());
 				}
 			}
 		}
@@ -640,7 +638,8 @@ void D3D12CommandBuffer::SetRenderTarget(IRenderTarget* pRT, IDepthTarget* Depth
 				CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(static_cast<D3D12DepthTarget*>(DepthTarget)->GetDSVCPU());
 				CommandList->OMSetRenderTargets(1, &RT, FALSE, &dsvHandle);
 
-				TransitionTo((D3D12DepthTarget*)DepthTarget, D3D12_RESOURCE_STATE_COMMON);
+				//TransitionTo((D3D12DepthTarget*)DepthTarget, D3D12_RESOURCE_STATE_COMMON);
+				Depth_ToTransition[D3D12_RESOURCE_STATE_COMMON].push_back((D3D12DepthTarget*)DepthTarget);
 			}
 			else
 			{
@@ -682,7 +681,8 @@ void D3D12CommandBuffer::SetRenderTargets(std::vector<IRenderTarget*> pRTs, IDep
 				CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(static_cast<D3D12DepthTarget*>(DepthTarget)->GetDSVCPU());
 				CommandList->OMSetRenderTargets((UINT)RTs.size(), &RTs[0], FALSE, &dsvHandle);
 
-				TransitionTo((D3D12DepthTarget*)DepthTarget, D3D12_RESOURCE_STATE_COMMON);
+				//TransitionTo((D3D12DepthTarget*)DepthTarget, D3D12_RESOURCE_STATE_COMMON);
+				Depth_ToTransition[D3D12_RESOURCE_STATE_COMMON].push_back((D3D12DepthTarget*)DepthTarget);
 			}
 			else
 			{
@@ -692,7 +692,8 @@ void D3D12CommandBuffer::SetRenderTargets(std::vector<IRenderTarget*> pRTs, IDep
 			for (const auto& RT : pRTs)
 			{
 				D3D12RenderTarget* FBuffer = static_cast<D3D12RenderTarget*>(RT);
-				TransitionTo(FBuffer, D3D12_RESOURCE_STATE_COMMON);
+				//TransitionTo(FBuffer, D3D12_RESOURCE_STATE_COMMON);
+				RT_ToTransition[D3D12_RESOURCE_STATE_COMMON].push_back(FBuffer);
 			}
 		}
 	}
@@ -721,7 +722,8 @@ void D3D12CommandBuffer::SetFrameBufferAsResource(IFrameBuffer* pFB, std::uint32
 
 			CommandList->SetGraphicsRootDescriptorTable(i, FBuffer->GetSRV()->GetGPU());
 
-			TransitionTo(FBuffer.get(), D3D12_RESOURCE_STATE_COMMON);
+			//TransitionTo(FBuffer.get(), D3D12_RESOURCE_STATE_COMMON);
+			RT_ToTransition[D3D12_RESOURCE_STATE_COMMON].push_back(FBuffer.get());
 
 			i++;
 		}
@@ -751,7 +753,8 @@ void D3D12CommandBuffer::SetFrameBufferAsResource(IFrameBuffer* pFB, std::uint32
 
 		CommandList->SetGraphicsRootDescriptorTable(RootParameterIndex, FBuffer->GetSRV()->GetGPU());
 
-		TransitionTo(FBuffer.get(), D3D12_RESOURCE_STATE_COMMON);
+		//TransitionTo(FBuffer.get(), D3D12_RESOURCE_STATE_COMMON);
+		RT_ToTransition[D3D12_RESOURCE_STATE_COMMON].push_back(FBuffer.get());
 	}
 }
 
@@ -775,7 +778,8 @@ void D3D12CommandBuffer::SetRenderTargetAsResource(IRenderTarget* pRT, std::uint
 
 		CommandList->SetGraphicsRootDescriptorTable(RootParameterIndex, FBuffer->GetSRV()->GetGPU());
 
-		TransitionTo(FBuffer, D3D12_RESOURCE_STATE_COMMON);
+		//TransitionTo(FBuffer, D3D12_RESOURCE_STATE_COMMON);
+		RT_ToTransition[D3D12_RESOURCE_STATE_COMMON].push_back(FBuffer);
 	}
 }
 
@@ -799,7 +803,8 @@ void D3D12CommandBuffer::SetRenderTargetsAsResource(std::vector<IRenderTarget*> 
 
 			CommandList->SetGraphicsRootDescriptorTable(i, FBuffer->GetSRV()->GetGPU());
 
-			TransitionTo(FBuffer, D3D12_RESOURCE_STATE_COMMON);
+			//TransitionTo(FBuffer, D3D12_RESOURCE_STATE_COMMON);
+			RT_ToTransition[D3D12_RESOURCE_STATE_COMMON].push_back(FBuffer);
 
 			i++;
 		}

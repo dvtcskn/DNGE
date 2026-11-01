@@ -221,37 +221,12 @@ D3D12RenderTarget::~D3D12RenderTarget()
 
 void D3D12RenderTarget::AsResource(EResourceState ResourceState, IGraphicsCommandContext* GraphicsCommandContext)
 {
-	/*D3D12CommandBuffer* CommandContext = Owner->GetIMCommandList();
-	CommandContext->BeginRecordCommandList();
-	CommandContext->TransitionTo(this, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-	CommandContext->FinishRecordCommandList();
-	CommandContext->ExecuteCommandList(); */
-
-	bool bUseIM = false;
-	if (!GraphicsCommandContext)
-	{
-		bUseIM = true;
-		GraphicsCommandContext = Owner->GetIMCommandList();
-		GraphicsCommandContext->BeginRecordCommandList();
-	}
-
 	switch (ResourceState)
 	{
 	case EResourceState::Common:
 	{
 		D3D12CommandBuffer* CommandContext = static_cast<D3D12CommandBuffer*>(GraphicsCommandContext);
-		//CommandContext->TransitionTo(this, D3D12_RESOURCE_STATE_COMMON);
-		CurrentState = D3D12_RESOURCE_STATE_PRESENT;
-
-		//if (CurrentState != D3D12_RESOURCE_STATE_PRESENT)
-		//{
-		//	D3D12_RESOURCE_BARRIER Barriers[1];
-		//	Barriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(GetD3D12Texture(), CurrentState, D3D12_RESOURCE_STATE_PRESENT);
-		//	//RT_ToTransition[State].push_back(RT);
-		//	CommandContext->Get()->ResourceBarrier(ARRAYSIZE(Barriers), Barriers);
-		//	CurrentState = D3D12_RESOURCE_STATE_PRESENT;
-		//}
-		
+		CommandContext->TransitionTo(this, D3D12_RESOURCE_STATE_COMMON);
 	}
 		break;
 	case EResourceState::RenderTarget:
@@ -283,12 +258,6 @@ void D3D12RenderTarget::AsResource(EResourceState ResourceState, IGraphicsComman
 		CommandContext->TransitionTo(this, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 	}
 		break;
-	}
-
-	if (bUseIM)
-	{
-		GraphicsCommandContext->FinishRecordCommandList();
-		GraphicsCommandContext->ExecuteCommandList();
 	}
 }
 
@@ -457,12 +426,6 @@ D3D12DepthTarget::~D3D12DepthTarget()
 
 void D3D12DepthTarget::AsResource(EResourceState ResourceState, IGraphicsCommandContext* GraphicsCommandContext)
 {
-	/*D3D12CommandBuffer* CommandContext = Owner->GetIMCommandList();
-	CommandContext->BeginRecordCommandList();
-	CommandContext->TransitionTo(this, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-	CommandContext->FinishRecordCommandList();
-	CommandContext->ExecuteCommandList(); */
-
 	switch (ResourceState)
 	{
 	case EResourceState::Common:
